@@ -343,7 +343,7 @@ function SessCard({s,members,faded,onClick}) {
             const firstTeam=(mem?.teams||[])[0]||null;
             const tm=getTeamMeta(firstTeam||"Unassigned");
             return <span key={i} style={{background:tm.bg,color:tm.text,borderRadius:20,
-              padding:"2px 8px",fontSize:11,fontWeight:700}}>{p.split(" ")[0]}</span>;
+              padding:"2px 8px",fontSize:11,fontWeight:700}}>{p}</span>;
           })}
           {s.players.length>5&&<span style={{fontSize:11,color:G.muted,padding:"2px 4px"}}>
             +{s.players.length-5}</span>}
