@@ -7,6 +7,7 @@ const FCC_LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHgAAAB4CAYAAAA5
 const SESSIONS_KEY = "fcc-nets-sessions-v4";
 const MEMBERS_KEY  = "fcc-nets-members-v4";
 const PINS_KEY     = "fcc-nets-pins-v4";
+const TEAMS_KEY    = "fcc-nets-teams-v4";
 
 // ─── Roles ────────────────────────────────────────────────────
 const ROLES = ["superadmin","admin","captain","vicecaptain","member"];
@@ -19,9 +20,18 @@ const ROLE_META = {
 };
 
 // Senior teams can have captains/vice captains; youth cannot
-const SENIOR_TEAMS = ["Div 2","Div 3","Div 4","Women's"];
-const YOUTH_TEAMS  = ["U18","U15","U15 Girls","U13","U11"];
-const ALL_TEAMS    = [...SENIOR_TEAMS,...YOUTH_TEAMS,"Unassigned"];
+// ─── Default teams (loaded from storage, editable by admins) ──
+const DEFAULT_TEAMS = [
+  {id:"div2",  name:"Div 2",      senior:true},
+  {id:"div3",  name:"Div 3",      senior:true},
+  {id:"div4",  name:"Div 4",      senior:true},
+  {id:"womens",name:"Women's",    senior:true},
+  {id:"u18",   name:"U18",        senior:false},
+  {id:"u15",   name:"U15",        senior:false},
+  {id:"u15g",  name:"U15 Girls",  senior:false},
+  {id:"u13",   name:"U13",        senior:false},
+  {id:"u11",   name:"U11",        senior:false},
+];
 
 const TEAM_META = {
   "Div 2":     { bg:"#14532d", text:"#a3e635" },
@@ -35,6 +45,13 @@ const TEAM_META = {
   "U11":       { bg:"#064e3b", text:"#6ee7b7" },
   "Unassigned":{ bg:"#374151", text:"#d1d5db" },
 };
+// Fallback colour pool for dynamically added teams
+const EXTRA_COLORS = [
+  {bg:"#1a3a2a",text:"#86efac"},{bg:"#7c3a00",text:"#fdba74"},
+  {bg:"#312e81",text:"#a5b4fc"},{bg:"#065f46",text:"#6ee7b7"},
+  {bg:"#1e1b4b",text:"#c7d2fe"},{bg:"#4c0519",text:"#fda4af"},
+];
+const getTeamMeta = name => TEAM_META[name] || EXTRA_COLORS[Math.abs([...name].reduce((h,c)=>h*31+c.charCodeAt(0),0)) % EXTRA_COLORS.length];
 
 // Permissions
 const CAN = {
@@ -50,11 +67,7 @@ const CAN = {
 };
 const can = (role, action) => (CAN[action]||[]).includes(role);
 
-// Roles available to assign based on team type
-const rolesForTeam = team =>
-  SENIOR_TEAMS.includes(team)
-    ? ["captain","vicecaptain","member"]
-    : ["member"]; // youth only get member
+// Roles available to assign based on team type — now uses dynamic seniorTeamNames inside component
 
 // ─── Seed members ─────────────────────────────────────────────
 const SEED_MEMBERS = [
@@ -158,7 +171,7 @@ const RolePill = ({role}) => {
 };
 
 const TeamPill = ({team,sm}) => {
-  const m=TEAM_META[team||"Unassigned"];
+  const m=getTeamMeta(team||"Unassigned");
   return <span style={{background:m.bg,color:m.text,borderRadius:20,
     padding:sm?"1px 7px":"2px 9px",fontSize:sm?10:11,fontWeight:800}}>{team||"Unassigned"}</span>;
 };
@@ -266,7 +279,7 @@ function SessCard({s,members,faded,onClick}) {
         <div style={{marginTop:6,display:"flex",flexWrap:"wrap",gap:4}}>
           {s.players.slice(0,5).map((p,i)=>{
             const mem=members.find(m=>m.name===p);
-            const tm=TEAM_META[mem?.team||"Unassigned"];
+            const tm=getTeamMeta(mem?.team||"Unassigned");
             return <span key={i} style={{background:tm.bg,color:tm.text,borderRadius:20,
               padding:"2px 8px",fontSize:11,fontWeight:700}}>{p.split(" ")[0]}</span>;
           })}
@@ -342,6 +355,11 @@ export default function App() {
   const [selSess,  setSelSess]  = useState(null);
   const [toast,    setToast]    = useState(null);
 
+  // Dynamic teams
+  const [teams, setTeams] = useState(DEFAULT_TEAMS);
+  const seniorTeamNames = teams.filter(t=>t.senior).map(t=>t.name);
+  const ALL_TEAMS = [...teams.map(t=>t.name), "Unassigned"];
+
   // Add session form
   const [bDate,    setBDate]    = useState("");
   const [bFrom,    setBFrom]    = useState("18:00");
@@ -357,7 +375,12 @@ export default function App() {
   const [newTeam,  setNewTeam]  = useState("Unassigned");
   const [aSearch,  setASearch]  = useState("");
   const [aFilter,  setAFilter]  = useState("All");
-  const [editingRole, setEditingRole] = useState(null); // memberId being role-edited
+  const [editingRole, setEditingRole] = useState(null);
+
+  // Team management state
+  const [newTName,  setNewTName]  = useState("");
+  const [newTSenior,setNewTSenior]= useState(false);
+  const [editingTeam,setEditingTeam]= useState(null); // {id, name} being renamed
 
   const userRole = currentUser?.role || "member";
   const showToast = m => { setToast(m); setTimeout(()=>setToast(null),2700); };
@@ -366,16 +389,18 @@ export default function App() {
   useEffect(()=>{
     (async()=>{
       try {
-        const [sr,mr,pr]=await Promise.all([
+        const [sr,mr,pr,tr]=await Promise.all([
           window.storage.get(SESSIONS_KEY,true).catch(()=>null),
           window.storage.get(MEMBERS_KEY, true).catch(()=>null),
           window.storage.get(PINS_KEY,    true).catch(()=>null),
+          window.storage.get(TEAMS_KEY,   true).catch(()=>null),
         ]);
         setSessions(sr?.value ? JSON.parse(sr.value) : []);
         setMembers( mr?.value ? JSON.parse(mr.value) : SEED_MEMBERS);
         setPins(    pr?.value ? JSON.parse(pr.value) : {});
+        setTeams(   tr?.value ? JSON.parse(tr.value) : DEFAULT_TEAMS);
       } catch {
-        setSessions([]); setMembers(SEED_MEMBERS); setPins({});
+        setSessions([]); setMembers(SEED_MEMBERS); setPins({}); setTeams(DEFAULT_TEAMS);
       }
       setLoading(false);
     })();
@@ -392,6 +417,10 @@ export default function App() {
   const savePins = async u => {
     setPins(u);
     await window.storage.set(PINS_KEY,JSON.stringify(u),true).catch(()=>{});
+  };
+  const saveTeams = async u => {
+    setTeams(u);
+    await window.storage.set(TEAMS_KEY,JSON.stringify(u),true).catch(()=>{});
   };
 
   // ── Auth flow ─────────────────────────────────────────────────
@@ -429,6 +458,62 @@ export default function App() {
     setAuthView("pick");
     setPickSearch("");
     setView("schedule");
+  }
+
+  // ── Auto-select current user when opening Add Session ────────
+  useEffect(()=>{
+    if(view==="add" && currentUser) {
+      setSelP(ps => ps.includes(currentUser.name) ? ps : [currentUser.name, ...ps]);
+      setPSearch(""); setPFilter("All");
+    }
+  },[view]);
+
+  // ── Team CRUD ─────────────────────────────────────────────────
+  function addTeam(e) {
+    e.preventDefault();
+    const n = newTName.trim();
+    if(!n) return;
+    if(teams.find(t=>t.name.toLowerCase()===n.toLowerCase())) {
+      showToast("A team with that name already exists"); return;
+    }
+    saveTeams([...teams, {id:uid(), name:n, senior:newTSenior}]);
+    setNewTName(""); setNewTSenior(false);
+    showToast(`Group "${n}" added ✓`);
+  }
+
+  function renameTeam(id, newName) {
+    const n = newName.trim();
+    if(!n) return;
+    const old = teams.find(t=>t.id===id)?.name;
+    if(!old) return;
+    // Update all members on the old team name
+    saveMembers(members.map(m=>m.team===old ? {...m,team:n} : m));
+    saveTeams(teams.map(t=>t.id===id ? {...t,name:n} : t));
+    setEditingTeam(null);
+    showToast(`Renamed to "${n}" ✓`);
+  }
+
+  function deleteTeam(id) {
+    const t = teams.find(t=>t.id===id);
+    if(!t) return;
+    if(!window.confirm(`Delete group "${t.name}"? Members in this group will be moved to Unassigned.`)) return;
+    saveMembers(members.map(m=>m.team===t.name ? {...m,team:null,role:"member"} : m));
+    saveTeams(teams.filter(t=>t.id!==id));
+    showToast(`Group "${t.name}" deleted`);
+  }
+
+  function toggleTeamSenior(id) {
+    const t = teams.find(t=>t.id===id);
+    if(!t) return;
+    // If switching from senior→youth, demote captains/VCs in this group
+    if(t.senior) {
+      saveMembers(members.map(m=>
+        m.team===t.name && ["captain","vicecaptain"].includes(m.role)
+          ? {...m,role:"member"} : m
+      ));
+    }
+    saveTeams(teams.map(t=>t.id===id ? {...t,senior:!t.senior} : t));
+    showToast(`"${t.name}" set to ${t.senior?"Youth":"Senior"} ✓`);
   }
 
   // ── Sessions ──────────────────────────────────────────────────
@@ -501,8 +586,8 @@ export default function App() {
   function updateTeam(id,team) {
     const t=team==="Unassigned"?null:team;
     const mem=members.find(m=>m.id===id);
-    // If switching to youth team and role is captain/vicecaptain, demote to member
-    const newRole=(YOUTH_TEAMS.includes(team)&&["captain","vicecaptain"].includes(mem?.role))
+    // If switching to a non-senior team and role is captain/vicecaptain, demote to member
+    const newRole=(!seniorTeamNames.includes(team)&&["captain","vicecaptain"].includes(mem?.role))
       ?"member":mem?.role||"member";
     saveMembers(members.map(m=>m.id===id?{...m,team:t,role:newRole}:m));
   }
@@ -572,53 +657,109 @@ export default function App() {
   // RENDER: Auth — pick member
   // ════════════════════════════════════════════════════════════
   if(!currentUser && authView==="pick") {
-    const filtered=members.filter(m=>
-      !pickSearch||m.name.toLowerCase().includes(pickSearch.toLowerCase()));
+    const filtered = pickSearch.trim().length >= 1
+      ? members.filter(m => m.name.toLowerCase().includes(pickSearch.toLowerCase()))
+      : [];
+    const hasQuery = pickSearch.trim().length >= 1;
+
     return (
       <Shell>
         {/* Header */}
-        <div style={{background:G.green,padding:"28px 20px 20px",textAlign:"center"}}>
-          <img src={FCC_LOGO} alt="FCC" style={{width:80,height:80,borderRadius:"50%",objectFit:"cover",margin:"0 auto 12px",display:"block",border:"3px solid rgba(255,255,255,0.3)"}}/>
+        <div style={{background:G.green, padding:"36px 24px 32px", textAlign:"center"}}>
+          <img src={FCC_LOGO} alt="FCC" style={{width:88,height:88,borderRadius:"50%",
+            objectFit:"cover",margin:"0 auto 14px",display:"block",
+            border:"3px solid rgba(255,255,255,0.25)",
+            boxShadow:"0 4px 20px rgba(0,0,0,0.3)"}}/>
           <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
-            fontSize:26,fontWeight:900,letterSpacing:"-.5px"}}>FCC Nets</div>
-          <div style={{color:"rgba(255,255,255,0.5)",fontSize:11,fontWeight:700,
-            letterSpacing:2,textTransform:"uppercase",marginTop:3}}>Karlebo · Select your name</div>
+            fontSize:28,fontWeight:900,letterSpacing:"-.5px",lineHeight:1}}>FCC Nets</div>
+          <div style={{color:"rgba(255,255,255,0.45)",fontSize:11,fontWeight:700,
+            letterSpacing:2.5,textTransform:"uppercase",marginTop:5}}>Karlebo · Fredensborg CC</div>
         </div>
 
-        <div style={{padding:"16px 16px 40px"}}>
-          <input style={iSt({background:G.white,marginBottom:14})}
-            placeholder="🔍  Search your name…"
-            value={pickSearch} onChange={e=>setPickSearch(e.target.value)}/>
-          {filtered.length===0 && (
-            <div style={{textAlign:"center",color:G.muted,padding:"30px 0",fontSize:14}}>
-              No member found — ask an admin to add you.
+        <div style={{padding:"24px 20px 40px"}}>
+          {/* Prompt text */}
+          <div style={{textAlign:"center",marginBottom:20}}>
+            <div style={{fontSize:16,fontWeight:800,color:G.text}}>Who are you?</div>
+            <div style={{fontSize:13,color:G.muted,marginTop:4}}>
+              Type your name to find yourself
+            </div>
+          </div>
+
+          {/* Search input */}
+          <div style={{position:"relative",marginBottom:16}}>
+            <span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",
+              fontSize:18,pointerEvents:"none"}}>🔍</span>
+            <input
+              style={{...iSt({background:G.white,paddingLeft:44,fontSize:16,
+                borderRadius:14,padding:"14px 14px 14px 44px",
+                boxShadow:"0 2px 12px rgba(0,0,0,0.07)"}),}}
+              placeholder="Start typing your name…"
+              value={pickSearch}
+              onChange={e=>setPickSearch(e.target.value)}
+              autoComplete="off"
+              autoFocus
+            />
+          </div>
+
+          {/* Results as chips */}
+          {hasQuery && filtered.length > 0 && (
+            <div style={{display:"flex",flexWrap:"wrap",gap:9,justifyContent:"center",
+              marginTop:8}}>
+              {filtered.map(m=>{
+                const tm = m.team ? getTeamMeta(m.team) : null;
+                return (
+                  <button key={m.id} onClick={()=>handlePickMember(m)}
+                    style={{
+                      background: tm ? tm.bg : G.green,
+                      color: tm ? tm.text : G.lime,
+                      border:"none", borderRadius:30,
+                      padding:"10px 18px",
+                      fontFamily:"inherit", fontWeight:800, fontSize:14,
+                      cursor:"pointer",
+                      display:"flex", alignItems:"center", gap:7,
+                      boxShadow:"0 2px 8px rgba(0,0,0,0.15)",
+                      transition:"transform .1s, box-shadow .1s",
+                    }}
+                    onMouseDown={e=>e.currentTarget.style.transform="scale(0.96)"}
+                    onMouseUp={e=>e.currentTarget.style.transform="scale(1)"}
+                  >
+                    <span style={{width:24,height:24,borderRadius:"50%",
+                      background:"rgba(255,255,255,0.2)",display:"inline-flex",
+                      alignItems:"center",justifyContent:"center",
+                      fontSize:10,fontWeight:900,flexShrink:0}}>
+                      {m.name.split(" ").map(w=>w[0]).join("").slice(0,2)}
+                    </span>
+                    {m.name.split(" ")[0]}
+                    {m.role && m.role !== "member" && (
+                      <span style={{fontSize:12}}>{ROLE_META[m.role]?.icon}</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
-          <div style={{display:"flex",flexDirection:"column",gap:7}}>
-            {filtered.map(m=>(
-              <button key={m.id} onClick={()=>handlePickMember(m)}
-                style={{background:G.white,border:`1.5px solid ${G.border}`,borderRadius:12,
-                  padding:"12px 16px",display:"flex",alignItems:"center",
-                  justifyContent:"space-between",cursor:"pointer",fontFamily:"inherit",
-                  transition:"border-color .15s"}}>
-                <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <div style={{width:36,height:36,background:`${G.green}18`,borderRadius:"50%",
-                    display:"flex",alignItems:"center",justifyContent:"center",
-                    fontWeight:900,fontSize:13,color:G.green,flexShrink:0}}>
-                    {m.name.split(" ").map(w=>w[0]).join("").slice(0,2)}
-                  </div>
-                  <div style={{textAlign:"left"}}>
-                    <div style={{fontWeight:800,color:G.text,fontSize:15}}>{m.name}</div>
-                    <div style={{display:"flex",gap:5,marginTop:2,flexWrap:"wrap"}}>
-                      {m.team&&<TeamPill team={m.team} sm/>}
-                      {(m.role&&m.role!=="member")&&<RolePill role={m.role}/>}
-                    </div>
-                  </div>
-                </div>
-                <span style={{color:G.muted,fontSize:18}}>›</span>
-              </button>
-            ))}
-          </div>
+
+          {/* No results */}
+          {hasQuery && filtered.length === 0 && (
+            <div style={{textAlign:"center",padding:"30px 0"}}>
+              <div style={{fontSize:32,marginBottom:8}}>🤔</div>
+              <div style={{fontWeight:800,color:G.text,fontSize:15}}>Not found</div>
+              <div style={{fontSize:13,color:G.muted,marginTop:4}}>
+                Ask an admin to add you to the app.
+              </div>
+            </div>
+          )}
+
+          {/* Idle hint */}
+          {!hasQuery && (
+            <div style={{textAlign:"center",padding:"20px 0 0"}}>
+              <div style={{fontSize:40,marginBottom:10,opacity:.4}}>🏏</div>
+              <div style={{fontSize:13,color:G.muted,lineHeight:1.7}}>
+                {members.length} members registered<br/>
+                <span style={{fontWeight:700,color:G.text}}>Type at least 1 letter</span> to find your name
+              </div>
+            </div>
+          )}
         </div>
       </Shell>
     );
@@ -949,7 +1090,7 @@ export default function App() {
   if(view==="admin"&&can(userRole,"accessMembers")) return (
     <Shell>
       <AppHeader title="Manage Members"
-        sub={`${members.length} members · ${ALL_TEAMS.length-1} groups`}
+        sub={`${members.length} members · ${teams.length} groups`}
         onBack={()=>setView("schedule")}/>
 
       <div style={{padding:"14px 16px 20px"}}>
@@ -992,10 +1133,82 @@ export default function App() {
             {ROLES.map(r=><RolePill key={r} role={r}/>)}
           </div>
           <div style={{fontSize:11,color:G.muted,marginTop:8,lineHeight:1.6}}>
-            Captain & Vice Captain only available for senior teams (Div 2, Div 3, Div 4, Women's).<br/>
-            Youth teams (U11–U18) are member-only.
+            Captain & Vice Captain only available for Senior groups.<br/>
+            Youth groups are member-only. Toggle Senior/Youth in Manage Groups below.
           </div>
         </div>
+
+        {/* ── Manage Groups ─────────────────────────────────── */}
+        {can(userRole,"addMember")&&<>
+          <SLbl mt={4}>Manage Groups</SLbl>
+          <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
+            padding:14,marginBottom:20}}>
+
+            {/* Existing teams */}
+            <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
+              {teams.map(t=>(
+                <div key={t.id} style={{display:"flex",alignItems:"center",gap:7,
+                  background:G.cream,borderRadius:9,padding:"7px 10px"}}>
+                  {editingTeam?.id===t.id ? (
+                    <input autoFocus style={{...iSt({padding:"5px 9px",fontSize:13}),flex:1}}
+                      value={editingTeam.name}
+                      onChange={e=>setEditingTeam({...editingTeam,name:e.target.value})}
+                      onKeyDown={e=>{
+                        if(e.key==="Enter"){e.preventDefault();renameTeam(t.id,editingTeam.name);}
+                        if(e.key==="Escape") setEditingTeam(null);
+                      }}/>
+                  ) : (
+                    <span style={{flex:1,fontWeight:800,fontSize:13,color:G.text}}>{t.name}</span>
+                  )}
+                  {/* Senior / Youth toggle */}
+                  <button type="button" onClick={()=>toggleTeamSenior(t.id)}
+                    title={t.senior?"Senior (click to set Youth)":"Youth (click to set Senior)"}
+                    style={{background:t.senior?"#dcfce7":"#f1f5f9",color:t.senior?"#15803d":"#64748b",
+                      border:"none",borderRadius:20,padding:"3px 9px",fontSize:10,fontWeight:800,
+                      cursor:"pointer",flexShrink:0,fontFamily:"inherit"}}>
+                    {t.senior?"Senior":"Youth"}
+                  </button>
+                  {/* Rename / confirm */}
+                  {editingTeam?.id===t.id ? (
+                    <button type="button" onClick={()=>renameTeam(t.id,editingTeam.name)}
+                      style={{background:G.green,color:G.lime,border:"none",borderRadius:7,
+                        padding:"4px 9px",fontSize:12,cursor:"pointer",fontFamily:"inherit",fontWeight:800}}>
+                      ✓
+                    </button>
+                  ) : (
+                    <button type="button" onClick={()=>setEditingTeam({id:t.id,name:t.name})}
+                      style={{background:"transparent",color:G.muted,border:`1px solid ${G.border}`,
+                        borderRadius:7,padding:"4px 8px",fontSize:12,cursor:"pointer",
+                        fontFamily:"inherit"}}>
+                      ✏️
+                    </button>
+                  )}
+                  {/* Delete */}
+                  <button type="button" onClick={()=>deleteTeam(t.id)}
+                    style={{background:G.redBg,color:G.red,border:"none",borderRadius:7,
+                      padding:"4px 8px",fontSize:12,cursor:"pointer",fontFamily:"inherit",fontWeight:800}}>
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Add new team */}
+            <form onSubmit={addTeam} style={{display:"flex",gap:7,alignItems:"center",flexWrap:"wrap"}}>
+              <input style={{...iSt({padding:"8px 11px",fontSize:13}),flex:1,minWidth:120}}
+                placeholder="New group name…"
+                value={newTName} onChange={e=>setNewTName(e.target.value)}/>
+              <label style={{display:"flex",alignItems:"center",gap:5,fontSize:12,
+                fontWeight:700,color:G.text,cursor:"pointer",flexShrink:0}}>
+                <input type="checkbox" checked={newTSenior}
+                  onChange={e=>setNewTSenior(e.target.checked)}
+                  style={{width:14,height:14}}/>
+                Senior
+              </label>
+              <Btn type="submit" bg={G.green} col={G.lime}>+ Add</Btn>
+            </form>
+          </div>
+        </>}
 
         {/* Member list */}
         {Object.entries(adminGrouped).map(([team,list])=>(
@@ -1005,7 +1218,7 @@ export default function App() {
               <span style={{fontSize:12,color:G.muted,fontWeight:700}}>
                 {list.length} player{list.length!==1?"s":""}
               </span>
-              {SENIOR_TEAMS.includes(team)&&(
+              {seniorTeamNames.includes(team)&&(
                 <span style={{fontSize:10,color:G.muted,fontWeight:600,fontStyle:"italic"}}>
                   · Captain / VC eligible
                 </span>
@@ -1044,7 +1257,7 @@ export default function App() {
                         {userRole==="superadmin"&&<option value="superadmin">👑 Super Admin</option>}
                         <option value="admin">🔧 Admin</option>
                         {/* Captain / VC only for senior teams */}
-                        {SENIOR_TEAMS.includes(m.team)&&<>
+                        {seniorTeamNames.includes(m.team)&&<>
                           <option value="captain">🏆 Captain</option>
                           <option value="vicecaptain">🥈 Vice Captain</option>
                         </>}
