@@ -464,6 +464,7 @@ export default function App() {
   const [newTName,  setNewTName]  = useState("");
   const [newTSenior,setNewTSenior]= useState(false);
   const [editingTeam,setEditingTeam]= useState(null);
+  const [editingName, setEditingName] = useState(null); // {id, value}
 
   // Recurring slot form state
   const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -756,6 +757,29 @@ export default function App() {
   function removeMember(id) {
     saveMembers(members.filter(m=>m.id!==id));
     showToast("Member removed");
+  }
+
+  function renameMember(id, newName) {
+    const trimmed = newName.trim();
+    if(!trimmed) { setEditingName(null); return; }
+    const old = members.find(m=>m.id===id)?.name;
+    if(!old || trimmed===old) { setEditingName(null); return; }
+    if(members.find(m=>m.id!==id && m.name.toLowerCase()===trimmed.toLowerCase())) {
+      showToast("Another member already has that name"); return;
+    }
+    // Update member name
+    saveMembers(members.map(m=>m.id===id ? {...m,name:trimmed} : m));
+    // Update all sessions that reference the old name
+    const updSess = sessions.map(s=>({
+      ...s,
+      players: s.players.map(p=>p===old ? trimmed : p),
+      poll: (s.poll||[]).map(o=>({
+        ...o, votes:(o.votes||[]).map(v=>v===old ? trimmed : v)
+      })),
+    }));
+    saveSessions(updSess);
+    setEditingName(null);
+    showToast(`Renamed to "${trimmed}" ✓`);
   }
 
   function updateTeam(id,team) {
@@ -1743,10 +1767,42 @@ export default function App() {
                 borderRadius:10,padding:"10px 14px",marginBottom:6}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontWeight:800,color:G.text,fontSize:14,
-                      overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                      {m.name}
-                    </div>
+                    {editingName?.id===m.id ? (
+                      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                        <input autoFocus
+                          style={{...iSt({padding:"5px 9px",fontSize:13}),flex:1}}
+                          value={editingName.value}
+                          onChange={e=>setEditingName({...editingName,value:e.target.value})}
+                          onKeyDown={e=>{
+                            if(e.key==="Enter"){e.preventDefault();renameMember(m.id,editingName.value);}
+                            if(e.key==="Escape") setEditingName(null);
+                          }}/>
+                        <button type="button"
+                          onClick={()=>renameMember(m.id,editingName.value)}
+                          style={{background:G.green,color:G.lime,border:"none",borderRadius:7,
+                            padding:"5px 10px",fontSize:13,cursor:"pointer",
+                            fontFamily:"inherit",fontWeight:800,flexShrink:0}}>✓</button>
+                        <button type="button" onClick={()=>setEditingName(null)}
+                          style={{background:G.cream,color:G.muted,border:`1px solid ${G.border}`,
+                            borderRadius:7,padding:"5px 9px",fontSize:13,cursor:"pointer",
+                            fontFamily:"inherit",flexShrink:0}}>✕</button>
+                      </div>
+                    ) : (
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <div style={{fontWeight:800,color:G.text,fontSize:14,
+                          overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                          {m.name}
+                        </div>
+                        {can(userRole,"addMember")&&(
+                          <button type="button"
+                            onClick={()=>setEditingName({id:m.id,value:m.name})}
+                            style={{background:"none",border:"none",cursor:"pointer",
+                              color:G.muted,fontSize:12,padding:"2px 4px",flexShrink:0,
+                              opacity:.6,lineHeight:1}}
+                            title="Edit name">✏️</button>
+                        )}
+                      </div>
+                    )}
                     <div style={{display:"flex",gap:5,marginTop:3,flexWrap:"wrap",alignItems:"center"}}>
                       <RolePill role={m.role||"member"}/>
                     </div>
