@@ -167,6 +167,7 @@ function ProfileDial({ pct }) {
     </svg>
   );
 }
+function hashPin(pin) {
   let h = 5381;
   for (let i=0;i<pin.length;i++) h=((h<<5)+h)+pin.charCodeAt(i);
   return String(h>>>0);
@@ -500,28 +501,26 @@ function SidebarNav({view, setView, userRole, currentUser, onLogout}) {
 }
 
 // ─── Shell ────────────────────────────────────────────────────
-function Shell({children, wide}) {
+function Shell({children, sidebar}) {
   return (
     <div style={{fontFamily:"'DM Sans',sans-serif",background:G.bg,minHeight:"100vh",
       display:"flex",justifyContent:"center",alignItems:"flex-start"}}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;0,800;0,900;1,400&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet"/>
-      {/* Desktop sidebar branding */}
-      <div style={{display:"none"}} className="fcc-sidebar"/>
       <style>{`
         @media(min-width:900px){
           .fcc-sidebar{
-            display:flex!important;flex-direction:column;align-items:center;
-            justify-content:flex-start;padding:48px 32px;width:260px;
-            min-height:100vh;position:sticky;top:0;
-            background:${G.green};gap:24px;
+            display:flex!important;flex-direction:column;align-items:flex-start;
+            padding:40px 28px;width:240px;flex-shrink:0;
+            min-height:100vh;position:sticky;top:0;align-self:flex-start;
+            background:${G.green};gap:20px;
           }
-          .fcc-sidebar-logo{width:80px;height:80px;border-radius:50%;object-fit:cover;
-            border:3px solid rgba(255,255,255,.3);}
+          .fcc-sidebar-logo{width:72px;height:72px;border-radius:50%;object-fit:cover;
+            border:3px solid rgba(255,255,255,.3);display:block;}
           .fcc-sidebar-title{font-family:'Playfair Display',serif;font-weight:900;
-            font-size:22px;color:#fff;text-align:center;line-height:1.2;}
-          .fcc-sidebar-sub{font-size:11px;color:rgba(255,255,255,.5);letter-spacing:2px;
-            text-transform:uppercase;text-align:center;}
-          .fcc-sidebar-links{display:flex;flex-direction:column;gap:4px;width:100%;margin-top:8px;}
+            font-size:20px;color:#fff;line-height:1.2;}
+          .fcc-sidebar-sub{font-size:11px;color:rgba(255,255,255,.45);letter-spacing:2px;
+            text-transform:uppercase;margin-top:2px;}
+          .fcc-sidebar-links{display:flex;flex-direction:column;gap:4px;width:100%;margin-top:4px;}
           .fcc-mobile-only{display:none!important;}
           .fcc-app-pane{max-width:520px;width:100%;min-height:100vh;
             border-left:1px solid ${G.border};border-right:1px solid ${G.border};}
@@ -531,6 +530,9 @@ function Shell({children, wide}) {
           .fcc-app-pane{max-width:500px;width:100%;margin:0 auto;}
         }
       `}</style>
+      {/* Sidebar slot — only visible on desktop via CSS */}
+      {sidebar && <div className="fcc-sidebar">{sidebar}</div>}
+      {/* Main content pane */}
       <div className="fcc-app-pane" style={{position:"relative",paddingBottom:90,background:G.bg}}>
         {children}
       </div>
@@ -1006,6 +1008,8 @@ export default function App() {
     setChangingPin(false);setOldPin("");setNewPin1("");setNewPin2("");setPinMsg("");
     showToast("PIN changed ✓");
   }
+
+  function resetPin(id) {
     const updated={...pins}; delete updated[id];
     savePins(updated);
     showToast("PIN cleared — member sets new PIN on next login");
@@ -1261,9 +1265,8 @@ export default function App() {
       .sort((a,b)=>a.date.localeCompare(b.date)||a.from.localeCompare(b.from));
 
     return (
-    <Shell>
-      <SidebarNav view={view} setView={setView} userRole={userRole}
-        currentUser={currentUser} onLogout={handleLogout}/>
+    <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
+        currentUser={currentUser} onLogout={handleLogout}/>}>
       <AppHeader title="FCC Training" sub="Karlebo · Fredensborg Cricket Club">
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -1385,7 +1388,7 @@ export default function App() {
             <div style={{fontSize:13,marginTop:6}}>
               {schedFilter==="mine"
                 ? <span>Tap <b>All Sessions</b> to browse and join one.</span>
-                : "Tap "+ Add / Join" to create the first one."}
+                : 'Tap "+ Add / Join" to create the first one.'}
             </div>
           </div>
         ):(
@@ -1830,14 +1833,10 @@ export default function App() {
     const {pct, needsReconfirm, isComplete, confirmedAt} = profileCompletion(me);
     const isReconfirm = pct===100 && needsReconfirm;
     return (
-      <Shell>
-        <SidebarNav view={view} setView={setView} userRole={userRole}
-          currentUser={currentUser} onLogout={handleLogout}/>
+      <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
+          currentUser={currentUser} onLogout={handleLogout}/>}>
         <AppHeader onBack={()=>setView("schedule")}
-          title="My Profile" subtitle={ROLE_META[me.role||"member"]?.label||"Member"}
-          right={<span onClick={handleLogout}
-            style={{fontSize:13,color:G.muted,cursor:"pointer",fontWeight:700}}>
-            sign out</span>}/>
+          title="My Profile" sub={ROLE_META[me.role||"member"]?.label||"Member"}/>
         <div style={{padding:"20px 16px",display:"flex",flexDirection:"column",gap:16}}>
 
           {/* Avatar + name card */}
