@@ -1,7 +1,7 @@
 {
-  "name": "FCC Nets – Karlebo",
-  "short_name": "FCC Nets",
-  "description": "Fredensborg Cricket Club nets booking",
+  "name": "FCC Training – Karlebo",
+  "short_name": "FCC Training",
+  "description": "Fredensborg Cricket Club training session booking",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f0fdf4",
