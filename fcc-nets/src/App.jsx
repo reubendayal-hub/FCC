@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import { db } from "./firebase";
+import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 // ─── Club Logo ───────────────────────────────────────────────
 const FCC_LOGO = "data:image/png;base64,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";
 
@@ -7,6 +9,7 @@ const FCC_LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHgAAAB4CAYAAAA5
 const SESSIONS_KEY = "fcc-nets-sessions-v4";
 const MEMBERS_KEY  = "fcc-nets-members-v4";
 const PINS_KEY     = "fcc-nets-pins-v4";
+const RECURRING_KEY = "recurring";
 const TEAMS_KEY    = "fcc-nets-teams-v4";
 
 // ─── Roles ────────────────────────────────────────────────────
@@ -52,6 +55,13 @@ const EXTRA_COLORS = [
   {bg:"#1e1b4b",text:"#c7d2fe"},{bg:"#4c0519",text:"#fda4af"},
 ];
 const getTeamMeta = name => TEAM_META[name] || EXTRA_COLORS[Math.abs([...name].reduce((h,c)=>h*31+c.charCodeAt(0),0)) % EXTRA_COLORS.length];
+
+const PRESET_POLL = [
+  {id:"batting",  label:"🏏 Batting Focus"},
+  {id:"bowling",  label:"🎳 Bowling Focus"},
+  {id:"fielding", label:"🧤 Fielding Focus"},
+  {id:"mixed",    label:"⚡ Mixed"},
+];
 
 // Permissions
 const CAN = {
@@ -272,6 +282,10 @@ function SessCard({s,members,faded,onClick}) {
           </span>
           {isToday(s.date)&&<span style={{background:G.lime,color:G.green,borderRadius:20,
             padding:"1px 8px",fontSize:10,fontWeight:900}}>TODAY</span>}
+          {s.restrictedTo&&<span style={{background:"#fef9c3",color:"#92400e",borderRadius:20,
+            padding:"1px 8px",fontSize:10,fontWeight:800}}>🔒 {s.restrictedTo}</span>}
+          {s.recurringId&&!s.restrictedTo&&<span style={{background:"#f0f9ff",color:"#0369a1",
+            borderRadius:20,padding:"1px 8px",fontSize:10,fontWeight:800}}>↻</span>}
           {s.label&&<span style={{background:"#ede9fe",color:"#5b21b6",borderRadius:20,
             padding:"1px 8px",fontSize:10,fontWeight:800}}>{s.label}</span>}
         </div>
@@ -298,26 +312,88 @@ function SessCard({s,members,faded,onClick}) {
 
 // ─── Bottom nav ───────────────────────────────────────────────
 function BotNav({view,setView,userRole}) {
-  const tabs=[
-    {id:"schedule",label:"📅 Schedule"},
-    {id:"add",     label:"+ Add / Join"},
-    ...(can(userRole,"accessMembers") ? [{id:"admin",label:"⚙️ Members"}] : []),
-  ];
-  const active=view==="session"?"schedule":view==="roleAdmin"?"admin":view;
+  const isAdmin = can(userRole,"accessMembers");
+  const active = view==="session"?"schedule":view==="roleAdmin"?"admin":view;
+
+  const IconSchedule = ({on}) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={on?2.5:1.8} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2"/>
+      <line x1="16" y1="2" x2="16" y2="6"/>
+      <line x1="8" y1="2" x2="8" y2="6"/>
+      <line x1="3" y1="10" x2="21" y2="10"/>
+    </svg>
+  );
+  const IconMembers = ({on}) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={on?2.5:1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </svg>
+  );
+
+  const tabStyle = (on) => ({
+    flex:1, background:"none", border:"none", cursor:"pointer",
+    fontFamily:"'DM Sans',sans-serif", padding:"6px 4px",
+    display:"flex", flexDirection:"column", alignItems:"center", gap:3,
+    color: on ? G.green : "#94a3b8", transition:"color .15s",
+  });
+  const labelStyle = (on) => ({
+    fontSize:10, fontWeight: on?800:600, letterSpacing:.3,
+  });
+
   return (
-    <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",
-      width:"100%",maxWidth:500,background:G.white,
-      borderTop:`1.5px solid ${G.border}`,display:"flex",zIndex:200}}>
-      {tabs.map(t=>(
-        <button key={t.id} onClick={()=>setView(t.id)}
-          style={{flex:1,background:"transparent",border:"none",
-            borderTop:active===t.id?`3px solid ${G.lime}`:"3px solid transparent",
-            padding:"11px 4px 14px",fontFamily:"'DM Sans',sans-serif",
-            fontWeight:800,fontSize:11,cursor:"pointer",
-            color:active===t.id?G.green:G.muted,transition:"all .12s"}}>
-          {t.label}
+    <div style={{
+      position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)",
+      width:"100%", maxWidth:500, zIndex:200,
+      background:"rgba(255,255,255,0.97)",
+      backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)",
+      borderTop:"1px solid rgba(0,0,0,0.08)",
+      boxShadow:"0 -4px 24px rgba(0,0,0,0.07)",
+      display:"flex", alignItems:"flex-end", justifyContent:"space-around",
+      padding:"8px 12px 12px",
+      paddingBottom:"max(12px, env(safe-area-inset-bottom))",
+    }}>
+      {/* Schedule */}
+      <button onClick={()=>setView("schedule")} style={tabStyle(active==="schedule")}>
+        <IconSchedule on={active==="schedule"}/>
+        <span style={labelStyle(active==="schedule")}>Schedule</span>
+      </button>
+
+      {/* Add / Join — floating circle, always centred */}
+      <div style={{flex:1, display:"flex", flexDirection:"column",
+        alignItems:"center", justifyContent:"flex-end"}}>
+        <button onClick={()=>setView("add")} style={{
+          width:54, height:54, borderRadius:"50%", border:"none", cursor:"pointer",
+          background: active==="add"
+            ? `linear-gradient(135deg,${G.green},#166534)`
+            : `linear-gradient(135deg,#16a34a,${G.green})`,
+          display:"flex", alignItems:"center", justifyContent:"center",
+          boxShadow: active==="add"
+            ? `0 0 0 4px ${G.lime}70, 0 4px 20px rgba(20,83,45,.45)`
+            : "0 4px 18px rgba(20,83,45,.32)",
+          transform: active==="add" ? "scale(1.07) translateY(-4px)" : "translateY(-4px)",
+          transition:"all .18s", marginBottom:2,
+        }}>
+          <span style={{fontSize:24,color:"#fff",fontWeight:900,lineHeight:1,
+            transform:active==="add"?"rotate(45deg)":"rotate(0)",
+            transition:"transform .18s", display:"block"}}>+</span>
         </button>
-      ))}
+        <span style={{...labelStyle(active==="add"),
+          color:active==="add"?G.green:"#94a3b8", marginTop:2}}>Book</span>
+      </div>
+
+      {/* Members (admin) or matching spacer */}
+      {isAdmin ? (
+        <button onClick={()=>setView("admin")} style={tabStyle(active==="admin")}>
+          <IconMembers on={active==="admin"}/>
+          <span style={labelStyle(active==="admin")}>Members</span>
+        </button>
+      ) : (
+        <div style={{flex:1}}/>
+      )}
     </div>
   );
 }
@@ -327,7 +403,7 @@ function Shell({children}) {
   return (
     <div style={{fontFamily:"'DM Sans',sans-serif",background:G.bg,
       minHeight:"100vh",maxWidth:500,margin:"0 auto",position:"relative",
-      paddingBottom:70}}>
+      paddingBottom:90}}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;0,800;0,900;1,400&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet"/>
       {children}
     </div>
@@ -360,15 +436,22 @@ export default function App() {
   const seniorTeamNames = teams.filter(t=>t.senior).map(t=>t.name);
   const ALL_TEAMS = [...teams.map(t=>t.name), "Unassigned"];
 
+  // Recurring slots
+  const [recurring, setRecurring] = useState([]);
+
   // Add session form
   const [bDate,    setBDate]    = useState("");
   const [bFrom,    setBFrom]    = useState("18:00");
   const [bTo,      setBTo]      = useState("20:00");
   const [bNote,    setBNote]    = useState("");
   const [bLabel,   setBLabel]   = useState("");
+  const [bRestrictTeam, setBRestrictTeam] = useState("");
   const [selP,     setSelP]     = useState([]);
   const [pSearch,  setPSearch]  = useState("");
   const [pFilter,  setPFilter]  = useState("All");
+  // Poll builder
+  const [bPollOpts, setBPollOpts] = useState([]);
+  const [bCustomOpt,setBCustomOpt]= useState("");
 
   // Admin state
   const [newName,  setNewName]  = useState("");
@@ -380,48 +463,91 @@ export default function App() {
   // Team management state
   const [newTName,  setNewTName]  = useState("");
   const [newTSenior,setNewTSenior]= useState(false);
-  const [editingTeam,setEditingTeam]= useState(null); // {id, name} being renamed
+  const [editingTeam,setEditingTeam]= useState(null);
+
+  // Recurring slot form state
+  const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const [rName,       setRName]      = useState("");
+  const [rTeam,       setRTeam]      = useState("");
+  const [rRestrict,   setRRestrict]  = useState(false);
+  const [rDay,        setRDay]       = useState(6); // Saturday
+  const [rFrom,       setRFrom]      = useState("14:00");
+  const [rTo,         setRTo]        = useState("15:30");
+  const [rActiveFrom, setRActiveFrom]= useState(todayStr());
+  const [rActiveTo,   setRActiveTo]  = useState("");
+  const [editingSlot, setEditingSlot]= useState(null);
 
   const userRole = currentUser?.role || "member";
   const showToast = m => { setToast(m); setTimeout(()=>setToast(null),2700); };
 
-  // ── Load ─────────────────────────────────────────────────────
+  // ── Load + real-time sync via Firestore ──────────────────────
   useEffect(()=>{
+    const refs = {
+      sessions:  doc(db,"fccnets","sessions"),
+      members:   doc(db,"fccnets","members"),
+      pins:      doc(db,"fccnets","pins"),
+      teams:     doc(db,"fccnets","teams"),
+      recurring: doc(db,"fccnets",RECURRING_KEY),
+    };
     (async()=>{
       try {
-        const [sr,mr,pr,tr]=await Promise.all([
-          window.storage.get(SESSIONS_KEY,true).catch(()=>null),
-          window.storage.get(MEMBERS_KEY, true).catch(()=>null),
-          window.storage.get(PINS_KEY,    true).catch(()=>null),
-          window.storage.get(TEAMS_KEY,   true).catch(()=>null),
+        const [mr,pr,tr,rr] = await Promise.all([
+          getDoc(refs.members),
+          getDoc(refs.pins),
+          getDoc(refs.teams),
+          getDoc(refs.recurring),
         ]);
-        setSessions(sr?.value ? JSON.parse(sr.value) : []);
-        setMembers( mr?.value ? JSON.parse(mr.value) : SEED_MEMBERS);
-        setPins(    pr?.value ? JSON.parse(pr.value) : {});
-        setTeams(   tr?.value ? JSON.parse(tr.value) : DEFAULT_TEAMS);
-      } catch {
-        setSessions([]); setMembers(SEED_MEMBERS); setPins({}); setTeams(DEFAULT_TEAMS);
+        setMembers(  mr.exists() ? JSON.parse(mr.data().value) : SEED_MEMBERS);
+        setPins(     pr.exists() ? JSON.parse(pr.data().value) : {});
+        setTeams(    tr.exists() ? JSON.parse(tr.data().value) : DEFAULT_TEAMS);
+        setRecurring(rr.exists() ? JSON.parse(rr.data().value) : []);
+      } catch(e) {
+        setMembers(SEED_MEMBERS); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]);
       }
       setLoading(false);
     })();
+    const unsub = onSnapshot(refs.sessions, snap => {
+      setSessions(snap.exists() ? JSON.parse(snap.data().value) : []);
+    }, () => setSessions([]));
+    return () => unsub();
   },[]);
 
-  const saveSessions = async u => {
-    setSessions(u);
-    await window.storage.set(SESSIONS_KEY,JSON.stringify(u),true).catch(()=>{});
-  };
-  const saveMembers = async u => {
-    setMembers(u);
-    await window.storage.set(MEMBERS_KEY,JSON.stringify(u),true).catch(()=>{});
-  };
-  const savePins = async u => {
-    setPins(u);
-    await window.storage.set(PINS_KEY,JSON.stringify(u),true).catch(()=>{});
-  };
-  const saveTeams = async u => {
-    setTeams(u);
-    await window.storage.set(TEAMS_KEY,JSON.stringify(u),true).catch(()=>{});
-  };
+  const saveSessions  = async u => { setSessions(u);  await setDoc(doc(db,"fccnets","sessions"), {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveMembers   = async u => { setMembers(u);   await setDoc(doc(db,"fccnets","members"),  {value:JSON.stringify(u)}).catch(()=>{}); };
+  const savePins      = async u => { setPins(u);      await setDoc(doc(db,"fccnets","pins"),     {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveTeams     = async u => { setTeams(u);     await setDoc(doc(db,"fccnets","teams"),    {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveRecurring = async u => { setRecurring(u); await setDoc(doc(db,"fccnets",RECURRING_KEY),{value:JSON.stringify(u)}).catch(()=>{}); };
+
+  // ── Auto-generate recurring sessions ─────────────────────────
+  useEffect(()=>{
+    if(loading || recurring.length===0) return;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const toAdd = [];
+    recurring.forEach(slot=>{
+      if(!slot.enabled) return;
+      for(let i=0; i<=21; i++){
+        const d = new Date(today); d.setDate(today.getDate()+i);
+        if(d.getDay() !== slot.day) continue;
+        const dateStr = d.toISOString().split("T")[0];
+        if(slot.activeFrom && dateStr < slot.activeFrom) continue;
+        if(slot.activeTo   && dateStr > slot.activeTo)   continue;
+        const exists = sessions.find(s=>
+          s.recurringId===slot.id && s.date===dateStr);
+        if(!exists) toAdd.push({
+          id:uid(), date:dateStr, from:slot.from, to:slot.to,
+          label:slot.name, note:"", players:[], poll:[],
+          restrictedTo: slot.restrictTeam ? slot.team : null,
+          recurringId: slot.id,
+        });
+      }
+    });
+    if(toAdd.length>0){
+      const merged = [...sessions,...toAdd].sort((a,b)=>
+        new Date(a.date)-new Date(b.date)||a.from.localeCompare(b.from));
+      saveSessions(merged);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[loading, recurring]);
 
   // ── Auth flow ─────────────────────────────────────────────────
   function handlePickMember(member) {
@@ -505,7 +631,6 @@ export default function App() {
   function toggleTeamSenior(id) {
     const t = teams.find(t=>t.id===id);
     if(!t) return;
-    // If switching from senior→youth, demote captains/VCs in this group
     if(t.senior) {
       saveMembers(members.map(m=>
         m.team===t.name && ["captain","vicecaptain"].includes(m.role)
@@ -516,26 +641,76 @@ export default function App() {
     showToast(`"${t.name}" set to ${t.senior?"Youth":"Senior"} ✓`);
   }
 
+  // ── Recurring slots ───────────────────────────────────────────
+  function addRecurringSlot(slot) {
+    const next = [...recurring, {...slot, id:uid(), enabled:true}];
+    saveRecurring(next);
+    showToast(`Recurring slot "${slot.name}" added ✓`);
+  }
+  function toggleRecurringSlot(id) {
+    const next = recurring.map(r=>r.id===id ? {...r,enabled:!r.enabled} : r);
+    saveRecurring(next);
+  }
+  function deleteRecurringSlot(id) {
+    const slot = recurring.find(r=>r.id===id);
+    if(!slot) return;
+    if(!window.confirm(`Delete recurring slot "${slot.name}"? Existing sessions from this slot are kept.`)) return;
+    saveRecurring(recurring.filter(r=>r.id!==id));
+    showToast(`Slot "${slot.name}" deleted`);
+  }
+  function updateRecurringSlot(id, changes) {
+    saveRecurring(recurring.map(r=>r.id===id ? {...r,...changes} : r));
+    showToast("Slot updated ✓");
+  }
+
   // ── Sessions ──────────────────────────────────────────────────
   function handleAddSession(e) {
     e.preventDefault();
     if(!bDate||selP.length===0){showToast("Pick a date & at least one player");return;}
-    const ex=sessions.find(s=>s.date===bDate&&s.from===bFrom&&s.to===bTo);
+    const pollOptions = bPollOpts.map(o=>({...o, votes:[]}));
+    const restrictedTo = bRestrictTeam || null;
+    const ex=sessions.find(s=>s.date===bDate&&s.from===bFrom&&s.to===bTo&&!s.recurringId);
     if(ex){
       const merged=[...new Set([...ex.players,...selP])];
-      saveSessions(sessions.map(s=>s.id===ex.id?{...s,players:merged,label:s.label||bLabel}:s));
+      const mergedPoll = ex.poll || [];
+      const existingIds = mergedPoll.map(o=>o.id);
+      const newOpts = pollOptions.filter(o=>!existingIds.includes(o.id));
+      saveSessions(sessions.map(s=>s.id===ex.id?{...s,players:merged,
+        label:s.label||bLabel,restrictedTo:s.restrictedTo||restrictedTo,
+        poll:[...mergedPoll,...newOpts]}:s));
       showToast(`Players added to session on ${fmtShort(bDate)} ✓`);
     } else {
       saveSessions([...sessions,{id:uid(),date:bDate,from:bFrom,to:bTo,
-        players:[...selP],note:bNote.trim(),label:bLabel.trim()}]
+        players:[...selP],note:bNote.trim(),label:bLabel.trim(),
+        restrictedTo,poll:pollOptions}]
         .sort((a,b)=>new Date(a.date)-new Date(b.date)));
       showToast(`Session booked for ${fmtShort(bDate)} ✓`);
     }
-    setBDate("");setBNote("");setBLabel("");setSelP([]);
+    setBDate("");setBNote("");setBLabel("");setBRestrictTeam("");
+    setSelP([]);setBPollOpts([]);setBCustomOpt("");
     setView("schedule");
   }
 
-  function handleLeave(sessId,name) {
+  function handleVote(sessId, optionId) {
+    const userName = currentUser.name;
+    const updated = sessions.map(s => {
+      if(s.id !== sessId) return s;
+      const poll = (s.poll||[]).map(o => {
+        if(o.id !== optionId) return o;
+        const hasVoted = (o.votes||[]).includes(userName);
+        return {...o, votes: hasVoted
+          ? o.votes.filter(v=>v!==userName)
+          : [...(o.votes||[]), userName]};
+      });
+      return {...s, poll};
+    });
+    saveSessions(updated);
+    // Keep selSess in sync
+    const found = updated.find(s=>s.id===sessId);
+    if(found) setSelSess(found);
+  }
+
+  function handleLeave(sessId, name) {
     const upd=sessions.map(s=>s.id===sessId
       ?{...s,players:s.players.filter(p=>p!==name)}:s).filter(s=>s.players.length>0);
     saveSessions(upd);
@@ -979,6 +1154,88 @@ export default function App() {
             </div>
           ))}
 
+          {can(userRole,"deleteSession")&&<>
+            <SLbl>Restrict to Team <span style={{fontWeight:500,color:G.muted}}>(optional)</span></SLbl>
+            <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
+              padding:14,marginBottom:14}}>
+              <div style={{fontSize:12,color:G.muted,marginBottom:10}}>
+                Leave as <strong>Open to all</strong> for combined/general sessions.
+                Restricted sessions show a 🔒 badge and non-members cannot join.
+              </div>
+              <select style={iSt()} value={bRestrictTeam}
+                onChange={e=>setBRestrictTeam(e.target.value)}>
+                <option value="">🌍 Open to all</option>
+                {teams.map(t=><option key={t.id} value={t.name}>{t.name} only</option>)}
+              </select>
+            </div>
+          </>}
+
+          <SLbl>Session Poll <span style={{fontWeight:500,color:G.muted}}>(optional)</span></SLbl>          <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
+            padding:14,marginBottom:14}}>
+            {/* Preset options */}
+            <div style={{fontSize:11,fontWeight:700,color:G.muted,textTransform:"uppercase",
+              letterSpacing:1.2,marginBottom:8}}>Tap to add preset options</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:12}}>
+              {PRESET_POLL.map(p=>{
+                const active = bPollOpts.find(o=>o.id===p.id);
+                return (
+                  <button key={p.id} type="button"
+                    onClick={()=>setBPollOpts(ps=>active
+                      ? ps.filter(o=>o.id!==p.id)
+                      : [...ps,{id:p.id,label:p.label}])}
+                    style={{background:active?G.green:G.cream,
+                      color:active?G.lime:G.text,
+                      border:active?`2px solid ${G.green}`:`1.5px solid ${G.border}`,
+                      borderRadius:24,padding:"8px 14px",fontSize:13,fontWeight:700,
+                      cursor:"pointer",fontFamily:"inherit",transition:"all .12s"}}>
+                    {active&&"✓ "}{p.label}
+                  </button>
+                );
+              })}
+            </div>
+            {/* Custom option input */}
+            <div style={{fontSize:11,fontWeight:700,color:G.muted,textTransform:"uppercase",
+              letterSpacing:1.2,marginBottom:7}}>Add a custom option</div>
+            <div style={{display:"flex",gap:8}}>
+              <input style={iSt({flex:1,padding:"9px 12px",fontSize:13})}
+                placeholder="e.g. Match prep, Throw-downs…"
+                value={bCustomOpt}
+                onChange={e=>setBCustomOpt(e.target.value)}
+                onKeyDown={e=>{
+                  if(e.key==="Enter"){e.preventDefault();
+                    const t=bCustomOpt.trim();
+                    if(t&&!bPollOpts.find(o=>o.label.toLowerCase()===t.toLowerCase())){
+                      setBPollOpts(ps=>[...ps,{id:uid(),label:t}]);
+                      setBCustomOpt("");
+                    }
+                  }
+                }}/>
+              <Btn type="button" bg={G.green} col={G.lime}
+                onClick={()=>{
+                  const t=bCustomOpt.trim();
+                  if(t&&!bPollOpts.find(o=>o.label.toLowerCase()===t.toLowerCase())){
+                    setBPollOpts(ps=>[...ps,{id:uid(),label:t}]);
+                    setBCustomOpt("");
+                  }
+                }}>+ Add</Btn>
+            </div>
+            {/* Selected poll options preview */}
+            {bPollOpts.length>0&&(
+              <div style={{marginTop:12,display:"flex",flexWrap:"wrap",gap:6}}>
+                {bPollOpts.map(o=>(
+                  <span key={o.id} style={{background:"#ede9fe",color:"#5b21b6",
+                    borderRadius:20,padding:"3px 10px",fontSize:12,fontWeight:800,
+                    display:"flex",alignItems:"center",gap:6}}>
+                    {o.label}
+                    <button type="button" onClick={()=>setBPollOpts(ps=>ps.filter(p=>p.id!==o.id))}
+                      style={{background:"none",border:"none",color:"#5b21b6",cursor:"pointer",
+                        fontWeight:900,padding:0,fontSize:13,lineHeight:1}}>×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
           <Btn type="submit" bg={G.green} col={G.lime} full>🏏 Confirm Session</Btn>
           <p style={{fontSize:11,color:G.muted,textAlign:"center",marginTop:8}}>
             Existing session at same date & time? Players are auto-added.
@@ -992,7 +1249,11 @@ export default function App() {
 
   // ── SESSION DETAIL ──────────────────────────────────────────
   if(view==="session"&&selSess) {
-    const notIn=members.filter(m=>!selSess.players.includes(m.name));
+    const userMem = members.find(m=>m.name===currentUser?.name);
+    const isRestricted = !!selSess.restrictedTo;
+    const userInTeam = !isRestricted || userMem?.team===selSess.restrictedTo || can(userRole,"deleteSession");
+    const notIn=members.filter(m=>!selSess.players.includes(m.name))
+      .filter(m=>!isRestricted || m.team===selSess.restrictedTo || can(userRole,"deleteSession"));
     return (
       <Shell>
         <AppHeader
@@ -1018,6 +1279,24 @@ export default function App() {
             <div style={{background:"#fff8e1",border:"1.5px solid #ffe082",borderRadius:10,
               padding:"10px 14px",marginBottom:14,fontSize:13,color:"#7a5c00",fontWeight:500}}>
               📋 {selSess.note}
+            </div>
+          )}
+
+          {isRestricted&&(
+            <div style={{
+              background: userInTeam ? "#f0fdf4" : "#fef9c3",
+              border: `1.5px solid ${userInTeam ? G.lime : "#fde047"}`,
+              borderRadius:10, padding:"10px 14px", marginBottom:14,
+              fontSize:13, fontWeight:700,
+              color: userInTeam ? G.green : "#92400e",
+              display:"flex", alignItems:"center", gap:8,
+            }}>
+              <span style={{fontSize:18}}>🔒</span>
+              <span>
+                {userInTeam
+                  ? `${selSess.restrictedTo} session — you're in`
+                  : `This session is restricted to ${selSess.restrictedTo} members. You can view but not join.`}
+              </span>
             </div>
           )}
 
@@ -1056,7 +1335,70 @@ export default function App() {
             );
           })}
 
-          {notIn.length>0&&<>
+          {/* Poll voting */}
+          {selSess.poll&&selSess.poll.length>0&&(()=>{
+            const poll = selSess.poll;
+            const totalVoters = [...new Set(poll.flatMap(o=>o.votes||[]))].length;
+            const maxVotes = Math.max(...poll.map(o=>(o.votes||[]).length), 1);
+            return (
+              <div style={{marginBottom:20}}>
+                <SLbl mt={4}>Session Poll</SLbl>
+                <div style={{background:G.white,borderRadius:12,
+                  border:`1.5px solid ${G.border}`,padding:14}}>
+                  <div style={{fontSize:11,color:G.muted,fontWeight:700,marginBottom:12,
+                    textTransform:"uppercase",letterSpacing:1.2}}>
+                    {totalVoters} vote{totalVoters!==1?"s":""}
+                    {selSess.players.includes(currentUser.name)
+                      ? " · tap to vote" : " · join session to vote"}
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    {poll.map(o=>{
+                      const votes = o.votes||[];
+                      const hasVoted = votes.includes(currentUser.name);
+                      const pct = Math.round((votes.length/maxVotes)*100);
+                      const canVote = selSess.players.includes(currentUser.name);
+                      return (
+                        <button key={o.id} type="button"
+                          onClick={()=>canVote&&handleVote(selSess.id,o.id)}
+                          style={{width:"100%",textAlign:"left",border:"none",
+                            background:"transparent",padding:0,
+                            cursor:canVote?"pointer":"default",fontFamily:"inherit"}}>
+                          <div style={{display:"flex",justifyContent:"space-between",
+                            alignItems:"center",marginBottom:4}}>
+                            <span style={{fontWeight:800,fontSize:14,color:G.text,
+                              display:"flex",alignItems:"center",gap:6}}>
+                              {hasVoted&&<span style={{color:G.green,fontSize:13}}>✓</span>}
+                              {o.label}
+                            </span>
+                            <span style={{fontSize:12,fontWeight:800,
+                              color:hasVoted?G.green:G.muted}}>
+                              {votes.length} {votes.length===1?"vote":"votes"}
+                            </span>
+                          </div>
+                          {/* Vote bar */}
+                          <div style={{height:8,borderRadius:20,
+                            background:G.border,overflow:"hidden"}}>
+                            <div style={{height:"100%",borderRadius:20,
+                              width:`${pct}%`,
+                              background:hasVoted?G.green:"#a3e63580",
+                              transition:"width .3s ease"}}/>
+                          </div>
+                          {/* Voter names */}
+                          {votes.length>0&&(
+                            <div style={{fontSize:11,color:G.muted,marginTop:3}}>
+                              {votes.map(v=>v.split(" ")[0]).join(", ")}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {notIn.length>0&&userInTeam&&<>
             <SLbl>Add More Players</SLbl>
             <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
               {notIn.map(m=>(
@@ -1207,6 +1549,178 @@ export default function App() {
               </label>
               <Btn type="submit" bg={G.green} col={G.lime}>+ Add</Btn>
             </form>
+          </div>
+        </>}
+
+        {/* ── Recurring Slots ───────────────────────────────── */}
+        {can(userRole,"addMember")&&<>
+          <SLbl mt={4}>Recurring Slots</SLbl>
+          <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
+            padding:14,marginBottom:20}}>
+            <div style={{fontSize:12,color:G.muted,marginBottom:12,lineHeight:1.5}}>
+              Recurring sessions auto-appear in the schedule up to 3 weeks ahead.
+              Toggle off to pause without deleting existing sessions.
+            </div>
+
+            {/* Existing slots */}
+            {recurring.length===0&&(
+              <div style={{textAlign:"center",padding:"16px 0",color:G.muted,fontSize:13}}>
+                No recurring slots yet. Add one below.
+              </div>
+            )}
+            <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:14}}>
+              {recurring.map(slot=>(
+                <div key={slot.id} style={{background:slot.enabled?G.cream:"#f1f5f9",
+                  borderRadius:10,padding:"10px 12px",
+                  border:`1.5px solid ${slot.enabled?G.border:"#cbd5e1"}`}}>
+                  {editingSlot?.id===slot.id ? (
+                    // ─── Inline edit form ───────────────────────
+                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                      <input style={iSt({padding:"7px 10px",fontSize:13})}
+                        value={editingSlot.name}
+                        onChange={e=>setEditingSlot({...editingSlot,name:e.target.value})}
+                        placeholder="Slot name"/>
+                      <div style={{display:"flex",gap:8}}>
+                        <select style={iSt({padding:"7px 10px",fontSize:13,flex:1})}
+                          value={editingSlot.day}
+                          onChange={e=>setEditingSlot({...editingSlot,day:Number(e.target.value)})}>
+                          {DAYS.map((d,i)=><option key={i} value={i}>{d}</option>)}
+                        </select>
+                        <input type="time" style={iSt({padding:"7px 10px",fontSize:13,flex:1})}
+                          value={editingSlot.from}
+                          onChange={e=>setEditingSlot({...editingSlot,from:e.target.value})}/>
+                        <input type="time" style={iSt({padding:"7px 10px",fontSize:13,flex:1})}
+                          value={editingSlot.to}
+                          onChange={e=>setEditingSlot({...editingSlot,to:e.target.value})}/>
+                      </div>
+                      <select style={iSt({padding:"7px 10px",fontSize:13})}
+                        value={editingSlot.team}
+                        onChange={e=>setEditingSlot({...editingSlot,team:e.target.value})}>
+                        <option value="">No team</option>
+                        {teams.map(t=><option key={t.id} value={t.name}>{t.name}</option>)}
+                      </select>
+                      <label style={{display:"flex",alignItems:"center",gap:7,fontSize:13,
+                        fontWeight:700,color:G.text,cursor:"pointer"}}>
+                        <input type="checkbox" checked={editingSlot.restrictTeam}
+                          onChange={e=>setEditingSlot({...editingSlot,restrictTeam:e.target.checked})}/>
+                        Restrict to this team only
+                      </label>
+                      <div style={{display:"flex",gap:8}}>
+                        <FFld label="Active from" style={{flex:1}}>
+                          <input type="date" style={iSt({padding:"7px 10px",fontSize:13})}
+                            value={editingSlot.activeFrom||""}
+                            onChange={e=>setEditingSlot({...editingSlot,activeFrom:e.target.value})}/>
+                        </FFld>
+                        <FFld label="Active until (blank = forever)" style={{flex:1}}>
+                          <input type="date" style={iSt({padding:"7px 10px",fontSize:13})}
+                            value={editingSlot.activeTo||""}
+                            onChange={e=>setEditingSlot({...editingSlot,activeTo:e.target.value})}/>
+                        </FFld>
+                      </div>
+                      <div style={{display:"flex",gap:8}}>
+                        <Btn bg={G.green} col={G.lime}
+                          onClick={()=>{updateRecurringSlot(slot.id,editingSlot);setEditingSlot(null);}}>
+                          ✓ Save
+                        </Btn>
+                        <Btn bg={G.cream} col={G.muted} onClick={()=>setEditingSlot(null)}>Cancel</Btn>
+                      </div>
+                    </div>
+                  ) : (
+                    // ─── Display row ────────────────────────────
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:800,fontSize:13,color:slot.enabled?G.text:G.muted,
+                          overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                          {slot.name}
+                        </div>
+                        <div style={{fontSize:11,color:G.muted,marginTop:2}}>
+                          {DAYS[slot.day]} · {slot.from}–{slot.to}
+                          {slot.team&&` · ${slot.team}${slot.restrictTeam?" only":""}`}
+                          {slot.activeTo&&` · ends ${fmtShort(slot.activeTo)}`}
+                        </div>
+                      </div>
+                      {/* Toggle on/off */}
+                      <button type="button" onClick={()=>toggleRecurringSlot(slot.id)}
+                        style={{background:slot.enabled?"#dcfce7":"#f1f5f9",
+                          color:slot.enabled?"#15803d":"#94a3b8",
+                          border:"none",borderRadius:20,padding:"3px 10px",fontSize:11,
+                          fontWeight:800,cursor:"pointer",flexShrink:0,fontFamily:"inherit"}}>
+                        {slot.enabled?"On":"Off"}
+                      </button>
+                      {/* Edit */}
+                      <button type="button"
+                        onClick={()=>setEditingSlot({...slot})}
+                        style={{background:"transparent",color:G.muted,
+                          border:`1px solid ${G.border}`,borderRadius:7,
+                          padding:"4px 8px",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+                        ✏️
+                      </button>
+                      {/* Delete */}
+                      <button type="button" onClick={()=>deleteRecurringSlot(slot.id)}
+                        style={{background:G.redBg,color:G.red,border:"none",borderRadius:7,
+                          padding:"4px 8px",fontSize:12,cursor:"pointer",fontFamily:"inherit",
+                          fontWeight:800}}>×</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Add new slot form */}
+            <div style={{borderTop:`1px solid ${G.border}`,paddingTop:12}}>
+              <div style={{fontSize:11,fontWeight:800,color:G.mid,letterSpacing:1.3,
+                textTransform:"uppercase",marginBottom:10}}>Add new slot</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                <input style={iSt({padding:"9px 12px",fontSize:13})}
+                  placeholder="Slot name e.g. U11 Saturday Nets"
+                  value={rName} onChange={e=>setRName(e.target.value)}/>
+                <div style={{display:"flex",gap:8}}>
+                  <select style={iSt({padding:"9px 10px",fontSize:13,flex:1})}
+                    value={rDay} onChange={e=>setRDay(Number(e.target.value))}>
+                    {DAYS.map((d,i)=><option key={i} value={i}>{d}</option>)}
+                  </select>
+                  <input type="time" style={iSt({padding:"9px 10px",fontSize:13,flex:1})}
+                    value={rFrom} onChange={e=>setRFrom(e.target.value)}/>
+                  <input type="time" style={iSt({padding:"9px 10px",fontSize:13,flex:1})}
+                    value={rTo} onChange={e=>setRTo(e.target.value)}/>
+                </div>
+                <select style={iSt({padding:"9px 12px",fontSize:13})}
+                  value={rTeam} onChange={e=>setRTeam(e.target.value)}>
+                  <option value="">No specific team</option>
+                  {teams.map(t=><option key={t.id} value={t.name}>{t.name}</option>)}
+                </select>
+                <label style={{display:"flex",alignItems:"center",gap:7,fontSize:13,
+                  fontWeight:700,color:G.text,cursor:"pointer"}}>
+                  <input type="checkbox" checked={rRestrict}
+                    onChange={e=>setRRestrict(e.target.checked)}/>
+                  Restrict to this team only (others can view but not join)
+                </label>
+                <div style={{display:"flex",gap:8}}>
+                  <FFld label="Active from" style={{flex:1}}>
+                    <input type="date" style={iSt({padding:"9px 10px",fontSize:13})}
+                      value={rActiveFrom} onChange={e=>setRActiveFrom(e.target.value)}/>
+                  </FFld>
+                  <FFld label="Active until (blank = forever)" style={{flex:1}}>
+                    <input type="date" style={iSt({padding:"9px 10px",fontSize:13})}
+                      value={rActiveTo} onChange={e=>setRActiveTo(e.target.value)}/>
+                  </FFld>
+                </div>
+                <Btn bg={G.green} col={G.lime} full
+                  onClick={()=>{
+                    if(!rName.trim()){showToast("Give the slot a name");return;}
+                    addRecurringSlot({
+                      name:rName.trim(), team:rTeam, restrictTeam:rRestrict,
+                      day:rDay, from:rFrom, to:rTo,
+                      activeFrom:rActiveFrom, activeTo:rActiveTo||null,
+                    });
+                    setRName("");setRTeam("");setRRestrict(false);
+                    setRDay(6);setRFrom("14:00");setRTo("15:30");
+                    setRActiveFrom(todayStr());setRActiveTo("");
+                  }}>
+                  ↻ Add Recurring Slot
+                </Btn>
+              </div>
+            </div>
           </div>
         </>}
 
