@@ -120,7 +120,11 @@ const fmtLong      = ds => new Date(ds).toLocaleDateString("en-GB",{weekday:"lon
 const isToday      = ds => ds === todayStr();
 const isFuture     = ds => { const d=new Date(ds); d.setHours(23,59,59); return d>=new Date(); };
 
-function hashPin(pin) {
+// Normalise member — migrate old single `team` field to `teams` array
+const normMember = m => ({
+  ...m,
+  teams: m.teams || (m.team ? [m.team] : []),
+});
   let h = 5381;
   for (let i=0;i<pin.length;i++) h=((h<<5)+h)+pin.charCodeAt(i);
   return String(h>>>0);
@@ -293,7 +297,8 @@ function SessCard({s,members,faded,onClick}) {
         <div style={{marginTop:6,display:"flex",flexWrap:"wrap",gap:4}}>
           {s.players.slice(0,5).map((p,i)=>{
             const mem=members.find(m=>m.name===p);
-            const tm=getTeamMeta(mem?.team||"Unassigned");
+            const firstTeam=(mem?.teams||[])[0]||null;
+            const tm=getTeamMeta(firstTeam||"Unassigned");
             return <span key={i} style={{background:tm.bg,color:tm.text,borderRadius:20,
               padding:"2px 8px",fontSize:11,fontWeight:700}}>{p.split(" ")[0]}</span>;
           })}
@@ -487,7 +492,9 @@ export default function App() {
   useEffect(()=>{
     if(!currentUser || members.length===0) return;
     const fresh = members.find(m=>m.id===currentUser.id);
-    if(fresh && (fresh.role!==currentUser.role || fresh.team!==currentUser.team || fresh.name!==currentUser.name)) {
+    if(fresh && (fresh.role!==currentUser.role
+      || JSON.stringify(fresh.teams)!==JSON.stringify(currentUser.teams)
+      || fresh.name!==currentUser.name)) {
       setCurrentUser(fresh);
       localStorage.setItem("fcc-current-user", JSON.stringify(fresh));
     }
@@ -510,12 +517,12 @@ export default function App() {
           getDoc(refs.teams),
           getDoc(refs.recurring),
         ]);
-        setMembers(  mr.exists() ? JSON.parse(mr.data().value) : SEED_MEMBERS);
+        setMembers(  mr.exists() ? JSON.parse(mr.data().value).map(normMember) : SEED_MEMBERS.map(normMember));
         setPins(     pr.exists() ? JSON.parse(pr.data().value) : {});
         setTeams(    tr.exists() ? JSON.parse(tr.data().value) : DEFAULT_TEAMS);
         setRecurring(rr.exists() ? JSON.parse(rr.data().value) : []);
       } catch(e) {
-        setMembers(SEED_MEMBERS); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]);
+        setMembers(SEED_MEMBERS.map(normMember)); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]);
       }
       setLoading(false);
     })();
@@ -765,7 +772,7 @@ export default function App() {
       showToast("Member already exists"); return;
     }
     saveMembers([...members,{id:uid(),name:newName.trim(),
-      team:newTeam==="Unassigned"?null:newTeam,role:"member"}]);
+      teams:newTeam==="Unassigned"?[]:[newTeam],role:"member"}]);
     setNewName(""); showToast("Member added ✓");
   }
 
@@ -797,16 +804,26 @@ export default function App() {
     showToast(`Renamed to "${trimmed}" ✓`);
   }
 
-  function updateTeam(id,team) {
-    const t=team==="Unassigned"?null:team;
-    const mem=members.find(m=>m.id===id);
-    // If switching to a non-senior team and role is captain/vicecaptain, demote to member
-    const newRole=(!seniorTeamNames.includes(team)&&["captain","vicecaptain"].includes(mem?.role))
-      ?"member":mem?.role||"member";
-    saveMembers(members.map(m=>m.id===id?{...m,team:t,role:newRole}:m));
+  function toggleMemberTeam(id, teamName) {
+    const mem = members.find(m=>m.id===id);
+    if(!mem) return;
+    const current = mem.teams || [];
+    const next = current.includes(teamName)
+      ? current.filter(t=>t!==teamName)
+      : [...current, teamName];
+    // If no senior team remains and role is captain/VC, demote
+    const hasSenior = next.some(t=>seniorTeamNames.includes(t));
+    const newRole = (!hasSenior && ["captain","vicecaptain"].includes(mem.role))
+      ? "member" : mem.role;
+    saveMembers(members.map(m=>m.id===id ? {...m,teams:next,role:newRole} : m));
   }
 
   function updateRole(id, role) {
+    const mem = members.find(m=>m.id===id);
+    const hasSenior = (mem?.teams||[]).some(t=>seniorTeamNames.includes(t));
+    if(["captain","vicecaptain"].includes(role) && !hasSenior) {
+      showToast("Captain/VC only available for Senior team members"); return;
+    }
     saveMembers(members.map(m=>m.id===id?{...m,role}:m));
     setEditingRole(null);
     showToast("Role updated ✓");
@@ -827,28 +844,36 @@ export default function App() {
   const tomorrowSess=sessions.filter(s=>s.date===tomorrowStr()&&isFuture(s.date));
   const todaySess   =sessions.filter(s=>s.date===todayStr()   &&isFuture(s.date));
 
-  // Player picker grouping
-  const pickVisible=members.filter(m=>{
-    const q=!pSearch||m.name.toLowerCase().includes(pSearch.toLowerCase());
-    const t=pFilter==="All"||(m.team||"Unassigned")===pFilter;
-    return q&&t;
-  });
-  const pickGrouped=ALL_TEAMS.reduce((acc,t)=>{
-    if(pFilter!=="All"&&pFilter!==t) return acc;
-    const list=pickVisible.filter(m=>(m.team||"Unassigned")===t);
+  // Player picker — member appears under EACH of their teams
+  const pickVisible = members.filter(m=>
+    !pSearch || m.name.toLowerCase().includes(pSearch.toLowerCase())
+  );
+  const pickGrouped = ALL_TEAMS.reduce((acc,t)=>{
+    if(pFilter!=="All" && pFilter!==t) return acc;
+    const list = pickVisible.filter(m=>
+      t==="Unassigned"
+        ? (m.teams||[]).length===0
+        : (m.teams||[]).includes(t)
+    );
     if(list.length) acc[t]=list;
     return acc;
   },{});
 
-  // Admin list
-  const adminVisible=members.filter(m=>{
+  // Admin list — member shown under EACH team (or Unassigned if none)
+  const adminVisible = members.filter(m=>{
     const q=!aSearch||m.name.toLowerCase().includes(aSearch.toLowerCase());
-    const t=aFilter==="All"||(m.team||"Unassigned")===aFilter;
+    const t=aFilter==="All"
+      ||(aFilter==="Unassigned" && (m.teams||[]).length===0)
+      ||(m.teams||[]).includes(aFilter);
     return q&&t;
   });
-  const adminGrouped=ALL_TEAMS.reduce((acc,t)=>{
+  const adminGrouped = ALL_TEAMS.reduce((acc,t)=>{
     if(aFilter!=="All"&&aFilter!==t) return acc;
-    const list=adminVisible.filter(m=>(m.team||"Unassigned")===t);
+    const list = adminVisible.filter(m=>
+      t==="Unassigned"
+        ? (m.teams||[]).length===0
+        : (m.teams||[]).includes(t)
+    );
     if(list.length) acc[t]=list;
     return acc;
   },{});
@@ -1290,9 +1315,13 @@ export default function App() {
   if(view==="session"&&selSess) {
     const userMem = members.find(m=>m.name===currentUser?.name);
     const isRestricted = !!selSess.restrictedTo;
-    const userInTeam = !isRestricted || userMem?.team===selSess.restrictedTo || can(userRole,"deleteSession");
+    const userInTeam = !isRestricted
+      || (userMem?.teams||[]).includes(selSess.restrictedTo)
+      || can(userRole,"deleteSession");
     const notIn=members.filter(m=>!selSess.players.includes(m.name))
-      .filter(m=>!isRestricted || m.team===selSess.restrictedTo || can(userRole,"deleteSession"));
+      .filter(m=>!isRestricted
+        || (m.teams||[]).includes(selSess.restrictedTo)
+        || can(userRole,"deleteSession"));
     return (
       <Shell>
         <AppHeader
@@ -1358,7 +1387,7 @@ export default function App() {
                       {p}{isSelf&&<span style={{color:G.muted,fontSize:12,fontWeight:500,marginLeft:6}}>(you)</span>}
                     </div>
                     <div style={{display:"flex",gap:4,marginTop:2,flexWrap:"wrap"}}>
-                      {mem?.team&&<TeamPill team={mem.team} sm/>}
+                      {(mem?.teams||[]).map(t=><TeamPill key={t} team={t} sm/>)}
                       {mem?.role&&mem.role!=="member"&&<RolePill role={mem.role}/>}
                     </div>
                   </div>
@@ -1825,37 +1854,53 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Bottom row: role pill + dropdowns + reset PIN */}
-                <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                  <RolePill role={m.role||"member"}/>
-                  {/* Team selector */}
-                  <select value={m.team||"Unassigned"}
-                    onChange={e=>updateTeam(m.id,e.target.value)}
-                    style={{border:`1px solid ${G.border}`,borderRadius:6,
-                      padding:"4px 6px",fontSize:11,fontFamily:"inherit",
-                      color:G.text,background:G.cream,cursor:"pointer"}}>
-                    {ALL_TEAMS.map(t=><option key={t} value={t}>{t}</option>)}
-                  </select>
-                  {/* Role selector */}
-                  {can(userRole,"assignRoles")&&(m.id!==currentUser.id||userRole==="superadmin")&&(
-                    <select value={m.role||"member"}
-                      onChange={e=>updateRole(m.id,e.target.value)}
-                      style={{border:`1px solid ${G.border}`,borderRadius:6,
-                        padding:"4px 6px",fontSize:11,fontFamily:"inherit",
-                        color:G.text,background:G.cream,cursor:"pointer"}}>
-                      {userRole==="superadmin"&&<option value="superadmin">👑 Super Admin</option>}
-                      <option value="admin">🔧 Admin</option>
-                      {seniorTeamNames.includes(m.team)&&<>
-                        <option value="captain">🏆 Captain</option>
-                        <option value="vicecaptain">🥈 Vice Captain</option>
-                      </>}
-                      <option value="member">🏏 Member</option>
-                    </select>
-                  )}
-                  {/* Reset PIN */}
-                  {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&pins[m.id]&&(
-                    <Btn onClick={()=>resetPin(m.id)} bg={G.amberBg} col={G.amber} sm>🔑 Reset PIN</Btn>
-                  )}
+                {/* Bottom row: role pill + team chips + role dropdown + reset PIN */}
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {/* Team chips */}
+                  <div>
+                    <div style={{fontSize:10,fontWeight:800,color:G.muted,
+                      letterSpacing:1.3,textTransform:"uppercase",marginBottom:5}}>Teams</div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                      {teams.map(t=>{
+                        const active=(m.teams||[]).includes(t.name);
+                        return (
+                          <button key={t.id} type="button"
+                            onClick={()=>toggleMemberTeam(m.id,t.name)}
+                            style={{
+                              background:active?G.green:G.cream,
+                              color:active?G.lime:G.muted,
+                              border:active?`1.5px solid ${G.green}`:`1.5px solid ${G.border}`,
+                              borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:800,
+                              cursor:"pointer",fontFamily:"inherit",transition:"all .12s",
+                            }}>
+                            {active?"✓ ":""}{t.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {/* Role + actions row */}
+                  <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                    <RolePill role={m.role||"member"}/>
+                    {can(userRole,"assignRoles")&&(m.id!==currentUser.id||userRole==="superadmin")&&(
+                      <select value={m.role||"member"}
+                        onChange={e=>updateRole(m.id,e.target.value)}
+                        style={{border:`1px solid ${G.border}`,borderRadius:6,
+                          padding:"4px 6px",fontSize:11,fontFamily:"inherit",
+                          color:G.text,background:G.cream,cursor:"pointer"}}>
+                        {userRole==="superadmin"&&<option value="superadmin">👑 Super Admin</option>}
+                        <option value="admin">🔧 Admin</option>
+                        {(m.teams||[]).some(t=>seniorTeamNames.includes(t))&&<>
+                          <option value="captain">🏆 Captain</option>
+                          <option value="vicecaptain">🥈 Vice Captain</option>
+                        </>}
+                        <option value="member">🏏 Member</option>
+                      </select>
+                    )}
+                    {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&pins[m.id]&&(
+                      <Btn onClick={()=>resetPin(m.id)} bg={G.amberBg} col={G.amber} sm>🔑 Reset PIN</Btn>
+                    )}
+                  </div>
                 </div>
 
               </div>
