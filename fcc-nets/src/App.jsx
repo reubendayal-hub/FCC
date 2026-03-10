@@ -1780,85 +1780,84 @@ export default function App() {
             {list.map(m=>(
               <div key={m.id} style={{background:G.white,border:`1.5px solid ${G.border}`,
                 borderRadius:10,padding:"10px 14px",marginBottom:6}}>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
-                  <div style={{flex:1,minWidth:0}}>
-                    {editingName?.id===m.id ? (
-                      <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                        <input autoFocus
-                          style={{...iSt({padding:"5px 9px",fontSize:13}),flex:1}}
-                          value={editingName.value}
-                          onChange={e=>setEditingName({...editingName,value:e.target.value})}
-                          onKeyDown={e=>{
-                            if(e.key==="Enter"){e.preventDefault();renameMember(m.id,editingName.value);}
-                            if(e.key==="Escape") setEditingName(null);
-                          }}/>
-                        <button type="button"
-                          onClick={()=>renameMember(m.id,editingName.value)}
-                          style={{background:G.green,color:G.lime,border:"none",borderRadius:7,
-                            padding:"5px 10px",fontSize:13,cursor:"pointer",
-                            fontFamily:"inherit",fontWeight:800,flexShrink:0}}>✓</button>
-                        <button type="button" onClick={()=>setEditingName(null)}
-                          style={{background:G.cream,color:G.muted,border:`1px solid ${G.border}`,
-                            borderRadius:7,padding:"5px 9px",fontSize:13,cursor:"pointer",
-                            fontFamily:"inherit",flexShrink:0}}>✕</button>
-                      </div>
-                    ) : (
-                      <div style={{display:"flex",alignItems:"center",gap:6}}>
-                        <div style={{fontWeight:800,color:G.text,fontSize:14,
-                          overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                          {m.name}
-                        </div>
-                        {can(userRole,"addMember")&&(
-                          <button type="button"
-                            onClick={()=>setEditingName({id:m.id,value:m.name})}
-                            style={{background:"none",border:"none",cursor:"pointer",
-                              color:G.muted,fontSize:12,padding:"2px 4px",flexShrink:0,
-                              opacity:.6,lineHeight:1}}
-                            title="Edit name">✏️</button>
-                        )}
-                      </div>
-                    )}
-                    <div style={{display:"flex",gap:5,marginTop:3,flexWrap:"wrap",alignItems:"center"}}>
-                      <RolePill role={m.role||"member"}/>
+
+                {/* Top row: name + pencil + delete */}
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
+                  {editingName?.id===m.id ? (
+                    <div style={{display:"flex",gap:6,alignItems:"center",flex:1}}>
+                      <input autoFocus
+                        style={{...iSt({padding:"5px 9px",fontSize:13}),flex:1}}
+                        value={editingName.value}
+                        onChange={e=>setEditingName({...editingName,value:e.target.value})}
+                        onKeyDown={e=>{
+                          if(e.key==="Enter"){e.preventDefault();renameMember(m.id,editingName.value);}
+                          if(e.key==="Escape") setEditingName(null);
+                        }}/>
+                      <button type="button"
+                        onClick={()=>renameMember(m.id,editingName.value)}
+                        style={{background:G.green,color:G.lime,border:"none",borderRadius:7,
+                          padding:"5px 10px",fontSize:13,cursor:"pointer",
+                          fontFamily:"inherit",fontWeight:800,flexShrink:0}}>✓</button>
+                      <button type="button" onClick={()=>setEditingName(null)}
+                        style={{background:G.cream,color:G.muted,border:`1px solid ${G.border}`,
+                          borderRadius:7,padding:"5px 9px",fontSize:13,cursor:"pointer",
+                          fontFamily:"inherit",flexShrink:0}}>✕</button>
                     </div>
-                  </div>
-                  <div style={{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap",justifyContent:"flex-end"}}>
-                    {/* Team selector */}
-                    <select value={m.team||"Unassigned"}
-                      onChange={e=>updateTeam(m.id,e.target.value)}
+                  ) : (
+                    <>
+                      <div style={{fontWeight:800,color:G.text,fontSize:15,flex:1}}>
+                        {m.name}
+                      </div>
+                      {can(userRole,"addMember")&&(
+                        <button type="button"
+                          onClick={()=>setEditingName({id:m.id,value:m.name})}
+                          style={{background:"none",border:"none",cursor:"pointer",
+                            color:G.muted,fontSize:14,padding:"2px 4px",flexShrink:0}}
+                          title="Edit name">✏️</button>
+                      )}
+                      {can(userRole,"removeMember")&&m.id!==currentUser.id&&(
+                        <button type="button" onClick={()=>removeMember(m.id)}
+                          style={{background:G.redBg,color:G.red,border:"none",borderRadius:7,
+                            padding:"4px 9px",fontSize:13,cursor:"pointer",
+                            fontFamily:"inherit",fontWeight:800,flexShrink:0}}>×</button>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {/* Bottom row: role pill + dropdowns + reset PIN */}
+                <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                  <RolePill role={m.role||"member"}/>
+                  {/* Team selector */}
+                  <select value={m.team||"Unassigned"}
+                    onChange={e=>updateTeam(m.id,e.target.value)}
+                    style={{border:`1px solid ${G.border}`,borderRadius:6,
+                      padding:"4px 6px",fontSize:11,fontFamily:"inherit",
+                      color:G.text,background:G.cream,cursor:"pointer"}}>
+                    {ALL_TEAMS.map(t=><option key={t} value={t}>{t}</option>)}
+                  </select>
+                  {/* Role selector */}
+                  {can(userRole,"assignRoles")&&(m.id!==currentUser.id||userRole==="superadmin")&&(
+                    <select value={m.role||"member"}
+                      onChange={e=>updateRole(m.id,e.target.value)}
                       style={{border:`1px solid ${G.border}`,borderRadius:6,
                         padding:"4px 6px",fontSize:11,fontFamily:"inherit",
                         color:G.text,background:G.cream,cursor:"pointer"}}>
-                      {ALL_TEAMS.map(t=><option key={t} value={t}>{t}</option>)}
+                      {userRole==="superadmin"&&<option value="superadmin">👑 Super Admin</option>}
+                      <option value="admin">🔧 Admin</option>
+                      {seniorTeamNames.includes(m.team)&&<>
+                        <option value="captain">🏆 Captain</option>
+                        <option value="vicecaptain">🥈 Vice Captain</option>
+                      </>}
+                      <option value="member">🏏 Member</option>
                     </select>
-                    {/* Role selector — only if current user can assign roles and it's not themselves (unless superadmin) */}
-                    {can(userRole,"assignRoles")&&(m.id!==currentUser.id||userRole==="superadmin")&&(
-                      <select value={m.role||"member"}
-                        onChange={e=>updateRole(m.id,e.target.value)}
-                        style={{border:`1px solid ${G.border}`,borderRadius:6,
-                          padding:"4px 6px",fontSize:11,fontFamily:"inherit",
-                          color:G.text,background:G.cream,cursor:"pointer"}}>
-                        {/* Superadmin only assignable by superadmin */}
-                        {userRole==="superadmin"&&<option value="superadmin">👑 Super Admin</option>}
-                        <option value="admin">🔧 Admin</option>
-                        {/* Captain / VC only for senior teams */}
-                        {seniorTeamNames.includes(m.team)&&<>
-                          <option value="captain">🏆 Captain</option>
-                          <option value="vicecaptain">🥈 Vice Captain</option>
-                        </>}
-                        <option value="member">🏏 Member</option>
-                      </select>
-                    )}
-                    {/* Reset PIN */}
-                    {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&pins[m.id]&&(
-                      <Btn onClick={()=>resetPin(m.id)} bg={G.amberBg} col={G.amber} sm>🔑 Reset PIN</Btn>
-                    )}
-                    {/* Remove member */}
-                    {can(userRole,"removeMember")&&m.id!==currentUser.id&&(
-                      <Btn onClick={()=>removeMember(m.id)} bg={G.redBg} col={G.red} sm>×</Btn>
-                    )}
-                  </div>
+                  )}
+                  {/* Reset PIN */}
+                  {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&pins[m.id]&&(
+                    <Btn onClick={()=>resetPin(m.id)} bg={G.amberBg} col={G.amber} sm>🔑 Reset PIN</Btn>
+                  )}
                 </div>
+
               </div>
             ))}
           </div>
