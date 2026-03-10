@@ -134,7 +134,7 @@ function makeICS(s) {
   return ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//FCC//EN","BEGIN:VEVENT",
     `DTSTART:${y}${p(mo)}${p(da)}T${p(fh)}${p(fm)}00`,
     `DTEND:${y}${p(mo)}${p(da)}T${p(th)}${p(tm)}00`,
-    `SUMMARY:FCC Nets – ${fmtShort(s.date)}`,
+    `SUMMARY:FCC Training – ${fmtShort(s.date)}`,
     `DESCRIPTION:Players: ${s.players.join(", ")}${s.note?"\\nNote: "+s.note:""}`,
     "LOCATION:Karlebo Cricket Ground",
     "END:VEVENT","END:VCALENDAR"].join("\r\n");
@@ -148,7 +148,7 @@ const dlICS = s => {
 function waMsg(sessions, date) {
   const day=sessions.filter(s=>s.date===date&&isFuture(s.date));
   if(!day.length) return null;
-  let m=`🏏 *FCC Nets – ${fmtLong(date)}*\n\n`;
+  let m=`🏏 *FCC Training – ${fmtLong(date)}*\n\n`;
   day.forEach(s=>{
     m+=`⏰ *${s.from} – ${s.to}*${s.label?" · _"+s.label+"_":""}\n`;
     s.players.forEach(p=>m+=`• ${p}\n`);
@@ -846,7 +846,7 @@ export default function App() {
       <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh"}}>
         <div style={{textAlign:"center",color:G.mid}}>
           <div style={{fontSize:48,marginBottom:12}}>🏏</div>
-          <div style={{fontWeight:800,fontSize:18}}>Loading FCC Nets…</div>
+          <div style={{fontWeight:800,fontSize:18}}>Loading FCC Training…</div>
         </div>
       </div>
     </Shell>
@@ -870,7 +870,7 @@ export default function App() {
             border:"3px solid rgba(255,255,255,0.25)",
             boxShadow:"0 4px 20px rgba(0,0,0,0.3)"}}/>
           <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
-            fontSize:28,fontWeight:900,letterSpacing:"-.5px",lineHeight:1}}>FCC Nets</div>
+            fontSize:28,fontWeight:900,letterSpacing:"-.5px",lineHeight:1}}>FCC Training</div>
           <div style={{color:"rgba(255,255,255,0.45)",fontSize:11,fontWeight:700,
             letterSpacing:2.5,textTransform:"uppercase",marginTop:5}}>Karlebo · Fredensborg CC</div>
         </div>
@@ -1035,13 +1035,13 @@ export default function App() {
   // ── SCHEDULE ────────────────────────────────────────────────
   if(view==="schedule") return (
     <Shell>
-      <AppHeader title="FCC Nets" sub="Karlebo · Fredensborg Cricket Club">
+      <AppHeader title="FCC Training" sub="Karlebo · Fredensborg Cricket Club">
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <img src={FCC_LOGO} alt="FCC" style={{width:44,height:44,borderRadius:"50%",objectFit:"cover",flexShrink:0,border:"2px solid rgba(255,255,255,0.3)"}}/>
             <div>
               <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
-                fontSize:22,fontWeight:900,lineHeight:1,letterSpacing:"-.5px"}}>FCC Nets</div>
+                fontSize:22,fontWeight:900,lineHeight:1,letterSpacing:"-.5px"}}>FCC Training</div>
               <div style={{color:"rgba(255,255,255,.45)",fontSize:10,fontWeight:700,
                 letterSpacing:2,textTransform:"uppercase"}}>Karlebo</div>
             </div>
@@ -1061,7 +1061,7 @@ export default function App() {
         {can(userRole,"sendReminder")&&todaySess.length>0&&(
           <div style={{marginTop:8,background:"rgba(255,255,255,.08)",borderRadius:10,
             padding:"9px 13px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <div style={{color:"rgba(255,255,255,.85)",fontSize:12,fontWeight:700}}>🟢 Nets on TODAY</div>
+            <div style={{color:"rgba(255,255,255,.85)",fontSize:12,fontWeight:700}}>🟢 Training TODAY</div>
             <Btn onClick={()=>openWA(todayStr())} bg="rgba(255,255,255,.18)" col={G.white} sm>📲 Share Today</Btn>
           </div>
         )}
@@ -1101,7 +1101,7 @@ export default function App() {
       <Shell>
         <AppHeader onBack={()=>{setView("schedule");setSelP([]);}}
           title="Add / Join a Session"
-          sub={conflict?"Session exists — players will be added":"Create or join a nets session"}/>
+          sub={conflict?"Session exists — players will be added":"Create or join a training session"}/>
         <form onSubmit={handleAddSession} style={{padding:"14px 16px 20px"}}>
           <SLbl mt={4}>When?</SLbl>
           <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
@@ -1696,7 +1696,7 @@ export default function App() {
                 textTransform:"uppercase",marginBottom:10}}>Add new slot</div>
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
                 <input style={iSt({padding:"9px 12px",fontSize:13})}
-                  placeholder="Slot name e.g. U11 Saturday Nets"
+                  placeholder="Slot name e.g. U11 Saturday Training"
                   value={rName} onChange={e=>setRName(e.target.value)}/>
                 <div style={{display:"flex",gap:8}}>
                   <select style={iSt({padding:"9px 10px",fontSize:13,flex:1})}
