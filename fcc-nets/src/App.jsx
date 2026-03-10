@@ -82,28 +82,28 @@ const can = (role, action) => (CAN[action]||[]).includes(role);
 // ─── Seed members ─────────────────────────────────────────────
 const SEED_MEMBERS = [
   "Aadya Kaul","Aarin Venkatesh","Abhinav Singh","Adam Pirzada",
-  "Adithya Manimaran","Adithya Vennickle","Advik Akkar","Ahaan Sinha",
+  "Adithya Manimaran","Adithya Vennickle","Advik Akar","Ahaan Sinha",
   "Ahmed Nawaz","Akshay Bhardwaj","Amer Ramzan","Amit Yadav",
-  "Anagha Mahajan","Anant Mahajan","Anirudh Ram Sriram","Anveshak Vujjini",
+  "Anagha Mahajan","Anant Mahajan","Anirudh Ram Sriram","Anshu Gupta",
+  "Anveshak Vujjini","Abhijit Guhagarkar",
   "Arun Krishnamurthy","Arun Shankar","Ashwin Shankar","Ashwin Singh Tensingh",
-  "Aurangzeb Pirzada","Ayumi","Bhaanu","Charlie","Deepak Akar","Dhruv Shah",
-  "Durgesh","Garghi Seenevas","Hemant Mahajan","Ilayaraja Karuppasamy",
-  "Ishan Bordoloi","Jaya Nair","Kai Pattison","Kamal Jayalaksminarasimhan",
-  "Kian Kakoti","Mishka Gupta","Monesh Shantharam","Naoki","Neha Gupta",
+  "Balaji","Charlie","Deepak Akar","Dhruv Shah",
+  "Durgesh","Gagan Sachdeva","Garghi Seenevas","Hasnain Ahmed",
+  "Ilayaraja Karuppasamy","Ishan Bordoloi","Jay","Jaya Nair",
+  "Kamal Jayalaksminarasimhan","Kian Kakoti","Mishka Gupta","Monesh Shantharam",
   "Nimesh Rajamohanan","Nirmal Mohanan","Nitin Gupta","Nitin Jain",
   "Pranavan Aananth","Prithvi Sagar","Pronit Lahiri","Pulin Dhar",
   "Raghavendar Murali","Rajesh Ayyappan","Rajesh Muthukumar",
   "Rajkumar Jeyaraman","Raju Dantuluri","Ramakrishnan Ravi",
-  "Ravi Kiran Rachakonda","Reuben Dayal","Rewanth Punna","Rohind",
-  "Rohith Arunkumar","Saatvik Dantuluri","Sahasra Dantuluri","Sahil Gagneja",
-  "Sami Pattison","Samyak Jaggi Ram","Savir","Senthil Gnanasambandan",
-  "Sharmila C","Shashank Rastogi","Shashrvat Skumar","Shilpa Mahajan",
-  "Sina Duehrsen","Sivansh Amit Yadav","Sridhar Chitrala","Stalin Natesan",
-  "Stephen Pattison","Sumithra","Suneeti Bala","Syed Hamza Kazmi",
-  "Taarush Jain","Talat Munshi","Vaasu Bala","Vihaan Rastogi",
-  "Vihaan Sundeep","Vijay Deepak","Vina (Unknown)","Vinay Arunkumar",
+  "Reuben Dayal","Rewanth Punna","Rohind Muthuselvaraj",
+  "Rohith Arunkumar","Saatvik Dantuluri","Sahasra Dantuluri","Sagar Gupta",
+  "Sahil Gagneja","Samyak Jaggi Ram","Savir Gagneja","Senthil Gnanasambandan",
+  "Shardul Joshi","Sharmila C","Shashank Rastogi","Shreyas Gujjar",
+  "Stalin Natesan","Sumithra","Syed Hamza Kazmi",
+  "Taarush Jain","Talat Munshi","Trineth Arjun","Vihaan Rastogi",
+  "Vihaan Sundeep","Vijay Deepak","Vinay Arunkumar",
   "Vinay Kumar","Virendra Pawar","Vishali Jain","Vivek Bhatnagar",
-  "Vivek Satyarthi","Xavier Ramzan","Yogismaan Kamal","Zachary Dayal",
+  "Vivek Satyarthi","Xavier Ramzan","Yogismaan Kamal","Zachary Dayal","Zeb Pirzada",
 ].map((name, i) => ({
   id: `m${i+1}`,
   name,
@@ -126,7 +126,47 @@ const normMember = m => ({
   teams: m.teams || (m.team ? [m.team] : []),
 });
 
-function hashPin(pin) {
+// ─── Profile completion ────────────────────────────────────────
+function profileCompletion(m) {
+  const fields = [!!m?.email?.trim(), !!m?.phone?.trim()];
+  const filled = fields.filter(Boolean).length;
+  const pct = Math.round((filled / fields.length) * 100);
+  // Needs reconfirm if confirmed > 6 months ago or never
+  const sixMonthsMs = 6 * 30 * 24 * 60 * 60 * 1000;
+  const confirmedAt = m?.profileConfirmedAt ? new Date(m.profileConfirmedAt) : null;
+  const needsReconfirm = !confirmedAt || (Date.now() - confirmedAt.getTime() > sixMonthsMs);
+  const isComplete = pct === 100 && !needsReconfirm;
+  return { pct, filled, total: fields.length, needsReconfirm, isComplete, confirmedAt };
+}
+
+// SVG arc dial
+function ProfileDial({ pct }) {
+  const r = 36, cx = 44, cy = 44, stroke = 7;
+  const circumference = Math.PI * r; // half circle
+  const arc = circumference * (pct / 100);
+  const color = pct === 100 ? "#16a34a" : pct >= 50 ? "#f59e0b" : "#ef4444";
+  return (
+    <svg width="88" height="54" viewBox="0 0 88 54">
+      {/* Track */}
+      <path d={`M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}`}
+        fill="none" stroke="#e5e7eb" strokeWidth={stroke} strokeLinecap="round"/>
+      {/* Fill */}
+      <path d={`M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}`}
+        fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
+        strokeDasharray={`${arc} ${circumference}`}/>
+      {/* % text */}
+      <text x={cx} y={cy-4} textAnchor="middle"
+        style={{fontSize:15,fontWeight:900,fontFamily:"'DM Sans',sans-serif",fill:color}}>
+        {pct}%
+      </text>
+      <text x={cx} y={cy+10} textAnchor="middle"
+        style={{fontSize:9,fontWeight:700,fontFamily:"'DM Sans',sans-serif",fill:"#94a3b8",
+          letterSpacing:1,textTransform:"uppercase"}}>
+        complete
+      </text>
+    </svg>
+  );
+}
   let h = 5381;
   for (let i=0;i<pin.length;i++) h=((h<<5)+h)+pin.charCodeAt(i);
   return String(h>>>0);
@@ -340,6 +380,13 @@ function BotNav({view,setView,userRole}) {
       <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
     </svg>
   );
+  const IconProfile = ({on}) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={on?2.5:1.8} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="4"/>
+      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+    </svg>
+  );
 
   const tabStyle = (on) => ({
     flex:1, background:"none", border:"none", cursor:"pointer",
@@ -352,7 +399,7 @@ function BotNav({view,setView,userRole}) {
   });
 
   return (
-    <div style={{
+    <div className="fcc-mobile-only" style={{
       position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)",
       width:"100%", maxWidth:500, zIndex:200,
       background:"rgba(255,255,255,0.97)",
@@ -392,27 +439,101 @@ function BotNav({view,setView,userRole}) {
           color:active==="add"?G.green:"#94a3b8", marginTop:2}}>Book</span>
       </div>
 
-      {/* Members (admin) or matching spacer */}
+      {/* Members (admin) OR Profile (all users) */}
       {isAdmin ? (
         <button onClick={()=>setView("admin")} style={tabStyle(active==="admin")}>
           <IconMembers on={active==="admin"}/>
           <span style={labelStyle(active==="admin")}>Members</span>
         </button>
       ) : (
-        <div style={{flex:1}}/>
+        <button onClick={()=>setView("profile")} style={tabStyle(active==="profile")}>
+          <IconProfile on={active==="profile"}/>
+          <span style={labelStyle(active==="profile")}>Profile</span>
+        </button>
       )}
     </div>
   );
 }
 
-// ─── Shell ────────────────────────────────────────────────────
-function Shell({children}) {
+// ─── Desktop Sidebar Nav ──────────────────────────────────────
+function SidebarNav({view, setView, userRole, currentUser, onLogout}) {
+  const isAdmin = can(userRole,"accessMembers");
+  const active = view==="session"?"schedule":view==="roleAdmin"?"admin":view;
+
+  const navBtn = (v, icon, label) => (
+    <button key={v} onClick={()=>setView(v)} style={{
+      display:"flex",alignItems:"center",gap:12,width:"100%",
+      padding:"11px 14px",borderRadius:10,border:"none",cursor:"pointer",
+      fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:14,
+      background: active===v ? "rgba(255,255,255,.18)" : "transparent",
+      color: active===v ? "#fff" : "rgba(255,255,255,.6)",
+      transition:"all .15s",textAlign:"left",
+    }}>{icon} {label}</button>
+  );
+
   return (
-    <div style={{fontFamily:"'DM Sans',sans-serif",background:G.bg,
-      minHeight:"100vh",maxWidth:500,margin:"0 auto",position:"relative",
-      paddingBottom:90}}>
+    <div className="fcc-sidebar">
+      <img src={FCC_LOGO} alt="FCC" className="fcc-sidebar-logo"/>
+      <div>
+        <div className="fcc-sidebar-title">FCC Training</div>
+        <div className="fcc-sidebar-sub" style={{marginTop:4}}>Karlebo</div>
+      </div>
+      <div className="fcc-sidebar-links">
+        {navBtn("schedule","📅","Schedule")}
+        {navBtn("add","＋","Book / Join")}
+        {isAdmin && navBtn("admin","👥","Members")}
+        {navBtn("profile","👤","My Profile")}
+      </div>
+      <div style={{marginTop:"auto",width:"100%",paddingTop:24,
+        borderTop:"1px solid rgba(255,255,255,.15)"}}>
+        <div style={{color:"rgba(255,255,255,.7)",fontSize:13,fontWeight:700,
+          marginBottom:8,paddingLeft:4}}>{currentUser?.name}</div>
+        <button onClick={onLogout} style={{
+          width:"100%",padding:"9px 14px",borderRadius:10,border:"none",
+          background:"rgba(255,255,255,.12)",color:"rgba(255,255,255,.7)",
+          fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:13,
+          cursor:"pointer",textAlign:"left",
+        }}>Sign out</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Shell ────────────────────────────────────────────────────
+function Shell({children, wide}) {
+  return (
+    <div style={{fontFamily:"'DM Sans',sans-serif",background:G.bg,minHeight:"100vh",
+      display:"flex",justifyContent:"center",alignItems:"flex-start"}}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;0,800;0,900;1,400&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet"/>
-      {children}
+      {/* Desktop sidebar branding */}
+      <div style={{display:"none"}} className="fcc-sidebar"/>
+      <style>{`
+        @media(min-width:900px){
+          .fcc-sidebar{
+            display:flex!important;flex-direction:column;align-items:center;
+            justify-content:flex-start;padding:48px 32px;width:260px;
+            min-height:100vh;position:sticky;top:0;
+            background:${G.green};gap:24px;
+          }
+          .fcc-sidebar-logo{width:80px;height:80px;border-radius:50%;object-fit:cover;
+            border:3px solid rgba(255,255,255,.3);}
+          .fcc-sidebar-title{font-family:'Playfair Display',serif;font-weight:900;
+            font-size:22px;color:#fff;text-align:center;line-height:1.2;}
+          .fcc-sidebar-sub{font-size:11px;color:rgba(255,255,255,.5);letter-spacing:2px;
+            text-transform:uppercase;text-align:center;}
+          .fcc-sidebar-links{display:flex;flex-direction:column;gap:4px;width:100%;margin-top:8px;}
+          .fcc-mobile-only{display:none!important;}
+          .fcc-app-pane{max-width:520px;width:100%;min-height:100vh;
+            border-left:1px solid ${G.border};border-right:1px solid ${G.border};}
+        }
+        @media(max-width:899px){
+          .fcc-sidebar{display:none!important;}
+          .fcc-app-pane{max-width:500px;width:100%;margin:0 auto;}
+        }
+      `}</style>
+      <div className="fcc-app-pane" style={{position:"relative",paddingBottom:90,background:G.bg}}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -510,21 +631,24 @@ export default function App() {
       pins:      doc(db,"fccnets","pins"),
       teams:     doc(db,"fccnets","teams"),
       recurring: doc(db,"fccnets",RECURRING_KEY),
+      blockcals: doc(db,"fccnets","blockcals"),
     };
     (async()=>{
       try {
-        const [mr,pr,tr,rr] = await Promise.all([
+        const [mr,pr,tr,rr,br] = await Promise.all([
           getDoc(refs.members),
           getDoc(refs.pins),
           getDoc(refs.teams),
           getDoc(refs.recurring),
+          getDoc(refs.blockcals),
         ]);
         setMembers(  mr.exists() ? JSON.parse(mr.data().value).map(normMember) : SEED_MEMBERS.map(normMember));
         setPins(     pr.exists() ? JSON.parse(pr.data().value) : {});
         setTeams(    tr.exists() ? JSON.parse(tr.data().value) : DEFAULT_TEAMS);
         setRecurring(rr.exists() ? JSON.parse(rr.data().value) : []);
+        setBlockCals(br.exists() ? JSON.parse(br.data().value) : []);
       } catch(e) {
-        setMembers(SEED_MEMBERS.map(normMember)); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]);
+        setMembers(SEED_MEMBERS.map(normMember)); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]); setBlockCals([]);
       }
       setLoading(false);
     })();
@@ -539,6 +663,7 @@ export default function App() {
   const savePins      = async u => { setPins(u);      await setDoc(doc(db,"fccnets","pins"),     {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveTeams     = async u => { setTeams(u);     await setDoc(doc(db,"fccnets","teams"),    {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveRecurring = async u => { setRecurring(u); await setDoc(doc(db,"fccnets",RECURRING_KEY),{value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveBlockCals = async u => { setBlockCals(u); await setDoc(doc(db,"fccnets","blockcals"),{value:JSON.stringify(u)}).catch(()=>{}); };
 
   // ── Auto-generate recurring sessions ─────────────────────────
   useEffect(()=>{
@@ -778,8 +903,26 @@ export default function App() {
     setNewName(""); showToast("Member added ✓");
   }
 
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [schedFilter,   setSchedFilter]   = useState("all"); // "all" | "mine"
+  const [blockCals,     setBlockCals]     = useState([]);    // [{id,date,from,to,label}]
+  const [bCalDate,      setBCalDate]      = useState("");
+  const [bCalFrom,      setBCalFrom]      = useState("10:00");
+  const [bCalTo,        setBCalTo]        = useState("14:00");
+  const [bCalLabel,     setBCalLabel]     = useState("");
+  const [showBlockForm, setShowBlockForm] = useState(false); // member object to confirm delete
+  const [profileEmail, setProfileEmail]   = useState("");
+  const [profilePhone, setProfilePhone]   = useState("");
+  const [profileEditing, setProfileEditing] = useState(false);
+  const [changingPin,  setChangingPin]    = useState(false);
+  const [oldPin,       setOldPin]         = useState("");
+  const [newPin1,      setNewPin1]        = useState("");
+  const [newPin2,      setNewPin2]        = useState("");
+  const [pinMsg,       setPinMsg]         = useState("");
+
   function removeMember(id) {
     saveMembers(members.filter(m=>m.id!==id));
+    setConfirmDelete(null);
     showToast("Member removed");
   }
 
@@ -831,7 +974,38 @@ export default function App() {
     showToast("Role updated ✓");
   }
 
-  function resetPin(id) {
+  function saveProfile(confirmed=false) {
+    const now = new Date().toISOString();
+    const updated = members.map(m => m.id===currentUser.id
+      ? {...m,
+          email: profileEmail.trim(),
+          phone: profilePhone.trim(),
+          profileConfirmedAt: confirmed ? now : (m.profileConfirmedAt||null),
+        } : m);
+    saveMembers(updated);
+    const fresh = updated.find(m=>m.id===currentUser.id);
+    setCurrentUser(fresh);
+    localStorage.setItem("fcc-current-user", JSON.stringify(fresh));
+    setProfileEditing(false);
+    showToast(confirmed ? "Profile confirmed ✓" : "Profile saved ✓");
+  }
+
+  function confirmProfile() {
+    // Save current details + stamp confirmed date
+    setProfileEmail(members.find(m=>m.id===currentUser.id)?.email||"");
+    setProfilePhone(members.find(m=>m.id===currentUser.id)?.phone||"");
+    saveProfile(true);
+  }
+
+  function handleChangePin() {
+    if(!oldPin||!newPin1||!newPin2){setPinMsg("Fill in all fields");return;}
+    if(hashPin(oldPin)!==pins[currentUser.id]){setPinMsg("Current PIN is incorrect");return;}
+    if(newPin1.length!==4||!/^\d+$/.test(newPin1)){setPinMsg("New PIN must be 4 digits");return;}
+    if(newPin1!==newPin2){setPinMsg("New PINs don't match");return;}
+    savePins({...pins,[currentUser.id]:hashPin(newPin1)});
+    setChangingPin(false);setOldPin("");setNewPin1("");setNewPin2("");setPinMsg("");
+    showToast("PIN changed ✓");
+  }
     const updated={...pins}; delete updated[id];
     savePins(updated);
     showToast("PIN cleared — member sets new PIN on next login");
@@ -970,7 +1144,7 @@ export default function App() {
                       fontSize:10,fontWeight:900,flexShrink:0}}>
                       {m.name.split(" ").map(w=>w[0]).join("").slice(0,2)}
                     </span>
-                    {m.name.split(" ")[0]}
+                    {m.name}
                     {m.role && m.role !== "member" && (
                       <span style={{fontSize:12}}>{ROLE_META[m.role]?.icon}</span>
                     )}
@@ -1075,8 +1249,21 @@ export default function App() {
   );
 
   // ── SCHEDULE ────────────────────────────────────────────────
-  if(view==="schedule") return (
+  if(view==="schedule") {
+    const myName = currentUser.name;
+    const filteredUpcoming = upcoming.filter(s=>
+      schedFilter==="all" || s.players.includes(myName));
+    const filteredPast = past.filter(s=>
+      schedFilter==="all" || s.players.includes(myName));
+    // Block cals for schedule display — future + today only
+    const upcomingBlocks = blockCals
+      .filter(b=>isFuture(b.date)||b.date===todayStr())
+      .sort((a,b)=>a.date.localeCompare(b.date)||a.from.localeCompare(b.from));
+
+    return (
     <Shell>
+      <SidebarNav view={view} setView={setView} userRole={userRole}
+        currentUser={currentUser} onLogout={handleLogout}/>
       <AppHeader title="FCC Training" sub="Karlebo · Fredensborg Cricket Club">
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -1089,6 +1276,20 @@ export default function App() {
             </div>
           </div>
           <Btn onClick={()=>setView("add")} bg={G.lime} col={G.green}>+ Add / Join</Btn>
+        </div>
+
+        {/* Filter toggle */}
+        <div style={{display:"flex",gap:6,marginTop:10}}>
+          {["all","mine"].map(f=>(
+            <button key={f} onClick={()=>setSchedFilter(f)}
+              style={{flex:1,padding:"7px 0",borderRadius:20,border:"none",
+                cursor:"pointer",fontFamily:"inherit",fontWeight:800,fontSize:12,
+                background: schedFilter===f ? G.lime : "rgba(255,255,255,.15)",
+                color: schedFilter===f ? G.green : "rgba(255,255,255,.75)",
+                transition:"all .15s"}}>
+              {f==="all" ? "🏏 All Sessions" : "✋ My Sessions"}
+            </button>
+          ))}
         </div>
 
         {can(userRole,"sendReminder")&&tomorrowSess.length>0&&(
@@ -1110,31 +1311,152 @@ export default function App() {
       </AppHeader>
 
       <div style={{padding:"14px 16px 20px"}}>
-        {upcoming.length===0&&past.length===0?(
+
+        {/* Profile nudge banner */}
+        {(()=>{
+          const me = members.find(m=>m.id===currentUser.id)||currentUser;
+          const {pct, needsReconfirm, isComplete, confirmedAt} = profileCompletion(me);
+          if(isComplete) return null;
+          const isReconfirm = pct===100 && needsReconfirm;
+          return (
+            <div style={{
+              background: isReconfirm ? "#fffbeb" : "#fef2f2",
+              border: `1.5px solid ${isReconfirm ? "#fcd34d" : "#fca5a5"}`,
+              borderRadius:12, padding:"12px 14px", marginBottom:14,
+              display:"flex", alignItems:"center", gap:12,
+            }}>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:800,fontSize:13,
+                  color: isReconfirm ? "#92400e" : "#991b1b"}}>
+                  {isReconfirm ? "⏰ Time to reconfirm your details" : "👋 Complete your profile"}
+                </div>
+                <div style={{fontSize:12,color: isReconfirm ? "#b45309" : "#b91c1c",marginTop:2}}>
+                  {isReconfirm
+                    ? `Last confirmed ${confirmedAt ? confirmedAt.toLocaleDateString("en-GB",{month:"short",year:"numeric"}) : "never"} — please check your details are still current`
+                    : `${100-pct}% missing — add your ${!me?.email?"email":""}${!me?.email&&!me?.phone?" & ":""}${!me?.phone?"phone":""} so the club can reach you`}
+                </div>
+              </div>
+              <button type="button" onClick={()=>setView("profile")}
+                style={{background: isReconfirm ? "#fcd34d" : "#fca5a5",
+                  border:"none",borderRadius:8,padding:"7px 12px",fontSize:12,
+                  fontWeight:800,cursor:"pointer",fontFamily:"inherit",
+                  color: isReconfirm ? "#78350f" : "#7f1d1d",flexShrink:0}}>
+                {isReconfirm ? "Review" : "Update"}
+              </button>
+            </div>
+          );
+        })()}
+
+        {/* Block calendar notices */}
+        {upcomingBlocks.length>0&&(
+          <div style={{marginBottom:14}}>
+            <SLbl mt={0}>🚫 Ground Blocked</SLbl>
+            {upcomingBlocks.map(b=>(
+              <div key={b.id} style={{background:"#fff7ed",border:"1.5px solid #fed7aa",
+                borderRadius:10,padding:"10px 14px",marginBottom:6,
+                display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div>
+                  <div style={{fontWeight:800,fontSize:13,color:"#c2410c"}}>
+                    🏏 {b.label||"Ground Blocked"} — {fmtShort(b.date)}
+                  </div>
+                  <div style={{fontSize:12,color:"#9a3412",marginTop:2}}>
+                    {b.from} – {b.to} · Nets unavailable (match day)
+                  </div>
+                </div>
+                {can(userRole,"deleteSession")&&(
+                  <button type="button" onClick={()=>saveBlockCals(blockCals.filter(x=>x.id!==b.id))}
+                    style={{background:"#fee2e2",color:"#dc2626",border:"none",
+                      borderRadius:6,padding:"4px 8px",fontSize:12,cursor:"pointer",
+                      fontFamily:"inherit",fontWeight:800,flexShrink:0}}>×</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {filteredUpcoming.length===0&&filteredPast.length===0?(
           <div style={{textAlign:"center",padding:"60px 16px",color:G.muted}}>
-            <div style={{fontSize:54,marginBottom:12}}>🏟️</div>
-            <div style={{fontWeight:900,fontSize:17,color:G.text}}>No sessions yet</div>
-            <div style={{fontSize:13,marginTop:6}}>Tap "+ Add / Join" to create the first one.</div>
+            <div style={{fontSize:54,marginBottom:12}}>
+              {schedFilter==="mine"?"🙋":"🏟️"}
+            </div>
+            <div style={{fontWeight:900,fontSize:17,color:G.text}}>
+              {schedFilter==="mine"?"You haven't joined any sessions yet":"No sessions yet"}
+            </div>
+            <div style={{fontSize:13,marginTop:6}}>
+              {schedFilter==="mine"
+                ? <span>Tap <b>All Sessions</b> to browse and join one.</span>
+                : "Tap "+ Add / Join" to create the first one."}
+            </div>
           </div>
         ):(
           <>
-            {upcoming.length>0&&<>
+            {filteredUpcoming.length>0&&<>
               <SLbl mt={4}>Upcoming</SLbl>
-              {upcoming.map(s=><SessCard key={s.id} s={s} members={members}
+              {filteredUpcoming.map(s=><SessCard key={s.id} s={s} members={members}
                 onClick={()=>{setSelSess(s);setView("session");}}/>)}
             </>}
-            {past.length>0&&<>
+            {filteredPast.length>0&&<>
               <SLbl>Past</SLbl>
-              {past.map(s=><SessCard key={s.id} s={s} members={members} faded
+              {filteredPast.map(s=><SessCard key={s.id} s={s} members={members} faded
                 onClick={()=>{setSelSess(s);setView("session");}}/>)}
             </>}
           </>
+        )}
+
+        {/* Add block cal — admin only */}
+        {can(userRole,"deleteSession")&&(
+          <div style={{marginTop:20,background:G.white,border:`1.5px solid ${G.border}`,
+            borderRadius:12,padding:"14px 16px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+              marginBottom:showBlockForm?14:0}}>
+              <div style={{fontWeight:800,fontSize:13,color:G.text}}>🚫 Block Ground (Match Day)</div>
+              <button type="button" onClick={()=>setShowBlockForm(v=>!v)}
+                style={{background:G.cream,border:`1px solid ${G.border}`,borderRadius:8,
+                  padding:"5px 12px",fontSize:12,fontWeight:700,cursor:"pointer",
+                  fontFamily:"inherit",color:G.text}}>
+                {showBlockForm?"Cancel":"+ Block Date"}
+              </button>
+            </div>
+            {showBlockForm&&(
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                <FFld label="Match / Event label">
+                  <input placeholder="e.g. Div 3 Home Match vs Svanholm"
+                    style={iSt({padding:"9px 12px",fontSize:13})}
+                    value={bCalLabel} onChange={e=>setBCalLabel(e.target.value)}/>
+                </FFld>
+                <FFld label="Date">
+                  <input type="date" style={iSt({padding:"9px 12px",fontSize:13})}
+                    value={bCalDate} onChange={e=>setBCalDate(e.target.value)}/>
+                </FFld>
+                <div style={{display:"flex",gap:8}}>
+                  <FFld label="From" style={{flex:1}}>
+                    <input type="time" style={iSt({padding:"9px 12px",fontSize:13})}
+                      value={bCalFrom} onChange={e=>setBCalFrom(e.target.value)}/>
+                  </FFld>
+                  <FFld label="To" style={{flex:1}}>
+                    <input type="time" style={iSt({padding:"9px 12px",fontSize:13})}
+                      value={bCalTo} onChange={e=>setBCalTo(e.target.value)}/>
+                  </FFld>
+                </div>
+                <Btn bg={G.green} col={G.lime} full onClick={()=>{
+                  if(!bCalDate){showToast("Please pick a date");return;}
+                  saveBlockCals([...blockCals,{
+                    id:uid(),date:bCalDate,from:bCalFrom,to:bCalTo,
+                    label:bCalLabel.trim()||"Ground Blocked"}]);
+                  setBCalDate("");setBCalFrom("10:00");setBCalTo("14:00");
+                  setBCalLabel("");setShowBlockForm(false);
+                  showToast("Ground blocked ✓");
+                }}>🚫 Block This Date</Btn>
+              </div>
+            )}
+          </div>
         )}
       </div>
       <BotNav view="schedule" setView={setView} userRole={userRole}/>
       {toast&&<Toast msg={toast}/>}
     </Shell>
-  );
+    );
+  }
 
   // ── ADD / JOIN ──────────────────────────────────────────────
   if(view==="add") {
@@ -1193,7 +1515,7 @@ export default function App() {
                   style={{background:G.green,color:G.lime,border:"none",borderRadius:20,
                     padding:"3px 10px",fontSize:12,fontWeight:800,
                     cursor:"pointer",fontFamily:"inherit"}}>
-                  {p.split(" ")[0]} ×
+                  {p} ×
                 </button>
               ))}
             </div>
@@ -1212,7 +1534,7 @@ export default function App() {
                         border:sel?`2px solid ${G.green}`:`1.5px solid ${G.border}`,
                         borderRadius:24,padding:"7px 14px",fontSize:13,fontWeight:700,
                         cursor:"pointer",fontFamily:"inherit",transition:"all .1s"}}>
-                      {sel&&"✓ "}{m.name.split(" ")[0]}
+                      {sel&&"✓ "}{m.name}
                     </button>
                   );
                 })}
@@ -1456,7 +1778,7 @@ export default function App() {
                           {/* Voter names */}
                           {votes.length>0&&(
                             <div style={{fontSize:11,color:G.muted,marginTop:3}}>
-                              {votes.map(v=>v.split(" ")[0]).join(", ")}
+                              {votes.map(v=>v).join(", ")}
                             </div>
                           )}
                         </button>
@@ -1476,7 +1798,7 @@ export default function App() {
                   style={{background:G.white,color:G.text,border:`1.5px solid ${G.border}`,
                     borderRadius:24,padding:"7px 14px",fontSize:13,fontWeight:700,
                     cursor:"pointer",fontFamily:"inherit"}}>
-                  + {m.name.split(" ")[0]}
+                  + {m.name}
                 </button>
               ))}
             </div>
@@ -1499,6 +1821,258 @@ export default function App() {
   }
 
   // ── ADMIN / MEMBERS ─────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════
+  // RENDER: Profile
+  // ════════════════════════════════════════════════════════════
+  if(view==="profile"||(view==="admin"&&!can(userRole,"accessMembers"))) {
+    const me = members.find(m=>m.id===currentUser.id)||currentUser;
+    const myTeams = (me.teams||[]);
+    const {pct, needsReconfirm, isComplete, confirmedAt} = profileCompletion(me);
+    const isReconfirm = pct===100 && needsReconfirm;
+    return (
+      <Shell>
+        <SidebarNav view={view} setView={setView} userRole={userRole}
+          currentUser={currentUser} onLogout={handleLogout}/>
+        <AppHeader onBack={()=>setView("schedule")}
+          title="My Profile" subtitle={ROLE_META[me.role||"member"]?.label||"Member"}
+          right={<span onClick={handleLogout}
+            style={{fontSize:13,color:G.muted,cursor:"pointer",fontWeight:700}}>
+            sign out</span>}/>
+        <div style={{padding:"20px 16px",display:"flex",flexDirection:"column",gap:16}}>
+
+          {/* Avatar + name card */}
+          <div style={{background:G.green,borderRadius:16,padding:"20px",
+            display:"flex",alignItems:"center",gap:16}}>
+            <div style={{width:60,height:60,borderRadius:"50%",
+              background:G.lime,display:"flex",alignItems:"center",justifyContent:"center",
+              fontSize:22,fontWeight:900,color:G.green,flexShrink:0}}>
+              {me.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()}
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontFamily:"'Playfair Display',serif",fontWeight:900,
+                fontSize:20,color:"#fff"}}>{me.name}</div>
+              <div style={{marginTop:4,display:"flex",gap:6,flexWrap:"wrap"}}>
+                <RolePill role={me.role||"member"}/>
+                {myTeams.map(t=><TeamPill key={t} team={t} sm/>)}
+                {myTeams.length===0&&<TeamPill team="Unassigned" sm/>}
+              </div>
+            </div>
+            {/* Completion dial */}
+            {!isComplete&&<ProfileDial pct={pct}/>}
+            {isComplete&&(
+              <div style={{textAlign:"center"}}>
+                <div style={{fontSize:28}}>✅</div>
+                <div style={{fontSize:10,color:"rgba(255,255,255,.6)",fontWeight:700,
+                  letterSpacing:1,textTransform:"uppercase",marginTop:2}}>Complete</div>
+              </div>
+            )}
+          </div>
+
+          {/* Profile status card — only shown if incomplete or needs reconfirm */}
+          {!isComplete&&(
+            <div style={{
+              background: isReconfirm ? "#fffbeb" : "#fef2f2",
+              border: `1.5px solid ${isReconfirm ? "#fcd34d" : "#fca5a5"}`,
+              borderRadius:12, padding:"14px 16px",
+            }}>
+              <div style={{fontWeight:800,fontSize:14,
+                color: isReconfirm ? "#92400e" : "#991b1b", marginBottom:6}}>
+                {isReconfirm ? "⏰ Please reconfirm your details" : "📋 Profile incomplete"}
+              </div>
+              <div style={{fontSize:13,color: isReconfirm ? "#b45309":"#b91c1c",
+                lineHeight:1.5,marginBottom:12}}>
+                {isReconfirm
+                  ? `It's been over 6 months since you last confirmed your details (${confirmedAt?.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})||"never"}). Please check they're still correct and confirm below.`
+                  : "Your profile is missing contact details. The club needs these to reach you about training, matches and important updates."}
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {[
+                  {icon:"📧", label:"Email", val:me.email, field:"email"},
+                  {icon:"📱", label:"Phone", val:me.phone, field:"phone"},
+                ].map(f=>(
+                  <div key={f.field} style={{display:"flex",alignItems:"center",gap:8,
+                    background:"rgba(255,255,255,.6)",borderRadius:8,padding:"8px 10px"}}>
+                    <span style={{fontSize:16}}>{f.icon}</span>
+                    <span style={{fontSize:13,color:G.text,flex:1}}>{f.label}</span>
+                    <span style={{fontSize:12,fontWeight:800,
+                      color: f.val ? "#16a34a" : "#dc2626"}}>
+                      {f.val ? "✓ Set" : "✗ Missing"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {isReconfirm&&(
+                <button type="button"
+                  onClick={()=>{
+                    const now = new Date().toISOString();
+                    const updated = members.map(m=>m.id===currentUser.id
+                      ? {...m, profileConfirmedAt:now} : m);
+                    saveMembers(updated);
+                    const fresh = updated.find(m=>m.id===currentUser.id);
+                    setCurrentUser(fresh);
+                    localStorage.setItem("fcc-current-user",JSON.stringify(fresh));
+                    showToast("Details confirmed ✓");
+                  }}
+                  style={{marginTop:12,width:"100%",padding:"11px 0",borderRadius:10,
+                    border:"none",background:"#f59e0b",color:"#fff",fontWeight:800,
+                    fontSize:14,cursor:"pointer",fontFamily:"inherit"}}>
+                  ✓ Yes, my details are still correct
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Contact details */}
+          <div style={{background:G.white,border:`1.5px solid ${G.border}`,
+            borderRadius:14,padding:"18px 16px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",
+              alignItems:"center",marginBottom:14}}>
+              <div style={{fontWeight:800,fontSize:14,color:G.text}}>Contact Details</div>
+              {!profileEditing&&(
+                <button type="button" onClick={()=>{
+                  setProfileEmail(me.email||"");
+                  setProfilePhone(me.phone||"");
+                  setProfileEditing(true);
+                }} style={{background:G.cream,border:`1px solid ${G.border}`,
+                  borderRadius:8,padding:"5px 12px",fontSize:12,fontWeight:700,
+                  cursor:"pointer",fontFamily:"inherit",color:G.text}}>
+                  ✏️ Edit
+                </button>
+              )}
+            </div>
+            {profileEditing ? (
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                <FFld label="Email address">
+                  <input type="email" placeholder="your@email.com"
+                    style={iSt({padding:"9px 12px",fontSize:14})}
+                    value={profileEmail}
+                    onChange={e=>setProfileEmail(e.target.value)}/>
+                </FFld>
+                <FFld label="Phone / Mobile">
+                  <input type="tel" placeholder="+45 12 34 56 78"
+                    style={iSt({padding:"9px 12px",fontSize:14})}
+                    value={profilePhone}
+                    onChange={e=>setProfilePhone(e.target.value)}/>
+                </FFld>
+                <div style={{display:"flex",gap:8,marginTop:4}}>
+                  <Btn bg={G.green} col={G.lime} full onClick={()=>{
+                    // Save + auto-confirm if both fields now filled
+                    const emailOk = profileEmail.trim().length > 0;
+                    const phoneOk = profilePhone.trim().length > 0;
+                    const now = new Date().toISOString();
+                    const updated = members.map(m => m.id===currentUser.id
+                      ? {...m,
+                          email: profileEmail.trim(),
+                          phone: profilePhone.trim(),
+                          profileConfirmedAt: (emailOk&&phoneOk) ? now : (m.profileConfirmedAt||null),
+                        } : m);
+                    saveMembers(updated);
+                    const fresh = updated.find(m=>m.id===currentUser.id);
+                    setCurrentUser(fresh);
+                    localStorage.setItem("fcc-current-user",JSON.stringify(fresh));
+                    setProfileEditing(false);
+                    showToast(emailOk&&phoneOk ? "Profile complete ✓" : "Saved ✓");
+                  }}>Save</Btn>
+                  <Btn bg={G.cream} col={G.muted} onClick={()=>setProfileEditing(false)}>Cancel</Btn>
+                </div>
+              </div>
+            ) : (
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{fontSize:18}}>📧</span>
+                  <div>
+                    <div style={{fontSize:11,color:G.muted,fontWeight:700,
+                      textTransform:"uppercase",letterSpacing:1}}>Email</div>
+                    <div style={{fontSize:14,color:me.email?G.text:G.muted,fontWeight:600}}>
+                      {me.email||"Not set yet"}
+                    </div>
+                  </div>
+                </div>
+                <div style={{height:1,background:G.border}}/>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{fontSize:18}}>📱</span>
+                  <div>
+                    <div style={{fontSize:11,color:G.muted,fontWeight:700,
+                      textTransform:"uppercase",letterSpacing:1}}>Phone</div>
+                    <div style={{fontSize:14,color:me.phone?G.text:G.muted,fontWeight:600}}>
+                      {me.phone||"Not set yet"}
+                    </div>
+                  </div>
+                </div>
+                {/* Last confirmed date */}
+                {me.profileConfirmedAt&&(
+                  <div style={{fontSize:11,color:G.muted,marginTop:4,fontStyle:"italic"}}>
+                    Last confirmed: {new Date(me.profileConfirmedAt).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}
+                    {" · "}Next check-in: {new Date(new Date(me.profileConfirmedAt).getTime()+6*30*24*60*60*1000).toLocaleDateString("en-GB",{month:"short",year:"numeric"})}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Change PIN */}
+          <div style={{background:G.white,border:`1.5px solid ${G.border}`,
+            borderRadius:14,padding:"18px 16px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",
+              alignItems:"center",marginBottom:changingPin?14:0}}>
+              <div style={{fontWeight:800,fontSize:14,color:G.text}}>🔐 Change PIN</div>
+              {!changingPin&&(
+                <button type="button"
+                  onClick={()=>{setChangingPin(true);setPinMsg("");}}
+                  style={{background:G.cream,border:`1px solid ${G.border}`,
+                    borderRadius:8,padding:"5px 12px",fontSize:12,fontWeight:700,
+                    cursor:"pointer",fontFamily:"inherit",color:G.text}}>
+                  Change
+                </button>
+              )}
+            </div>
+            {changingPin&&(
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                <FFld label="Current PIN">
+                  <input type="password" inputMode="numeric" maxLength={4}
+                    placeholder="••••" style={iSt({padding:"9px 12px",fontSize:18,
+                    letterSpacing:6,textAlign:"center"})}
+                    value={oldPin} onChange={e=>setOldPin(e.target.value.replace(/\D/g,""))}/>
+                </FFld>
+                <FFld label="New PIN">
+                  <input type="password" inputMode="numeric" maxLength={4}
+                    placeholder="••••" style={iSt({padding:"9px 12px",fontSize:18,
+                    letterSpacing:6,textAlign:"center"})}
+                    value={newPin1} onChange={e=>setNewPin1(e.target.value.replace(/\D/g,""))}/>
+                </FFld>
+                <FFld label="Confirm new PIN">
+                  <input type="password" inputMode="numeric" maxLength={4}
+                    placeholder="••••" style={iSt({padding:"9px 12px",fontSize:18,
+                    letterSpacing:6,textAlign:"center"})}
+                    value={newPin2} onChange={e=>setNewPin2(e.target.value.replace(/\D/g,""))}/>
+                </FFld>
+                {pinMsg&&<div style={{color:"#dc2626",fontSize:13,fontWeight:700}}>{pinMsg}</div>}
+                <div style={{display:"flex",gap:8}}>
+                  <Btn bg={G.green} col={G.lime} full onClick={handleChangePin}>Update PIN</Btn>
+                  <Btn bg={G.cream} col={G.muted} onClick={()=>{
+                    setChangingPin(false);setOldPin("");setNewPin1("");setNewPin2("");setPinMsg("");
+                  }}>Cancel</Btn>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Sign out */}
+          <button type="button" onClick={handleLogout}
+            style={{background:"none",border:`1.5px solid ${G.border}`,
+              borderRadius:12,padding:"13px",fontFamily:"inherit",
+              fontWeight:800,fontSize:14,color:G.muted,cursor:"pointer",
+              width:"100%"}}>
+            Sign out
+          </button>
+
+        </div>
+        <BotNav view="profile" setView={setView} userRole={userRole}/>
+        {toast&&<Toast msg={toast}/>}
+      </Shell>
+    );
+  }
+
   if(view==="admin"&&can(userRole,"accessMembers")) return (
     <Shell>
       <AppHeader title="Manage Members"
@@ -1675,13 +2249,13 @@ export default function App() {
                           onChange={e=>setEditingSlot({...editingSlot,restrictTeam:e.target.checked})}/>
                         Restrict to this team only
                       </label>
-                      <div style={{display:"flex",gap:8}}>
-                        <FFld label="Active from" style={{flex:1}}>
+                      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                        <FFld label="Active from">
                           <input type="date" style={iSt({padding:"7px 10px",fontSize:13})}
                             value={editingSlot.activeFrom||""}
                             onChange={e=>setEditingSlot({...editingSlot,activeFrom:e.target.value})}/>
                         </FFld>
-                        <FFld label="Active until (blank = forever)" style={{flex:1}}>
+                        <FFld label="Active until (blank = forever)">
                           <input type="date" style={iSt({padding:"7px 10px",fontSize:13})}
                             value={editingSlot.activeTo||""}
                             onChange={e=>setEditingSlot({...editingSlot,activeTo:e.target.value})}/>
@@ -1765,12 +2339,12 @@ export default function App() {
                     onChange={e=>setRRestrict(e.target.checked)}/>
                   Restrict to this team only (others can view but not join)
                 </label>
-                <div style={{display:"flex",gap:8}}>
-                  <FFld label="Active from" style={{flex:1}}>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  <FFld label="Active from">
                     <input type="date" style={iSt({padding:"9px 10px",fontSize:13})}
                       value={rActiveFrom} onChange={e=>setRActiveFrom(e.target.value)}/>
                   </FFld>
-                  <FFld label="Active until (blank = forever)" style={{flex:1}}>
+                  <FFld label="Active until (blank = forever)">
                     <input type="date" style={iSt({padding:"9px 10px",fontSize:13})}
                       value={rActiveTo} onChange={e=>setRActiveTo(e.target.value)}/>
                   </FFld>
@@ -1847,7 +2421,7 @@ export default function App() {
                           title="Edit name">✏️</button>
                       )}
                       {can(userRole,"removeMember")&&m.id!==currentUser.id&&(
-                        <button type="button" onClick={()=>removeMember(m.id)}
+                        <button type="button" onClick={()=>setConfirmDelete(m)}
                           style={{background:G.redBg,color:G.red,border:"none",borderRadius:7,
                             padding:"4px 9px",fontSize:13,cursor:"pointer",
                             fontFamily:"inherit",fontWeight:800,flexShrink:0}}>×</button>
@@ -1912,6 +2486,46 @@ export default function App() {
       </div>
       <BotNav view="admin" setView={setView} userRole={userRole}/>
       {toast&&<Toast msg={toast}/>}
+
+      {/* ── Delete confirmation modal ── */}
+      {confirmDelete&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",
+          zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+          <div style={{background:G.white,borderRadius:16,padding:28,maxWidth:340,width:"100%",
+            boxShadow:"0 8px 40px rgba(0,0,0,0.18)"}}>
+            <div style={{fontSize:22,marginBottom:8}}>🗑️</div>
+            <div style={{fontWeight:900,fontSize:17,color:G.text,marginBottom:8}}>
+              Remove member?
+            </div>
+            <div style={{color:G.muted,fontSize:14,marginBottom:6}}>
+              You're about to permanently remove:
+            </div>
+            <div style={{fontWeight:800,fontSize:16,color:G.green,marginBottom:6}}>
+              {confirmDelete.name}
+            </div>
+            <div style={{color:"#b91c1c",fontSize:13,marginBottom:22,
+              background:G.redBg,borderRadius:8,padding:"10px 12px"}}>
+              ⚠️ This cannot be undone. All their session history will remain but they will no longer appear in the member list.
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button type="button"
+                onClick={()=>setConfirmDelete(null)}
+                style={{flex:1,padding:"11px 0",borderRadius:10,border:`1.5px solid ${G.border}`,
+                  background:G.cream,color:G.text,fontWeight:800,fontSize:14,
+                  cursor:"pointer",fontFamily:"inherit"}}>
+                Cancel
+              </button>
+              <button type="button"
+                onClick={()=>removeMember(confirmDelete.id)}
+                style={{flex:1,padding:"11px 0",borderRadius:10,border:"none",
+                  background:"#dc2626",color:"#fff",fontWeight:800,fontSize:14,
+                  cursor:"pointer",fontFamily:"inherit"}}>
+                Yes, Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Shell>
   );
 
