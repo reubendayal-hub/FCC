@@ -134,10 +134,10 @@ const SEED_MEMBERS = [
   "Aadya Kaul","Aarin Venkatesh","Abhinav Singh","Adam Pirzada",
   "Adithya Manimaran","Adithya Vennickle","Advik Akar","Ahaan Sinha",
   "Ahmed Nawaz","Akshay Bhardwaj","Amer Ramzan","Amit Yadav",
-  "Anagha Mahajan","Anant Mahajan","Anirudh Ram Sriram","Anshu Gupta",
+  "Anagha Mahajan","Anant Mahajan","Anirudh Ram Sriram","Ansh Gupta",
   "Anveshak Vujjini","Abhijit Guhagarkar",
   "Arun Krishnamurthy","Arun Shankar","Ashwin Shankar","Ashwin Singh Tensingh",
-  "Balaji","Charlie","Deepak Akar","Dhruv Shah",
+  "Balaji R","Charlie","Deepak Akar","Dhruv Shah",
   "Durgesh","Gagan Sachdeva","Garghi Seenevas","Hasnain Ahmed",
   "Ilayaraja Karuppasamy","Ishan Bordoloi","Jayashwanth J S","Jaya Nair",
   "Kamal Jayalaksminarasimhan","Kian Kakoti","Mishka Gupta","Monesh Shantharam",
@@ -177,7 +177,7 @@ const NAME_MAP = {
   "Adam":"Adam Pirzada","Advik":"Advik Akar","Ahaan":"Ahaan Sinha",
   "Ahmed":"Ahmed Nawaz","Akshay":"Akshay Bhardwaj","Amer":"Amer Ramzan",
   "Amit":"Amit Yadav","Anagha":"Anagha Mahajan","Anant":"Anant Mahajan",
-  "Anirudh":"Anirudh Ram Sriram","Anshu":"Anshu Gupta",
+  "Anirudh":"Anirudh Ram Sriram","Anshu":"Ansh Gupta",
   "Anveshak":"Anveshak Vujjini","Abhijit":"Abhijit Guhagarkar",
   "Deepak":"Deepak Akar","Dhruv":"Dhruv Shah",
   "Gagan":"Gagan Sachdeva","Garghi":"Garghi Seenevas",
@@ -224,12 +224,12 @@ const EMAIL_SEED = {
   "Ahmed Nawaz":"ahmednawaz86@hotmail.com",
   "Amit Yadav":"amit230317@gmail.com",
   "Anirudh Ram Sriram":"iamramsriram@gmail.com",
-  "Anshu Gupta":"6anshu1994@gmail.com",
+  "Ansh Gupta":"6anshu1994@gmail.com",
   "Arun Krishnamurthy":"kae.arunkumar@gmail.com",
   "Arun Shankar":"arundynaero@gmail.com",
   "Ashwin Shankar":"ashwin.thewall19@gmail.com",
   "Ashwin Singh Tensingh":"ashwin_singh17@yahoo.com",
-  "Balaji":"balajir136@gmail.com",
+  "Balaji R":"balajir136@gmail.com",
   "Deepak Akar":"deepakakar@gmail.com",
   "Dhruv Shah":"activities.dhruv@gmail.com",
   "Durgesh":"durgece66@gmail.com",
@@ -1389,16 +1389,29 @@ export default function App() {
   const pickVisible = members.filter(m=>
     !pSearch || m.name.toLowerCase().includes(pSearch.toLowerCase())
   );
-  const pickGrouped = ALL_TEAMS.reduce((acc,t)=>{
-    if(pFilter!=="All" && pFilter!==t) return acc;
-    const list = pickVisible.filter(m=>
-      t==="Unassigned"
-        ? (m.teams||[]).length===0
-        : (m.teams||[]).includes(t)
-    );
-    if(list.length) acc[t]=list;
-    return acc;
-  },{});
+  const myTeamsList = currentUser ? (members.find(m=>m.id===currentUser.id)?.teams||[]) : [];
+  // Build pickGrouped with user's teams first, then others
+  const pickGrouped = (()=>{
+    const obj = ALL_TEAMS.reduce((acc,t)=>{
+      if(pFilter!=="All" && pFilter!==t) return acc;
+      const list = pickVisible.filter(m=>
+        t==="Unassigned"
+          ? (m.teams||[]).length===0
+          : (m.teams||[]).includes(t)
+      );
+      if(list.length) acc[t]=list;
+      return acc;
+    },{});
+    // Sort keys: user's teams first, then alphabetical
+    const sorted = Object.keys(obj).sort((a,b)=>{
+      const aIsMine = myTeamsList.includes(a);
+      const bIsMine = myTeamsList.includes(b);
+      if(aIsMine && !bIsMine) return -1;
+      if(!aIsMine && bIsMine) return 1;
+      return a.localeCompare(b);
+    });
+    return sorted.reduce((acc,k)=>{ acc[k]=obj[k]; return acc; },{});
+  })();
 
   // Admin list — member shown under EACH team (or Unassigned if none)
   const adminVisible = members.filter(m=>{
@@ -1906,8 +1919,9 @@ export default function App() {
       <div style={{display:"flex",alignItems:"center",gap:11,marginBottom:children?10:0}}>
         {onBack
           ? <BackBtn onClick={onBack}/>
-          : <img src={FCC_LOGO} alt="FCC" style={{width:38,height:38,borderRadius:"50%",
-              objectFit:"cover",flexShrink:0,border:"2px solid rgba(255,255,255,0.25)"}}/>
+          : <img src={FCC_LOGO} alt="FCC" style={{width:52,height:52,borderRadius:"50%",
+              objectFit:"cover",flexShrink:0,border:"2px solid rgba(255,255,255,0.3)",
+              boxShadow:"0 2px 8px rgba(0,0,0,0.2)"}}/>
         }
         <div style={{flex:1}}>
           <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
@@ -2166,10 +2180,59 @@ export default function App() {
             </FFld>
             <div style={{display:"flex",gap:10,marginTop:10}}>
               <FFld label="From" style={{flex:1}}>
-                <input type="time" style={iSt()} value={bFrom} onChange={e=>setBFrom(e.target.value)}/>
+                <div style={{display:"flex",gap:5}}>
+                  <select style={iSt({flex:1})}
+                    value={bFrom.split(":")[0]}
+                    onChange={e=>{
+                      const h=e.target.value;
+                      const m=bFrom.split(":")[1]||"00";
+                      setBFrom(`${h}:${m}`);
+                      // Auto-advance end time by 1 hour
+                      const nextH=String(Math.min(23,parseInt(h)+1)).padStart(2,"0");
+                      setBTo(`${nextH}:${m}`);
+                    }}>
+                    {Array.from({length:24},(_,i)=>{
+                      const h=String(i).padStart(2,"0");
+                      return <option key={h} value={h}>{h}:00</option>;
+                    })}
+                  </select>
+                  <select style={iSt({width:72})}
+                    value={bFrom.split(":")[1]||"00"}
+                    onChange={e=>{
+                      const h=bFrom.split(":")[0]||"18";
+                      setBFrom(`${h}:${e.target.value}`);
+                    }}>
+                    {["00","15","30","45"].map(m=>(
+                      <option key={m} value={m}>:{m}</option>
+                    ))}
+                  </select>
+                </div>
               </FFld>
               <FFld label="Until" style={{flex:1}}>
-                <input type="time" style={iSt()} value={bTo} onChange={e=>setBTo(e.target.value)}/>
+                <div style={{display:"flex",gap:5}}>
+                  <select style={iSt({flex:1})}
+                    value={bTo.split(":")[0]}
+                    onChange={e=>{
+                      const h=e.target.value;
+                      const m=bTo.split(":")[1]||"00";
+                      setBTo(`${h}:${m}`);
+                    }}>
+                    {Array.from({length:24},(_,i)=>{
+                      const h=String(i).padStart(2,"0");
+                      return <option key={h} value={h}>{h}:00</option>;
+                    })}
+                  </select>
+                  <select style={iSt({width:72})}
+                    value={bTo.split(":")[1]||"00"}
+                    onChange={e=>{
+                      const h=bTo.split(":")[0]||"20";
+                      setBTo(`${h}:${e.target.value}`);
+                    }}>
+                    {["00","15","30","45"].map(m=>(
+                      <option key={m} value={m}>:{m}</option>
+                    ))}
+                  </select>
+                </div>
               </FFld>
             </div>
             <FFld label="Label (optional)" style={{marginTop:10}}>
@@ -2211,26 +2274,54 @@ export default function App() {
             </div>
           )}
 
-          {Object.entries(pickGrouped).map(([team,list])=>(
-            <div key={team} style={{marginBottom:14}}>
-              <div style={{marginBottom:7}}><TeamPill team={team}/></div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                {list.map(m=>{
-                  const sel=selP.includes(m.name);
-                  return (
-                    <button key={m.id} type="button"
-                      onClick={()=>setSelP(ps=>sel?ps.filter(x=>x!==m.name):[...ps,m.name])}
-                      style={{background:sel?G.green:G.white,color:sel?G.lime:G.text,
-                        border:sel?`2px solid ${G.green}`:`1.5px solid ${G.border}`,
-                        borderRadius:24,padding:"7px 14px",fontSize:13,fontWeight:700,
-                        cursor:"pointer",fontFamily:"inherit",transition:"all .1s"}}>
-                      {sel&&"✓ "}{m.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+          {(()=>{
+            const entries = Object.entries(pickGrouped);
+            const myTeamsSet = new Set(myTeamsList);
+            let shownDivider = false;
+            return entries.map(([team,list],idx)=>{
+              const isMine = myTeamsSet.has(team);
+              const showDiv = !isMine && !shownDivider && myTeamsList.length>0 && idx>0;
+              if(showDiv) shownDivider = true;
+              return (
+                <React.Fragment key={team}>
+                  {showDiv&&(
+                    <div style={{display:"flex",alignItems:"center",gap:8,margin:"4px 0 10px"}}>
+                      <div style={{flex:1,height:1,background:G.border}}/>
+                      <span style={{fontSize:10,fontWeight:900,letterSpacing:1.5,
+                        color:G.muted,textTransform:"uppercase",whiteSpace:"nowrap"}}>
+                        Other Groups
+                      </span>
+                      <div style={{flex:1,height:1,background:G.border}}/>
+                    </div>
+                  )}
+                  <div style={{marginBottom:14}}>
+                    <div style={{marginBottom:7,display:"flex",alignItems:"center",gap:7}}>
+                      <TeamPill team={team}/>
+                      {isMine&&<span style={{fontSize:10,fontWeight:800,color:G.green,
+                        background:"#dcfce7",borderRadius:99,padding:"1px 7px"}}>
+                        Your group
+                      </span>}
+                    </div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                      {list.map(m=>{
+                        const sel=selP.includes(m.name);
+                        return (
+                          <button key={m.id} type="button"
+                            onClick={()=>setSelP(ps=>sel?ps.filter(x=>x!==m.name):[...ps,m.name])}
+                            style={{background:sel?G.green:G.white,color:sel?G.lime:G.text,
+                              border:sel?`2px solid ${G.green}`:`1.5px solid ${G.border}`,
+                              borderRadius:24,padding:"7px 14px",fontSize:13,fontWeight:700,
+                              cursor:"pointer",fontFamily:"inherit",transition:"all .1s"}}>
+                            {sel&&"✓ "}{m.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </React.Fragment>
+              );
+            });
+          })()}
 
           {can(userRole,"deleteSession")&&<>
             <SLbl>Restrict to Team <span style={{fontWeight:500,color:G.muted}}>(optional)</span></SLbl>
@@ -2494,15 +2585,40 @@ export default function App() {
             </div>
           </>}
 
-          {can(userRole,"deleteSession")&&(
-            <button onClick={()=>handleDeleteSess(selSess.id)}
-              style={{display:"block",width:"100%",marginTop:22,
-                background:"transparent",border:`1.5px solid ${G.red}`,color:G.red,
-                borderRadius:10,padding:"11px",fontSize:14,fontWeight:800,
-                cursor:"pointer",fontFamily:"inherit"}}>
-              🗑 Delete Session
-            </button>
-          )}
+          {can(userRole,"deleteSession")&&(()=>{
+            const isRecurring = !!selSess.recurringId;
+            const slot = isRecurring ? recurring.find(r=>r.id===selSess.recurringId) : null;
+            return (
+              <div style={{marginTop:22}}>
+                {isRecurring&&slot&&(
+                  <div style={{background:"#fff7ed",border:"1.5px solid #fed7aa",
+                    borderRadius:10,padding:"11px 14px",marginBottom:10,fontSize:12,
+                    color:"#92400e",lineHeight:1.6}}>
+                    <b>⚠️ This is a recurring session</b> — it will regenerate automatically
+                    unless you also stop the recurring slot "<b>{slot.name}</b>".
+                    <label style={{display:"flex",alignItems:"center",gap:8,
+                      marginTop:9,cursor:"pointer",fontWeight:700}}>
+                      <input type="checkbox" id="stopRecurring"
+                        style={{width:16,height:16,cursor:"pointer"}}/>
+                      Also delete the "{slot.name}" recurring slot
+                    </label>
+                  </div>
+                )}
+                <button onClick={()=>{
+                    if(isRecurring&&slot&&document.getElementById("stopRecurring")?.checked){
+                      deleteRecurringSlot(slot.id);
+                    }
+                    handleDeleteSess(selSess.id);
+                  }}
+                  style={{display:"block",width:"100%",
+                    background:"transparent",border:`1.5px solid ${G.red}`,color:G.red,
+                    borderRadius:10,padding:"11px",fontSize:14,fontWeight:800,
+                    cursor:"pointer",fontFamily:"inherit"}}>
+                  🗑 Delete Session
+                </button>
+              </div>
+            );
+          })()}
         </div>
         <BotNav view="session" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
         {toast&&<Toast msg={toast}/>}
