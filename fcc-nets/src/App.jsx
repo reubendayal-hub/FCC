@@ -111,6 +111,47 @@ const SEED_MEMBERS = [
   role: name === "Reuben Dayal" ? "superadmin" : "member",
 }));
 
+// ─── Name fix map ─────────────────────────────────────────────
+// Maps first-name-only entries to their known full names.
+// Entries with duplicate first names (e.g. "Adithya" → 2 people) are
+// intentionally excluded — those must be fixed manually via the pencil icon.
+const NAME_MAP = {
+  "Aadya":"Aadya Kaul","Aarin":"Aarin Venkatesh","Abhinav":"Abhinav Singh",
+  "Adam":"Adam Pirzada","Advik":"Advik Akar","Ahaan":"Ahaan Sinha",
+  "Ahmed":"Ahmed Nawaz","Akshay":"Akshay Bhardwaj","Amer":"Amer Ramzan",
+  "Amit":"Amit Yadav","Anagha":"Anagha Mahajan","Anant":"Anant Mahajan",
+  "Anirudh":"Anirudh Ram Sriram","Anshu":"Anshu Gupta",
+  "Anveshak":"Anveshak Vujjini","Abhijit":"Abhijit Guhagarkar",
+  "Deepak":"Deepak Akar","Dhruv":"Dhruv Shah",
+  "Gagan":"Gagan Sachdeva","Garghi":"Garghi Seenevas",
+  "Hasnain":"Hasnain Ahmed","Ilayaraja":"Ilayaraja Karuppasamy",
+  "Ishan":"Ishan Bordoloi","Jaya":"Jaya Nair",
+  "Kamal":"Kamal Jayalaksminarasimhan","Kian":"Kian Kakoti",
+  "Mishka":"Mishka Gupta","Monesh":"Monesh Shantharam",
+  "Nimesh":"Nimesh Rajamohanan","Nirmal":"Nirmal Mohanan",
+  "Pranavan":"Pranavan Aananth","Prithvi":"Prithvi Sagar",
+  "Pronit":"Pronit Lahiri","Pulin":"Pulin Dhar",
+  "Raghavendar":"Raghavendar Murali","Rajkumar":"Rajkumar Jeyaraman",
+  "Raju":"Raju Dantuluri","Ramakrishnan":"Ramakrishnan Ravi",
+  "Reuben":"Reuben Dayal","Rewanth":"Rewanth Punna",
+  "Rohind":"Rohind Muthuselvaraj","Rohith":"Rohith Arunkumar",
+  "Saatvik":"Saatvik Dantuluri","Sahasra":"Sahasra Dantuluri",
+  "Sagar":"Sagar Gupta","Sahil":"Sahil Gagneja",
+  "Samyak":"Samyak Jaggi Ram","Savir":"Savir Gagneja",
+  "Senthil":"Senthil Gnanasambandan","Shardul":"Shardul Joshi",
+  "Sharmila":"Sharmila C","Shashank":"Shashank Rastogi",
+  "Shreyas":"Shreyas Gujjar","Stalin":"Stalin Natesan",
+  "Syed":"Syed Hamza Kazmi","Taarush":"Taarush Jain",
+  "Talat":"Talat Munshi","Trineth":"Trineth Arjun",
+  "Vijay":"Vijay Deepak","Virendra":"Virendra Pawar",
+  "Vishali":"Vishali Jain","Xavier":"Xavier Ramzan",
+  "Yogismaan":"Yogismaan Kamal","Zachary":"Zachary Dayal","Zeb":"Zeb Pirzada",
+  // Session refs use old short names too — include these common session-only names:
+  "Rajesh":"Rajesh Muthukumar", // will be overridden for Rajesh Ayyappan if both exist
+};
+// Names that are ambiguous (multiple people share the first name) — manual fix only:
+const AMBIGUOUS_FIRST_NAMES = ["Adithya","Arun","Ashwin","Nitin","Rajesh","Vihaan","Vinay","Vivek"];
+
 // ─── Utility ──────────────────────────────────────────────────
 const uid          = () => Math.random().toString(36).slice(2,9);
 const todayStr     = () => new Date().toISOString().split("T")[0];
@@ -280,10 +321,10 @@ function PinPad({ label, onDone, onCancel, error }) {
   useEffect(() => { if(val.length===4) onDone(val); }, [val]);
 
   return (
-    <div style={{textAlign:"center",padding:"24px 20px"}}>
-      <div style={{fontSize:15,fontWeight:800,color:G.text,marginBottom:20}}>{label}</div>
+    <div style={{textAlign:"center",padding:"60px 20px 24px"}}>
+      <div style={{fontSize:15,fontWeight:800,color:G.text,marginBottom:24}}>{label}</div>
       {/* dots */}
-      <div style={{display:"flex",justifyContent:"center",gap:14,marginBottom:28}}>
+      <div style={{display:"flex",justifyContent:"center",gap:14,marginBottom:32}}>
         {[0,1,2,3].map(i=>(
           <div key={i} style={{width:18,height:18,borderRadius:"50%",
             background: val.length>i ? G.green : G.border,
@@ -390,10 +431,11 @@ function BotNav({view,setView,userRole}) {
   );
 
   const tabStyle = (on) => ({
-    flex:1, background:"none", border:"none", cursor:"pointer",
+    background:"none", border:"none", cursor:"pointer",
     fontFamily:"'DM Sans',sans-serif", padding:"6px 4px",
     display:"flex", flexDirection:"column", alignItems:"center", gap:3,
     color: on ? G.green : "#94a3b8", transition:"color .15s",
+    width:"100%",
   });
   const labelStyle = (on) => ({
     fontSize:10, fontWeight: on?800:600, letterSpacing:.3,
@@ -407,18 +449,18 @@ function BotNav({view,setView,userRole}) {
       backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)",
       borderTop:"1px solid rgba(0,0,0,0.08)",
       boxShadow:"0 -4px 24px rgba(0,0,0,0.07)",
-      display:"flex", alignItems:"flex-end", justifyContent:"space-around",
-      padding:"8px 12px 12px",
+      display:"grid", gridTemplateColumns:"1fr 1fr 1fr", alignItems:"flex-end",
+      padding:"8px 0 12px",
       paddingBottom:"max(12px, env(safe-area-inset-bottom))",
     }}>
-      {/* Schedule */}
+      {/* Schedule — left slot */}
       <button onClick={()=>setView("schedule")} style={tabStyle(active==="schedule")}>
         <IconSchedule on={active==="schedule"}/>
         <span style={labelStyle(active==="schedule")}>Schedule</span>
       </button>
 
-      {/* Add / Join — floating circle, always centred */}
-      <div style={{flex:1, display:"flex", flexDirection:"column",
+      {/* Book — centre slot */}
+      <div style={{display:"flex", flexDirection:"column",
         alignItems:"center", justifyContent:"flex-end"}}>
         <button onClick={()=>setView("add")} style={{
           width:54, height:54, borderRadius:"50%", border:"none", cursor:"pointer",
@@ -440,7 +482,7 @@ function BotNav({view,setView,userRole}) {
           color:active==="add"?G.green:"#94a3b8", marginTop:2}}>Book</span>
       </div>
 
-      {/* Members (admin) OR Profile (all users) */}
+      {/* Right slot — Members (admin) or Profile (member) */}
       {isAdmin ? (
         <button onClick={()=>setView("admin")} style={tabStyle(active==="admin")}>
           <IconMembers on={active==="admin"}/>
@@ -951,6 +993,33 @@ export default function App() {
     showToast(`Renamed to "${trimmed}" ✓`);
   }
 
+  function fixAllNames() {
+    // Only fix members whose entire name is a single word AND it exists in NAME_MAP
+    let renames = []; // [{old, new}]
+    const newMembers = members.map(m => {
+      const isSingleWord = !m.name.includes(" ");
+      const mapped = NAME_MAP[m.name];
+      if (isSingleWord && mapped && mapped !== m.name) {
+        renames.push({ old: m.name, new: mapped });
+        return { ...m, name: mapped };
+      }
+      return m;
+    });
+    if (renames.length === 0) { showToast("All names already look complete ✓"); return; }
+    // Apply renames to sessions (players + poll votes)
+    const rMap = Object.fromEntries(renames.map(r => [r.old, r.new]));
+    const newSessions = sessions.map(s => ({
+      ...s,
+      players: s.players.map(p => rMap[p] || p),
+      poll: (s.poll || []).map(o => ({
+        ...o, votes: (o.votes || []).map(v => rMap[v] || v),
+      })),
+    }));
+    saveMembers(newMembers);
+    saveSessions(newSessions);
+    showToast(`Fixed ${renames.length} name${renames.length > 1 ? "s" : ""} ✓`);
+  }
+
   function toggleMemberTeam(id, teamName) {
     const mem = members.find(m=>m.id===id);
     if(!mem) return;
@@ -1189,19 +1258,27 @@ export default function App() {
   // ════════════════════════════════════════════════════════════
   if(!currentUser && authView==="newpin") return (
     <Shell>
-      <div style={{background:G.green,padding:"24px 20px",textAlign:"center"}}>
-        <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
-          fontSize:20,fontWeight:900}}>Hi, {pendingMember?.name.split(" ")[0]}!</div>
-        <div style={{color:"rgba(255,255,255,0.6)",fontSize:13,marginTop:4}}>
-          First time? Set your 4-digit PIN
+      <div style={{display:"flex",flexDirection:"column",minHeight:"100vh"}}>
+        {/* Compact header at top */}
+        <div style={{background:G.green,padding:"18px 20px 16px",textAlign:"center"}}>
+          <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
+            fontSize:19,fontWeight:900}}>Hi, {pendingMember?.name.split(" ")[0]}!</div>
+          <div style={{color:"rgba(255,255,255,0.6)",fontSize:12,marginTop:3}}>
+            First time? Set your 4-digit PIN
+          </div>
+        </div>
+        {/* Keypad pushed to lower portion of screen */}
+        <div style={{flex:1,display:"flex",alignItems:"flex-end",paddingBottom:60}}>
+          <div style={{width:"100%"}}>
+            <PinPad
+              label="Choose a 4-digit PIN"
+              onDone={handleNewPin}
+              onCancel={()=>{ setPendingMember(null); setAuthView("pick"); }}
+              error={pinError}
+            />
+          </div>
         </div>
       </div>
-      <PinPad
-        label="Choose a 4-digit PIN"
-        onDone={handleNewPin}
-        onCancel={()=>{ setPendingMember(null); setAuthView("pick"); }}
-        error={pinError}
-      />
     </Shell>
   );
 
@@ -1210,17 +1287,25 @@ export default function App() {
   // ════════════════════════════════════════════════════════════
   if(!currentUser && authView==="enterpin") return (
     <Shell>
-      <div style={{background:G.green,padding:"24px 20px",textAlign:"center"}}>
-        <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
-          fontSize:20,fontWeight:900}}>Welcome back, {pendingMember?.name.split(" ")[0]}!</div>
-        <div style={{color:"rgba(255,255,255,0.6)",fontSize:13,marginTop:4}}>Enter your PIN</div>
+      <div style={{display:"flex",flexDirection:"column",minHeight:"100vh"}}>
+        {/* Compact header at top */}
+        <div style={{background:G.green,padding:"18px 20px 16px",textAlign:"center"}}>
+          <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
+            fontSize:19,fontWeight:900}}>Welcome back, {pendingMember?.name.split(" ")[0]}!</div>
+          <div style={{color:"rgba(255,255,255,0.6)",fontSize:12,marginTop:3}}>Enter your PIN</div>
+        </div>
+        {/* Keypad pushed to lower portion of screen */}
+        <div style={{flex:1,display:"flex",alignItems:"flex-end",paddingBottom:60}}>
+          <div style={{width:"100%"}}>
+            <PinPad
+              label="Enter your 4-digit PIN"
+              onDone={handleEnterPin}
+              onCancel={()=>{ setPendingMember(null); setAuthView("pick"); }}
+              error={pinError}
+            />
+          </div>
+        </div>
       </div>
-      <PinPad
-        label="Enter your 4-digit PIN"
-        onDone={handleEnterPin}
-        onCancel={()=>{ setPendingMember(null); setAuthView("pick"); }}
-        error={pinError}
-      />
     </Shell>
   );
 
@@ -2072,7 +2157,14 @@ export default function App() {
     );
   }
 
-  if(view==="admin"&&can(userRole,"accessMembers")) return (
+  if(view==="admin"&&can(userRole,"accessMembers")) {
+    const namesNeedFix = userRole==="superadmin"
+      ? members.filter(m=>!m.name.includes(" ")&&NAME_MAP[m.name])
+      : [];
+    const namesAmbiguous = userRole==="superadmin"
+      ? members.filter(m=>!m.name.includes(" ")&&AMBIGUOUS_FIRST_NAMES.includes(m.name))
+      : [];
+    return (
     <Shell>
       <AppHeader title="Manage Members"
         sub={`${members.length} members · ${teams.length} groups`}
@@ -2367,6 +2459,31 @@ export default function App() {
           </div>
         </>}
 
+        {/* ── Fix Names (superadmin only) ───────────────────── */}
+        {(namesNeedFix.length>0||namesAmbiguous.length>0)&&(
+          <div style={{background:"#fffbeb",border:"1.5px solid #fbbf24",borderRadius:12,
+            padding:"14px 16px",marginBottom:16}}>
+            <div style={{fontWeight:900,fontSize:13,color:"#92400e",marginBottom:6}}>
+              ⚠️ Members with incomplete names detected
+            </div>
+            {namesNeedFix.length>0&&<>
+              <div style={{fontSize:12,color:"#78350f",marginBottom:10}}>
+                <b>{namesNeedFix.length}</b> member{namesNeedFix.length>1?"s":""} can be auto-fixed:{" "}
+                {namesNeedFix.map(m=>m.name).join(", ")}
+              </div>
+              <Btn bg="#d97706" col="#fff" onClick={fixAllNames}>
+                Fix {namesNeedFix.length} Name{namesNeedFix.length>1?"s":""} Automatically
+              </Btn>
+            </>}
+            {namesAmbiguous.length>0&&(
+              <div style={{fontSize:12,color:"#78350f",marginTop:namesNeedFix.length?10:0}}>
+                <b>{namesAmbiguous.length}</b> need manual fix (ambiguous — use ✏️ pencil below):{" "}
+                {namesAmbiguous.map(m=>m.name).join(", ")}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Member list */}
         {Object.entries(adminGrouped).map(([team,list])=>(
           <div key={team} style={{marginBottom:18}}>
@@ -2527,6 +2644,7 @@ export default function App() {
       )}
     </Shell>
   );
+  }
 
   // Fallback
   return <Shell><div style={{padding:20,color:G.muted}}>Loading…</div></Shell>;
