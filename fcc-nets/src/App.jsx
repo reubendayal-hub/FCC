@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { db } from "./firebase";
 import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 // ─── Club Logo ───────────────────────────────────────────────
@@ -702,6 +702,7 @@ function Shell({children, sidebar}) {
         @media(max-width:899px){
           .fcc-sidebar{display:none!important;}
           .fcc-app-pane{max-width:500px;width:100%;margin:0 auto;}
+          .fcc-header-logo{width:64px!important;height:64px!important;}
         }
       `}</style>
       {/* Sidebar slot — only visible on desktop via CSS */}
@@ -1126,6 +1127,13 @@ export default function App() {
     saveRecurring(recurring.filter(r=>r.id!==id));
     logAction("recurring", `Deleted recurring slot: "${slot.name}"`);
     showToast(`Slot "${slot.name}" deleted`);
+  }
+  function deleteRecurringSlotSilent(id) {
+    // No confirm — used when checkbox is already the user's confirmation
+    const slot = recurring.find(r=>r.id===id);
+    if(!slot) return;
+    saveRecurring(recurring.filter(r=>r.id!==id));
+    logAction("recurring", `Deleted recurring slot: "${slot.name}"`);
   }
   function updateRecurringSlot(id, changes) {
     const slot = recurring.find(r=>r.id===id);
@@ -1919,7 +1927,7 @@ export default function App() {
       <div style={{display:"flex",alignItems:"center",gap:11,marginBottom:children?10:0}}>
         {onBack
           ? <BackBtn onClick={onBack}/>
-          : <img src={FCC_LOGO} alt="FCC" style={{width:52,height:52,borderRadius:"50%",
+        : <img src={FCC_LOGO} alt="FCC" className="fcc-header-logo" style={{width:64,height:64,borderRadius:"50%",
               objectFit:"cover",flexShrink:0,border:"2px solid rgba(255,255,255,0.3)",
               boxShadow:"0 2px 8px rgba(0,0,0,0.2)"}}/>
         }
@@ -2606,7 +2614,7 @@ export default function App() {
                 )}
                 <button onClick={()=>{
                     if(isRecurring&&slot&&document.getElementById("stopRecurring")?.checked){
-                      deleteRecurringSlot(slot.id);
+                      deleteRecurringSlotSilent(slot.id);
                     }
                     handleDeleteSess(selSess.id);
                   }}
