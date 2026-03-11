@@ -205,6 +205,8 @@ const NAME_MAP = {
   "Yogismaan":"Yogismaan Kamal","Zachary":"Zachary Dayal","Zeb":"Zeb Pirzada",
   // Session refs use old short names too — include these common session-only names:
   "Rajesh":"Rajesh Muthukumar", // will be overridden for Rajesh Ayyappan if both exist
+  // Renamed members — old name → new name:
+  "Jay":"Jayashwanth J S",
 };
 // Names that are ambiguous (multiple people share the first name) — manual fix only:
 const AMBIGUOUS_FIRST_NAMES = ["Adithya","Arun","Ashwin","Nitin","Rajesh","Vihaan","Vinay","Vivek"];
@@ -2953,6 +2955,21 @@ export default function App() {
       logAction("system", `Seeded ${emailsToSeed.length} email${emailsToSeed.length>1?"s":""}: ${emailsToSeed.map(m=>m.name).join(", ")}`);
       showToast(`${emailsToSeed.length} email${emailsToSeed.length>1?"s":""} seeded ✓`);
     }
+    // Members in SEED list but missing from live Firebase data
+    const existingNames = new Set(members.map(m=>m.name.toLowerCase()));
+    const membersToImport = userRole==="superadmin"
+      ? SEED_MEMBERS.filter(m=>!existingNames.has(m.name.toLowerCase()))
+      : [];
+    function importMissingMembers() {
+      const toAdd = membersToImport.map(m=>normMember({
+        ...m,
+        id: uid(), // give fresh IDs to avoid collisions
+        email: EMAIL_SEED[m.name] || null,
+      }));
+      saveMembers([...members, ...toAdd]);
+      logAction("system", `Imported ${toAdd.length} missing member${toAdd.length>1?"s":""}: ${toAdd.map(m=>m.name).join(", ")}`);
+      showToast(`${toAdd.length} member${toAdd.length>1?"s":""} added ✓`);
+    }
     return (
     <Shell>
       <AppHeader title="Manage Members"
@@ -3385,6 +3402,27 @@ export default function App() {
             </div>
             <Btn bg="#1e3a5f" col="#93c5fd" onClick={seedAllEmails}>
               Import {emailsToSeed.length} Email{emailsToSeed.length>1?"s":""} from Uniform Form
+            </Btn>
+          </div>
+        )}
+
+        {/* ── Missing Members (superadmin only) ────────────────── */}
+        {membersToImport.length > 0 && (
+          <div style={{background:"#f0fdf4",border:"1.5px solid #86efac",
+            borderRadius:12,padding:"14px 16px",marginBottom:16}}>
+            <div style={{fontWeight:900,fontSize:13,color:"#14532d",marginBottom:6}}>
+              👤 Members missing from app
+            </div>
+            <div style={{fontSize:12,color:"#166534",marginBottom:10,lineHeight:1.5}}>
+              <b>{membersToImport.length}</b> member{membersToImport.length>1?"s":""} are in the master list but haven't been added to the app yet.
+              Tap below to add them all in one go.
+            </div>
+            <div style={{fontSize:11,color:"#4ade80",background:"#14532d",
+              borderRadius:7,padding:"7px 10px",marginBottom:10,lineHeight:1.7}}>
+              {membersToImport.map(m=>m.name).join(" · ")}
+            </div>
+            <Btn bg="#14532d" col="#a3e635" onClick={importMissingMembers}>
+              Add {membersToImport.length} Missing Member{membersToImport.length>1?"s":""}
             </Btn>
           </div>
         )}
