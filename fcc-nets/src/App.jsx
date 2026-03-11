@@ -14,6 +14,38 @@ const TEAMS_KEY      = "fcc-nets-teams-v4";
 const JOINREQS_KEY   = "joinrequests";
 const AUDITLOG_KEY   = "auditlog";
 
+// ─── 2026 Home Match Fixtures (Fredensborg ground only) ───────
+const MATCH_FIXTURES = [
+  // ── T20 Series 4 ──────────────────────────────────────────
+  { date:"2026-05-03", from:"13:00", to:"21:00", label:"T20 Series 4 — FCC vs Nørrebro" },
+  { date:"2026-07-05", from:"10:00", to:"19:00", label:"T20 Series 4 — FCC vs AB" },
+  { date:"2026-08-02", from:"15:00", to:"21:00", label:"T20 Series 4 — FCC vs Tåstrup" },
+  // ── T20 Series 5 ──────────────────────────────────────────
+  { date:"2026-05-16", from:"14:30", to:"21:00", label:"T20 Series 5 — FCC vs Himalaya" },
+  { date:"2026-07-05", from:"14:00", to:"21:00", label:"T20 Series 5 — FCC vs Tårnby" },
+  { date:"2026-07-11", from:"11:00", to:"19:00", label:"T20 Series 5 — FCC vs Tåstrup" },
+  // ── Div 2 (FCC1 = Fredensborg 1) ──────────────────────────
+  { date:"2026-05-17", from:"10:00", to:"19:00", label:"Div 2 — FCC vs Århus" },
+  { date:"2026-05-24", from:"11:00", to:"19:00", label:"Div 2 — FCC vs Himalaya" },
+  { date:"2026-06-07", from:"11:00", to:"19:00", label:"Div 2 — FCC vs Copenhagen" },
+  { date:"2026-07-26", from:"11:00", to:"19:00", label:"Div 2 — FCC vs Bella" },
+  { date:"2026-08-15", from:"11:00", to:"19:00", label:"Div 2 — FCC vs Kolding" },
+  { date:"2026-08-30", from:"11:00", to:"19:00", label:"Div 2 — FCC vs Frem" },
+  // ── Div 3 (FCC2 = Fredensborg 2) ──────────────────────────
+  { date:"2026-05-02", from:"13:00", to:"21:00", label:"Div 3 — FCC vs APMM" },
+  { date:"2026-05-31", from:"10:00", to:"18:00", label:"Div 3 — FCC vs Frem" },
+  { date:"2026-06-13", from:"14:00", to:"21:00", label:"Div 3 — FCC vs Hvidovre" },
+  { date:"2026-06-27", from:"10:00", to:"19:00", label:"Div 3 — FCC vs Ishøj" },
+  { date:"2026-08-22", from:"10:00", to:"19:00", label:"Div 3 — FCC vs APMM" },
+  { date:"2026-09-05", from:"15:00", to:"21:00", label:"Div 3 — FCC vs AB" },
+  // ── Div 4 (FCC3 = Fredensborg 3) ──────────────────────────
+  { date:"2026-05-10", from:"10:00", to:"19:00", label:"Div 4 — FCC vs Tårnby" },
+  { date:"2026-05-31", from:"15:00", to:"21:00", label:"Div 4 — FCC vs Albertslund" },
+  { date:"2026-06-14", from:"14:30", to:"21:00", label:"Div 4 — FCC vs Tåstrup" },
+  { date:"2026-08-01", from:"10:00", to:"19:00", label:"Div 4 — FCC vs Hvidovre" },
+  { date:"2026-08-09", from:"14:00", to:"21:00", label:"Div 4 — FCC vs Frem" },
+];
+
 // ─── Roles ────────────────────────────────────────────────────
 const ROLES = ["superadmin","admin","captain","vicecaptain","member"];
 const ROLE_META = {
@@ -2248,31 +2280,19 @@ export default function App() {
           );
         })()}
 
-        {/* Block calendar notices */}
+        {/* Block calendar notices — read-only for members, managed in Admin */}
         {upcomingBlocks.length>0&&(
           <div style={{marginBottom:14}}>
             <SLbl mt={0}>🚫 Ground Blocked</SLbl>
             {upcomingBlocks.map(b=>(
               <div key={b.id} style={{background:"#fff7ed",border:"1.5px solid #fed7aa",
-                borderRadius:10,padding:"10px 14px",marginBottom:6,
-                display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <div>
-                  <div style={{fontWeight:800,fontSize:13,color:"#c2410c"}}>
-                    🏏 {b.label||"Ground Blocked"} — {fmtShort(b.date)}
-                  </div>
-                  <div style={{fontSize:12,color:"#9a3412",marginTop:2}}>
-                    {b.from} – {b.to} · Nets unavailable (match day)
-                  </div>
+                borderRadius:10,padding:"10px 14px",marginBottom:6}}>
+                <div style={{fontWeight:800,fontSize:13,color:"#c2410c"}}>
+                  🏏 {b.label||"Ground Blocked"} — {fmtShort(b.date)}
                 </div>
-                {can(userRole,"deleteSession")&&(
-                  <button type="button" onClick={()=>{
-                    logAction("blockcal", `Removed block: ${b.date} ${b.from}–${b.to} "${b.label}"`);
-                    saveBlockCals(blockCals.filter(x=>x.id!==b.id));
-                  }}
-                    style={{background:"#fee2e2",color:"#dc2626",border:"none",
-                      borderRadius:6,padding:"4px 8px",fontSize:12,cursor:"pointer",
-                      fontFamily:"inherit",fontWeight:800,flexShrink:0}}>×</button>
-                )}
+                <div style={{fontSize:12,color:"#9a3412",marginTop:2}}>
+                  {b.from} – {b.to} · Nets unavailable (match day)
+                </div>
               </div>
             ))}
           </div>
@@ -2307,60 +2327,6 @@ export default function App() {
           </>
         )}
 
-        {/* Block Nets Sessions — admin/captain/VC only */}
-        {(["superadmin","admin","captain","vicecaptain"].includes(userRole))&&(
-          <div style={{marginTop:20,background:G.white,border:`1.5px solid ${G.border}`,
-            borderRadius:12,padding:"14px 16px"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-              marginBottom:showBlockForm?14:0}}>
-              <div>
-                <div style={{fontWeight:800,fontSize:13,color:G.text}}>🚫 Block Nets Sessions</div>
-                <div style={{fontSize:11,color:G.muted,marginTop:2,fontStyle:"italic"}}>
-                  (during matches &amp; other events)
-                </div>
-              </div>
-              <button type="button" onClick={()=>setShowBlockForm(v=>!v)}
-                style={{background:G.cream,border:`1px solid ${G.border}`,borderRadius:8,
-                  padding:"5px 12px",fontSize:12,fontWeight:700,cursor:"pointer",
-                  fontFamily:"inherit",color:G.text,flexShrink:0}}>
-                {showBlockForm?"Cancel":"+ Block Date"}
-              </button>
-            </div>
-            {showBlockForm&&(
-              <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                <FFld label="Match / Event label">
-                  <input placeholder="e.g. Div 3 Home Match vs Svanholm"
-                    style={iSt({padding:"9px 12px",fontSize:13})}
-                    value={bCalLabel} onChange={e=>setBCalLabel(e.target.value)}/>
-                </FFld>
-                <FFld label="Date">
-                  <input type="date" style={iSt({padding:"9px 12px",fontSize:13})}
-                    value={bCalDate} onChange={e=>setBCalDate(e.target.value)}/>
-                </FFld>
-                <div style={{display:"flex",gap:8}}>
-                  <FFld label="From" style={{flex:1}}>
-                    <input type="time" style={iSt({padding:"9px 12px",fontSize:13})}
-                      value={bCalFrom} onChange={e=>setBCalFrom(e.target.value)}/>
-                  </FFld>
-                  <FFld label="To" style={{flex:1}}>
-                    <input type="time" style={iSt({padding:"9px 12px",fontSize:13})}
-                      value={bCalTo} onChange={e=>setBCalTo(e.target.value)}/>
-                  </FFld>
-                </div>
-                <Btn bg={G.green} col={G.lime} full onClick={()=>{
-                  if(!bCalDate){showToast("Please pick a date");return;}
-                  const lbl = bCalLabel.trim()||"Ground Blocked";
-                  saveBlockCals([...blockCals,{
-                    id:uid(),date:bCalDate,from:bCalFrom,to:bCalTo,label:lbl}]);
-                  logAction("blockcal", `Blocked ground: ${bCalDate} ${bCalFrom}–${bCalTo} "${lbl}"`);
-                  setBCalDate("");setBCalFrom("10:00");setBCalTo("14:00");
-                  setBCalLabel("");setShowBlockForm(false);
-                  showToast("Ground blocked ✓");
-                }}>🚫 Block This Date</Btn>
-              </div>
-            )}
-          </div>
-        )}
       </div>
       <BotNav view="schedule" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
       {toast&&<Toast msg={toast}/>}
@@ -3668,6 +3634,124 @@ export default function App() {
               </label>
               <Btn type="submit" bg={G.green} col={G.lime}>+ Add</Btn>
             </form>
+          </div>
+        </>}
+
+        {/* ── Block Nets Sessions ────────────────────────────── */}
+        {can(userRole,"addMember")&&<>
+          <SLbl mt={4}>Block Nets Sessions</SLbl>
+          <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
+            padding:14,marginBottom:8}}>
+            <div style={{fontSize:12,color:G.muted,marginBottom:10,lineHeight:1.5}}>
+              Block the ground on match days or events so members know nets aren't available.
+            </div>
+            {/* Import 2026 fixtures button */}
+            {(()=>{
+              const alreadyImported = MATCH_FIXTURES.every(f=>
+                blockCals.some(b=>b.date===f.date&&b.label===f.label));
+              const importedCount = MATCH_FIXTURES.filter(f=>
+                blockCals.some(b=>b.date===f.date&&b.label===f.label)).length;
+              const remaining = MATCH_FIXTURES.length - importedCount;
+              if(alreadyImported) return (
+                <div style={{background:"#f0fdf4",border:"1.5px solid #bbf7d0",borderRadius:8,
+                  padding:"9px 12px",marginBottom:12,fontSize:12,color:"#166534",fontWeight:700}}>
+                  ✅ All 2026 home match fixtures imported ({MATCH_FIXTURES.length} blocks)
+                </div>
+              );
+              return (
+                <div style={{background:"#eff6ff",border:"1.5px solid #bfdbfe",borderRadius:8,
+                  padding:"10px 12px",marginBottom:12,display:"flex",
+                  alignItems:"center",justifyContent:"space-between",gap:10}}>
+                  <div>
+                    <div style={{fontWeight:800,fontSize:12,color:"#1e40af"}}>
+                      🏏 Import 2026 Home Fixtures
+                    </div>
+                    <div style={{fontSize:11,color:"#3b82f6",marginTop:2}}>
+                      {remaining} match block{remaining!==1?"s":""} not yet added
+                      {importedCount>0?` (${importedCount} already imported)`:""}
+                    </div>
+                  </div>
+                  <button onClick={async ()=>{
+                    const toAdd = MATCH_FIXTURES.filter(f=>
+                      !blockCals.some(b=>b.date===f.date&&b.label===f.label));
+                    const updated = [...blockCals, ...toAdd.map(f=>({...f,id:uid()}))];
+                    await saveBlockCals(updated);
+                    logAction("blockcal",`Imported ${toAdd.length} home match fixtures for 2026`);
+                    showToast(`${toAdd.length} match blocks imported ✓`);
+                  }} style={{background:"#2563eb",color:"#fff",border:"none",borderRadius:8,
+                    padding:"7px 14px",fontSize:12,fontWeight:800,cursor:"pointer",
+                    fontFamily:"inherit",flexShrink:0,whiteSpace:"nowrap"}}>
+                    Import All
+                  </button>
+                </div>
+              );
+            })()}
+            {/* Existing blocks */}
+            {blockCals.filter(b=>isFuture(b.date)||b.date===todayStr())
+              .sort((a,b)=>a.date.localeCompare(b.date))
+              .map(b=>(
+              <div key={b.id} style={{display:"flex",justifyContent:"space-between",
+                alignItems:"center",padding:"8px 10px",background:G.cream,
+                borderRadius:8,marginBottom:6,gap:8}}>
+                <div>
+                  <div style={{fontWeight:700,fontSize:13,color:G.text}}>{b.label}</div>
+                  <div style={{fontSize:11,color:G.muted}}>{fmtShort(b.date)} · {b.from}–{b.to}</div>
+                </div>
+                <button onClick={()=>{
+                    saveBlockCals(blockCals.filter(x=>x.id!==b.id));
+                    logAction("blockcal",`Removed block: ${b.date} ${b.from}–${b.to} "${b.label}"`);
+                  }}
+                  style={{background:"none",border:"none",color:G.red,fontSize:16,
+                    cursor:"pointer",padding:"2px 6px",lineHeight:1}}>×</button>
+              </div>
+            ))}
+            {/* Add new block form */}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+              marginBottom:showBlockForm?12:0,marginTop:blockCals.filter(b=>isFuture(b.date)||b.date===todayStr()).length>0?10:0}}>
+              <div style={{fontSize:12,fontWeight:700,color:G.muted}}>
+                {blockCals.filter(b=>isFuture(b.date)||b.date===todayStr()).length===0&&"No upcoming blocks"}
+              </div>
+              <button type="button" onClick={()=>setShowBlockForm(v=>!v)}
+                style={{background:showBlockForm?G.redBg:G.cream,border:`1px solid ${G.border}`,
+                  borderRadius:8,padding:"5px 12px",fontSize:12,fontWeight:700,
+                  cursor:"pointer",fontFamily:"inherit",
+                  color:showBlockForm?G.red:G.text}}>
+                {showBlockForm?"Cancel":"+ Block Date"}
+              </button>
+            </div>
+            {showBlockForm&&(
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                <FFld label="Match / Event label">
+                  <input placeholder="e.g. Div 3 Home Match vs Svanholm"
+                    style={iSt({padding:"9px 12px",fontSize:13})}
+                    value={bCalLabel} onChange={e=>setBCalLabel(e.target.value)}/>
+                </FFld>
+                <FFld label="Date">
+                  <input type="date" style={iSt({padding:"9px 12px",fontSize:13})}
+                    value={bCalDate} onChange={e=>setBCalDate(e.target.value)}/>
+                </FFld>
+                <div style={{display:"flex",gap:8}}>
+                  <FFld label="From" style={{flex:1}}>
+                    <input type="time" style={iSt({padding:"9px 12px",fontSize:13})}
+                      value={bCalFrom} onChange={e=>setBCalFrom(e.target.value)}/>
+                  </FFld>
+                  <FFld label="To" style={{flex:1}}>
+                    <input type="time" style={iSt({padding:"9px 12px",fontSize:13})}
+                      value={bCalTo} onChange={e=>setBCalTo(e.target.value)}/>
+                  </FFld>
+                </div>
+                <Btn bg={G.green} col={G.lime} full onClick={()=>{
+                  if(!bCalDate){showToast("Please pick a date");return;}
+                  const lbl = bCalLabel.trim()||"Ground Blocked";
+                  saveBlockCals([...blockCals,{
+                    id:uid(),date:bCalDate,from:bCalFrom,to:bCalTo,label:lbl}]);
+                  logAction("blockcal",`Blocked ground: ${bCalDate} ${bCalFrom}–${bCalTo} "${lbl}"`);
+                  setBCalDate("");setBCalFrom("10:00");setBCalTo("14:00");
+                  setBCalLabel("");setShowBlockForm(false);
+                  showToast("Ground blocked ✓");
+                }}>🚫 Block This Date</Btn>
+              </div>
+            )}
           </div>
         </>}
 
