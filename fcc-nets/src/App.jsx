@@ -117,6 +117,7 @@ const PRESET_POLL = [
 const CAN = {
   deleteSession:  ["superadmin","admin","captain","vicecaptain"],
   removePlayer:   ["superadmin","admin","captain","vicecaptain"],
+  addOtherPlayer: ["superadmin","admin","captain","vicecaptain"],
   createSession:  ["superadmin","admin","captain","vicecaptain","member"],
   sendReminder:   ["superadmin","admin","captain","vicecaptain"],
   accessMembers:  ["superadmin","admin"],
@@ -126,6 +127,16 @@ const CAN = {
   resetOtherPin:  ["superadmin"],
 };
 const can = (role, action) => (CAN[action]||[]).includes(role);
+
+// 9pm cutoff: after 9pm the night before a session, members can't self-remove
+function isAfterCutoff(sessionDateStr) {
+  const now = new Date();
+  const sessDay = new Date(sessionDateStr + "T00:00:00");
+  const cutoff = new Date(sessDay);
+  cutoff.setDate(cutoff.getDate() - 1);
+  cutoff.setHours(21, 0, 0, 0); // 9pm the day before
+  return now >= cutoff;
+}
 
 // Roles available to assign based on team type — now uses dynamic seniorTeamNames inside component
 
@@ -210,6 +221,61 @@ const NAME_MAP = {
 };
 // Names that are ambiguous (multiple people share the first name) — manual fix only:
 const AMBIGUOUS_FIRST_NAMES = ["Adithya","Arun","Ashwin","Nitin","Rajesh","Vihaan","Vinay","Vivek"];
+
+// ─── Division team rosters (from squad lists) ─────────────────
+// Maps member names (as stored in Firebase) to their division team.
+// Run "Assign Division Teams" in Admin Panel to apply these.
+const DIVISION_TEAMS = {
+  // Div 2
+  "Aarin Venkatesh":       "Div 2",
+  "Saatvik Dantuluri":     "Div 2",
+  "Vinay Arunkumar":       "Div 2",
+  "Dhruv Shah":            "Div 2",
+  "Ashwin Shankar":        "Div 2",
+  "Rewanth Punna":         "Div 2",
+  "Syed Hamza Kazmi":      "Div 2",
+  "Garghi Seenevas":       "Div 2",
+  "Rohind Muthuselvaraj":  "Div 2",
+  "Adithya Manimaran":     "Div 2",
+  "Anirudh Ram Sriram":    "Div 2",
+  "Vinay Kumar":           "Div 2",
+  "Stalin Natesan":        "Div 2",
+  "Virendra Pawar":        "Div 2",
+  "Vijay Deepak":          "Div 2",
+  "Muhammad Aun Zaheer":   "Div 2",
+  // Div 3
+  "Adam Pirzada":          "Div 3",
+  "Advik Akar":            "Div 3",
+  "Junaid Khan":           "Div 3",
+  "Ahmed Nawaz":           "Div 3",
+  "Prithvi Sagar":         "Div 3",
+  "Reuben Dayal":          "Div 3",
+  "Nimesh Rajamohanan":    "Div 3",
+  "Sahil Gagneja":         "Div 3",
+  "Deepak Akar":           "Div 3",
+  "Nitin Jain":            "Div 3",
+  "Vivek Bhatnagar":       "Div 3",
+  "Balaji R":              "Div 3",
+  "Ilayaraja Karuppasamy": "Div 3",
+  // Div 4
+  "Samyak Jaggi Ram":      "Div 4",
+  "Abhinav Singh":         "Div 4",
+  "Xavier Ramzan":         "Div 4",
+  "Anveshak Vujjini":      "Div 4",
+  "Amit Yadav":            "Div 4",
+  "Gagan Sachdeva":        "Div 4",
+  "Shreyas Gujjar":        "Div 4",
+  "Nirmal Mohanan":        "Div 4",
+  "Monesh Shantharam":     "Div 4",
+  "Shashank Rastogi":      "Div 4",
+  "Rajkumar Jeyaraman":    "Div 4",
+  "Sagar Gupta":           "Div 4",
+  "Vivek Satyarthi":       "Div 4",
+  "Arun Shankar":          "Div 4",
+  "Jayashwanth J S":       "Div 4",
+  "Shardul Joshi":         "Div 4",
+  "Pronit Lahiri":         "Div 4",
+};
 
 // ─── Email seed (from uniform order form) ────────────────────
 // Used to pre-populate member emails via admin "Seed Emails" button.
@@ -681,7 +747,7 @@ function SidebarNav({view, setView, userRole, currentUser, onLogout}) {
       <img src={FCC_LOGO} alt="FCC" className="fcc-sidebar-logo"/>
       <div>
         <div className="fcc-sidebar-title">FCC Training</div>
-        <div className="fcc-sidebar-sub" style={{marginTop:4}}>Karlebo</div>
+        <div className="fcc-sidebar-sub" style={{marginTop:4}}>Fredensborg CC</div>
       </div>
       <div className="fcc-sidebar-links">
         {navBtn("schedule","📅","Schedule")}
@@ -732,7 +798,7 @@ function Shell({children, sidebar}) {
         @media(max-width:899px){
           .fcc-sidebar{display:none!important;}
           .fcc-app-pane{max-width:500px;width:100%;margin:0 auto;}
-          .fcc-header-logo{width:64px!important;height:64px!important;}
+          .fcc-header-logo{width:72px!important;height:72px!important;}
         }
       `}</style>
       {/* Sidebar slot — only visible on desktop via CSS */}
@@ -1504,7 +1570,7 @@ export default function App() {
           <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
             fontSize:28,fontWeight:900,letterSpacing:"-.5px",lineHeight:1}}>FCC Training</div>
           <div style={{color:"rgba(255,255,255,0.45)",fontSize:11,fontWeight:700,
-            letterSpacing:2.5,textTransform:"uppercase",marginTop:5}}>Karlebo · Fredensborg CC</div>
+            letterSpacing:2.5,textTransform:"uppercase",marginTop:5}}>Fredensborg CC</div>
         </div>
 
         <div style={{padding:"24px 20px 40px"}}>
@@ -1997,7 +2063,7 @@ export default function App() {
     return (
     <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
         currentUser={currentUser} onLogout={handleLogout}/>}>
-      <AppHeader title="FCC Training" sub="Karlebo · Fredensborg Cricket Club">
+      <AppHeader title="FCC Training" sub="Fredensborg Cricket Club">
         <div style={{display:"flex",alignItems:"center",justifyContent:"flex-end"}}>
           <Btn onClick={()=>setView("add")} bg={G.lime} col={G.green}>+ Add / Join</Btn>
         </div>
@@ -2464,10 +2530,21 @@ export default function App() {
     const userInTeam = !isRestricted
       || (userMem?.teams||[]).includes(selSess.restrictedTo)
       || can(userRole,"deleteSession");
-    const notIn=members.filter(m=>!selSess.players.includes(m.name))
-      .filter(m=>!isRestricted
-        || (m.teams||[]).includes(selSess.restrictedTo)
-        || can(userRole,"deleteSession"));
+    const canAddOthers = can(userRole,"addOtherPlayer");
+    const cutoff = isAfterCutoff(selSess.date);
+    // Members not in session — admins/captains see all relevant, members only see own team
+    const notIn = members.filter(m=>!selSess.players.includes(m.name))
+      .filter(m=>{
+        if(isRestricted) return (m.teams||[]).includes(selSess.restrictedTo) || can(userRole,"deleteSession");
+        if(!canAddOthers) return (m.teams||[]).some(t=>(userMem?.teams||[]).includes(t));
+        return true;
+      });
+    // Who's NOT coming from user's own team (or restricted team) — for the "absent" list
+    const myTeams = userMem?.teams||[];
+    const relevantTeam = isRestricted ? selSess.restrictedTo : (myTeams[0]||null);
+    const absentFromTeam = relevantTeam
+      ? members.filter(m=>(m.teams||[]).includes(relevantTeam) && !selSess.players.includes(m.name))
+      : [];
     return (
       <Shell>
         <AppHeader
@@ -2538,13 +2615,16 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-                {/* Remove: admins/captains can remove anyone; members can only remove themselves */}
-                {(can(userRole,"removePlayer")||isSelf)&&(
+                {/* Remove button: admins/captains always; members only before 9pm cutoff */}
+                {can(userRole,"removePlayer") ? (
                   <Btn onClick={()=>handleLeave(selSess.id,p)}
-                    bg={G.redBg} col={G.red} sm>
-                    {isSelf&&!can(userRole,"removePlayer")?"Leave":"Remove"}
-                  </Btn>
-                )}
+                    bg={G.redBg} col={G.red} sm>Remove</Btn>
+                ) : isSelf ? (
+                  cutoff
+                    ? <span style={{fontSize:11,color:G.muted,fontWeight:700}}>🔒 Locked</span>
+                    : <Btn onClick={()=>handleLeave(selSess.id,p)}
+                        bg={G.redBg} col={G.red} sm>Leave</Btn>
+                ) : null}
               </div>
             );
           })}
@@ -2612,8 +2692,8 @@ export default function App() {
             );
           })()}
 
+          {/* ── Who's not coming (admins/captains see add button; members see read-only) ── */}
           {notIn.length>0&&userInTeam&&(()=>{
-            // Group notIn by team, user's teams first
             const myTs = userMem?.teams||[];
             const myTsSet = new Set(myTs);
             const grouped = ALL_TEAMS.reduce((acc,t)=>{
@@ -2628,8 +2708,9 @@ export default function App() {
               return a.localeCompare(b);
             });
             let divShown=false;
+            const isSelf = name => name === currentUser?.name;
             return (<>
-              <SLbl>Add More Players</SLbl>
+              <SLbl>{canAddOthers ? "Add Players / Not Yet Signed Up" : "Not Yet Signed Up"}</SLbl>
               {sortedKeys.map((t,idx)=>{
                 const isMine=myTsSet.has(t);
                 const showDiv=!isMine&&!divShown&&myTs.length>0&&idx>0;
@@ -2647,19 +2728,34 @@ export default function App() {
                     <div style={{marginBottom:12}}>
                       <div style={{marginBottom:6}}><TeamPill team={t}/></div>
                       <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
-                        {grouped[t].map(m=>(
-                          <button key={m.id} onClick={()=>handleJoinDetail(m.name)}
-                            style={{background:G.white,color:G.text,border:`1.5px solid ${G.border}`,
-                              borderRadius:24,padding:"7px 14px",fontSize:13,fontWeight:700,
-                              cursor:"pointer",fontFamily:"inherit"}}>
-                            + {m.name}
-                          </button>
-                        ))}
+                        {grouped[t].map(m=>{
+                          const self = isSelf(m.name);
+                          // Members can only add themselves; captains/admins can add anyone
+                          const canAdd = canAddOthers || self;
+                          return (
+                            <button key={m.id}
+                              onClick={canAdd ? ()=>handleJoinDetail(m.name) : undefined}
+                              style={{background:canAdd?G.white:"#f1f5f9",
+                                color:canAdd?G.text:G.muted,
+                                border:`1.5px solid ${canAdd?G.border:"#e2e8f0"}`,
+                                borderRadius:24,padding:"7px 14px",fontSize:13,fontWeight:700,
+                                cursor:canAdd?"pointer":"default",fontFamily:"inherit",
+                                opacity:canAdd?1:0.65}}>
+                              {canAdd ? `+ ${m.name}` : m.name}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   </React.Fragment>
                 );
               })}
+              {!canAddOthers&&(
+                <div style={{fontSize:11,color:G.muted,marginBottom:12,fontStyle:"italic"}}>
+                  Only captains and admins can add other players.
+                  {cutoff && " Sign-ups are locked — contact your captain."}
+                </div>
+              )}
             </>);
           })()}
 
@@ -3164,6 +3260,25 @@ export default function App() {
       logAction("system", `Imported ${toAdd.length} missing member${toAdd.length>1?"s":""}: ${toAdd.map(m=>m.name).join(", ")}`);
       showToast(`${toAdd.length} member${toAdd.length>1?"s":""} added ✓`);
     }
+    // Members who have a division assignment in DIVISION_TEAMS but not yet that team in Firebase
+    const divisionUpdates = userRole==="superadmin"
+      ? members.filter(m=>{
+          const div = DIVISION_TEAMS[m.name];
+          return div && !(m.teams||[]).includes(div);
+        })
+      : [];
+    function applyDivisionTeams() {
+      const updated = members.map(m=>{
+        const div = DIVISION_TEAMS[m.name];
+        if(!div) return m;
+        const existing = m.teams||[];
+        if(existing.includes(div)) return m;
+        return normMember({...m, teams:[...existing, div]});
+      });
+      saveMembers(updated);
+      logAction("system", `Assigned division teams to ${divisionUpdates.length} member${divisionUpdates.length>1?"s":""}: ${divisionUpdates.map(m=>m.name+" → "+DIVISION_TEAMS[m.name]).join(", ")}`);
+      showToast(`Division teams assigned ✓`);
+    }
     return (
     <Shell>
       <AppHeader title="Manage Members"
@@ -3617,6 +3732,27 @@ export default function App() {
             </div>
             <Btn bg="#14532d" col="#a3e635" onClick={importMissingMembers}>
               Add {membersToImport.length} Missing Member{membersToImport.length>1?"s":""}
+            </Btn>
+          </div>
+        )}
+
+        {/* ── Division Team Assignments ──────────────────────── */}
+        {divisionUpdates.length > 0 && (
+          <div style={{background:"#eff6ff",border:"1.5px solid #93c5fd",
+            borderRadius:12,padding:"14px 16px",marginBottom:16}}>
+            <div style={{fontWeight:900,fontSize:13,color:"#1e3a5f",marginBottom:6}}>
+              🏏 Division team assignments ready
+            </div>
+            <div style={{fontSize:12,color:"#1e40af",marginBottom:10,lineHeight:1.5}}>
+              <b>{divisionUpdates.length}</b> member{divisionUpdates.length>1?"s":""} have a division squad assignment not yet reflected in the app.
+              This will add their division group without removing any existing groups.
+            </div>
+            <div style={{fontSize:11,background:"#1e3a5f",color:"#93c5fd",
+              borderRadius:7,padding:"7px 10px",marginBottom:10,lineHeight:1.8}}>
+              {divisionUpdates.map(m=>`${m.name} → ${DIVISION_TEAMS[m.name]}`).join(" · ")}
+            </div>
+            <Btn bg="#1e3a5f" col="#93c5fd" onClick={applyDivisionTeams}>
+              Assign Division Teams to {divisionUpdates.length} Member{divisionUpdates.length>1?"s":""}
             </Btn>
           </div>
         )}
