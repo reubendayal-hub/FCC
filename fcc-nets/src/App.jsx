@@ -2063,30 +2063,54 @@ export default function App() {
     return (
     <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
         currentUser={currentUser} onLogout={handleLogout}/>}>
-      <AppHeader title="FCC Training" sub="Fredensborg Cricket Club">
-        <div style={{display:"flex",alignItems:"center",justifyContent:"flex-end"}}>
-          <Btn onClick={()=>setView("add")} bg={G.lime} col={G.green}>+ Add / Join</Btn>
+      {/* ── Schedule header — custom compact layout ── */}
+      <div style={{background:G.green,padding:"12px 16px 10px",
+        position:"sticky",top:0,zIndex:100}}>
+        {/* Row 1: Logo + title + sign-out */}
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+          <img src={FCC_LOGO} alt="FCC" className="fcc-header-logo"
+            style={{width:48,height:48,borderRadius:"50%",objectFit:"cover",flexShrink:0,
+              border:"2px solid rgba(255,255,255,0.35)",
+              boxShadow:"0 2px 8px rgba(0,0,0,0.25)"}}/>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
+              fontSize:18,fontWeight:900,lineHeight:1.15}}>FCC Training</div>
+            <div style={{color:"rgba(255,255,255,0.55)",fontSize:11,marginTop:1}}>
+              Fredensborg Cricket Club
+            </div>
+          </div>
+          <button onClick={handleLogout}
+            style={{background:"rgba(255,255,255,0.12)",border:"none",borderRadius:20,
+              padding:"5px 10px",color:"rgba(255,255,255,0.8)",fontSize:11,fontWeight:800,
+              cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:5,
+              flexShrink:0}}>
+            {currentUser.name.split(" ")[0]}
+            <span style={{opacity:.6,fontWeight:400}}>· sign out</span>
+          </button>
         </div>
-
-        {/* Filter toggle — compact pill tabs */}
-        <div style={{display:"flex",justifyContent:"flex-end",gap:4,marginTop:8}}>
+        {/* Row 2: Add/Join + filter tabs on same line */}
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <button onClick={()=>setView("add")}
+            style={{background:G.lime,color:G.green,border:"none",borderRadius:20,
+              padding:"7px 14px",fontSize:12,fontWeight:900,cursor:"pointer",
+              fontFamily:"inherit",flexShrink:0,whiteSpace:"nowrap"}}>
+            + Add / Join
+          </button>
+          <div style={{flex:1}}/>
           {[
-            {key:"all",  label:"🏏 All Sessions"},
-            {key:"mine", label:"✋ My Sessions"},
+            {key:"all",  label:"🏏 All"},
+            {key:"mine", label:"✋ Mine"},
           ].map(({key,label})=>{
             const active = schedFilter===key;
             return (
               <button key={key} onClick={()=>setSchedFilter(key)}
                 style={{
-                  padding:"5px 11px", borderRadius:20, cursor:"pointer",
-                  fontFamily:"inherit", fontWeight:700, fontSize:11,
-                  transition:"all .15s",
-                  border: active ? "none" : "none",
-                  background: active
-                    ? G.lime
-                    : "rgba(255,255,255,0.18)",
-                  color: active ? G.green : "rgba(255,255,255,0.9)",
-                  boxShadow: active ? "0 2px 6px rgba(0,0,0,0.2)" : "none",
+                  padding:"6px 12px",borderRadius:20,cursor:"pointer",
+                  fontFamily:"inherit",fontWeight:700,fontSize:12,border:"none",
+                  transition:"all .15s",whiteSpace:"nowrap",
+                  background: active ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.15)",
+                  color: active ? G.green : "rgba(255,255,255,0.75)",
+                  boxShadow: active ? "0 1px 4px rgba(0,0,0,0.2)" : "none",
                 }}>
                 {label}
               </button>
@@ -2095,7 +2119,7 @@ export default function App() {
         </div>
 
         {can(userRole,"sendReminder")&&tomorrowSess.length>0&&(
-          <div style={{marginTop:10,background:"rgba(163,230,53,.13)",borderRadius:10,
+          <div style={{marginTop:8,background:"rgba(163,230,53,.13)",borderRadius:10,
             padding:"9px 13px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <div style={{color:"rgba(255,255,255,.85)",fontSize:12,fontWeight:700}}>
               📅 {tomorrowSess.reduce((n,s)=>n+s.players.length,0)} players booked tomorrow
@@ -2110,7 +2134,7 @@ export default function App() {
             <Btn onClick={()=>openWA(todayStr())} bg="rgba(255,255,255,.18)" col={G.white} sm>📲 Share Today</Btn>
           </div>
         )}
-      </AppHeader>
+      </div>
 
       <div style={{padding:"14px 16px 20px"}}>
 
