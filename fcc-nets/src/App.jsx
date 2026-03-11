@@ -386,8 +386,11 @@ const Toast = ({msg}) => (
 );
 
 const SLbl = ({children,mt=16}) => (
-  <div style={{fontSize:10,fontWeight:900,letterSpacing:2,textTransform:"uppercase",
-    color:G.mid,marginBottom:7,marginTop:mt}}>{children}</div>
+  <div style={{fontSize:13,fontWeight:900,letterSpacing:.5,textTransform:"uppercase",
+    color:G.mid,marginBottom:8,marginTop:mt,display:"flex",alignItems:"center",gap:8}}>
+    <span style={{flex:1}}>{children}</span>
+    <span style={{display:"block",height:1,flex:1,background:G.border}}/>
+  </div>
 );
 
 const FFld = ({label,children,style}) => (
@@ -2928,10 +2931,18 @@ export default function App() {
 
         {/* ── Team jump bar ─────────────────────────────────── */}
         {Object.keys(adminGrouped).length > 2 && (
-          <div style={{marginBottom:16}}>
-            <div style={{fontSize:11,fontWeight:900,letterSpacing:1.5,color:G.muted,
-              textTransform:"uppercase",marginBottom:8}}>Jump to team</div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+          <div style={{
+            background:G.white, border:`1.5px solid ${G.border}`,
+            borderRadius:14, padding:"14px 16px", marginBottom:20,
+            boxShadow:"0 2px 8px rgba(0,0,0,0.06)",
+          }}>
+            <div style={{fontSize:11,fontWeight:900,letterSpacing:1.8,color:G.mid,
+              textTransform:"uppercase",marginBottom:12,
+              display:"flex",alignItems:"center",gap:8}}>
+              <span>⚡ Jump to team</span>
+              <span style={{flex:1,height:1,background:G.border,display:"block"}}/>
+            </div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
               {Object.keys(adminGrouped).map(team=>{
                 const meta = getTeamMeta(team);
                 const isFem = TEAM_META[team]?.feminine;
@@ -2944,10 +2955,10 @@ export default function App() {
                         ? "linear-gradient(135deg, #be185d, #9d174d)"
                         : meta.bg,
                       color: meta.text,
-                      border:"none", borderRadius:20, padding:"5px 13px",
+                      border:"none", borderRadius:20, padding:"6px 14px",
                       fontSize:12, fontWeight:800, cursor:"pointer",
                       fontFamily:"inherit",
-                      boxShadow: isFem ? "0 2px 8px rgba(190,24,93,0.35)" : "0 1px 4px rgba(0,0,0,.18)",
+                      boxShadow: isFem ? "0 2px 8px rgba(190,24,93,0.35)" : "0 2px 5px rgba(0,0,0,.22)",
                     }}>
                     {isFem ? "✨ " : ""}{team}
                   </button>
@@ -2958,16 +2969,28 @@ export default function App() {
         )}
 
         {/* Member list */}
-        {Object.entries(adminGrouped).map(([team,list])=>(
+        {Object.entries(adminGrouped).map(([team,list])=>{
+          const meta = getTeamMeta(team);
+          const isFem = TEAM_META[team]?.feminine;
+          const accentColor = isFem ? "#be185d" : meta.bg;
+          return (
           <div key={team} id={"team-section-"+team.replace(/\s+/g,"-")}
-            style={{marginBottom:18,scrollMarginTop:80}}>
-            {TEAM_META[team]?.feminine ? (
+            style={{marginBottom:24, scrollMarginTop:80,
+              background:G.white,
+              border:`1.5px solid ${G.border}`,
+              borderLeft:`4px solid ${accentColor}`,
+              borderRadius:14,
+              overflow:"hidden",
+              boxShadow:"0 2px 10px rgba(0,0,0,0.05)",
+            }}>
+            {/* Team header bar */}
+            {isFem ? (
               <div style={{background:"linear-gradient(135deg,#fce7f3,#fdf2f8)",
-                border:"1.5px solid #f9a8d4",borderRadius:12,padding:"10px 14px",
-                marginBottom:10,display:"flex",alignItems:"center",gap:8}}>
+                borderBottom:"1.5px solid #f9a8d4",padding:"12px 16px",
+                display:"flex",alignItems:"center",gap:8}}>
                 <span style={{fontSize:18}}>✨</span>
                 <div style={{flex:1}}>
-                  <span style={{fontWeight:900,fontSize:14,
+                  <span style={{fontWeight:900,fontSize:15,
                     background:"linear-gradient(90deg,#9d174d,#be185d,#ec4899)",
                     WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>
                     {team}
@@ -2978,7 +3001,8 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+              <div style={{background:`${accentColor}14`, borderBottom:`1px solid ${accentColor}30`,
+                padding:"10px 16px",display:"flex",alignItems:"center",gap:8}}>
                 <TeamPill team={team}/>
                 <span style={{fontSize:12,color:G.muted,fontWeight:700}}>
                   {list.length} player{list.length!==1?"s":""}
@@ -2990,12 +3014,13 @@ export default function App() {
                 )}
               </div>
             )}
+            {/* Member cards inside */}
+            <div style={{padding:"10px 12px",display:"flex",flexDirection:"column",gap:6}}>
             {list.map(m=>(
               <div key={m.id} style={{
-                background: TEAM_META[team]?.feminine ? "#fff5f9" : G.white,
-                border: TEAM_META[team]?.feminine
-                  ? "1.5px solid #fbcfe8" : `1.5px solid ${G.border}`,
-                borderRadius:10,padding:"10px 14px",marginBottom:6}}>
+                background: isFem ? "#fff5f9" : G.bg,
+                border: `1px solid ${isFem ? "#fbcfe8" : G.border}`,
+                borderRadius:10,padding:"10px 14px"}}>
 
                 {/* Top row: name + pencil + delete */}
                 <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
@@ -3092,8 +3117,10 @@ export default function App() {
 
               </div>
             ))}
+            </div>{/* end padding wrapper */}
           </div>
-        ))}
+          );
+        })}
       </div>
       <BotNav view="admin" setView={setView} userRole={userRole}/>
       {toast&&<Toast msg={toast}/>}
