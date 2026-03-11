@@ -40,10 +40,10 @@ const TEAM_META = {
   "Div 2":     { bg:"#14532d", text:"#a3e635" },
   "Div 3":     { bg:"#1e3a5f", text:"#93c5fd" },
   "Div 4":     { bg:"#3b1f6e", text:"#c4b5fd" },
-  "Women's":   { bg:"#831843", text:"#fbcfe8" },
+  "Women's":   { bg:"#9d174d", text:"#fce7f3", accent:"#fbcfe8", feminine:true },
   "U18":       { bg:"#7c2d12", text:"#fed7aa" },
   "U15":       { bg:"#713f12", text:"#fde68a" },
-  "U15 Girls": { bg:"#4a044e", text:"#f5d0fe" },
+  "U15 Girls": { bg:"#be185d", text:"#fdf2f8", accent:"#fbcfe8", feminine:true },
   "U13":       { bg:"#0c4a6e", text:"#bae6fd" },
   "U11":       { bg:"#064e3b", text:"#6ee7b7" },
   "Unassigned":{ bg:"#374151", text:"#d1d5db" },
@@ -55,6 +55,54 @@ const EXTRA_COLORS = [
   {bg:"#1e1b4b",text:"#c7d2fe"},{bg:"#4c0519",text:"#fda4af"},
 ];
 const getTeamMeta = name => TEAM_META[name] || EXTRA_COLORS[Math.abs([...name].reduce((h,c)=>h*31+c.charCodeAt(0),0)) % EXTRA_COLORS.length];
+
+// ─── Colour themes ────────────────────────────────────────────
+const THEMES = {
+  forest: {
+    label:"🌿 Forest Green", emoji:"🌿",
+    bg:"#f0fdf4", white:"#fff", green:"#14532d", mid:"#166534",
+    lime:"#a3e635", cream:"#fefce8", sand:"#f7fee7",
+    text:"#14532d", muted:"#6b7280", border:"rgba(0,0,0,0.09)",
+    red:"#dc2626", redBg:"#fee2e2", amber:"#92400e", amberBg:"#fef3c7",
+    headerBg:"#14532d",
+  },
+  navy: {
+    label:"⚓ Navy & Gold", emoji:"⚓",
+    bg:"#f0f4ff", white:"#fff", green:"#1e3a5f", mid:"#1e40af",
+    lime:"#fbbf24", cream:"#fffbeb", sand:"#fef9c3",
+    text:"#1e3a5f", muted:"#6b7280", border:"rgba(0,0,0,0.09)",
+    red:"#dc2626", redBg:"#fee2e2", amber:"#92400e", amberBg:"#fef3c7",
+    headerBg:"#1e3a5f",
+  },
+  burgundy: {
+    label:"🍷 Burgundy & Cream", emoji:"🍷",
+    bg:"#fff1f2", white:"#fff", green:"#881337", mid:"#9f1239",
+    lime:"#fda4af", cream:"#fff1f2", sand:"#ffe4e6",
+    text:"#881337", muted:"#6b7280", border:"rgba(0,0,0,0.09)",
+    red:"#dc2626", redBg:"#fee2e2", amber:"#92400e", amberBg:"#fef3c7",
+    headerBg:"#881337",
+  },
+  slate: {
+    label:"🌑 Slate & Teal", emoji:"🌑",
+    bg:"#f1f5f9", white:"#fff", green:"#0f4c5c", mid:"#0e7490",
+    lime:"#22d3ee", cream:"#ecfeff", sand:"#cffafe",
+    text:"#0f4c5c", muted:"#6b7280", border:"rgba(0,0,0,0.09)",
+    red:"#dc2626", redBg:"#fee2e2", amber:"#92400e", amberBg:"#fef3c7",
+    headerBg:"#0f4c5c",
+  },
+  rose: {
+    label:"🌸 Rose & Gold", emoji:"🌸",
+    bg:"#fff5f7", white:"#fff", green:"#9d174d", mid:"#be185d",
+    lime:"#fbbf24", cream:"#fff0f3", sand:"#ffe4e6",
+    text:"#9d174d", muted:"#6b7280", border:"rgba(0,0,0,0.09)",
+    red:"#dc2626", redBg:"#fee2e2", amber:"#92400e", amberBg:"#fef3c7",
+    headerBg:"#9d174d",
+  },
+};
+const THEME_KEYS = Object.keys(THEMES);
+let _themeKey = "forest";
+try { _themeKey = localStorage.getItem("fcc-theme") || "forest"; } catch{}
+if(!THEMES[_themeKey]) _themeKey = "forest";
 
 const PRESET_POLL = [
   {id:"batting",  label:"🏏 Batting Focus"},
@@ -152,7 +200,66 @@ const NAME_MAP = {
 // Names that are ambiguous (multiple people share the first name) — manual fix only:
 const AMBIGUOUS_FIRST_NAMES = ["Adithya","Arun","Ashwin","Nitin","Rajesh","Vihaan","Vinay","Vivek"];
 
-// ─── Utility ──────────────────────────────────────────────────
+// ─── Email seed (from uniform order form) ────────────────────
+// Used to pre-populate member emails via admin "Seed Emails" button.
+// Also used for first-time login verification for members who have no email yet.
+const EMAIL_SEED = {
+  "Aarin Venkatesh":"aarin.venki@gmail.com",
+  "Abhijit Guhagarkar":"gabhijit@yahoo.com",
+  "Abhinav Singh":"vcefu1@gmail.com",
+  "Adam Pirzada":"pirzada.adam2@gmail.com",
+  "Adithya Manimaran":"aadi.manimaran@gmail.com",
+  "Advik Akar":"akar.advik@gmail.com",
+  "Ahmed Nawaz":"ahmednawaz86@hotmail.com",
+  "Amit Yadav":"amit230317@gmail.com",
+  "Anirudh Ram Sriram":"iamramsriram@gmail.com",
+  "Anshu Gupta":"6anshu1994@gmail.com",
+  "Arun Krishnamurthy":"kae.arunkumar@gmail.com",
+  "Arun Shankar":"arundynaero@gmail.com",
+  "Ashwin Shankar":"ashwin.thewall19@gmail.com",
+  "Ashwin Singh Tensingh":"ashwin_singh17@yahoo.com",
+  "Balaji":"balajir136@gmail.com",
+  "Deepak Akar":"deepakakar@gmail.com",
+  "Dhruv Shah":"activities.dhruv@gmail.com",
+  "Durgesh":"durgece66@gmail.com",
+  "Gagan Sachdeva":"gagan78639@gmail.com",
+  "Garghi Seenevas":"s.garghi@gmail.com",
+  "Hasnain Ahmed":"ahmed.hasnain@hotmail.com",
+  "Ilayaraja Karuppasamy":"ilayarajak04@gmail.com",
+  "Jaya Nair":"jayasundeep@gmail.com",
+  "Kamal Jayalaksminarasimhan":"jlkamal@gmail.com",
+  "Monesh Shantharam":"ms403@snu.edu.in",
+  "Nimesh Rajamohanan":"nimesh.rajamohanan@gmail.com",
+  "Nirmal Mohanan":"1983.nirmal@gmail.com",
+  "Nitin Gupta":"kotanitin@gmail.com",
+  "Nitin Jain":"nitin.niec@gmail.com",
+  "Prithvi Sagar":"prithvisagar@gmail.com",
+  "Pronit Lahiri":"pronit.lahiri@gmail.com",
+  "Rajkumar Jeyaraman":"raj2618@gmail.com",
+  "Ramakrishnan Ravi":"ramakrishnan23@gmail.com",
+  "Reuben Dayal":"reuben.dayal@gmail.com",
+  "Rewanth Punna":"revanthpunna2304@gmail.com",
+  "Rohind Muthuselvaraj":"rohind.127@gmail.com",
+  "Saatvik Dantuluri":"saatvikvarma33@gmail.com",
+  "Sagar Gupta":"gksagar10@gmail.com",
+  "Sahil Gagneja":"gagneja808@gmail.com",
+  "Samyak Jaggi Ram":"dinesh.pro@gmail.com",
+  "Shardul Joshi":"spjoshi99@outlook.com",
+  "Shashank Rastogi":"ca.shashankrastogi@gmail.com",
+  "Shreyas Gujjar":"shreyasgujjar8@gmail.com",
+  "Stalin Natesan":"stalinnatesan@gmail.com",
+  "Syed Hamza Kazmi":"s.hamza.kazmi@gmail.com",
+  "Talat Munshi":"talatmunshi@gmail.com",
+  "Trineth Arjun":"madhanprabu@gmail.com",
+  "Vijay Deepak":"vijaydeepak33@gmail.com",
+  "Vinay Arunkumar":"kae.arunkumar@gmail.com",
+  "Vinay Kumar":"kumarvinay14@gmail.com",
+  "Virendra Pawar":"virendra23pawar@gmail.com",
+  "Vivek Bhatnagar":"vkbhatnagar@gmail.com",
+  "Vivek Satyarthi":"satyarthivivek@gmail.com",
+  "Xavier Ramzan":"xavier_ramzan@hotmail.com",
+  "Zeb Pirzada":"zpirzada@gmail.com",
+};
 const uid          = () => Math.random().toString(36).slice(2,9);
 const todayStr     = () => new Date().toISOString().split("T")[0];
 const tomorrowStr  = () => { const d=new Date(); d.setDate(d.getDate()+1); return d.toISOString().split("T")[0]; };
@@ -246,13 +353,8 @@ function waMsg(sessions, date) {
   return m+"See you at Karlebo! 🙌";
 }
 
-// ─── Colours ──────────────────────────────────────────────────
-const G = {
-  bg:"#f0fdf4", white:"#fff", green:"#14532d", mid:"#166534",
-  lime:"#a3e635", cream:"#fefce8", sand:"#f7fee7",
-  text:"#14532d", muted:"#6b7280", border:"rgba(0,0,0,0.09)",
-  red:"#dc2626", redBg:"#fee2e2", amber:"#92400e", amberBg:"#fef3c7",
-};
+// G is now set dynamically from theme — see App() below
+let G = THEMES[_themeKey];
 
 const iSt = (extra={}) => ({
   width:"100%", borderRadius:9, border:`1.5px solid ${G.border}`,
@@ -486,7 +588,7 @@ function BotNav({view,setView,userRole}) {
       {isAdmin ? (
         <button onClick={()=>setView("admin")} style={tabStyle(active==="admin")}>
           <IconMembers on={active==="admin"}/>
-          <span style={labelStyle(active==="admin")}>Members</span>
+          <span style={labelStyle(active==="admin")}>Admin</span>
         </button>
       ) : (
         <button onClick={()=>setView("profile")} style={tabStyle(active==="profile")}>
@@ -524,7 +626,7 @@ function SidebarNav({view, setView, userRole, currentUser, onLogout}) {
       <div className="fcc-sidebar-links">
         {navBtn("schedule","📅","Schedule")}
         {navBtn("add","＋","Book / Join")}
-        {isAdmin && navBtn("admin","👥","Members")}
+        {isAdmin && navBtn("admin","👥","Admin Panel")}
         {navBtn("profile","👤","My Profile")}
       </div>
       <div style={{marginTop:"auto",width:"100%",paddingTop:24,
@@ -591,6 +693,16 @@ export default function App() {
   const [pins,     setPins]     = useState({});   // { memberId: hashedPin }
   const [loading,  setLoading]  = useState(true);
 
+  // Theme
+  const [themeKey, setThemeKey] = useState(_themeKey);
+  G = THEMES[themeKey] || THEMES.forest; // keep global G in sync for atoms
+  const applyTheme = (key) => {
+    if(!THEMES[key]) return;
+    setThemeKey(key);
+    G = THEMES[key];
+    try { localStorage.setItem("fcc-theme", key); } catch{}
+  };
+
   // Auth state — restore from localStorage if previously logged in
   const [currentUser, setCurrentUser] = useState(()=>{
     try { const s=localStorage.getItem("fcc-current-user"); return s?JSON.parse(s):null; } catch{ return null; }
@@ -599,6 +711,8 @@ export default function App() {
   const [pickSearch, setPickSearch]   = useState("");
   const [pinError,   setPinError]     = useState("");
   const [pendingMember, setPendingMember] = useState(null);
+  const [emailInput,   setEmailInput]   = useState("");
+  const [emailError,   setEmailError]   = useState("");
 
   // App view
   const [view,     setView]     = useState("schedule");
@@ -744,8 +858,43 @@ export default function App() {
   function handlePickMember(member) {
     setPendingMember(member);
     setPinError("");
-    if(pins[member.id]) setAuthView("enterpin");
-    else setAuthView("newpin");
+    setEmailInput("");
+    setEmailError("");
+    if(pins[member.id]) {
+      // Returning user — straight to PIN
+      setAuthView("enterpin");
+    } else {
+      // First-time login
+      // If member has no email in DB AND no seed email → no verification possible → child/unverifiable
+      const seedEmail = EMAIL_SEED[member.name];
+      const storedEmail = member.email;
+      if(!seedEmail && !storedEmail) {
+        // No email on record — go straight to PIN setup (youth/children)
+        setAuthView("newpin");
+      } else {
+        // Has email on record — require verification before PIN setup
+        setAuthView("verifyemail");
+      }
+    }
+  }
+
+  function handleVerifyEmail() {
+    const seed = EMAIL_SEED[pendingMember.name] || "";
+    const stored = (pendingMember.email || "").trim().toLowerCase();
+    const typed = emailInput.trim().toLowerCase();
+    const expected = stored || seed;
+    if(!typed) { setEmailError("Please enter your email address"); return; }
+    if(typed !== expected) {
+      setEmailError("Email doesn't match our records. Try again or contact your admin.");
+      return;
+    }
+    // Passed — also write email to member record if not already stored
+    if(!stored && seed) {
+      const updated = members.map(m => m.id===pendingMember.id ? {...m, email:seed} : m);
+      saveMembers(updated);
+    }
+    setEmailError("");
+    setAuthView("newpin");
   }
 
   function handleNewPin(pin) {
@@ -1254,6 +1403,79 @@ export default function App() {
   }
 
   // ════════════════════════════════════════════════════════════
+  // RENDER: Auth — verify email (first-time, adults only)
+  // ════════════════════════════════════════════════════════════
+  if(!currentUser && authView==="verifyemail") {
+    const maskedEmail = (()=>{
+      const e = EMAIL_SEED[pendingMember?.name||""] || (pendingMember?.email||"");
+      if(!e) return null;
+      const [local, domain] = e.split("@");
+      const shown = local.slice(0,2) + "•".repeat(Math.max(local.length-2,2));
+      return shown + "@" + domain;
+    })();
+    return (
+      <Shell>
+        <div style={{display:"flex",flexDirection:"column",minHeight:"100vh"}}>
+          <div style={{background:G.green,padding:"22px 20px 18px",textAlign:"center"}}>
+            <div style={{fontSize:28,marginBottom:6}}>🔐</div>
+            <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
+              fontSize:19,fontWeight:900}}>Hi, {pendingMember?.name.split(" ")[0]}!</div>
+            <div style={{color:"rgba(255,255,255,0.65)",fontSize:12,marginTop:4}}>
+              Verify your email to set up your account
+            </div>
+          </div>
+          <div style={{flex:1,padding:"28px 24px"}}>
+            <div style={{background:"#f0fdf4",border:"1.5px solid rgba(20,83,45,.15)",
+              borderRadius:14,padding:"16px 18px",marginBottom:20}}>
+              <div style={{fontSize:13,color:G.muted,lineHeight:1.6}}>
+                We have an email address on record for you ending in{" "}
+                <span style={{fontWeight:800,color:G.text}}>{maskedEmail}</span>.
+                <br/>Enter your full email address below to verify your identity.
+              </div>
+            </div>
+            <div style={{marginBottom:14}}>
+              <label style={{display:"block",fontSize:11,fontWeight:800,
+                color:G.muted,letterSpacing:1.2,textTransform:"uppercase",marginBottom:6}}>
+                Your Email Address
+              </label>
+              <input
+                type="email" autoFocus autoCapitalize="none"
+                placeholder="your@email.com"
+                value={emailInput}
+                onChange={e=>{setEmailInput(e.target.value);setEmailError("");}}
+                onKeyDown={e=>e.key==="Enter"&&handleVerifyEmail()}
+                style={{width:"100%",borderRadius:10,border:`1.5px solid ${emailError?"#ef4444":G.border}`,
+                  padding:"13px 14px",fontSize:15,fontFamily:"'DM Sans',sans-serif",
+                  fontWeight:500,background:"#fff",color:G.text,outline:"none",
+                  boxSizing:"border-box"}}/>
+              {emailError&&(
+                <div style={{marginTop:6,fontSize:12,color:"#dc2626",fontWeight:700}}>
+                  ⚠️ {emailError}
+                </div>
+              )}
+            </div>
+            <button onClick={handleVerifyEmail}
+              style={{width:"100%",background:G.green,color:G.lime,border:"none",
+                borderRadius:12,padding:"15px",fontSize:15,fontWeight:800,
+                cursor:"pointer",fontFamily:"inherit",marginBottom:10}}>
+              Verify &amp; Continue →
+            </button>
+            <button onClick={()=>{setPendingMember(null);setAuthView("pick");setEmailInput("");setEmailError("");}}
+              style={{width:"100%",background:"transparent",color:G.muted,border:"none",
+                fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",padding:"8px"}}>
+              ← Back
+            </button>
+            <div style={{marginTop:20,padding:"12px 14px",background:"#fffbeb",
+              border:"1px solid #fde68a",borderRadius:10,fontSize:12,color:"#78350f",lineHeight:1.6}}>
+              <b>Can't remember?</b> Contact your admin to reset your account.
+            </div>
+          </div>
+        </div>
+      </Shell>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════
   // RENDER: Auth — set new PIN
   // ════════════════════════════════════════════════════════════
   if(!currentUser && authView==="newpin") return (
@@ -1353,31 +1575,26 @@ export default function App() {
     <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
         currentUser={currentUser} onLogout={handleLogout}/>}>
       <AppHeader title="FCC Training" sub="Karlebo · Fredensborg Cricket Club">
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <img src={FCC_LOGO} alt="FCC" style={{width:44,height:44,borderRadius:"50%",objectFit:"cover",flexShrink:0,border:"2px solid rgba(255,255,255,0.3)"}}/>
-            <div>
-              <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
-                fontSize:22,fontWeight:900,lineHeight:1,letterSpacing:"-.5px"}}>FCC Training</div>
-              <div style={{color:"rgba(255,255,255,.45)",fontSize:10,fontWeight:700,
-                letterSpacing:2,textTransform:"uppercase"}}>Karlebo</div>
-            </div>
-          </div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"flex-end"}}>
           <Btn onClick={()=>setView("add")} bg={G.lime} col={G.green}>+ Add / Join</Btn>
         </div>
 
-        {/* Filter toggle */}
-        <div style={{display:"flex",gap:6,marginTop:10}}>
-          {["all","mine"].map(f=>(
-            <button key={f} onClick={()=>setSchedFilter(f)}
-              style={{flex:1,padding:"7px 0",borderRadius:20,border:"none",
-                cursor:"pointer",fontFamily:"inherit",fontWeight:800,fontSize:12,
-                background: schedFilter===f ? G.lime : "rgba(255,255,255,.15)",
-                color: schedFilter===f ? G.green : "rgba(255,255,255,.75)",
-                transition:"all .15s"}}>
-              {f==="all" ? "🏏 All Sessions" : "✋ My Sessions"}
-            </button>
-          ))}
+        {/* Filter toggle — compact chips, right-aligned */}
+        <div style={{display:"flex",justifyContent:"flex-end",gap:5,marginTop:8}}>
+          {["all","mine"].map(f=>{
+            const active = schedFilter===f;
+            return (
+              <button key={f} onClick={()=>setSchedFilter(f)}
+                style={{padding:"4px 12px",borderRadius:20,
+                  border: active ? "none" : "1.5px solid rgba(255,255,255,.3)",
+                  cursor:"pointer",fontFamily:"inherit",fontWeight:700,fontSize:11,
+                  background: active ? G.lime : "transparent",
+                  color: active ? G.green : "rgba(255,255,255,.75)",
+                  transition:"all .15s",letterSpacing:.2}}>
+                {f==="all" ? "🏏 All" : "✋ Mine"}
+              </button>
+            );
+          })}
         </div>
 
         {can(userRole,"sendReminder")&&tomorrowSess.length>0&&(
@@ -1497,7 +1714,7 @@ export default function App() {
             borderRadius:12,padding:"14px 16px"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
               marginBottom:showBlockForm?14:0}}>
-              <div style={{fontWeight:800,fontSize:13,color:G.text}}>🚫 Block Ground (Match Day)</div>
+              <div style={{fontWeight:800,fontSize:13,color:G.text}}>🚫 Block Nets Sessions – During Matches</div>
               <button type="button" onClick={()=>setShowBlockForm(v=>!v)}
                 style={{background:G.cream,border:`1px solid ${G.border}`,borderRadius:8,
                   padding:"5px 12px",fontSize:12,fontWeight:700,cursor:"pointer",
@@ -1925,32 +2142,44 @@ export default function App() {
         <div style={{padding:"20px 16px",display:"flex",flexDirection:"column",gap:16}}>
 
           {/* Avatar + name card */}
-          <div style={{background:G.green,borderRadius:16,padding:"20px",
-            display:"flex",alignItems:"center",gap:16}}>
-            <div style={{width:60,height:60,borderRadius:"50%",
-              background:G.lime,display:"flex",alignItems:"center",justifyContent:"center",
-              fontSize:22,fontWeight:900,color:G.green,flexShrink:0}}>
-              {me.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()}
-            </div>
-            <div style={{flex:1}}>
-              <div style={{fontFamily:"'Playfair Display',serif",fontWeight:900,
-                fontSize:20,color:"#fff"}}>{me.name}</div>
-              <div style={{marginTop:4,display:"flex",gap:6,flexWrap:"wrap"}}>
-                <RolePill role={me.role||"member"}/>
-                {myTeams.map(t=><TeamPill key={t} team={t} sm/>)}
-                {myTeams.length===0&&<TeamPill team="Unassigned" sm/>}
+          {(()=>{
+            const isFemTeam = myTeams.some(t=>TEAM_META[t]?.feminine);
+            const headerBg = isFemTeam
+              ? "linear-gradient(135deg,#9d174d,#be185d)"
+              : G.green;
+            const avatarBg = isFemTeam ? "#fbcfe8" : G.lime;
+            const avatarFg = isFemTeam ? "#9d174d" : G.green;
+            return (
+              <div style={{background:headerBg,borderRadius:16,padding:"20px",
+                display:"flex",alignItems:"center",gap:16}}>
+                {isFemTeam&&<span style={{position:"absolute",fontSize:16,
+                  top:0,right:8,opacity:.3,pointerEvents:"none"}}>✨</span>}
+                <div style={{width:60,height:60,borderRadius:"50%",
+                  background:avatarBg,display:"flex",alignItems:"center",justifyContent:"center",
+                  fontSize:22,fontWeight:900,color:avatarFg,flexShrink:0}}>
+                  {me.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()}
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontWeight:900,
+                    fontSize:20,color:"#fff"}}>{me.name}</div>
+                  <div style={{marginTop:4,display:"flex",gap:6,flexWrap:"wrap"}}>
+                    <RolePill role={me.role||"member"}/>
+                    {myTeams.map(t=><TeamPill key={t} team={t} sm/>)}
+                    {myTeams.length===0&&<TeamPill team="Unassigned" sm/>}
+                  </div>
+                </div>
+                {/* Completion dial */}
+                {!isComplete&&<ProfileDial pct={pct}/>}
+                {isComplete&&(
+                  <div style={{textAlign:"center"}}>
+                    <div style={{fontSize:28}}>✅</div>
+                    <div style={{fontSize:10,color:"rgba(255,255,255,.6)",fontWeight:700,
+                      letterSpacing:1,textTransform:"uppercase",marginTop:2}}>Complete</div>
+                  </div>
+                )}
               </div>
-            </div>
-            {/* Completion dial */}
-            {!isComplete&&<ProfileDial pct={pct}/>}
-            {isComplete&&(
-              <div style={{textAlign:"center"}}>
-                <div style={{fontSize:28}}>✅</div>
-                <div style={{fontSize:10,color:"rgba(255,255,255,.6)",fontWeight:700,
-                  letterSpacing:1,textTransform:"uppercase",marginTop:2}}>Complete</div>
-              </div>
-            )}
-          </div>
+            );
+          })()}
 
           {/* Profile status card — only shown if incomplete or needs reconfirm */}
           {!isComplete&&(
@@ -2141,6 +2370,36 @@ export default function App() {
             )}
           </div>
 
+          {/* Theme switcher */}
+          <div style={{background:G.white,borderRadius:14,border:`1.5px solid ${G.border}`,
+            padding:"14px 16px"}}>
+            <div style={{fontSize:11,fontWeight:900,letterSpacing:1.5,color:G.muted,
+              textTransform:"uppercase",marginBottom:12}}>App Theme</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {THEME_KEYS.map(key=>{
+                const t=THEMES[key];
+                const active=themeKey===key;
+                return (
+                  <button key={key} onClick={()=>applyTheme(key)}
+                    style={{display:"flex",alignItems:"center",gap:12,
+                      background:active?t.headerBg:"transparent",
+                      border:`2px solid ${active?t.headerBg:G.border}`,
+                      borderRadius:10,padding:"10px 14px",cursor:"pointer",
+                      fontFamily:"inherit",transition:"all .15s"}}>
+                    <span style={{fontSize:20}}>{t.emoji}</span>
+                    <span style={{fontSize:14,fontWeight:700,
+                      color:active?"#fff":G.text,flex:1,textAlign:"left"}}>
+                      {t.label}
+                    </span>
+                    {active&&<span style={{fontSize:12,color:"rgba(255,255,255,.7)",fontWeight:700}}>
+                      Active ✓
+                    </span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Sign out */}
           <button type="button" onClick={handleLogout}
             style={{background:"none",border:`1.5px solid ${G.border}`,
@@ -2164,6 +2423,17 @@ export default function App() {
     const namesAmbiguous = userRole==="superadmin"
       ? members.filter(m=>!m.name.includes(" ")&&AMBIGUOUS_FIRST_NAMES.includes(m.name))
       : [];
+    // Members who have a seed email but no stored email yet
+    const emailsToSeed = userRole==="superadmin"
+      ? members.filter(m=>!m.email && EMAIL_SEED[m.name])
+      : [];
+    function seedAllEmails() {
+      const updated = members.map(m =>
+        !m.email && EMAIL_SEED[m.name] ? {...m, email: EMAIL_SEED[m.name]} : m
+      );
+      saveMembers(updated);
+      showToast(`${emailsToSeed.length} email${emailsToSeed.length>1?"s":""} seeded ✓`);
+    }
     return (
     <Shell>
       <AppHeader title="Manage Members"
@@ -2484,22 +2754,95 @@ export default function App() {
           </div>
         )}
 
+        {/* ── Seed Emails (superadmin only) ─────────────────── */}
+        {emailsToSeed.length > 0 && (
+          <div style={{background:"#eff6ff",border:"1.5px solid #93c5fd",borderRadius:12,
+            padding:"14px 16px",marginBottom:16}}>
+            <div style={{fontWeight:900,fontSize:13,color:"#1e3a5f",marginBottom:6}}>
+              📧 Email addresses ready to import
+            </div>
+            <div style={{fontSize:12,color:"#1e40af",marginBottom:10,lineHeight:1.5}}>
+              <b>{emailsToSeed.length}</b> member{emailsToSeed.length>1?"s":""} have email data from the uniform order form that can be imported now.
+              This will also enable secure first-time login verification for those members.
+            </div>
+            <div style={{fontSize:11,color:"#3b82f6",marginBottom:10}}>
+              {emailsToSeed.map(m=>m.name).join(", ")}
+            </div>
+            <Btn bg="#1e3a5f" col="#93c5fd" onClick={seedAllEmails}>
+              Import {emailsToSeed.length} Email{emailsToSeed.length>1?"s":""} from Uniform Form
+            </Btn>
+          </div>
+        )}
+
+        {/* ── Team jump bar ─────────────────────────────────── */}
+        {Object.keys(adminGrouped).length > 2 && (
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:11,fontWeight:900,letterSpacing:1.5,color:G.muted,
+              textTransform:"uppercase",marginBottom:8}}>Jump to team</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {Object.keys(adminGrouped).map(team=>{
+                const meta = getTeamMeta(team);
+                const isFem = TEAM_META[team]?.feminine;
+                return (
+                  <button key={team}
+                    onClick={()=>document.getElementById("team-section-"+team.replace(/\s+/g,"-"))
+                      ?.scrollIntoView({behavior:"smooth",block:"start"})}
+                    style={{
+                      background: isFem
+                        ? "linear-gradient(135deg, #be185d, #9d174d)"
+                        : meta.bg,
+                      color: meta.text,
+                      border:"none", borderRadius:20, padding:"5px 13px",
+                      fontSize:12, fontWeight:800, cursor:"pointer",
+                      fontFamily:"inherit",
+                      boxShadow: isFem ? "0 2px 8px rgba(190,24,93,0.35)" : "0 1px 4px rgba(0,0,0,.18)",
+                    }}>
+                    {isFem ? "✨ " : ""}{team}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Member list */}
         {Object.entries(adminGrouped).map(([team,list])=>(
-          <div key={team} style={{marginBottom:18}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-              <TeamPill team={team}/>
-              <span style={{fontSize:12,color:G.muted,fontWeight:700}}>
-                {list.length} player{list.length!==1?"s":""}
-              </span>
-              {seniorTeamNames.includes(team)&&(
-                <span style={{fontSize:10,color:G.muted,fontWeight:600,fontStyle:"italic"}}>
-                  · Captain / VC eligible
+          <div key={team} id={"team-section-"+team.replace(/\s+/g,"-")}
+            style={{marginBottom:18,scrollMarginTop:80}}>
+            {TEAM_META[team]?.feminine ? (
+              <div style={{background:"linear-gradient(135deg,#fce7f3,#fdf2f8)",
+                border:"1.5px solid #f9a8d4",borderRadius:12,padding:"10px 14px",
+                marginBottom:10,display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:18}}>✨</span>
+                <div style={{flex:1}}>
+                  <span style={{fontWeight:900,fontSize:14,
+                    background:"linear-gradient(90deg,#9d174d,#be185d,#ec4899)",
+                    WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>
+                    {team}
+                  </span>
+                  <span style={{fontSize:12,color:"#be185d",fontWeight:700,marginLeft:8}}>
+                    {list.length} player{list.length!==1?"s":""}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                <TeamPill team={team}/>
+                <span style={{fontSize:12,color:G.muted,fontWeight:700}}>
+                  {list.length} player{list.length!==1?"s":""}
                 </span>
-              )}
-            </div>
+                {seniorTeamNames.includes(team)&&(
+                  <span style={{fontSize:10,color:G.muted,fontWeight:600,fontStyle:"italic"}}>
+                    · Captain / VC eligible
+                  </span>
+                )}
+              </div>
+            )}
             {list.map(m=>(
-              <div key={m.id} style={{background:G.white,border:`1.5px solid ${G.border}`,
+              <div key={m.id} style={{
+                background: TEAM_META[team]?.feminine ? "#fff5f9" : G.white,
+                border: TEAM_META[team]?.feminine
+                  ? "1.5px solid #fbcfe8" : `1.5px solid ${G.border}`,
                 borderRadius:10,padding:"10px 14px",marginBottom:6}}>
 
                 {/* Top row: name + pencil + delete */}
