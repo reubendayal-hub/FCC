@@ -1084,8 +1084,8 @@ export default function App() {
     } else if(hasInviteCode) {
       setAuthView("verifycode");
     } else {
-      // No email, no code — straight to PIN (very young youth, no verification possible)
-      setAuthView("newpin");
+      // No email, no invite code — account not set up yet, block access
+      setAuthView("blocked");
     }
   }
 
@@ -1249,11 +1249,18 @@ export default function App() {
   }
 
   // ── Sessions ──────────────────────────────────────────────────
+  // Returns true if two time ranges overlap (exclusive of touching endpoints)
+  function timesOverlap(aFrom, aTo, bFrom, bTo) {
+    const toMins = t => { const [h,m]=t.split(":").map(Number); return h*60+m; };
+    return toMins(aFrom) < toMins(bTo) && toMins(bFrom) < toMins(aTo);
+  }
+
   function handleAddSession(e) {
     e.preventDefault();
     if(!bDate||selP.length===0){showToast("Pick a date & at least one player");return;}
     const pollOptions = bPollOpts.map(o=>({...o, votes:[]}));
     const restrictedTo = bRestrictTeam || null;
+    // Exact match — merge players into existing session
     const ex=sessions.find(s=>s.date===bDate&&s.from===bFrom&&s.to===bTo&&!s.recurringId);
     if(ex){
       const merged=[...new Set([...ex.players,...selP])];
@@ -1266,6 +1273,18 @@ export default function App() {
       logAction("session", `Added players to session on ${bDate} (${bFrom}–${bTo}): ${selP.join(", ")}`);
       showToast(`Players added to session on ${fmtShort(bDate)} ✓`);
     } else {
+      // Check for overlapping sessions — block if any of the selected players are already booked
+      const overlapping = sessions.filter(s=>
+        s.date===bDate && timesOverlap(bFrom,bTo,s.from,s.to)
+      );
+      const alreadyBooked = overlapping.filter(s=>
+        selP.some(p=>s.players.includes(p))
+      );
+      if(alreadyBooked.length>0) {
+        const clash = alreadyBooked[0];
+        showToast(`⚠️ ${selP.find(p=>clash.players.includes(p))} already has a session at this time (${clash.from}–${clash.to}${clash.label?" · "+clash.label:""})`);
+        return;
+      }
       saveSessions([...sessions,{id:uid(),date:bDate,from:bFrom,to:bTo,
         players:[...selP],note:bNote.trim(),label:bLabel.trim(),
         restrictedTo,poll:pollOptions}]
@@ -1274,7 +1293,7 @@ export default function App() {
       showToast(`Session booked for ${fmtShort(bDate)} ✓`);
     }
     setBDate("");setBNote("");setBLabel("");setBRestrictTeam("");
-    setSelP([]);setBPollOpts([]);setBCustomOpt("");
+    setSelP([currentUser?.name].filter(Boolean));setBPollOpts([...PRESET_POLL]);setBCustomOpt("");
     setView("schedule");
   }
 
@@ -1967,6 +1986,51 @@ export default function App() {
   );
 
   // ════════════════════════════════════════════════════════════
+  // RENDER: Auth — blocked (no email, no invite code)
+  // ════════════════════════════════════════════════════════════
+  if(!currentUser && authView==="blocked") return (
+    <Shell>
+      <div style={{display:"flex",flexDirection:"column",minHeight:"100vh"}}>
+        <div style={{background:G.green,padding:"18px 20px 16px",textAlign:"center"}}>
+          <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
+            fontSize:19,fontWeight:900}}>Hi, {pendingMember?.name.split(" ")[0]}!</div>
+          <div style={{color:"rgba(255,255,255,0.6)",fontSize:12,marginTop:3}}>
+            FCC Training
+          </div>
+        </div>
+        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",
+          padding:"0 28px"}}>
+          <div style={{textAlign:"center",maxWidth:320}}>
+            <div style={{fontSize:52,marginBottom:16}}>🔒</div>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,
+              fontWeight:900,color:G.green,marginBottom:10}}>
+              Account not set up yet
+            </div>
+            <div style={{fontSize:14,color:G.muted,lineHeight:1.6,marginBottom:24}}>
+              Your account needs to be activated before you can log in.
+              Please ask your admin to either add your email address or
+              generate an invite code for you.
+            </div>
+            <div style={{background:"#f0fdf4",borderRadius:12,padding:"14px 16px",
+              fontSize:12,color:"#166534",lineHeight:1.7,textAlign:"left",
+              border:"1.5px solid #86efac",marginBottom:20}}>
+              <b>For admins:</b> Go to Admin Panel → find this member →
+              either add their email, or tap <b>🎟️ Gen Code</b> to create
+              a one-time invite code and share it with them.
+            </div>
+            <button onClick={()=>{setPendingMember(null);setAuthView("pick");}}
+              style={{background:G.green,color:G.lime,border:"none",borderRadius:24,
+                padding:"11px 28px",fontSize:14,fontWeight:800,cursor:"pointer",
+                fontFamily:"inherit"}}>
+              ← Back to login
+            </button>
+          </div>
+        </div>
+      </div>
+    </Shell>
+  );
+
+  // ════════════════════════════════════════════════════════════
   // RENDER: Auth — set new PIN
   // ════════════════════════════════════════════════════════════
   if(!currentUser && authView==="newpin") return (
@@ -2305,12 +2369,19 @@ export default function App() {
 
   // ── ADD / JOIN ──────────────────────────────────────────────
   if(view==="add") {
-    const conflict=sessions.find(s=>s.date===bDate&&s.from===bFrom&&s.to===bTo);
+    const exactMatch = sessions.find(s=>s.date===bDate&&s.from===bFrom&&s.to===bTo);
+    // Sessions that overlap in time (but aren't an exact match)
+    const overlappingSessions = bDate ? sessions.filter(s=>
+      s.date===bDate && !exactMatch && timesOverlap(bFrom,bTo,s.from,s.to)
+    ) : [];
+    // Which of the selected players are already in an overlapping session
+    const clashSess = overlappingSessions.find(s=>selP.some(p=>s.players.includes(p)));
+    const clashPlayers = clashSess ? selP.filter(p=>clashSess.players.includes(p)) : [];
     return (
       <Shell>
         <AppHeader onBack={()=>{setView("schedule");setSelP([]);}}
           title="Add / Join a Session"
-          sub={conflict?"Session exists — players will be added":"Create or join a training session"}/>
+          sub={exactMatch?"Session exists — players will be added":"Create or join a training session"}/>
         <form onSubmit={handleAddSession} style={{padding:"14px 16px 20px"}}>
           <SLbl mt={4}>When?</SLbl>
           <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
@@ -2385,6 +2456,31 @@ export default function App() {
                 value={bNote} onChange={e=>setBNote(e.target.value)}/>
             </FFld>
           </div>
+
+          {/* ── Overlap warning ───────────────────────────────── */}
+          {clashSess&&(
+            <div style={{background:"#fff7ed",border:"1.5px solid #fed7aa",
+              borderRadius:12,padding:"13px 15px",marginBottom:12}}>
+              <div style={{fontWeight:900,fontSize:13,color:"#92400e",marginBottom:5}}>
+                ⚠️ Overlapping session detected
+              </div>
+              <div style={{fontSize:12,color:"#92400e",lineHeight:1.6,marginBottom:10}}>
+                <b>{clashPlayers.join(", ")}</b> {clashPlayers.length>1?"are":"is"} already
+                in <b>{clashSess.label||"a session"}</b> ({clashSess.from}–{clashSess.to})
+                on this date. Change the time, or join that session instead.
+              </div>
+              <button type="button"
+                onClick={()=>{
+                  setSelSess(clashSess);
+                  setView("session");
+                }}
+                style={{background:G.green,color:G.lime,border:"none",borderRadius:20,
+                  padding:"7px 16px",fontSize:12,fontWeight:800,cursor:"pointer",
+                  fontFamily:"inherit"}}>
+                → Join "{clashSess.label||fmtShort(clashSess.date)}" instead
+              </button>
+            </div>
+          )}
 
           <SLbl>Who's coming? {selP.length>0&&`(${selP.length} selected)`}</SLbl>
           <div style={{display:"flex",gap:8,marginBottom:10}}>
