@@ -1398,6 +1398,7 @@ export default function App() {
 
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [schedFilter,   setSchedFilter]   = useState("all"); // "all" | "mine"
+  const [blocksExpanded, setBlocksExpanded] = useState(false);
   const [blockCals,     setBlockCals]     = useState([]);    // [{id,date,from,to,label}]
   const [bCalDate,      setBCalDate]      = useState("");
   const [bCalFrom,      setBCalFrom]      = useState("10:00");
@@ -2280,24 +2281,6 @@ export default function App() {
           );
         })()}
 
-        {/* Block calendar notices — read-only for members, managed in Admin */}
-        {upcomingBlocks.length>0&&(
-          <div style={{marginBottom:14}}>
-            <SLbl mt={0}>🚫 Ground Blocked</SLbl>
-            {upcomingBlocks.map(b=>(
-              <div key={b.id} style={{background:"#fff7ed",border:"1.5px solid #fed7aa",
-                borderRadius:10,padding:"10px 14px",marginBottom:6}}>
-                <div style={{fontWeight:800,fontSize:13,color:"#c2410c"}}>
-                  🏏 {b.label||"Ground Blocked"} — {fmtShort(b.date)}
-                </div>
-                <div style={{fontSize:12,color:"#9a3412",marginTop:2}}>
-                  {b.from} – {b.to} · Nets unavailable (match day)
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
         {filteredUpcoming.length===0&&filteredPast.length===0?(
           <div style={{textAlign:"center",padding:"60px 16px",color:G.muted}}>
             <div style={{fontSize:54,marginBottom:12}}>
@@ -2325,6 +2308,47 @@ export default function App() {
                 onClick={()=>{setSelSess(s);setView("session");}}/>)}
             </>}
           </>
+        )}
+
+        {/* Nets Blocked — collapsed, shows 3 upcoming, expandable */}
+        {upcomingBlocks.length>0&&(
+          <div style={{marginTop:24,marginBottom:6}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+              marginBottom:8}}>
+              <SLbl mt={0}>🚫 Nets Blocked</SLbl>
+              {upcomingBlocks.length>3&&(
+                <button onClick={()=>setBlocksExpanded(e=>!e)}
+                  style={{background:"none",border:"none",cursor:"pointer",
+                    fontSize:12,fontWeight:700,color:G.green,padding:"2px 0",
+                    fontFamily:"inherit"}}>
+                  {blocksExpanded
+                    ? "▲ Show less"
+                    : `▼ Show all ${upcomingBlocks.length}`}
+                </button>
+              )}
+            </div>
+            {(blocksExpanded ? upcomingBlocks : upcomingBlocks.slice(0,3)).map(b=>(
+              <div key={b.id} style={{background:"#fff7ed",border:"1.5px solid #fed7aa",
+                borderRadius:10,padding:"10px 14px",marginBottom:6}}>
+                <div style={{fontWeight:800,fontSize:13,color:"#c2410c"}}>
+                  🏏 {b.label||"Nets Blocked"} — {fmtShort(b.date)}
+                </div>
+                <div style={{fontSize:12,color:"#9a3412",marginTop:2}}>
+                  {b.from} – {b.to} · Nets unavailable (match day)
+                </div>
+              </div>
+            ))}
+            {!blocksExpanded&&upcomingBlocks.length>3&&(
+              <div style={{textAlign:"center",paddingTop:2}}>
+                <button onClick={()=>setBlocksExpanded(true)}
+                  style={{background:"none",border:`1px dashed ${G.border}`,borderRadius:8,
+                    padding:"6px 18px",fontSize:12,fontWeight:700,color:G.muted,
+                    cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
+                  +{upcomingBlocks.length-3} more blocked dates
+                </button>
+              </div>
+            )}
+          </div>
         )}
 
       </div>
@@ -3742,7 +3766,7 @@ export default function App() {
                 </div>
                 <Btn bg={G.green} col={G.lime} full onClick={()=>{
                   if(!bCalDate){showToast("Please pick a date");return;}
-                  const lbl = bCalLabel.trim()||"Ground Blocked";
+                  const lbl = bCalLabel.trim()||"Nets Blocked";
                   saveBlockCals([...blockCals,{
                     id:uid(),date:bCalDate,from:bCalFrom,to:bCalTo,label:lbl}]);
                   logAction("blockcal",`Blocked ground: ${bCalDate} ${bCalFrom}–${bCalTo} "${lbl}"`);
