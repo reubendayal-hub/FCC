@@ -766,6 +766,10 @@ export default function App() {
   const [rActiveTo,   setRActiveTo]  = useState("");
   const [editingSlot, setEditingSlot]= useState(null);
 
+  // Help / contact form
+  const [helpMsg,  setHelpMsg]  = useState("");
+  const [helpCat,  setHelpCat]  = useState("general");
+
   const userRole = currentUser?.role || "member";
   const showToast = m => { setToast(m); setTimeout(()=>setToast(null),2700); };
 
@@ -1316,9 +1320,9 @@ export default function App() {
         <div style={{padding:"24px 20px 40px"}}>
           {/* Prompt text */}
           <div style={{textAlign:"center",marginBottom:20}}>
-            <div style={{fontSize:16,fontWeight:800,color:G.text}}>Who are you?</div>
-            <div style={{fontSize:13,color:G.muted,marginTop:4}}>
-              Type your name to find yourself
+            <div style={{fontSize:15,fontWeight:800,color:G.text}}>Enter your name to find your profile and log in</div>
+            <div style={{fontSize:12,color:G.muted,marginTop:4}}>
+              Not listed? Ask an admin to add you.
             </div>
           </div>
 
@@ -1393,7 +1397,7 @@ export default function App() {
               <div style={{fontSize:40,marginBottom:10,opacity:.4}}>🏏</div>
               <div style={{fontSize:13,color:G.muted,lineHeight:1.7}}>
                 {members.length} members registered<br/>
-                <span style={{fontWeight:700,color:G.text}}>Type at least 1 letter</span> to find your name
+                <span style={{fontWeight:700,color:G.text}}>Start typing</span> to find your name
               </div>
             </div>
           )}
@@ -1579,19 +1583,27 @@ export default function App() {
           <Btn onClick={()=>setView("add")} bg={G.lime} col={G.green}>+ Add / Join</Btn>
         </div>
 
-        {/* Filter toggle — compact chips, right-aligned */}
-        <div style={{display:"flex",justifyContent:"flex-end",gap:5,marginTop:8}}>
-          {["all","mine"].map(f=>{
-            const active = schedFilter===f;
+        {/* Filter toggle — compact pill tabs */}
+        <div style={{display:"flex",justifyContent:"flex-end",gap:4,marginTop:8}}>
+          {[
+            {key:"all",  label:"🏏 All Sessions"},
+            {key:"mine", label:"✋ My Sessions"},
+          ].map(({key,label})=>{
+            const active = schedFilter===key;
             return (
-              <button key={f} onClick={()=>setSchedFilter(f)}
-                style={{padding:"4px 12px",borderRadius:20,
-                  border: active ? "none" : "1.5px solid rgba(255,255,255,.3)",
-                  cursor:"pointer",fontFamily:"inherit",fontWeight:700,fontSize:11,
-                  background: active ? G.lime : "transparent",
-                  color: active ? G.green : "rgba(255,255,255,.75)",
-                  transition:"all .15s",letterSpacing:.2}}>
-                {f==="all" ? "🏏 All" : "✋ Mine"}
+              <button key={key} onClick={()=>setSchedFilter(key)}
+                style={{
+                  padding:"5px 11px", borderRadius:20, cursor:"pointer",
+                  fontFamily:"inherit", fontWeight:700, fontSize:11,
+                  transition:"all .15s",
+                  border: active ? "none" : "none",
+                  background: active
+                    ? G.lime
+                    : "rgba(255,255,255,0.18)",
+                  color: active ? G.green : "rgba(255,255,255,0.9)",
+                  boxShadow: active ? "0 2px 6px rgba(0,0,0,0.2)" : "none",
+                }}>
+                {label}
               </button>
             );
           })}
@@ -1708,17 +1720,22 @@ export default function App() {
           </>
         )}
 
-        {/* Add block cal — admin only */}
-        {can(userRole,"deleteSession")&&(
+        {/* Block Nets Sessions — admin/captain/VC only */}
+        {(["superadmin","admin","captain","vicecaptain"].includes(userRole))&&(
           <div style={{marginTop:20,background:G.white,border:`1.5px solid ${G.border}`,
             borderRadius:12,padding:"14px 16px"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
               marginBottom:showBlockForm?14:0}}>
-              <div style={{fontWeight:800,fontSize:13,color:G.text}}>🚫 Block Nets Sessions – During Matches</div>
+              <div>
+                <div style={{fontWeight:800,fontSize:13,color:G.text}}>🚫 Block Nets Sessions</div>
+                <div style={{fontSize:11,color:G.muted,marginTop:2,fontStyle:"italic"}}>
+                  (during matches &amp; other events)
+                </div>
+              </div>
               <button type="button" onClick={()=>setShowBlockForm(v=>!v)}
                 style={{background:G.cream,border:`1px solid ${G.border}`,borderRadius:8,
                   padding:"5px 12px",fontSize:12,fontWeight:700,cursor:"pointer",
-                  fontFamily:"inherit",color:G.text}}>
+                  fontFamily:"inherit",color:G.text,flexShrink:0}}>
                 {showBlockForm?"Cancel":"+ Block Date"}
               </button>
             </div>
@@ -2400,6 +2417,17 @@ export default function App() {
             </div>
           </div>
 
+          {/* Help & Contact */}
+          <button type="button" onClick={()=>setView("help")}
+            style={{background:G.white,border:`1.5px solid ${G.border}`,
+              borderRadius:12,padding:"13px 16px",fontFamily:"inherit",
+              fontWeight:700,fontSize:14,color:G.text,cursor:"pointer",
+              width:"100%",display:"flex",alignItems:"center",gap:10,textAlign:"left"}}>
+            <span style={{fontSize:20}}>💬</span>
+            <span style={{flex:1}}>Help &amp; Contact Admin</span>
+            <span style={{color:G.muted,fontSize:16}}>›</span>
+          </button>
+
           {/* Sign out */}
           <button type="button" onClick={handleLogout}
             style={{background:"none",border:`1.5px solid ${G.border}`,
@@ -2408,6 +2436,130 @@ export default function App() {
               width:"100%"}}>
             Sign out
           </button>
+
+        </div>
+        <BotNav view="profile" setView={setView} userRole={userRole}/>
+        {toast&&<Toast msg={toast}/>}
+      </Shell>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // RENDER: Help & Contact
+  // ════════════════════════════════════════════════════════════
+  if(view==="help") {
+    const CATS = [
+      {id:"general",   label:"💬 General question"},
+      {id:"booking",   label:"📅 Booking / session issue"},
+      {id:"account",   label:"🔑 Account / login problem"},
+      {id:"technical", label:"🛠️ Technical / app bug"},
+      {id:"other",     label:"📝 Other"},
+    ];
+    const me = members.find(m=>m.id===currentUser.id)||currentUser;
+    function sendHelp() {
+      if(!helpMsg.trim()) { showToast("Please write a message first"); return; }
+      const cat = CATS.find(c=>c.id===helpCat)?.label || helpCat;
+      const subject = encodeURIComponent(`FCC Training App — ${cat} — from ${me.name}`);
+      const body = encodeURIComponent(
+        `Hi Reuben,\n\nA message from the FCC Training app:\n\n`+
+        `Member: ${me.name}\nCategory: ${cat}\n\n`+
+        `Message:\n${helpMsg.trim()}\n\n`+
+        `---\nSent via FCC Training App`
+      );
+      window.open(`mailto:reuben.dayal@gmail.com?subject=${subject}&body=${body}`,"_self");
+      setHelpMsg("");
+      showToast("Opening your email app… ✓");
+      setTimeout(()=>setView("profile"),1200);
+    }
+    return (
+      <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
+          currentUser={currentUser} onLogout={handleLogout}/>}>
+        <AppHeader title="Help & Contact" sub="Send a message to your admin"
+          onBack={()=>setView("profile")}/>
+        <div style={{padding:"20px 16px 100px",display:"flex",flexDirection:"column",gap:16}}>
+
+          {/* Info card */}
+          <div style={{background:G.white,border:`1.5px solid ${G.border}`,
+            borderRadius:14,padding:"16px 18px",display:"flex",gap:14,alignItems:"flex-start"}}>
+            <div style={{width:44,height:44,borderRadius:"50%",background:G.green,
+              flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",
+              fontSize:20}}>👋</div>
+            <div>
+              <div style={{fontWeight:800,fontSize:14,color:G.text,marginBottom:4}}>
+                Got a question or issue?
+              </div>
+              <div style={{fontSize:13,color:G.muted,lineHeight:1.6}}>
+                Send a message to <b style={{color:G.text}}>Reuben</b> directly. Your name is included automatically so he knows who to reply to.
+              </div>
+            </div>
+          </div>
+
+          {/* Category picker */}
+          <div style={{background:G.white,border:`1.5px solid ${G.border}`,
+            borderRadius:14,padding:"14px 16px"}}>
+            <div style={{fontSize:11,fontWeight:900,letterSpacing:1.5,color:G.muted,
+              textTransform:"uppercase",marginBottom:10}}>What's this about?</div>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {CATS.map(c=>(
+                <button key={c.id} onClick={()=>setHelpCat(c.id)}
+                  style={{display:"flex",alignItems:"center",gap:10,
+                    background:helpCat===c.id ? G.green : "transparent",
+                    border:`1.5px solid ${helpCat===c.id ? G.green : G.border}`,
+                    borderRadius:9,padding:"9px 12px",cursor:"pointer",
+                    fontFamily:"inherit",transition:"all .12s"}}>
+                  <span style={{fontSize:14,fontWeight:700,
+                    color:helpCat===c.id?"#fff":G.text,flex:1,textAlign:"left"}}>
+                    {c.label}
+                  </span>
+                  {helpCat===c.id&&<span style={{color:G.lime,fontSize:14,fontWeight:800}}>✓</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Screenshot tip — shown when Technical selected */}
+          {helpCat==="technical"&&(
+            <div style={{background:"#fffbeb",border:"1.5px solid #fde68a",
+              borderRadius:12,padding:"12px 14px",display:"flex",gap:10,alignItems:"flex-start"}}>
+              <span style={{fontSize:18,flexShrink:0}}>📸</span>
+              <div style={{fontSize:12,color:"#78350f",lineHeight:1.6}}>
+                <b>Tip:</b> A screenshot of the error or broken screen is really helpful for troubleshooting.
+                After hitting send, <b>attach your screenshot</b> to the email before you deliver it.
+                On iPhone: <b>Side + Volume Up</b>. On Android: <b>Power + Volume Down</b>.
+              </div>
+            </div>
+          )}
+
+          {/* Message box */}
+          <div style={{background:G.white,border:`1.5px solid ${G.border}`,
+            borderRadius:14,padding:"14px 16px"}}>
+            <div style={{fontSize:11,fontWeight:900,letterSpacing:1.5,color:G.muted,
+              textTransform:"uppercase",marginBottom:10}}>Your message</div>
+            <textarea
+              rows={5}
+              placeholder="Describe your question or issue… (e.g. what happened, which screen you were on, what you expected vs what you saw)"
+              value={helpMsg}
+              onChange={e=>setHelpMsg(e.target.value)}
+              style={{width:"100%",borderRadius:9,border:`1.5px solid ${G.border}`,
+                padding:"11px 13px",fontSize:14,fontFamily:"'DM Sans',sans-serif",
+                fontWeight:500,background:G.cream,color:G.text,
+                outline:"none",boxSizing:"border-box",resize:"vertical",
+                lineHeight:1.6}}/>
+            <div style={{marginTop:6,fontSize:11,color:G.muted}}>
+              Sending as: <b style={{color:G.text}}>{me.name}</b>
+            </div>
+          </div>
+
+          <Btn bg={G.green} col={G.lime} full onClick={sendHelp}>
+            📧 Send Message to Reuben
+          </Btn>
+
+          <div style={{fontSize:11,color:G.muted,textAlign:"center",lineHeight:1.8}}>
+            This will open your email app with the message pre-filled.<br/>
+            Hit send to deliver it — and if it's a bug or error,{" "}
+            <b style={{color:G.text}}>attach a screenshot</b> if you can.
+            It really helps troubleshoot the problem faster.
+          </div>
 
         </div>
         <BotNav view="profile" setView={setView} userRole={userRole}/>
