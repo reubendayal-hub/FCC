@@ -6,11 +6,13 @@ const FCC_LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHgAAAB4CAYAAAA5
 
 
 // ─── Keys ─────────────────────────────────────────────────────
-const SESSIONS_KEY = "fcc-nets-sessions-v4";
-const MEMBERS_KEY  = "fcc-nets-members-v4";
-const PINS_KEY     = "fcc-nets-pins-v4";
-const RECURRING_KEY = "recurring";
-const TEAMS_KEY    = "fcc-nets-teams-v4";
+const SESSIONS_KEY   = "fcc-nets-sessions-v4";
+const MEMBERS_KEY    = "fcc-nets-members-v4";
+const PINS_KEY       = "fcc-nets-pins-v4";
+const RECURRING_KEY  = "recurring";
+const TEAMS_KEY      = "fcc-nets-teams-v4";
+const JOINREQS_KEY   = "joinrequests";
+const AUDITLOG_KEY   = "auditlog";
 
 // ─── Roles ────────────────────────────────────────────────────
 const ROLES = ["superadmin","admin","captain","vicecaptain","member"];
@@ -137,7 +139,7 @@ const SEED_MEMBERS = [
   "Arun Krishnamurthy","Arun Shankar","Ashwin Shankar","Ashwin Singh Tensingh",
   "Balaji","Charlie","Deepak Akar","Dhruv Shah",
   "Durgesh","Gagan Sachdeva","Garghi Seenevas","Hasnain Ahmed",
-  "Ilayaraja Karuppasamy","Ishan Bordoloi","Jay","Jaya Nair",
+  "Ilayaraja Karuppasamy","Ishan Bordoloi","Jayashwanth J S","Jaya Nair",
   "Kamal Jayalaksminarasimhan","Kian Kakoti","Mishka Gupta","Monesh Shantharam",
   "Nimesh Rajamohanan","Nirmal Mohanan","Nitin Gupta","Nitin Jain",
   "Pranavan Aananth","Prithvi Sagar","Pronit Lahiri","Pulin Dhar",
@@ -152,10 +154,17 @@ const SEED_MEMBERS = [
   "Vihaan Sundeep","Vijay Deepak","Vinay Arunkumar",
   "Vinay Kumar","Virendra Pawar","Vishali Jain","Vivek Bhatnagar",
   "Vivek Satyarthi","Xavier Ramzan","Yogismaan Kamal","Zachary Dayal","Zeb Pirzada",
+  "Junaid Khan","Muhammad Aun Zaheer",
+  "Bhoomi Joshi","Suneeti Bala","Nandini",
 ].map((name, i) => ({
   id: `m${i+1}`,
   name,
   team: name === "Zachary Dayal" ? "U11" : null,
+  teams: name === "Zachary Dayal" ? ["U11"]
+       : name === "Bhoomi Joshi"  ? ["U15 Girls"]
+       : name === "Nandini"       ? ["U15"]
+       : name === "Suneeti Bala"  ? ["Women's"]
+       : [],
   role: name === "Reuben Dayal" ? "superadmin" : "member",
 }));
 
@@ -259,6 +268,12 @@ const EMAIL_SEED = {
   "Vivek Satyarthi":"satyarthivivek@gmail.com",
   "Xavier Ramzan":"xavier_ramzan@hotmail.com",
   "Zeb Pirzada":"zpirzada@gmail.com",
+  // Added from uniform form — were missing from member list
+  "Junaid Khan":"junaidmuhammad395@gmail.com",
+  "Muhammad Aun Zaheer":"aunzaheer@hotmail.com",
+  "Bhoomi Joshi":"joshi.bhoomi013@gmail.com",
+  "Suneeti Bala":"suneeti.bala@gmail.com",
+  "Jayashwanth J S":"j.jaayshwaanth@gmail.com",
 };
 const uid          = () => Math.random().toString(36).slice(2,9);
 const todayStr     = () => new Date().toISOString().split("T")[0];
@@ -505,7 +520,7 @@ function SessCard({s,members,faded,onClick}) {
 }
 
 // ─── Bottom nav ───────────────────────────────────────────────
-function BotNav({view,setView,userRole}) {
+function BotNav({view,setView,userRole,pendingCount=0}) {
   const isAdmin = can(userRole,"accessMembers");
   const active = view==="session"?"schedule":view==="roleAdmin"?"admin":view;
 
@@ -590,7 +605,17 @@ function BotNav({view,setView,userRole}) {
       {/* Right slot — Members (admin) or Profile (member) */}
       {isAdmin ? (
         <button onClick={()=>setView("admin")} style={tabStyle(active==="admin")}>
-          <IconMembers on={active==="admin"}/>
+          <div style={{position:"relative",display:"inline-flex"}}>
+            <IconMembers on={active==="admin"}/>
+            {pendingCount>0&&(
+              <span style={{position:"absolute",top:-4,right:-6,
+                background:"#ef4444",color:"#fff",borderRadius:99,
+                fontSize:9,fontWeight:900,minWidth:16,height:16,
+                display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px"}}>
+                {pendingCount}
+              </span>
+            )}
+          </div>
           <span style={labelStyle(active==="admin")}>Admin</span>
         </button>
       ) : (
@@ -716,6 +741,12 @@ export default function App() {
   const [pendingMember, setPendingMember] = useState(null);
   const [emailInput,   setEmailInput]   = useState("");
   const [emailError,   setEmailError]   = useState("");
+  // Invite codes for members without email — { memberId: hashedCode }
+  const [inviteCodes,   setInviteCodes]   = useState({});
+  // Join requests from non-members
+  const [joinRequests,  setJoinRequests]  = useState([]);
+  // Superadmin-only audit log
+  const [auditLog,      setAuditLog]      = useState([]);
 
   // App view
   const [view,     setView]     = useState("schedule");
@@ -772,6 +803,13 @@ export default function App() {
   // Help / contact form
   const [helpMsg,  setHelpMsg]  = useState("");
   const [helpCat,  setHelpCat]  = useState("general");
+  // Request-to-join form state
+  const [jrName,    setJrName]   = useState("");
+  const [jrTeam,    setJrTeam]   = useState("");
+  const [jrContact, setJrContact]= useState("");
+  const [jrForChild,setJrForChild]=useState(false);
+  const [jrChildName,setJrChildName]=useState("");
+  const [jrChildTeam,setJrChildTeam]=useState("");
 
   const userRole = currentUser?.role || "member";
   const showToast = m => { setToast(m); setTimeout(()=>setToast(null),2700); };
@@ -791,29 +829,38 @@ export default function App() {
   // ── Load + real-time sync via Firestore ──────────────────────
   useEffect(()=>{
     const refs = {
-      sessions:  doc(db,"fccnets","sessions"),
-      members:   doc(db,"fccnets","members"),
-      pins:      doc(db,"fccnets","pins"),
-      teams:     doc(db,"fccnets","teams"),
-      recurring: doc(db,"fccnets",RECURRING_KEY),
-      blockcals: doc(db,"fccnets","blockcals"),
+      sessions:    doc(db,"fccnets","sessions"),
+      members:     doc(db,"fccnets","members"),
+      pins:        doc(db,"fccnets","pins"),
+      teams:       doc(db,"fccnets","teams"),
+      recurring:   doc(db,"fccnets",RECURRING_KEY),
+      blockcals:   doc(db,"fccnets","blockcals"),
+      invitecodes: doc(db,"fccnets","invitecodes"),
+      joinrequests:doc(db,"fccnets",JOINREQS_KEY),
+      auditlog:    doc(db,"fccnets",AUDITLOG_KEY),
     };
     (async()=>{
       try {
-        const [mr,pr,tr,rr,br] = await Promise.all([
+        const [mr,pr,tr,rr,br,ir,jr,ar] = await Promise.all([
           getDoc(refs.members),
           getDoc(refs.pins),
           getDoc(refs.teams),
           getDoc(refs.recurring),
           getDoc(refs.blockcals),
+          getDoc(refs.invitecodes),
+          getDoc(refs.joinrequests),
+          getDoc(refs.auditlog),
         ]);
-        setMembers(  mr.exists() ? JSON.parse(mr.data().value).map(normMember) : SEED_MEMBERS.map(normMember));
-        setPins(     pr.exists() ? JSON.parse(pr.data().value) : {});
-        setTeams(    tr.exists() ? JSON.parse(tr.data().value) : DEFAULT_TEAMS);
-        setRecurring(rr.exists() ? JSON.parse(rr.data().value) : []);
-        setBlockCals(br.exists() ? JSON.parse(br.data().value) : []);
+        setMembers(     mr.exists() ? JSON.parse(mr.data().value).map(normMember) : SEED_MEMBERS.map(normMember));
+        setPins(        pr.exists() ? JSON.parse(pr.data().value) : {});
+        setTeams(       tr.exists() ? JSON.parse(tr.data().value) : DEFAULT_TEAMS);
+        setRecurring(   rr.exists() ? JSON.parse(rr.data().value) : []);
+        setBlockCals(   br.exists() ? JSON.parse(br.data().value) : []);
+        setInviteCodes( ir.exists() ? JSON.parse(ir.data().value) : {});
+        setJoinRequests(jr.exists() ? JSON.parse(jr.data().value) : []);
+        setAuditLog(    ar.exists() ? JSON.parse(ar.data().value) : []);
       } catch(e) {
-        setMembers(SEED_MEMBERS.map(normMember)); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]); setBlockCals([]);
+        setMembers(SEED_MEMBERS.map(normMember)); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]); setBlockCals([]); setInviteCodes({}); setJoinRequests([]); setAuditLog([]);
       }
       setLoading(false);
     })();
@@ -828,7 +875,33 @@ export default function App() {
   const savePins      = async u => { setPins(u);      await setDoc(doc(db,"fccnets","pins"),     {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveTeams     = async u => { setTeams(u);     await setDoc(doc(db,"fccnets","teams"),    {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveRecurring = async u => { setRecurring(u); await setDoc(doc(db,"fccnets",RECURRING_KEY),{value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveBlockCals = async u => { setBlockCals(u); await setDoc(doc(db,"fccnets","blockcals"),{value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveBlockCals   = async u => { setBlockCals(u);   await setDoc(doc(db,"fccnets","blockcals"),   {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveInviteCodes = async u => { setInviteCodes(u);  await setDoc(doc(db,"fccnets","invitecodes"), {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveJoinRequests= async u => { setJoinRequests(u); await setDoc(doc(db,"fccnets",JOINREQS_KEY),  {value:JSON.stringify(u)}).catch(()=>{}); };
+
+  // ── Audit log ─────────────────────────────────────────────────
+  // Cap at 500 entries; newest first. Only superadmin can read.
+  const saveAuditLog = async u => {
+    setAuditLog(u);
+    await setDoc(doc(db,"fccnets",AUDITLOG_KEY), {value:JSON.stringify(u)}).catch(()=>{});
+  };
+  function logAction(category, detail) {
+    if(!currentUser) return;
+    const entry = {
+      id: uid(),
+      ts: new Date().toISOString(),
+      byId: currentUser.id,
+      byName: currentUser.name,
+      byRole: currentUser.role || "member",
+      category, // e.g. "member", "role", "team", "session", "pin", "request", "system"
+      detail,   // human-readable description
+    };
+    setAuditLog(prev => {
+      const next = [entry, ...prev].slice(0, 500);
+      setDoc(doc(db,"fccnets",AUDITLOG_KEY), {value:JSON.stringify(next)}).catch(()=>{});
+      return next;
+    });
+  }
 
   // ── Auto-generate recurring sessions ─────────────────────────
   useEffect(()=>{
@@ -861,6 +934,24 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[loading, recurring]);
 
+  // ── Invite code helpers ───────────────────────────────────────
+  // Generate a short human-readable code: FCC-XXXX (letters+digits, no ambiguous chars)
+  function genCode() {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    return "FCC-" + Array.from({length:4}, ()=>chars[Math.floor(Math.random()*chars.length)]).join("");
+  }
+  function hashCode(code) { return hashPin(code.toUpperCase()); }
+
+  function generateInviteCode(memberId) {
+    const m = members.find(x=>x.id===memberId);
+    const plain = genCode();
+    const updated = {...inviteCodes, [memberId]: hashCode(plain)};
+    saveInviteCodes(updated);
+    if(m) logAction("pin", `Generated invite code for: ${m.name}`);
+    showToast(`Code for member: ${plain}`);
+    return plain;
+  }
+
   // ── Auth flow ─────────────────────────────────────────────────
   function handlePickMember(member) {
     setPendingMember(member);
@@ -872,15 +963,16 @@ export default function App() {
       setAuthView("enterpin");
     } else {
       // First-time login
-      // If member has no email in DB AND no seed email → no verification possible → child/unverifiable
       const seedEmail = EMAIL_SEED[member.name];
       const storedEmail = member.email;
-      if(!seedEmail && !storedEmail) {
-        // No email on record — go straight to PIN setup (youth/children)
-        setAuthView("newpin");
-      } else {
-        // Has email on record — require verification before PIN setup
+      const hasInviteCode = !!inviteCodes[member.id];
+      if(seedEmail || storedEmail) {
         setAuthView("verifyemail");
+      } else if(hasInviteCode) {
+        setAuthView("verifycode");
+      } else {
+        // No email, no code — straight to PIN (very young youth, no verification possible)
+        setAuthView("newpin");
       }
     }
   }
@@ -900,6 +992,21 @@ export default function App() {
       const updated = members.map(m => m.id===pendingMember.id ? {...m, email:seed} : m);
       saveMembers(updated);
     }
+    setEmailError("");
+    setAuthView("newpin");
+  }
+
+  function handleVerifyCode() {
+    const typed = emailInput.trim().toUpperCase();
+    if(!typed) { setEmailError("Please enter your invite code"); return; }
+    if(hashCode(typed) !== inviteCodes[pendingMember.id]) {
+      setEmailError("Invalid code. Check with your admin and try again.");
+      return;
+    }
+    // Passed — clear the used code so it can't be reused
+    const updated = {...inviteCodes};
+    delete updated[pendingMember.id];
+    saveInviteCodes(updated);
     setEmailError("");
     setAuthView("newpin");
   }
@@ -953,6 +1060,7 @@ export default function App() {
       showToast("A team with that name already exists"); return;
     }
     saveTeams([...teams, {id:uid(), name:n, senior:newTSenior}]);
+    logAction("group", `Created group: "${n}" (${newTSenior?"Senior":"Youth"})`);
     setNewTName(""); setNewTSenior(false);
     showToast(`Group "${n}" added ✓`);
   }
@@ -962,9 +1070,9 @@ export default function App() {
     if(!n) return;
     const old = teams.find(t=>t.id===id)?.name;
     if(!old) return;
-    // Update all members on the old team name
     saveMembers(members.map(m=>m.team===old ? {...m,team:n} : m));
     saveTeams(teams.map(t=>t.id===id ? {...t,name:n} : t));
+    logAction("group", `Renamed group: "${old}" → "${n}"`);
     setEditingTeam(null);
     showToast(`Renamed to "${n}" ✓`);
   }
@@ -975,6 +1083,7 @@ export default function App() {
     if(!window.confirm(`Delete group "${t.name}"? Members in this group will be moved to Unassigned.`)) return;
     saveMembers(members.map(m=>m.team===t.name ? {...m,team:null,role:"member"} : m));
     saveTeams(teams.filter(t=>t.id!==id));
+    logAction("group", `Deleted group: "${t.name}"`);
     showToast(`Group "${t.name}" deleted`);
   }
 
@@ -988,6 +1097,7 @@ export default function App() {
       ));
     }
     saveTeams(teams.map(t=>t.id===id ? {...t,senior:!t.senior} : t));
+    logAction("group", `Changed "${t.name}" type: ${t.senior?"Senior→Youth":"Youth→Senior"}`);
     showToast(`"${t.name}" set to ${t.senior?"Youth":"Senior"} ✓`);
   }
 
@@ -995,21 +1105,27 @@ export default function App() {
   function addRecurringSlot(slot) {
     const next = [...recurring, {...slot, id:uid(), enabled:true}];
     saveRecurring(next);
+    logAction("recurring", `Added recurring slot: "${slot.name}" (${["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][slot.day]}, ${slot.from}–${slot.to}${slot.team?", "+slot.team:""})`);
     showToast(`Recurring slot "${slot.name}" added ✓`);
   }
   function toggleRecurringSlot(id) {
+    const slot = recurring.find(r=>r.id===id);
     const next = recurring.map(r=>r.id===id ? {...r,enabled:!r.enabled} : r);
     saveRecurring(next);
+    if(slot) logAction("recurring", `${slot.enabled?"Disabled":"Enabled"} recurring slot: "${slot.name}"`);
   }
   function deleteRecurringSlot(id) {
     const slot = recurring.find(r=>r.id===id);
     if(!slot) return;
     if(!window.confirm(`Delete recurring slot "${slot.name}"? Existing sessions from this slot are kept.`)) return;
     saveRecurring(recurring.filter(r=>r.id!==id));
+    logAction("recurring", `Deleted recurring slot: "${slot.name}"`);
     showToast(`Slot "${slot.name}" deleted`);
   }
   function updateRecurringSlot(id, changes) {
+    const slot = recurring.find(r=>r.id===id);
     saveRecurring(recurring.map(r=>r.id===id ? {...r,...changes} : r));
+    if(slot) logAction("recurring", `Updated recurring slot: "${slot.name}" → "${changes.name||slot.name}"`);
     showToast("Slot updated ✓");
   }
 
@@ -1028,12 +1144,14 @@ export default function App() {
       saveSessions(sessions.map(s=>s.id===ex.id?{...s,players:merged,
         label:s.label||bLabel,restrictedTo:s.restrictedTo||restrictedTo,
         poll:[...mergedPoll,...newOpts]}:s));
+      logAction("session", `Added players to session on ${bDate} (${bFrom}–${bTo}): ${selP.join(", ")}`);
       showToast(`Players added to session on ${fmtShort(bDate)} ✓`);
     } else {
       saveSessions([...sessions,{id:uid(),date:bDate,from:bFrom,to:bTo,
         players:[...selP],note:bNote.trim(),label:bLabel.trim(),
         restrictedTo,poll:pollOptions}]
         .sort((a,b)=>new Date(a.date)-new Date(b.date)));
+      logAction("session", `Created session: ${bDate} ${bFrom}–${bTo}${bLabel?" «"+bLabel+"»":""}${restrictedTo?" ("+restrictedTo+" only)":""} — ${selP.length} player${selP.length>1?"s":""}: ${selP.join(", ")}`);
       showToast(`Session booked for ${fmtShort(bDate)} ✓`);
     }
     setBDate("");setBNote("");setBLabel("");setBRestrictTeam("");
@@ -1080,7 +1198,9 @@ export default function App() {
   }
 
   function handleDeleteSess(id) {
+    const s = sessions.find(x=>x.id===id);
     saveSessions(sessions.filter(s=>s.id!==id));
+    if(s) logAction("session", `Deleted session: ${s.date} ${s.from}–${s.to}${s.label?" «"+s.label+"»":""} (${s.players?.length||0} players)`);
     setView("schedule");setSelSess(null);
     showToast("Session deleted");
   }
@@ -1098,8 +1218,10 @@ export default function App() {
     if(members.find(m=>m.name.toLowerCase()===newName.trim().toLowerCase())){
       showToast("Member already exists"); return;
     }
+    const teamLabel = newTeam==="Unassigned" ? "no team" : newTeam;
     saveMembers([...members,{id:uid(),name:newName.trim(),
       teams:newTeam==="Unassigned"?[]:[newTeam],role:"member"}]);
+    logAction("member", `Added member: ${newName.trim()} (${teamLabel})`);
     setNewName(""); showToast("Member added ✓");
   }
 
@@ -1121,7 +1243,9 @@ export default function App() {
   const [pinMsg,       setPinMsg]         = useState("");
 
   function removeMember(id) {
+    const m = members.find(x=>x.id===id);
     saveMembers(members.filter(m=>m.id!==id));
+    if(m) logAction("member", `Deleted member: ${m.name} (was ${m.role||"member"}${m.teams?.length ? ", teams: "+m.teams.join(", ") : ""})`);
     setConfirmDelete(null);
     showToast("Member removed");
   }
@@ -1136,6 +1260,7 @@ export default function App() {
     }
     // Update member name
     saveMembers(members.map(m=>m.id===id ? {...m,name:trimmed} : m));
+    logAction("member", `Renamed member: "${old}" → "${trimmed}"`);
     // Update all sessions that reference the old name
     const updSess = sessions.map(s=>({
       ...s,
@@ -1173,6 +1298,7 @@ export default function App() {
     }));
     saveMembers(newMembers);
     saveSessions(newSessions);
+    logAction("system", `Auto-fixed ${renames.length} name${renames.length>1?"s":""}: ${renames.map(r=>`"${r.old}"→"${r.new}"`).join(", ")}`);
     showToast(`Fixed ${renames.length} name${renames.length > 1 ? "s" : ""} ✓`);
   }
 
@@ -1187,6 +1313,8 @@ export default function App() {
     const hasSenior = next.some(t=>seniorTeamNames.includes(t));
     const newRole = (!hasSenior && ["captain","vicecaptain"].includes(mem.role))
       ? "member" : mem.role;
+    const action = current.includes(teamName) ? "Removed" : "Added";
+    logAction("team", `${action} ${mem.name} ${action==="Added"?"to":"from"} ${teamName}${newRole!==mem.role?` (demoted to member — no senior team)`:""}`);
     saveMembers(members.map(m=>m.id===id ? {...m,teams:next,role:newRole} : m));
   }
 
@@ -1196,6 +1324,7 @@ export default function App() {
     if(["captain","vicecaptain"].includes(role) && !hasSenior) {
       showToast("Captain/VC only available for Senior team members"); return;
     }
+    logAction("role", `Changed role: ${mem?.name} → ${role} (was ${mem?.role||"member"})`);
     saveMembers(members.map(m=>m.id===id?{...m,role}:m));
     setEditingRole(null);
     showToast("Role updated ✓");
@@ -1235,8 +1364,10 @@ export default function App() {
   }
 
   function resetPin(id) {
+    const m = members.find(x=>x.id===id);
     const updated={...pins}; delete updated[id];
     savePins(updated);
+    if(m) logAction("pin", `Reset PIN for: ${m.name}`);
     showToast("PIN cleared — member sets new PIN on next login");
   }
 
@@ -1383,14 +1514,25 @@ export default function App() {
             </div>
           )}
 
-          {/* No results */}
+          {/* No results — offer Request to Join */}
           {hasQuery && filtered.length === 0 && (
-            <div style={{textAlign:"center",padding:"30px 0"}}>
+            <div style={{textAlign:"center",padding:"24px 0 8px"}}>
               <div style={{fontSize:32,marginBottom:8}}>🤔</div>
               <div style={{fontWeight:800,color:G.text,fontSize:15}}>Not found</div>
-              <div style={{fontSize:13,color:G.muted,marginTop:4}}>
-                Ask an admin to add you to the app.
+              <div style={{fontSize:13,color:G.muted,marginTop:4,marginBottom:18,lineHeight:1.6}}>
+                Not in the app yet? Submit a request<br/>and an admin will add you.
               </div>
+              <button onClick={()=>{
+                  setJrName(pickSearch.trim());
+                  setJrTeam(""); setJrContact(""); setJrForChild(false);
+                  setJrChildName(""); setJrChildTeam("");
+                  setAuthView("joinrequest");
+                }}
+                style={{background:G.green,color:G.lime,border:"none",borderRadius:12,
+                  padding:"12px 24px",fontFamily:"inherit",fontWeight:800,fontSize:14,
+                  cursor:"pointer",boxShadow:"0 3px 12px rgba(20,83,45,.3)"}}>
+                ✋ Request to Join
+              </button>
             </div>
           )}
 
@@ -1408,6 +1550,152 @@ export default function App() {
       </Shell>
     );
   }
+
+  // ════════════════════════════════════════════════════════════
+  // RENDER: Auth — Request to Join
+  // ════════════════════════════════════════════════════════════
+  if(!currentUser && authView==="joinrequest") {
+    const nonPlayerOption = "I don't play / I'm a parent";
+    const teamOptions = [...ALL_TEAMS.filter(t=>t!=="Unassigned"), nonPlayerOption];
+
+    function submitJoinRequest() {
+      const nameToCheck = jrForChild ? jrChildName.trim() : jrName.trim();
+      if(!nameToCheck) { showToast("Please enter a name"); return; }
+      const req = {
+        id: uid(),
+        submittedAt: new Date().toISOString(),
+        forChild: jrForChild,
+        // Player details
+        playerName: jrForChild ? jrChildName.trim() : jrName.trim(),
+        playerTeam: jrForChild ? jrChildTeam : jrTeam,
+        // Parent/submitter details (only stored if for child)
+        parentName: jrForChild ? jrName.trim() : null,
+        contact: jrContact.trim() || null,
+        status: "pending",
+      };
+      saveJoinRequests([...joinRequests, req]);
+      setAuthView("joinrequestdone");
+    }
+
+    return (
+      <Shell>
+        <div style={{background:G.green,padding:"20px 20px 16px",textAlign:"center"}}>
+          <div style={{fontSize:26,marginBottom:4}}>✋</div>
+          <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
+            fontSize:19,fontWeight:900}}>Request to Join</div>
+          <div style={{color:"rgba(255,255,255,0.6)",fontSize:12,marginTop:3}}>
+            An admin will review and add you shortly
+          </div>
+        </div>
+
+        <div style={{padding:"20px 20px 100px",display:"flex",flexDirection:"column",gap:14}}>
+
+          {/* Registering for yourself or a child? */}
+          <div style={{background:"#fff",border:`1.5px solid ${G.border}`,borderRadius:12,
+            padding:"14px 16px"}}>
+            <div style={{fontSize:11,fontWeight:900,letterSpacing:1.5,color:G.muted,
+              textTransform:"uppercase",marginBottom:10}}>Who are you registering?</div>
+            <div style={{display:"flex",gap:8}}>
+              {[{v:false,label:"🙋 Myself"},{v:true,label:"👶 My child"}].map(opt=>(
+                <button key={String(opt.v)} onClick={()=>setJrForChild(opt.v)}
+                  style={{flex:1,padding:"10px 0",borderRadius:10,border:"none",
+                    cursor:"pointer",fontFamily:"inherit",fontWeight:700,fontSize:13,
+                    background:jrForChild===opt.v ? G.green : G.bg,
+                    color:jrForChild===opt.v ? G.lime : G.muted,
+                    transition:"all .12s"}}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Your name (always shown — either player or parent) */}
+          <div style={{background:"#fff",border:`1.5px solid ${G.border}`,borderRadius:12,
+            padding:"14px 16px",display:"flex",flexDirection:"column",gap:10}}>
+            <FFld label={jrForChild ? "Your Name (Parent / Guardian)" : "Your Full Name"}>
+              <input placeholder={jrForChild ? "e.g. Priya Sharma" : "e.g. Arjun Sharma"}
+                style={iSt()} value={jrName}
+                onChange={e=>setJrName(e.target.value)}/>
+            </FFld>
+            {!jrForChild&&(
+              <FFld label="Your Team / Group">
+                <select style={iSt()} value={jrTeam} onChange={e=>setJrTeam(e.target.value)}>
+                  <option value="">— Select your team —</option>
+                  {teamOptions.map(t=><option key={t} value={t}>{t}</option>)}
+                </select>
+              </FFld>
+            )}
+            <FFld label="Your Email or Phone (optional — so we can contact you)">
+              <input placeholder="email or phone number"
+                style={iSt()} value={jrContact}
+                onChange={e=>setJrContact(e.target.value)}/>
+            </FFld>
+          </div>
+
+          {/* Child details — only if registering for child */}
+          {jrForChild&&(
+            <div style={{background:"#fdf2f8",border:"1.5px solid #f9a8d4",borderRadius:12,
+              padding:"14px 16px",display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{fontSize:11,fontWeight:900,letterSpacing:1.5,
+                color:"#be185d",textTransform:"uppercase",marginBottom:2}}>
+                👶 Child's Details
+              </div>
+              <FFld label="Child's Full Name">
+                <input placeholder="e.g. Priya's child"
+                  style={iSt()} value={jrChildName}
+                  onChange={e=>setJrChildName(e.target.value)}/>
+              </FFld>
+              <FFld label="Child's Team / Group">
+                <select style={iSt()} value={jrChildTeam} onChange={e=>setJrChildTeam(e.target.value)}>
+                  <option value="">— Select team —</option>
+                  {teamOptions.filter(t=>t!==nonPlayerOption).map(t=>(
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </FFld>
+            </div>
+          )}
+
+          <button onClick={submitJoinRequest}
+            style={{background:G.green,color:G.lime,border:"none",borderRadius:12,
+              padding:"15px",fontSize:15,fontWeight:800,cursor:"pointer",
+              fontFamily:"inherit",boxShadow:"0 3px 14px rgba(20,83,45,.3)"}}>
+            Submit Request →
+          </button>
+          <button onClick={()=>setAuthView("pick")}
+            style={{background:"transparent",color:G.muted,border:"none",
+              fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",padding:"6px"}}>
+            ← Back to login
+          </button>
+        </div>
+      </Shell>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // RENDER: Auth — Request submitted confirmation
+  // ════════════════════════════════════════════════════════════
+  if(!currentUser && authView==="joinrequestdone") return (
+    <Shell>
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",
+        justifyContent:"center",minHeight:"100vh",padding:"40px 28px",textAlign:"center"}}>
+        <div style={{fontSize:64,marginBottom:16}}>🎉</div>
+        <div style={{fontFamily:"'Playfair Display',serif",fontWeight:900,
+          fontSize:22,color:G.text,marginBottom:10}}>Request Sent!</div>
+        <div style={{fontSize:14,color:G.muted,lineHeight:1.7,marginBottom:30}}>
+          An admin will review your request and add you to the app.
+          You'll be able to log in as soon as it's approved.<br/><br/>
+          This usually happens within a day or two. 🏏
+        </div>
+        <button onClick={()=>setAuthView("pick")}
+          style={{background:G.green,color:G.lime,border:"none",borderRadius:12,
+            padding:"14px 32px",fontFamily:"inherit",fontWeight:800,fontSize:15,
+            cursor:"pointer"}}>
+          Back to Login
+        </button>
+      </div>
+    </Shell>
+  );
 
   // ════════════════════════════════════════════════════════════
   // RENDER: Auth — verify email (first-time, adults only)
@@ -1483,6 +1771,70 @@ export default function App() {
   }
 
   // ════════════════════════════════════════════════════════════
+  // RENDER: Auth — verify invite code (no email, first-time)
+  // ════════════════════════════════════════════════════════════
+  if(!currentUser && authView==="verifycode") return (
+    <Shell>
+      <div style={{display:"flex",flexDirection:"column",minHeight:"100vh"}}>
+        <div style={{background:G.green,padding:"22px 20px 18px",textAlign:"center"}}>
+          <div style={{fontSize:28,marginBottom:6}}>🔑</div>
+          <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
+            fontSize:19,fontWeight:900}}>Hi, {pendingMember?.name.split(" ")[0]}!</div>
+          <div style={{color:"rgba(255,255,255,0.65)",fontSize:12,marginTop:4}}>
+            Enter your invite code to set up your account
+          </div>
+        </div>
+        <div style={{flex:1,padding:"28px 24px"}}>
+          <div style={{background:"#f0fdf4",border:"1.5px solid rgba(20,83,45,.15)",
+            borderRadius:14,padding:"16px 18px",marginBottom:20}}>
+            <div style={{fontSize:13,color:G.muted,lineHeight:1.6}}>
+              Your admin has shared a personal <b style={{color:G.text}}>invite code</b> with you.
+              It looks like <b style={{color:G.text}}>FCC-XXXX</b>.
+              Enter it below to verify your identity and set your PIN.
+            </div>
+          </div>
+          <div style={{marginBottom:14}}>
+            <label style={{display:"block",fontSize:11,fontWeight:800,
+              color:G.muted,letterSpacing:1.2,textTransform:"uppercase",marginBottom:6}}>
+              Your Invite Code
+            </label>
+            <input
+              type="text" autoFocus autoCapitalize="characters" spellCheck={false}
+              placeholder="FCC-XXXX"
+              value={emailInput}
+              onChange={e=>{setEmailInput(e.target.value.toUpperCase());setEmailError("");}}
+              onKeyDown={e=>e.key==="Enter"&&handleVerifyCode()}
+              style={{width:"100%",borderRadius:10,border:`1.5px solid ${emailError?"#ef4444":G.border}`,
+                padding:"13px 14px",fontSize:18,fontFamily:"'DM Sans',sans-serif",
+                fontWeight:700,background:"#fff",color:G.text,outline:"none",
+                boxSizing:"border-box",letterSpacing:3,textAlign:"center"}}/>
+            {emailError&&(
+              <div style={{marginTop:6,fontSize:12,color:"#dc2626",fontWeight:700}}>
+                ⚠️ {emailError}
+              </div>
+            )}
+          </div>
+          <button onClick={handleVerifyCode}
+            style={{width:"100%",background:G.green,color:G.lime,border:"none",
+              borderRadius:12,padding:"15px",fontSize:15,fontWeight:800,
+              cursor:"pointer",fontFamily:"inherit",marginBottom:10}}>
+            Verify &amp; Continue →
+          </button>
+          <button onClick={()=>{setPendingMember(null);setAuthView("pick");setEmailInput("");setEmailError("");}}
+            style={{width:"100%",background:"transparent",color:G.muted,border:"none",
+              fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",padding:"8px"}}>
+            ← Back
+          </button>
+          <div style={{marginTop:20,padding:"12px 14px",background:"#fffbeb",
+            border:"1px solid #fde68a",borderRadius:10,fontSize:12,color:"#78350f",lineHeight:1.6}}>
+            <b>Don't have a code?</b> Ask your admin to generate one for you — they can do it in the Members panel.
+          </div>
+        </div>
+      </div>
+    </Shell>
+  );
+
+  // ════════════════════════════════════════════════════════════
   // RENDER: Auth — set new PIN
   // ════════════════════════════════════════════════════════════
   if(!currentUser && authView==="newpin") return (
@@ -1547,7 +1899,11 @@ export default function App() {
     <div style={{background:G.green,padding:"15px 18px",
       position:"sticky",top:0,zIndex:100}}>
       <div style={{display:"flex",alignItems:"center",gap:11,marginBottom:children?10:0}}>
-        {onBack&&<BackBtn onClick={onBack}/>}
+        {onBack
+          ? <BackBtn onClick={onBack}/>
+          : <img src={FCC_LOGO} alt="FCC" style={{width:38,height:38,borderRadius:"50%",
+              objectFit:"cover",flexShrink:0,border:"2px solid rgba(255,255,255,0.25)"}}/>
+        }
         <div style={{flex:1}}>
           <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
             fontSize:19,fontWeight:900,lineHeight:1.2}}>{title}</div>
@@ -1684,7 +2040,10 @@ export default function App() {
                   </div>
                 </div>
                 {can(userRole,"deleteSession")&&(
-                  <button type="button" onClick={()=>saveBlockCals(blockCals.filter(x=>x.id!==b.id))}
+                  <button type="button" onClick={()=>{
+                    logAction("blockcal", `Removed block: ${b.date} ${b.from}–${b.to} "${b.label}"`);
+                    saveBlockCals(blockCals.filter(x=>x.id!==b.id));
+                  }}
                     style={{background:"#fee2e2",color:"#dc2626",border:"none",
                       borderRadius:6,padding:"4px 8px",fontSize:12,cursor:"pointer",
                       fontFamily:"inherit",fontWeight:800,flexShrink:0}}>×</button>
@@ -1765,9 +2124,10 @@ export default function App() {
                 </div>
                 <Btn bg={G.green} col={G.lime} full onClick={()=>{
                   if(!bCalDate){showToast("Please pick a date");return;}
+                  const lbl = bCalLabel.trim()||"Ground Blocked";
                   saveBlockCals([...blockCals,{
-                    id:uid(),date:bCalDate,from:bCalFrom,to:bCalTo,
-                    label:bCalLabel.trim()||"Ground Blocked"}]);
+                    id:uid(),date:bCalDate,from:bCalFrom,to:bCalTo,label:lbl}]);
+                  logAction("blockcal", `Blocked ground: ${bCalDate} ${bCalFrom}–${bCalTo} "${lbl}"`);
                   setBCalDate("");setBCalFrom("10:00");setBCalTo("14:00");
                   setBCalLabel("");setShowBlockForm(false);
                   showToast("Ground blocked ✓");
@@ -1777,7 +2137,7 @@ export default function App() {
           </div>
         )}
       </div>
-      <BotNav view="schedule" setView={setView} userRole={userRole}/>
+      <BotNav view="schedule" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
       {toast&&<Toast msg={toast}/>}
     </Shell>
     );
@@ -1954,7 +2314,7 @@ export default function App() {
             Existing session at same date & time? Players are auto-added.
           </p>
         </form>
-        <BotNav view="add" setView={setView} userRole={userRole}/>
+        <BotNav view="add" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
         {toast&&<Toast msg={toast}/>}
       </Shell>
     );
@@ -2139,7 +2499,7 @@ export default function App() {
             </button>
           )}
         </div>
-        <BotNav view="session" setView={setView} userRole={userRole}/>
+        <BotNav view="session" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
         {toast&&<Toast msg={toast}/>}
       </Shell>
     );
@@ -2441,7 +2801,7 @@ export default function App() {
           </button>
 
         </div>
-        <BotNav view="profile" setView={setView} userRole={userRole}/>
+        <BotNav view="profile" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
         {toast&&<Toast msg={toast}/>}
       </Shell>
     );
@@ -2565,7 +2925,7 @@ export default function App() {
           </div>
 
         </div>
-        <BotNav view="profile" setView={setView} userRole={userRole}/>
+        <BotNav view="profile" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
         {toast&&<Toast msg={toast}/>}
       </Shell>
     );
@@ -2587,6 +2947,7 @@ export default function App() {
         !m.email && EMAIL_SEED[m.name] ? {...m, email: EMAIL_SEED[m.name]} : m
       );
       saveMembers(updated);
+      logAction("system", `Seeded ${emailsToSeed.length} email${emailsToSeed.length>1?"s":""}: ${emailsToSeed.map(m=>m.name).join(", ")}`);
       showToast(`${emailsToSeed.length} email${emailsToSeed.length>1?"s":""} seeded ✓`);
     }
     return (
@@ -2596,6 +2957,84 @@ export default function App() {
         onBack={()=>setView("schedule")}/>
 
       <div style={{padding:"14px 16px 20px"}}>
+
+        {/* ── Join Requests ──────────────────────────────────── */}
+        {can(userRole,"addMember")&&joinRequests.filter(r=>r.status==="pending").length>0&&(()=>{
+          const pending = joinRequests.filter(r=>r.status==="pending");
+          function approveRequest(req) {
+            // Create the member
+            const newMember = {
+              id: uid(),
+              name: req.playerName,
+              team: req.playerTeam && req.playerTeam !== "I don't play / I'm a parent" ? req.playerTeam : null,
+              role: "member",
+              email: null,
+              note: req.parentName
+                ? `Parent: ${req.parentName}${req.contact ? " · " + req.contact : ""}`
+                : req.contact || null,
+            };
+            saveMembers([...members, newMember]);
+            saveJoinRequests(joinRequests.map(r=>r.id===req.id ? {...r,status:"approved"} : r));
+            logAction("request", `Approved join request: ${req.playerName}${req.playerTeam?" → "+req.playerTeam:""}${req.forChild&&req.parentName?" (parent: "+req.parentName+")":""}`);
+            showToast(`${req.playerName} added ✓`);
+          }
+          function declineRequest(req) {
+            saveJoinRequests(joinRequests.map(r=>r.id===req.id ? {...r,status:"declined"} : r));
+            logAction("request", `Declined join request: ${req.playerName}`);
+            showToast("Request declined");
+          }
+          return (
+            <>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,marginTop:4}}>
+                <div style={{flex:1,height:1,background:G.border}}/>
+                <div style={{fontSize:10,fontWeight:900,letterSpacing:1.5,color:"#dc2626",
+                  textTransform:"uppercase",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5}}>
+                  <span style={{background:"#ef4444",color:"#fff",borderRadius:99,fontSize:9,
+                    fontWeight:900,padding:"1px 6px"}}>{pending.length}</span>
+                  Join Requests Pending
+                </div>
+                <div style={{flex:1,height:1,background:G.border}}/>
+              </div>
+
+              {pending.map(req=>(
+                <div key={req.id} style={{background:"#fff7ed",border:"1.5px solid #fed7aa",
+                  borderRadius:12,padding:"12px 14px",marginBottom:10}}>
+                  <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:800,fontSize:14,color:G.text}}>
+                        {req.forChild ? "👶 " : "🙋 "}{req.playerName}
+                      </div>
+                      <div style={{fontSize:11,color:G.muted,marginTop:3,lineHeight:1.6}}>
+                        {req.playerTeam ? `Team: ${req.playerTeam}` : "No team specified"}
+                        {req.forChild && req.parentName && ` · Parent: ${req.parentName}`}
+                        {req.contact && ` · ${req.contact}`}
+                        <br/>
+                        <span style={{color:"#9ca3af",fontSize:10}}>
+                          {new Date(req.submittedAt).toLocaleDateString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:8,marginTop:10}}>
+                    <button onClick={()=>approveRequest(req)}
+                      style={{flex:1,background:"#16a34a",color:"#fff",border:"none",
+                        borderRadius:9,padding:"9px 0",fontFamily:"inherit",
+                        fontWeight:800,fontSize:12,cursor:"pointer"}}>
+                      ✓ Approve &amp; Add
+                    </button>
+                    <button onClick={()=>declineRequest(req)}
+                      style={{background:"#fee2e2",color:"#dc2626",border:"none",
+                        borderRadius:9,padding:"9px 14px",fontFamily:"inherit",
+                        fontWeight:800,fontSize:12,cursor:"pointer"}}>
+                      ✗ Decline
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </>
+          );
+        })()}
+
         {/* Add member */}
         {can(userRole,"addMember")&&<>
           <SLbl mt={4}>Add New Member</SLbl>
@@ -2639,6 +3078,21 @@ export default function App() {
             Youth groups are member-only. Toggle Senior/Youth in Manage Groups below.
           </div>
         </div>
+
+        {/* Invite code guide */}
+        {userRole==="superadmin"&&(
+          <div style={{background:"#f0f9ff",border:"1.5px solid #bae6fd",borderRadius:10,
+            padding:"10px 14px",marginBottom:14}}>
+            <div style={{fontSize:10,fontWeight:900,letterSpacing:1.5,color:"#0369a1",
+              textTransform:"uppercase",marginBottom:6}}>🎟️ Invite Codes (for members without email)</div>
+            <div style={{fontSize:11,color:"#0c4a6e",lineHeight:1.7}}>
+              Members with <b>no email on file</b> and <b>no PIN yet</b> will show a <b>Gen Code</b> button.
+              Tap it to generate a one-time code (e.g. <b>FCC-7K2P</b>), then share it with the member via WhatsApp.
+              They'll enter it on first login to verify their identity before setting a PIN.
+              Each code is single-use and expires after use.
+            </div>
+          </div>
+        )}
 
         {/* ── Manage Groups ─────────────────────────────────── */}
         {can(userRole,"addMember")&&<>
@@ -2929,6 +3383,130 @@ export default function App() {
           </div>
         )}
 
+        {/* ── Audit Log (superadmin only) ───────────────────── */}
+        {userRole==="superadmin"&&(()=>{
+          const CATEGORY_META = {
+            member:    {icon:"👤", label:"Member",   col:"#0369a1", bg:"#e0f2fe"},
+            role:      {icon:"🏷️", label:"Role",     col:"#7c3aed", bg:"#ede9fe"},
+            team:      {icon:"🏏", label:"Team",     col:"#059669", bg:"#d1fae5"},
+            session:   {icon:"📅", label:"Session",  col:"#d97706", bg:"#fef3c7"},
+            recurring: {icon:"🔁", label:"Recurring",col:"#0891b2", bg:"#cffafe"},
+            blockcal:  {icon:"🚫", label:"Block",    col:"#dc2626", bg:"#fee2e2"},
+            pin:       {icon:"🔑", label:"PIN",      col:"#92400e", bg:"#fef3c7"},
+            request:   {icon:"✋", label:"Request",  col:"#be185d", bg:"#fdf2f8"},
+            system:    {icon:"⚙️", label:"System",  col:"#374151", bg:"#f3f4f6"},
+          };
+          const ROLE_COLOURS = {
+            superadmin:"#14532d", admin:"#1e3a5f", captain:"#7c3aed",
+            vicecaptain:"#6b21a8", member:"#374151",
+          };
+          const [logFilter, setLogFilter] = React.useState("all");
+          const [logOpen,   setLogOpen]   = React.useState(false);
+          const filtered = logFilter==="all"
+            ? auditLog
+            : auditLog.filter(e=>e.category===logFilter);
+          function fmtTs(ts) {
+            const d = new Date(ts);
+            return d.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})
+              +" "+d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+          }
+          return (
+            <>
+              <SLbl mt={4}>👑 Audit Log</SLbl>
+              <div style={{background:"#0c1a2e",borderRadius:14,overflow:"hidden",
+                border:"1.5px solid #1e3a5f",marginBottom:20}}>
+
+                {/* Header bar */}
+                <div style={{padding:"12px 16px",display:"flex",alignItems:"center",
+                  gap:10,borderBottom:"1px solid #1e3a5f",cursor:"pointer"}}
+                  onClick={()=>setLogOpen(o=>!o)}>
+                  <div style={{flex:1}}>
+                    <div style={{color:"#93c5fd",fontWeight:900,fontSize:13}}>
+                      Admin Activity Log
+                    </div>
+                    <div style={{color:"#475569",fontSize:11,marginTop:1}}>
+                      {auditLog.length} action{auditLog.length!==1?"s":""} recorded · visible only to you
+                    </div>
+                  </div>
+                  <span style={{color:"#475569",fontSize:18,lineHeight:1}}>
+                    {logOpen?"▲":"▼"}
+                  </span>
+                </div>
+
+                {logOpen&&(
+                  <>
+                    {/* Category filter chips */}
+                    <div style={{padding:"10px 12px",display:"flex",flexWrap:"wrap",
+                      gap:5,borderBottom:"1px solid #1e3a5f"}}>
+                      {["all",...Object.keys(CATEGORY_META)].map(cat=>{
+                        const m = CATEGORY_META[cat];
+                        const on = logFilter===cat;
+                        return (
+                          <button key={cat} onClick={()=>setLogFilter(cat)}
+                            style={{border:"none",borderRadius:99,cursor:"pointer",
+                              fontFamily:"inherit",fontWeight:700,fontSize:10,
+                              padding:"3px 9px",
+                              background: on ? (m?.bg||"#3b82f6") : "#1e3a5f",
+                              color: on ? (m?.col||"#fff") : "#94a3b8",
+                              transition:"all .1s"}}>
+                            {m ? `${m.icon} ${m.label}` : "All"}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Log entries */}
+                    <div style={{maxHeight:420,overflowY:"auto"}}>
+                      {filtered.length===0&&(
+                        <div style={{padding:"24px 16px",textAlign:"center",
+                          color:"#475569",fontSize:13}}>
+                          No actions recorded yet
+                        </div>
+                      )}
+                      {filtered.map((entry,i)=>{
+                        const m = CATEGORY_META[entry.category]||CATEGORY_META.system;
+                        const isMe = entry.byId===currentUser.id;
+                        return (
+                          <div key={entry.id} style={{
+                            padding:"10px 14px",
+                            borderBottom: i<filtered.length-1 ? "1px solid #0f2240" : "none",
+                            display:"flex",gap:10,alignItems:"flex-start",
+                          }}>
+                            {/* Category dot */}
+                            <div style={{marginTop:2,width:28,height:28,borderRadius:"50%",
+                              background:m.bg,display:"flex",alignItems:"center",
+                              justifyContent:"center",fontSize:13,flexShrink:0}}>
+                              {m.icon}
+                            </div>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontSize:12,color:"#e2e8f0",lineHeight:1.4,
+                                wordBreak:"break-word"}}>
+                                {entry.detail}
+                              </div>
+                              <div style={{marginTop:4,display:"flex",
+                                alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                                <span style={{fontSize:10,fontWeight:800,
+                                  color: ROLE_COLOURS[entry.byRole]||"#94a3b8",
+                                  background:"rgba(255,255,255,0.07)",
+                                  padding:"1px 6px",borderRadius:6}}>
+                                  {isMe?"👑 You":entry.byName}
+                                </span>
+                                <span style={{fontSize:10,color:"#475569"}}>
+                                  {fmtTs(entry.ts)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          );
+        })()}
+
         {/* ── Team jump bar ─────────────────────────────────── */}
         {Object.keys(adminGrouped).length > 2 && (
           <div style={{
@@ -3112,6 +3690,25 @@ export default function App() {
                     {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&pins[m.id]&&(
                       <Btn onClick={()=>resetPin(m.id)} bg={G.amberBg} col={G.amber} sm>🔑 Reset PIN</Btn>
                     )}
+                    {/* Invite code — only for members with no email and no PIN yet */}
+                    {can(userRole,"resetOtherPin")&&!pins[m.id]&&!m.email&&!EMAIL_SEED[m.name]&&(
+                      <Btn sm bg="#f0f9ff" col="#0369a1"
+                        onClick={()=>{
+                          const code = generateInviteCode(m.id);
+                          // Show in a non-blocking overlay using the toast — slightly longer
+                          setToast(`📋 Code for ${m.name.split(" ")[0]}: ${code} — share via WhatsApp`);
+                          setTimeout(()=>setToast(null), 6000);
+                        }}>
+                        🎟️ Gen Code
+                      </Btn>
+                    )}
+                    {/* Show if code already exists for this member */}
+                    {can(userRole,"resetOtherPin")&&!pins[m.id]&&inviteCodes[m.id]&&(
+                      <span style={{fontSize:10,color:"#0369a1",fontWeight:700,
+                        background:"#e0f2fe",borderRadius:6,padding:"3px 7px"}}>
+                        🎟️ Code active
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -3122,7 +3719,7 @@ export default function App() {
           );
         })}
       </div>
-      <BotNav view="admin" setView={setView} userRole={userRole}/>
+      <BotNav view="admin" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
       {toast&&<Toast msg={toast}/>}
 
       {/* ── Delete confirmation modal ── */}
