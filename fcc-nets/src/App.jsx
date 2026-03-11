@@ -1055,7 +1055,7 @@ export default function App() {
   }
 
   // ── Auth flow ─────────────────────────────────────────────────
-  function handlePickMember(member) {
+  async function handlePickMember(member) {
     setPendingMember(member);
     setPinError("");
     setEmailInput("");
@@ -1063,19 +1063,29 @@ export default function App() {
     if(pins[member.id]) {
       // Returning user — straight to PIN
       setAuthView("enterpin");
-    } else {
-      // First-time login
-      const seedEmail = EMAIL_SEED[member.name];
-      const storedEmail = member.email;
-      const hasInviteCode = !!inviteCodes[member.id];
-      if(seedEmail || storedEmail) {
-        setAuthView("verifyemail");
-      } else if(hasInviteCode) {
-        setAuthView("verifycode");
-      } else {
-        // No email, no code — straight to PIN (very young youth, no verification possible)
-        setAuthView("newpin");
+      return;
+    }
+    // First-time login — do a fresh fetch of invitecodes from Firebase
+    // (the in-memory state may be stale if a code was generated after page load)
+    let freshCodes = inviteCodes;
+    try {
+      const snap = await getDoc(doc(db,"fccnets","invitecodes"));
+      if(snap.exists()) {
+        freshCodes = JSON.parse(snap.data().value);
+        setInviteCodes(freshCodes); // sync state too
       }
+    } catch(e) { /* use cached value on error */ }
+
+    const seedEmail = EMAIL_SEED[member.name];
+    const storedEmail = member.email;
+    const hasInviteCode = !!freshCodes[member.id];
+    if(seedEmail || storedEmail) {
+      setAuthView("verifyemail");
+    } else if(hasInviteCode) {
+      setAuthView("verifycode");
+    } else {
+      // No email, no code — straight to PIN (very young youth, no verification possible)
+      setAuthView("newpin");
     }
   }
 
@@ -4086,8 +4096,8 @@ export default function App() {
                     {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&pins[m.id]&&(
                       <Btn onClick={()=>resetPin(m.id)} bg={G.amberBg} col={G.amber} sm>🔑 Reset PIN</Btn>
                     )}
-                    {/* Invite code — only for members with no email and no PIN yet */}
-                    {can(userRole,"resetOtherPin")&&!pins[m.id]&&!m.email&&!EMAIL_SEED[m.name]&&(
+                    {/* Invite code — only for members with no email and no PIN yet, and no existing code */}
+                    {can(userRole,"resetOtherPin")&&!pins[m.id]&&!m.email&&!EMAIL_SEED[m.name]&&!inviteCodes[m.id]&&(
                       <Btn sm bg="#f0f9ff" col="#0369a1"
                         onClick={()=>{
                           const code = generateInviteCode(m.id);
@@ -4098,12 +4108,22 @@ export default function App() {
                         🎟️ Gen Code
                       </Btn>
                     )}
-                    {/* Show if code already exists for this member */}
+                    {/* Show if code already exists — with option to regenerate */}
                     {can(userRole,"resetOtherPin")&&!pins[m.id]&&inviteCodes[m.id]&&(
-                      <span style={{fontSize:10,color:"#0369a1",fontWeight:700,
-                        background:"#e0f2fe",borderRadius:6,padding:"3px 7px"}}>
-                        🎟️ Code active
-                      </span>
+                      <div style={{display:"flex",alignItems:"center",gap:5}}>
+                        <span style={{fontSize:10,color:"#0369a1",fontWeight:700,
+                          background:"#e0f2fe",borderRadius:6,padding:"3px 7px"}}>
+                          🎟️ Code active
+                        </span>
+                        <Btn sm bg="#f0f9ff" col="#0369a1"
+                          onClick={()=>{
+                            const code = generateInviteCode(m.id);
+                            setToast(`📋 New code for ${m.name.split(" ")[0]}: ${code} — share via WhatsApp`);
+                            setTimeout(()=>setToast(null), 6000);
+                          }}>
+                          ↻ New
+                        </Btn>
+                      </div>
                     )}
                   </div>
                 </div>
