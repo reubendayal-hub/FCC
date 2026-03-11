@@ -870,6 +870,7 @@ export default function App() {
   const [selP,     setSelP]     = useState([]);
   const [pSearch,  setPSearch]  = useState("");
   const [pFilter,  setPFilter]  = useState("All");
+  const [otherGroupsOpen, setOtherGroupsOpen] = useState(false);
   // Poll builder
   const [bPollOpts, setBPollOpts] = useState([...PRESET_POLL]);
   const [bCustomOpt,setBCustomOpt]= useState("");
@@ -1159,7 +1160,7 @@ export default function App() {
   useEffect(()=>{
     if(view==="add" && currentUser) {
       setSelP(ps => ps.includes(currentUser.name) ? ps : [currentUser.name, ...ps]);
-      setPSearch(""); setPFilter("All");
+      setPSearch(""); setPFilter("All"); setOtherGroupsOpen(false);
     }
   },[view]);
 
@@ -2377,6 +2378,11 @@ export default function App() {
     // Which of the selected players are already in an overlapping session
     const clashSess = overlappingSessions.find(s=>selP.some(p=>s.players.includes(p)));
     const clashPlayers = clashSess ? selP.filter(p=>clashSess.players.includes(p)) : [];
+    // Split: already IN that session vs just selected here
+    const alreadyIn = clashSess ? clashPlayers.filter(p=>clashSess.players.includes(p) && selP.includes(p)) : [];
+    const bookingUser = currentUser?.name;
+    const userAlreadyIn = alreadyIn.includes(bookingUser);
+    const othersAlreadyIn = alreadyIn.filter(p=>p!==bookingUser);
     return (
       <Shell>
         <AppHeader onBack={()=>{setView("schedule");setSelP([]);}}
@@ -2461,24 +2467,20 @@ export default function App() {
           {clashSess&&(
             <div style={{background:"#fff7ed",border:"1.5px solid #fed7aa",
               borderRadius:12,padding:"13px 15px",marginBottom:12}}>
-              <div style={{fontWeight:900,fontSize:13,color:"#92400e",marginBottom:5}}>
+              <div style={{fontWeight:900,fontSize:13,color:"#92400e",marginBottom:6}}>
                 ⚠️ Overlapping session detected
               </div>
-              <div style={{fontSize:12,color:"#92400e",lineHeight:1.6,marginBottom:10}}>
-                <b>{clashPlayers.join(", ")}</b> {clashPlayers.length>1?"are":"is"} already
-                in <b>{clashSess.label||"a session"}</b> ({clashSess.from}–{clashSess.to})
-                on this date. Change the time, or join that session instead.
+              <div style={{fontSize:12,color:"#78350f",lineHeight:1.7}}>
+                {userAlreadyIn && othersAlreadyIn.length===0 && (
+                  <>You're already booked into <b>{clashSess.label||"a session"}</b> ({clashSess.from}–{clashSess.to}) on this date. Please choose a different time.</>
+                )}
+                {userAlreadyIn && othersAlreadyIn.length>0 && (
+                  <>You and <b>{othersAlreadyIn.join(", ")}</b> are already in <b>{clashSess.label||"a session"}</b> ({clashSess.from}–{clashSess.to}) on this date. Please choose a different time.</>
+                )}
+                {!userAlreadyIn && othersAlreadyIn.length>0 && (
+                  <><b>{othersAlreadyIn.join(", ")}</b> {othersAlreadyIn.length>1?"are":"is"} already booked into <b>{clashSess.label||"a session"}</b> ({clashSess.from}–{clashSess.to}) on this date. Please choose a different time or deselect {othersAlreadyIn.length>1?"them":"this player"}.</>
+                )}
               </div>
-              <button type="button"
-                onClick={()=>{
-                  setSelSess(clashSess);
-                  setView("session");
-                }}
-                style={{background:G.green,color:G.lime,border:"none",borderRadius:20,
-                  padding:"7px 16px",fontSize:12,fontWeight:800,cursor:"pointer",
-                  fontFamily:"inherit"}}>
-                → Join "{clashSess.label||fmtShort(clashSess.date)}" instead
-              </button>
             </div>
           )}
 
@@ -2514,50 +2516,91 @@ export default function App() {
           {(()=>{
             const entries = Object.entries(pickGrouped);
             const myTeamsSet = new Set(myTeamsList);
-            let shownDivider = false;
-            return entries.map(([team,list],idx)=>{
-              const isMine = myTeamsSet.has(team);
-              const showDiv = !isMine && !shownDivider && myTeamsList.length>0 && idx>0;
-              if(showDiv) shownDivider = true;
-              return (
-                <React.Fragment key={team}>
-                  {showDiv&&(
-                    <div style={{display:"flex",alignItems:"center",gap:8,margin:"4px 0 10px"}}>
-                      <div style={{flex:1,height:1,background:G.border}}/>
-                      <span style={{fontSize:10,fontWeight:900,letterSpacing:1.5,
-                        color:G.muted,textTransform:"uppercase",whiteSpace:"nowrap"}}>
-                        Other Groups
+            const myEntries = entries.filter(([t])=>myTeamsSet.has(t));
+            const otherEntries = entries.filter(([t])=>!myTeamsSet.has(t));
+            // Count how many players from other groups are already selected
+            const otherSelected = otherEntries.reduce((n,[,list])=>
+              n+list.filter(m=>selP.includes(m.name)).length, 0);
+            // If user has no team, show everything normally
+            const hasTeam = myTeamsList.length > 0;
+            const showEntries = hasTeam ? myEntries : entries;
+            return (<>
+              {showEntries.map(([team,list])=>(
+                <div key={team} style={{marginBottom:14}}>
+                  <div style={{marginBottom:7,display:"flex",alignItems:"center",gap:7}}>
+                    <TeamPill team={team}/>
+                    {hasTeam&&<span style={{fontSize:10,fontWeight:800,color:G.green,
+                      background:"#dcfce7",borderRadius:99,padding:"1px 7px"}}>
+                      Your group
+                    </span>}
+                  </div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                    {list.map(m=>{
+                      const sel=selP.includes(m.name);
+                      return (
+                        <button key={m.id} type="button"
+                          onClick={()=>setSelP(ps=>sel?ps.filter(x=>x!==m.name):[...ps,m.name])}
+                          style={{background:sel?G.green:G.white,color:sel?G.lime:G.text,
+                            border:sel?`2px solid ${G.green}`:`1.5px solid ${G.border}`,
+                            borderRadius:24,padding:"7px 14px",fontSize:13,fontWeight:700,
+                            cursor:"pointer",fontFamily:"inherit",transition:"all .1s"}}>
+                          {sel&&"✓ "}{m.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+
+              {hasTeam&&otherEntries.length>0&&(
+                <div style={{marginBottom:14}}>
+                  <button type="button"
+                    onClick={()=>setOtherGroupsOpen(o=>!o)}
+                    style={{width:"100%",background:"none",border:`1.5px dashed ${G.border}`,
+                      borderRadius:10,padding:"9px 14px",cursor:"pointer",fontFamily:"inherit",
+                      display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                    <span style={{fontSize:12,fontWeight:700,color:G.muted}}>
+                      {otherGroupsOpen?"▲":"▼"} Other Groups
+                      {" "}
+                      <span style={{color:G.text}}>
+                        ({otherEntries.reduce((n,[,l])=>n+l.length,0)} players)
                       </span>
-                      <div style={{flex:1,height:1,background:G.border}}/>
+                    </span>
+                    {otherSelected>0&&(
+                      <span style={{background:G.green,color:G.lime,borderRadius:99,
+                        padding:"1px 8px",fontSize:11,fontWeight:800}}>
+                        {otherSelected} selected
+                      </span>
+                    )}
+                  </button>
+
+                  {otherGroupsOpen&&(
+                    <div style={{marginTop:10}}>
+                      {otherEntries.map(([team,list])=>(
+                        <div key={team} style={{marginBottom:14}}>
+                          <div style={{marginBottom:7}}><TeamPill team={team}/></div>
+                          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                            {list.map(m=>{
+                              const sel=selP.includes(m.name);
+                              return (
+                                <button key={m.id} type="button"
+                                  onClick={()=>setSelP(ps=>sel?ps.filter(x=>x!==m.name):[...ps,m.name])}
+                                  style={{background:sel?G.green:G.white,color:sel?G.lime:G.text,
+                                    border:sel?`2px solid ${G.green}`:`1.5px solid ${G.border}`,
+                                    borderRadius:24,padding:"7px 14px",fontSize:13,fontWeight:700,
+                                    cursor:"pointer",fontFamily:"inherit",transition:"all .1s"}}>
+                                  {sel&&"✓ "}{m.name}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
-                  <div style={{marginBottom:14}}>
-                    <div style={{marginBottom:7,display:"flex",alignItems:"center",gap:7}}>
-                      <TeamPill team={team}/>
-                      {isMine&&<span style={{fontSize:10,fontWeight:800,color:G.green,
-                        background:"#dcfce7",borderRadius:99,padding:"1px 7px"}}>
-                        Your group
-                      </span>}
-                    </div>
-                    <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                      {list.map(m=>{
-                        const sel=selP.includes(m.name);
-                        return (
-                          <button key={m.id} type="button"
-                            onClick={()=>setSelP(ps=>sel?ps.filter(x=>x!==m.name):[...ps,m.name])}
-                            style={{background:sel?G.green:G.white,color:sel?G.lime:G.text,
-                              border:sel?`2px solid ${G.green}`:`1.5px solid ${G.border}`,
-                              borderRadius:24,padding:"7px 14px",fontSize:13,fontWeight:700,
-                              cursor:"pointer",fontFamily:"inherit",transition:"all .1s"}}>
-                            {sel&&"✓ "}{m.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </React.Fragment>
-              );
-            });
+                </div>
+              )}
+            </>);
           })()}
 
           {can(userRole,"deleteSession")&&<>
