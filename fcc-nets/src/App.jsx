@@ -108,7 +108,7 @@ if(!THEMES[_themeKey]) _themeKey = "forest";
 
 const PRESET_POLL = [
   {id:"batting",  label:"🏏 Batting Focus"},
-  {id:"bowling",  label:"🎳 Bowling Focus"},
+  {id:"bowling",  label:"🎯 Bowling Focus"},
   {id:"fielding", label:"🧤 Fielding Focus"},
   {id:"mixed",    label:"⚡ Mixed"},
 ];
@@ -527,16 +527,25 @@ function BotNav({view,setView,userRole,pendingCount=0}) {
   const active = view==="session"?"schedule":view==="roleAdmin"?"admin":view;
 
   const IconSchedule = ({on}) => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth={on?2.5:1.8} strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="18" rx="2"/>
-      <line x1="16" y1="2" x2="16" y2="6"/>
-      <line x1="8" y1="2" x2="8" y2="6"/>
-      <line x1="3" y1="10" x2="21" y2="10"/>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill={on?"currentColor":"none"} stroke="currentColor"
+      strokeWidth={on?0:1.8} strokeLinecap="round" strokeLinejoin="round">
+      {on ? <>
+        <rect x="3" y="4" width="18" height="18" rx="2" fill={G.green} stroke="none"/>
+        <line x1="16" y1="2" x2="16" y2="6" stroke={G.green} strokeWidth="2.5"/>
+        <line x1="8" y1="2" x2="8" y2="6" stroke={G.green} strokeWidth="2.5"/>
+        <line x1="3" y1="10" x2="21" y2="10" stroke="white" strokeWidth="1.8"/>
+        <rect x="7" y="13" width="3" height="3" rx="0.5" fill="white"/>
+        <rect x="11" y="13" width="3" height="3" rx="0.5" fill="white"/>
+      </> : <>
+        <rect x="3" y="4" width="18" height="18" rx="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/>
+        <line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+      </>}
     </svg>
   );
   const IconMembers = ({on}) => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth={on?2.5:1.8} strokeLinecap="round" strokeLinejoin="round">
       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
       <circle cx="9" cy="7" r="4"/>
@@ -545,86 +554,107 @@ function BotNav({view,setView,userRole,pendingCount=0}) {
     </svg>
   );
   const IconProfile = ({on}) => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth={on?2.5:1.8} strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="8" r="4"/>
       <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
     </svg>
   );
 
-  const tabStyle = (on) => ({
-    background:"none", border:"none", cursor:"pointer",
-    fontFamily:"'DM Sans',sans-serif", padding:"6px 4px",
-    display:"flex", flexDirection:"column", alignItems:"center", gap:3,
-    color: on ? G.green : "#94a3b8", transition:"color .15s",
-    width:"100%",
-  });
-  const labelStyle = (on) => ({
-    fontSize:10, fontWeight: on?800:600, letterSpacing:.3,
-  });
+  const Tab = ({id, icon, label, badge}) => {
+    const on = active===id;
+    return (
+      <button onClick={()=>setView(id)} style={{
+        background:"none", border:"none", cursor:"pointer",
+        fontFamily:"'DM Sans',sans-serif",
+        display:"flex", flexDirection:"column", alignItems:"center",
+        justifyContent:"center", gap:0, width:"100%", padding:"6px 4px 2px",
+        position:"relative",
+      }}>
+        <div style={{
+          display:"flex", flexDirection:"column", alignItems:"center", gap:3,
+          padding:"6px 16px 5px",
+          borderRadius:14,
+          background: on ? `${G.green}18` : "transparent",
+          border: on ? `1.5px solid ${G.green}30` : "1.5px solid transparent",
+          transition:"all .18s",
+          position:"relative",
+        }}>
+          {on && <div style={{
+            position:"absolute", top:-1, left:"50%", transform:"translateX(-50%)",
+            width:28, height:3, borderRadius:"0 0 3px 3px",
+            background:G.green,
+          }}/>}
+          <div style={{
+            color: on ? G.green : "#94a3b8",
+            transition:"color .15s",
+            position:"relative",
+            display:"flex", alignItems:"center", justifyContent:"center",
+          }}>
+            {icon}
+            {badge>0&&(
+              <span style={{position:"absolute",top:-5,right:-8,
+                background:"#ef4444",color:"#fff",borderRadius:99,
+                fontSize:9,fontWeight:900,minWidth:15,height:15,
+                display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px"}}>
+                {badge}
+              </span>
+            )}
+          </div>
+          <span style={{
+            fontSize:10, fontWeight: on?800:600, letterSpacing:.3,
+            color: on ? G.green : "#94a3b8",
+            transition:"color .15s",
+          }}>{label}</span>
+        </div>
+      </button>
+    );
+  };
 
   return (
     <div className="fcc-mobile-only" style={{
       position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)",
       width:"100%", maxWidth:500, zIndex:200,
-      background:"rgba(255,255,255,0.97)",
-      backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)",
-      borderTop:"1px solid rgba(0,0,0,0.08)",
-      boxShadow:"0 -4px 24px rgba(0,0,0,0.07)",
-      display:"grid", gridTemplateColumns:"1fr 1fr 1fr", alignItems:"flex-end",
-      padding:"8px 0 12px",
-      paddingBottom:"max(12px, env(safe-area-inset-bottom))",
+      background:"rgba(255,255,255,0.98)",
+      backdropFilter:"blur(16px)", WebkitBackdropFilter:"blur(16px)",
+      borderTop:"1px solid rgba(0,0,0,0.06)",
+      boxShadow:"0 -6px 32px rgba(0,0,0,0.10), 0 -1px 0 rgba(0,0,0,0.04)",
+      display:"grid", gridTemplateColumns:"1fr auto 1fr", alignItems:"center",
+      padding:"6px 8px",
+      paddingBottom:"max(10px, env(safe-area-inset-bottom))",
+      gap:4,
     }}>
-      {/* Schedule — left slot */}
-      <button onClick={()=>setView("schedule")} style={tabStyle(active==="schedule")}>
-        <IconSchedule on={active==="schedule"}/>
-        <span style={labelStyle(active==="schedule")}>Schedule</span>
-      </button>
+      <Tab id="schedule" icon={<IconSchedule on={active==="schedule"}/>} label="Schedule"/>
 
-      {/* Book — centre slot */}
-      <div style={{display:"flex", flexDirection:"column",
-        alignItems:"center", justifyContent:"flex-end"}}>
+      {/* Book — centre CTA */}
+      <div style={{display:"flex", flexDirection:"column", alignItems:"center", gap:0, padding:"0 8px"}}>
         <button onClick={()=>setView("add")} style={{
-          width:54, height:54, borderRadius:"50%", border:"none", cursor:"pointer",
+          width:52, height:52, borderRadius:"50%", border:"none", cursor:"pointer",
           background: active==="add"
-            ? `linear-gradient(135deg,${G.green},#166534)`
-            : `linear-gradient(135deg,#16a34a,${G.green})`,
+            ? `linear-gradient(145deg,#166534,${G.green})`
+            : `linear-gradient(145deg,#16a34a,${G.green})`,
           display:"flex", alignItems:"center", justifyContent:"center",
           boxShadow: active==="add"
-            ? `0 0 0 4px ${G.lime}70, 0 4px 20px rgba(20,83,45,.45)`
-            : "0 4px 18px rgba(20,83,45,.32)",
-          transform: active==="add" ? "scale(1.07) translateY(-4px)" : "translateY(-4px)",
-          transition:"all .18s", marginBottom:2,
+            ? `0 0 0 3px ${G.lime}90, 0 6px 20px rgba(20,83,45,.5)`
+            : "0 4px 14px rgba(20,83,45,.38), 0 1px 3px rgba(0,0,0,.15)",
+          transform: "translateY(-10px)",
+          transition:"all .18s",
         }}>
-          <span style={{fontSize:24,color:"#fff",fontWeight:900,lineHeight:1,
+          <span style={{fontSize:26, color:"#fff", fontWeight:300, lineHeight:1,
             transform:active==="add"?"rotate(45deg)":"rotate(0)",
-            transition:"transform .18s", display:"block"}}>+</span>
+            transition:"transform .2s", display:"block", marginTop:-1}}>+</span>
         </button>
-        <span style={{...labelStyle(active==="add"),
-          color:active==="add"?G.green:"#94a3b8", marginTop:2}}>Book</span>
+        <span style={{
+          fontSize:10, fontWeight:active==="add"?800:600, letterSpacing:.3,
+          color:active==="add"?G.green:"#94a3b8", marginTop:-6,
+          transition:"color .15s",
+        }}>Book</span>
       </div>
 
-      {/* Right slot — Members (admin) or Profile (member) */}
       {isAdmin ? (
-        <button onClick={()=>setView("admin")} style={tabStyle(active==="admin")}>
-          <div style={{position:"relative",display:"inline-flex"}}>
-            <IconMembers on={active==="admin"}/>
-            {pendingCount>0&&(
-              <span style={{position:"absolute",top:-4,right:-6,
-                background:"#ef4444",color:"#fff",borderRadius:99,
-                fontSize:9,fontWeight:900,minWidth:16,height:16,
-                display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px"}}>
-                {pendingCount}
-              </span>
-            )}
-          </div>
-          <span style={labelStyle(active==="admin")}>Admin</span>
-        </button>
+        <Tab id="admin" icon={<IconMembers on={active==="admin"}/>} label="Admin" badge={pendingCount}/>
       ) : (
-        <button onClick={()=>setView("profile")} style={tabStyle(active==="profile")}>
-          <IconProfile on={active==="profile"}/>
-          <span style={labelStyle(active==="profile")}>Profile</span>
-        </button>
+        <Tab id="profile" icon={<IconProfile on={active==="profile"}/>} label="Profile"/>
       )}
     </div>
   );
@@ -775,7 +805,7 @@ export default function App() {
   const [pSearch,  setPSearch]  = useState("");
   const [pFilter,  setPFilter]  = useState("All");
   // Poll builder
-  const [bPollOpts, setBPollOpts] = useState([]);
+  const [bPollOpts, setBPollOpts] = useState([...PRESET_POLL]);
   const [bCustomOpt,setBCustomOpt]= useState("");
 
   // Admin state
@@ -1922,19 +1952,22 @@ export default function App() {
 
   // ── Header bar ─────────────────────────────────────────────
   const AppHeader = ({onBack,title,sub,children}) => (
-    <div style={{background:G.green,padding:"15px 18px",
+    <div style={{background:G.green,padding:"12px 16px",
       position:"sticky",top:0,zIndex:100}}>
-      <div style={{display:"flex",alignItems:"center",gap:11,marginBottom:children?10:0}}>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:children?10:0}}>
         {onBack
           ? <BackBtn onClick={onBack}/>
-        : <img src={FCC_LOGO} alt="FCC" className="fcc-header-logo" style={{width:64,height:64,borderRadius:"50%",
-              objectFit:"cover",flexShrink:0,border:"2px solid rgba(255,255,255,0.3)",
-              boxShadow:"0 2px 8px rgba(0,0,0,0.2)"}}/>
+          : <img src={FCC_LOGO} alt="FCC" className="fcc-header-logo"
+              style={{width:72,height:72,borderRadius:"50%",
+                objectFit:"cover",flexShrink:0,
+                border:"2.5px solid rgba(255,255,255,0.4)",
+                boxShadow:"0 3px 12px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.1)"}}/>
         }
-        <div style={{flex:1}}>
+        <div style={{flex:1,minWidth:0}}>
           <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
-            fontSize:19,fontWeight:900,lineHeight:1.2}}>{title}</div>
-          {sub&&<div style={{color:"rgba(255,255,255,0.55)",fontSize:12,marginTop:2}}>{sub}</div>}
+            fontSize:20,fontWeight:900,lineHeight:1.2}}>{title}</div>
+          {sub&&<div style={{color:"rgba(255,255,255,0.6)",fontSize:11,marginTop:3,
+            lineHeight:1.4}}>{sub}</div>}
         </div>
         {/* User pill */}
         <button onClick={handleLogout}
@@ -2183,13 +2216,13 @@ export default function App() {
           <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
             padding:14,marginBottom:12}}>
             <FFld label="Date">
-              <input type="date" style={iSt()} value={bDate}
+              <input type="date" style={iSt({fontSize:14,padding:"9px 10px"})} value={bDate}
                 min={todayStr()} onChange={e=>setBDate(e.target.value)} required/>
             </FFld>
-            <div style={{display:"flex",gap:10,marginTop:10}}>
+            <div style={{display:"flex",gap:8,marginTop:10}}>
               <FFld label="From" style={{flex:1}}>
-                <div style={{display:"flex",gap:5}}>
-                  <select style={iSt({flex:1})}
+                <div style={{display:"flex",gap:4}}>
+                  <select style={iSt({flex:1,fontSize:13,padding:"9px 4px",textAlign:"center"})}
                     value={bFrom.split(":")[0]}
                     onChange={e=>{
                       const h=e.target.value;
@@ -2201,10 +2234,10 @@ export default function App() {
                     }}>
                     {Array.from({length:24},(_,i)=>{
                       const h=String(i).padStart(2,"0");
-                      return <option key={h} value={h}>{h}:00</option>;
+                      return <option key={h} value={h}>{h}</option>;
                     })}
                   </select>
-                  <select style={iSt({width:72})}
+                  <select style={iSt({width:58,fontSize:13,padding:"9px 2px",textAlign:"center",flexShrink:0})}
                     value={bFrom.split(":")[1]||"00"}
                     onChange={e=>{
                       const h=bFrom.split(":")[0]||"18";
@@ -2217,8 +2250,8 @@ export default function App() {
                 </div>
               </FFld>
               <FFld label="Until" style={{flex:1}}>
-                <div style={{display:"flex",gap:5}}>
-                  <select style={iSt({flex:1})}
+                <div style={{display:"flex",gap:4}}>
+                  <select style={iSt({flex:1,fontSize:13,padding:"9px 4px",textAlign:"center"})}
                     value={bTo.split(":")[0]}
                     onChange={e=>{
                       const h=e.target.value;
@@ -2227,10 +2260,10 @@ export default function App() {
                     }}>
                     {Array.from({length:24},(_,i)=>{
                       const h=String(i).padStart(2,"0");
-                      return <option key={h} value={h}>{h}:00</option>;
+                      return <option key={h} value={h}>{h}</option>;
                     })}
                   </select>
-                  <select style={iSt({width:72})}
+                  <select style={iSt({width:58,fontSize:13,padding:"9px 2px",textAlign:"center",flexShrink:0})}
                     value={bTo.split(":")[1]||"00"}
                     onChange={e=>{
                       const h=bTo.split(":")[0]||"20";
@@ -2579,19 +2612,56 @@ export default function App() {
             );
           })()}
 
-          {notIn.length>0&&userInTeam&&<>
-            <SLbl>Add More Players</SLbl>
-            <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
-              {notIn.map(m=>(
-                <button key={m.id} onClick={()=>handleJoinDetail(m.name)}
-                  style={{background:G.white,color:G.text,border:`1.5px solid ${G.border}`,
-                    borderRadius:24,padding:"7px 14px",fontSize:13,fontWeight:700,
-                    cursor:"pointer",fontFamily:"inherit"}}>
-                  + {m.name}
-                </button>
-              ))}
-            </div>
-          </>}
+          {notIn.length>0&&userInTeam&&(()=>{
+            // Group notIn by team, user's teams first
+            const myTs = userMem?.teams||[];
+            const myTsSet = new Set(myTs);
+            const grouped = ALL_TEAMS.reduce((acc,t)=>{
+              const list = notIn.filter(m=>
+                t==="Unassigned"?(m.teams||[]).length===0:(m.teams||[]).includes(t));
+              if(list.length) acc[t]=list;
+              return acc;
+            },{});
+            const sortedKeys = Object.keys(grouped).sort((a,b)=>{
+              const aM=myTsSet.has(a), bM=myTsSet.has(b);
+              if(aM&&!bM) return -1; if(!aM&&bM) return 1;
+              return a.localeCompare(b);
+            });
+            let divShown=false;
+            return (<>
+              <SLbl>Add More Players</SLbl>
+              {sortedKeys.map((t,idx)=>{
+                const isMine=myTsSet.has(t);
+                const showDiv=!isMine&&!divShown&&myTs.length>0&&idx>0;
+                if(showDiv) divShown=true;
+                return (
+                  <React.Fragment key={t}>
+                    {showDiv&&(
+                      <div style={{display:"flex",alignItems:"center",gap:8,margin:"4px 0 8px"}}>
+                        <div style={{flex:1,height:1,background:G.border}}/>
+                        <span style={{fontSize:10,fontWeight:900,letterSpacing:1.5,
+                          color:G.muted,textTransform:"uppercase"}}>Other Groups</span>
+                        <div style={{flex:1,height:1,background:G.border}}/>
+                      </div>
+                    )}
+                    <div style={{marginBottom:12}}>
+                      <div style={{marginBottom:6}}><TeamPill team={t}/></div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+                        {grouped[t].map(m=>(
+                          <button key={m.id} onClick={()=>handleJoinDetail(m.name)}
+                            style={{background:G.white,color:G.text,border:`1.5px solid ${G.border}`,
+                              borderRadius:24,padding:"7px 14px",fontSize:13,fontWeight:700,
+                              cursor:"pointer",fontFamily:"inherit"}}>
+                            + {m.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </React.Fragment>
+                );
+              })}
+            </>);
+          })()}
 
           {can(userRole,"deleteSession")&&(()=>{
             const isRecurring = !!selSess.recurringId;
