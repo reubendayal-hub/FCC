@@ -803,6 +803,9 @@ export default function App() {
   // Help / contact form
   const [helpMsg,  setHelpMsg]  = useState("");
   const [helpCat,  setHelpCat]  = useState("general");
+  // Audit log UI state (superadmin only — safe to have at component level)
+  const [logFilter, setLogFilter] = useState("all");
+  const [logOpen,   setLogOpen]   = useState(false);
   // Request-to-join form state
   const [jrName,    setJrName]   = useState("");
   const [jrTeam,    setJrTeam]   = useState("");
@@ -2963,16 +2966,19 @@ export default function App() {
           const pending = joinRequests.filter(r=>r.status==="pending");
           function approveRequest(req) {
             // Create the member
-            const newMember = {
+            const playerTeam = req.playerTeam && req.playerTeam !== "I don't play / I'm a parent"
+              ? req.playerTeam : null;
+            const newMember = normMember({
               id: uid(),
               name: req.playerName,
-              team: req.playerTeam && req.playerTeam !== "I don't play / I'm a parent" ? req.playerTeam : null,
+              team: playerTeam,
+              teams: playerTeam ? [playerTeam] : [],
               role: "member",
               email: null,
               note: req.parentName
                 ? `Parent: ${req.parentName}${req.contact ? " · " + req.contact : ""}`
                 : req.contact || null,
-            };
+            });
             saveMembers([...members, newMember]);
             saveJoinRequests(joinRequests.map(r=>r.id===req.id ? {...r,status:"approved"} : r));
             logAction("request", `Approved join request: ${req.playerName}${req.playerTeam?" → "+req.playerTeam:""}${req.forChild&&req.parentName?" (parent: "+req.parentName+")":""}`);
@@ -3400,8 +3406,6 @@ export default function App() {
             superadmin:"#14532d", admin:"#1e3a5f", captain:"#7c3aed",
             vicecaptain:"#6b21a8", member:"#374151",
           };
-          const [logFilter, setLogFilter] = React.useState("all");
-          const [logOpen,   setLogOpen]   = React.useState(false);
           const filtered = logFilter==="all"
             ? auditLog
             : auditLog.filter(e=>e.category===logFilter);
