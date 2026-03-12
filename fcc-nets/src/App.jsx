@@ -916,13 +916,16 @@ function WeatherBar({wx,setView}) {
         {/* Right: CTA panel */}
         <div style={{background:"rgba(255,255,255,.1)",borderLeft:"1px solid rgba(255,255,255,.12)",
           padding:"9px 13px",display:"flex",flexDirection:"column",
-          alignItems:"center",justifyContent:"center",gap:2,flexShrink:0,minWidth:72}}>
-          <span style={{fontSize:14}}>📡</span>
+          alignItems:"center",justifyContent:"center",gap:3,flexShrink:0,minWidth:90}}>
           <span style={{fontSize:9,fontWeight:800,color:G.lime,
-            textTransform:"uppercase",letterSpacing:.8,whiteSpace:"nowrap"}}>
-            Detailed Forecast
+            textTransform:"uppercase",letterSpacing:.8,textAlign:"center",
+            lineHeight:1.3}}>
+            Detailed<br/>Forecast
           </span>
-          <span style={{fontSize:13,color:G.lime,fontWeight:900,lineHeight:1}}>›</span>
+          <div style={{display:"flex",alignItems:"center",gap:4}}>
+            <span style={{fontSize:13}}>📡</span>
+            <span style={{fontSize:15,color:G.lime,fontWeight:900,lineHeight:1}}>›</span>
+          </div>
         </div>
       </div>
     </button>
