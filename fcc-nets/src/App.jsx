@@ -376,12 +376,42 @@ const EMAIL_SEED = {
   "Jayashwanth J S":"j.jaayshwaanth@gmail.com",
 };
 const uid          = () => Math.random().toString(36).slice(2,9);
-const todayStr     = () => new Date().toISOString().split("T")[0];
-const tomorrowStr  = () => { const d=new Date(); d.setDate(d.getDate()+1); return d.toISOString().split("T")[0]; };
+const localDateStr  = (d=new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const todayStr     = () => localDateStr();
+const tomorrowStr  = () => { const d=new Date(); d.setDate(d.getDate()+1); return localDateStr(d); };
 const fmtShort     = ds => new Date(ds).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"});
 const fmtLong      = ds => new Date(ds).toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
 const isToday      = ds => ds === todayStr();
 const isFuture     = ds => { const d=new Date(ds); d.setHours(23,59,59); return d>=new Date(); };
+
+// ─── Nets timeline helpers ────────────────────────────────────
+const NET_COLORS = {
+  "1": { bar:"#14532d", label:"#a3e635", barBg:"#f0fdf4", borderFree:"#bbf7d0", freeText:"#86efac" },
+  "2": { bar:"#1e3a8a", label:"#bfdbfe", barBg:"#eff6ff", borderFree:"#bfdbfe", freeText:"#93c5fd" },
+};
+const PRIME_ZONES   = [{from:"17:00",to:"20:00"},{from:"09:00",to:"13:00"}];
+const NET_DAY_START = 8*60, NET_DAY_END = 21*60, NET_SPAN = NET_DAY_END - NET_DAY_START;
+const netPct = m => Math.max(0,Math.min(100,(m-NET_DAY_START)/NET_SPAN*100));
+const toMinsNet = t => { const [h,mn]=t.split(":").map(Number); return h*60+mn; };
+function isPrimeTime(fromStr) {
+  const m=toMinsNet(fromStr);
+  return PRIME_ZONES.some(z=>m>=toMinsNet(z.from)&&m<toMinsNet(z.to));
+}
+function netAvailGauge(sessions, date) {
+  const span=NET_DAY_END-NET_DAY_START;
+  const booked=(net)=>sessions
+    .filter(s=>s.date===date&&(s.net===net||s.net==="both"))
+    .reduce((a,s)=>{
+      const sf=Math.max(toMinsNet(s.from),NET_DAY_START);
+      const st=Math.min(toMinsNet(s.to),NET_DAY_END);
+      return a+Math.max(0,st-sf);
+    },0);
+  const bp=((booked("1")+booked("2"))/(span*2))*100;
+  if(bp===0)  return {pct:0,  color:"#22c55e"};
+  if(bp<30)   return {pct:bp, color:"#84cc16"};
+  if(bp<60)   return {pct:bp, color:"#f59e0b"};
+  return           {pct:bp, color:"#ef4444"};
+}
 
 // Normalise member — migrate old single `team` field to `teams` array
 const normMember = m => ({
@@ -575,6 +605,205 @@ function PinPad({ label, onDone, onCancel, error }) {
   );
 }
 
+// ─── Availability gauge (arc dial) ───────────────────────────
+function AvailGauge({gauge,active}) {
+  const r=7,cx=10,cy=10,circ=2*Math.PI*r;
+  const arcLen=circ*0.75, filled=arcLen*(gauge.pct/100);
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20">
+      <circle cx={cx} cy={cy} r={r} fill="none"
+        stroke={active?"rgba(255,255,255,.15)":"#e5e7eb"} strokeWidth="3"
+        strokeDasharray={`${arcLen} ${circ-arcLen}`}
+        strokeDashoffset={circ*0.125} strokeLinecap="round"
+        transform={`rotate(135 ${cx} ${cy})`}/>
+      <circle cx={cx} cy={cy} r={r} fill="none"
+        stroke={active?(gauge.pct===0?"rgba(163,230,53,.8)":gauge.color):gauge.color}
+        strokeWidth="3"
+        strokeDasharray={`${filled} ${circ-filled}`}
+        strokeDashoffset={circ*0.125} strokeLinecap="round"
+        transform={`rotate(135 ${cx} ${cy})`}/>
+    </svg>
+  );
+}
+
+// ─── Group-of-people icon (3 silhouettes) ─────────────────────
+function GroupIcon({color,size=18}) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 20" fill={color}>
+      <circle cx="7"  cy="5" r="3.2"/>
+      <path d="M7 10c-3.5 0-5.5 1.6-5.5 3v2h11v-2c0-1.4-2-3-5.5-3z"/>
+      <circle cx="25" cy="5" r="3.2"/>
+      <path d="M25 10c-3.5 0-5.5 1.6-5.5 3v2h11v-2c0-1.4-2-3-5.5-3z"/>
+      <circle cx="16" cy="4" r="3.8"/>
+      <path d="M16 9.5c-4 0-6.5 1.8-6.5 3.2v2.3h13v-2.3c0-1.4-2.5-3.2-6.5-3.2z"/>
+    </svg>
+  );
+}
+
+// ─── Nets Timeline Strip ──────────────────────────────────────
+function NetsTimeline({sessions,netsDate,setNetsDate,setView,setBDate,setBFrom,setBTo,setBNet}) {
+  // Build 14-day window starting today
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dates = Array.from({length:14},(_,i)=>{
+    const d=new Date(today); d.setDate(today.getDate()+i);
+    return localDateStr(d);
+  });
+  const fmtD = ds => {
+    const d=new Date(ds+"T12:00:00");
+    return {day:d.toLocaleDateString("en-GB",{weekday:"short"}),date:d.getDate()};
+  };
+
+  const daySessions = sessions.filter(s=>s.date===netsDate);
+
+  function handleBarClick(e,net,barEl) {
+    if(!barEl) return;
+    const rect=barEl.getBoundingClientRect();
+    const ratio=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
+    const raw=NET_DAY_START+ratio*NET_SPAN;
+    const snapped=Math.round(raw/15)*15;
+    // Is click on a booked block?
+    const isBooked=daySessions.some(s=>{
+      if(s.net!==net&&s.net!=="both") return false;
+      return snapped>=toMinsNet(s.from)&&snapped<toMinsNet(s.to);
+    });
+    if(isBooked) return;
+    const fromMins=Math.min(snapped,NET_DAY_END-60);
+    const prime=isPrimeTime(`${String(Math.floor(fromMins/60)).padStart(2,"0")}:${String(fromMins%60).padStart(2,"0")}`);
+    const durMins=prime?60:90;
+    const toMins2=Math.min(fromMins+durMins,NET_DAY_END);
+    const fmt=m=>`${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`;
+    setBDate(netsDate);
+    setBFrom(fmt(fromMins));
+    setBTo(fmt(toMins2));
+    setBNet(net);
+    setView("add");
+  }
+
+  const barRefs={};
+
+  return (
+    <div style={{background:G.white,borderRadius:14,padding:"12px 13px",
+      border:`1.5px solid ${G.border}`,marginBottom:12}}>
+
+      {/* Date strip */}
+      <div style={{display:"flex",gap:5,marginBottom:10,overflowX:"auto",paddingBottom:2}}>
+        {dates.map(d=>{
+          const f=fmtD(d), active=d===netsDate;
+          const gauge=netAvailGauge(sessions,d);
+          return (
+            <button key={d} onClick={()=>setNetsDate(d)}
+              style={{flexShrink:0,background:active?G.green:G.cream,
+                border:active?`2px solid ${G.green}`:`1.5px solid ${G.border}`,
+                borderRadius:10,padding:"6px 8px 5px",cursor:"pointer",fontFamily:"inherit",
+                minWidth:44,textAlign:"center",transition:"all .15s",
+                boxShadow:active?"0 2px 6px rgba(20,83,45,.2)":"none"}}>
+              <div style={{fontSize:8,fontWeight:700,color:active?G.lime:G.muted,
+                textTransform:"uppercase"}}>{f.day}</div>
+              <div style={{fontSize:14,fontWeight:900,color:active?G.lime:G.text,
+                margin:"1px 0"}}>{f.date}</div>
+              <div style={{display:"flex",justifyContent:"center",marginTop:1}}>
+                <AvailGauge gauge={gauge} active={active}/>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Gauge legend */}
+      <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+        {[["#22c55e","Free"],["#84cc16","Some slots booked"],["#f59e0b","Busy"],["#ef4444","Fully booked"]].map(([c,l])=>(
+          <div key={l} style={{display:"flex",alignItems:"center",gap:3}}>
+            <div style={{width:6,height:6,borderRadius:"50%",background:c,flexShrink:0}}/>
+            <span style={{fontSize:9,color:G.muted,fontWeight:600,whiteSpace:"nowrap"}}>{l}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Hour labels */}
+      <div style={{display:"flex",marginBottom:3}}>
+        <div style={{width:54,flexShrink:0}}/>
+        <div style={{flex:1,position:"relative",height:13}}>
+          {[8,10,12,14,16,18,20].map(h=>(
+            <span key={h} style={{position:"absolute",
+              left:`${netPct(h*60)}%`,transform:"translateX(-50%)",
+              fontSize:9,color:G.muted,fontWeight:600}}>{h}:00</span>
+          ))}
+        </div>
+      </div>
+
+      {/* Net bars */}
+      {["1","2"].map(net=>{
+        const nc=NET_COLORS[net];
+        const netSess=daySessions.filter(s=>s.net===net||s.net==="both")
+          .sort((a,b)=>toMinsNet(a.from)-toMinsNet(b.from));
+        const isFree=netSess.length===0;
+        const freeSlots=[]; let cur=NET_DAY_START;
+        netSess.forEach(s=>{
+          const sf=toMinsNet(s.from),st=toMinsNet(s.to);
+          if(sf>cur) freeSlots.push({from:cur,to:sf});
+          cur=Math.max(cur,st);
+        });
+        if(cur<NET_DAY_END) freeSlots.push({from:cur,to:NET_DAY_END});
+        return (
+          <div key={net} style={{display:"flex",alignItems:"center",gap:7,marginBottom:7}}>
+            <div style={{width:54,flexShrink:0,textAlign:"right"}}>
+              <span style={{background:nc.bar,color:nc.label,borderRadius:6,
+                padding:"3px 7px",fontSize:10,fontWeight:900}}>Net {net}</span>
+            </div>
+            <div ref={el=>{barRefs[net]=el;}}
+              onClick={e=>handleBarClick(e,net,barRefs[net])}
+              style={{flex:1,height:38,background:nc.barBg,borderRadius:8,
+                position:"relative",border:`1.5px solid ${isFree?nc.borderFree:G.border}`,
+                overflow:"hidden",cursor:"crosshair"}}>
+              {/* Prime shading */}
+              {PRIME_ZONES.map((z,i)=>(
+                <div key={i} style={{position:"absolute",
+                  left:`${netPct(toMinsNet(z.from))}%`,
+                  width:`${netPct(toMinsNet(z.to))-netPct(toMinsNet(z.from))}%`,
+                  top:0,bottom:0,background:"rgba(250,204,21,.08)",
+                  borderLeft:"1px dashed rgba(250,204,21,.4)",
+                  borderRight:"1px dashed rgba(250,204,21,.4)",
+                  pointerEvents:"none"}}/>
+              ))}
+              {/* Grid lines */}
+              {[10,12,14,16,18,20].map(h=>(
+                <div key={h} style={{position:"absolute",left:`${netPct(h*60)}%`,
+                  top:0,bottom:0,width:1,background:"rgba(0,0,0,.05)",pointerEvents:"none"}}/>
+              ))}
+              {/* Free labels */}
+              {freeSlots.filter(f=>f.to-f.from>=90).map((f,i)=>(
+                <div key={i} style={{position:"absolute",left:`${netPct(f.from)}%`,
+                  width:`${netPct(f.to)-netPct(f.from)}%`,top:0,bottom:0,
+                  display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none"}}>
+                  <span style={{fontSize:8,color:nc.freeText,fontWeight:700}}>FREE · tap to book</span>
+                </div>
+              ))}
+              {/* Booked blocks */}
+              {netSess.map(s=>{
+                const tm=getTeamMeta(s.restrictedTo||"Unassigned");
+                const w=netPct(toMinsNet(s.to))-netPct(toMinsNet(s.from));
+                return (
+                  <div key={s.id} style={{position:"absolute",
+                    left:`${netPct(toMinsNet(s.from))}%`,width:`${w}%`,
+                    top:3,bottom:3,background:tm.bg,borderRadius:5,
+                    padding:"0 5px",overflow:"hidden",cursor:"default",
+                    display:"flex",alignItems:"center",
+                    boxShadow:"0 1px 3px rgba(0,0,0,.15)"}}>
+                    <span style={{color:tm.accent||tm.text,fontSize:9,fontWeight:800,
+                      whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                      {s.label||"Session"}{s.net==="both"?" ×2":""}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Session card ─────────────────────────────────────────────
 function SessCard({s,members,faded,onClick}) {
   return (
@@ -594,6 +823,11 @@ function SessCard({s,members,faded,onClick}) {
             padding:"1px 8px",fontSize:10,fontWeight:800}}>🔒 {s.restrictedTo}</span>}
           {s.recurringId&&!s.restrictedTo&&<span style={{background:"#f0f9ff",color:"#0369a1",
             borderRadius:20,padding:"1px 8px",fontSize:10,fontWeight:800}}>↻</span>}
+          {s.net&&<span style={{background:s.net==="both"?"#fef3c7":s.net==="2"?"#ede9fe":"#dcfce7",
+            color:s.net==="both"?"#92400e":s.net==="2"?"#5b21b6":"#166534",
+            borderRadius:20,padding:"1px 8px",fontSize:10,fontWeight:800}}>
+            {s.net==="both"?"🎯 Both Nets":s.net==="2"?"🎯 Net 2":"🎯 Net 1"}
+          </span>}
           {s.label&&<span style={{background:"#ede9fe",color:"#5b21b6",borderRadius:20,
             padding:"1px 8px",fontSize:10,fontWeight:800}}>{s.label}</span>}
         </div>
@@ -610,10 +844,12 @@ function SessCard({s,members,faded,onClick}) {
             +{s.players.length-5}</span>}
         </div>
       </div>
-      <div style={{background:G.green,color:G.lime,borderRadius:"50%",width:36,height:36,
-        display:"flex",alignItems:"center",justifyContent:"center",
-        fontWeight:900,fontSize:16,flexShrink:0,marginLeft:10}}>
-        {s.players.length}
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,
+        marginLeft:10,flexShrink:0}}>
+        <GroupIcon color={G.green} size={20}/>
+        <span style={{fontWeight:900,fontSize:13,color:G.green,lineHeight:1}}>
+          {s.players.length}
+        </span>
       </div>
     </div>
   );
@@ -898,6 +1134,7 @@ export default function App() {
   const [bTo,      setBTo]      = useState("20:00");
   const [bNote,    setBNote]    = useState("");
   const [bLabel,   setBLabel]   = useState("");
+  const [bNet,     setBNet]     = useState("1");  // "1" | "2" | "both"
   const [bRestrictTeam, setBRestrictTeam] = useState("");
   const [selP,     setSelP]     = useState([]);
   const [pSearch,  setPSearch]  = useState("");
@@ -906,6 +1143,8 @@ export default function App() {
   // Poll builder
   const [bPollOpts, setBPollOpts] = useState([...PRESET_POLL]);
   const [bCustomOpt,setBCustomOpt]= useState("");
+  // Session comments
+  const [commentText, setCommentText] = useState("");
 
   // Admin state
   const [newName,  setNewName]  = useState("");
@@ -923,7 +1162,7 @@ export default function App() {
   // Recurring slot form state
   const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
   const [rName,       setRName]      = useState("");
-  const [rTeam,       setRTeam]      = useState("");
+  const [rTeam,       setRTeam]      = useState([]);  // array for multi-select
   const [rRestrict,   setRRestrict]  = useState(false);
   const [rDay,        setRDay]       = useState(6); // Saturday
   const [rFrom,       setRFrom]      = useState("14:00");
@@ -1048,7 +1287,7 @@ export default function App() {
       for(let i=0; i<=21; i++){
         const d = new Date(today); d.setDate(today.getDate()+i);
         if(d.getDay() !== slot.day) continue;
-        const dateStr = d.toISOString().split("T")[0];
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
         if(slot.activeFrom && dateStr < slot.activeFrom) continue;
         if(slot.activeTo   && dateStr > slot.activeTo)   continue;
         const exists = sessions.find(s=>
@@ -1293,17 +1532,28 @@ export default function App() {
     if(!bDate||selP.length===0){showToast("Pick a date & at least one player");return;}
     const pollOptions = bPollOpts.map(o=>({...o, votes:[]}));
     const restrictedTo = bRestrictTeam || null;
-    // Exact match — merge players into existing session
-    const ex=sessions.find(s=>s.date===bDate&&s.from===bFrom&&s.to===bTo&&!s.recurringId);
+
+    // Auto-enroll: only when session is restricted to a team
+    let autoPlayers = [...selP];
+    const isLeader = ["superadmin","admin","captain","vicecaptain"].includes(userRole);
+    if(isLeader && restrictedTo) {
+      const teamMembers = members
+        .filter(m => (m.teams||[]).includes(restrictedTo))
+        .map(m => m.name);
+      autoPlayers = [...new Set([...autoPlayers, ...teamMembers])];
+    }
+
+    // Exact match — merge players into existing session (including recurring)
+    const ex=sessions.find(s=>s.date===bDate&&s.from===bFrom&&s.to===bTo);
     if(ex){
-      const merged=[...new Set([...ex.players,...selP])];
+      const merged=[...new Set([...ex.players,...autoPlayers])];
       const mergedPoll = ex.poll || [];
       const existingIds = mergedPoll.map(o=>o.id);
       const newOpts = pollOptions.filter(o=>!existingIds.includes(o.id));
       saveSessions(sessions.map(s=>s.id===ex.id?{...s,players:merged,
         label:s.label||bLabel,restrictedTo:s.restrictedTo||restrictedTo,
         poll:[...mergedPoll,...newOpts]}:s));
-      logAction("session", `Added players to session on ${bDate} (${bFrom}–${bTo}): ${selP.join(", ")}`);
+      logAction("session", `Added players to session on ${bDate} (${bFrom}–${bTo}): ${autoPlayers.join(", ")}`);
       showToast(`Players added to session on ${fmtShort(bDate)} ✓`);
     } else {
       // Check for overlapping sessions — block if any of the selected players are already booked
@@ -1311,23 +1561,42 @@ export default function App() {
         s.date===bDate && timesOverlap(bFrom,bTo,s.from,s.to)
       );
       const alreadyBooked = overlapping.filter(s=>
-        selP.some(p=>s.players.includes(p))
+        autoPlayers.some(p=>s.players.includes(p))
       );
       if(alreadyBooked.length>0) {
         const clash = alreadyBooked[0];
-        showToast(`⚠️ ${selP.find(p=>clash.players.includes(p))} already has a session at this time (${clash.from}–${clash.to}${clash.label?" · "+clash.label:""})`);
+        showToast(`⚠️ ${autoPlayers.find(p=>clash.players.includes(p))} already has a session at this time (${clash.from}–${clash.to}${clash.label?" · "+clash.label:""})`);
         return;
       }
+      const addedCount = autoPlayers.length - selP.length;
       saveSessions([...sessions,{id:uid(),date:bDate,from:bFrom,to:bTo,
-        players:[...selP],note:bNote.trim(),label:bLabel.trim(),
-        restrictedTo,poll:pollOptions}]
+        players:[...autoPlayers],note:bNote.trim(),label:bLabel.trim(),
+        net:bNet,
+        restrictedTo,poll:pollOptions,comments:[]}]
         .sort((a,b)=>new Date(a.date)-new Date(b.date)));
-      logAction("session", `Created session: ${bDate} ${bFrom}–${bTo}${bLabel?" «"+bLabel+"»":""}${restrictedTo?" ("+restrictedTo+" only)":""} — ${selP.length} player${selP.length>1?"s":""}: ${selP.join(", ")}`);
-      showToast(`Session booked for ${fmtShort(bDate)} ✓`);
+      logAction("session", `Created session: ${bDate} ${bFrom}–${bTo}${bLabel?" «"+bLabel+"»":""}${restrictedTo?" ("+restrictedTo+" only)":""} — ${autoPlayers.length} player${autoPlayers.length>1?"s":""}: ${autoPlayers.join(", ")}`);
+      const autoMsg = addedCount > 0 ? ` · ${addedCount} team member${addedCount>1?"s":""} auto-enrolled` : "";
+      showToast(`Session booked for ${fmtShort(bDate)} ✓${autoMsg}`);
     }
-    setBDate("");setBNote("");setBLabel("");setBRestrictTeam("");
+    setBDate("");setBNote("");setBLabel("");setBRestrictTeam("");setBNet("1");
     setSelP([currentUser?.name].filter(Boolean));setBPollOpts([...PRESET_POLL]);setBCustomOpt("");
     setView("schedule");
+  }
+
+  function handlePostComment(sessId, text) {
+    if(!text.trim()) return;
+    const comment = { id:uid(), name:currentUser.name, text:text.trim(),
+      ts: new Date().toISOString() };
+    saveSessions(sessions.map(s => s.id===sessId
+      ? {...s, comments:[...(s.comments||[]), comment]}
+      : s));
+    setCommentText("");
+  }
+
+  function handleDeleteComment(sessId, commentId) {
+    saveSessions(sessions.map(s => s.id===sessId
+      ? {...s, comments:(s.comments||[]).filter(c=>c.id!==commentId)}
+      : s));
   }
 
   function handleVote(sessId, optionId) {
@@ -1399,6 +1668,8 @@ export default function App() {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [schedFilter,   setSchedFilter]   = useState("all"); // "all" | "mine"
   const [blocksExpanded, setBlocksExpanded] = useState(false);
+  const [showAllBlocks,  setShowAllBlocks]  = useState(false);
+  const [netsDate,       setNetsDate]       = useState(todayStr());
   const [blockCals,     setBlockCals]     = useState([]);    // [{id,date,from,to,label}]
   const [bCalDate,      setBCalDate]      = useState("");
   const [bCalFrom,      setBCalFrom]      = useState("10:00");
@@ -2281,6 +2552,18 @@ export default function App() {
           );
         })()}
 
+        {/* Nets timeline strip */}
+        <NetsTimeline
+          sessions={sessions}
+          netsDate={netsDate}
+          setNetsDate={setNetsDate}
+          setView={setView}
+          setBDate={setBDate}
+          setBFrom={setBFrom}
+          setBTo={setBTo}
+          setBNet={setBNet}
+        />
+
         {filteredUpcoming.length===0&&filteredPast.length===0?(
           <div style={{textAlign:"center",padding:"60px 16px",color:G.muted}}>
             <div style={{fontSize:54,marginBottom:12}}>
@@ -2427,7 +2710,10 @@ export default function App() {
                     }}>
                     {Array.from({length:24},(_,i)=>{
                       const h=String(i).padStart(2,"0");
-                      return <option key={h} value={h}>{h}</option>;
+                      const prime=bFrom?isPrimeTime(bFrom):false;
+                      const maxMins=toMinsNet(bFrom)+(prime?60:120);
+                      const disabled=i*60>maxMins||i*60<=toMinsNet(bFrom);
+                      return <option key={h} value={h} disabled={disabled}>{h}</option>;
                     })}
                   </select>
                   <select style={iSt({width:58,fontSize:13,padding:"9px 2px",textAlign:"center",flexShrink:0})}
@@ -2443,10 +2729,52 @@ export default function App() {
                 </div>
               </FFld>
             </div>
-            <FFld label="Label (optional)" style={{marginTop:10}}>
-              <input style={iSt()} placeholder="e.g. Div 3 Training, U11 Batting"
-                value={bLabel} onChange={e=>setBLabel(e.target.value)}/>
+            <FFld label="Net" style={{marginTop:10}}>
+              <div style={{display:"flex",gap:8}}>
+                {[["1","🎯 Net 1"],["2","🎯 Net 2"],["both","🎯 Both Nets"]].map(([val,lbl])=>(
+                  <button key={val} type="button" onClick={()=>setBNet(val)}
+                    style={{flex:1,background:bNet===val?G.green:G.white,
+                      color:bNet===val?G.lime:G.text,
+                      border:bNet===val?`2px solid ${G.green}`:`1.5px solid ${G.border}`,
+                      borderRadius:10,padding:"10px 6px",fontSize:13,fontWeight:700,
+                      cursor:"pointer",fontFamily:"inherit",transition:"all .12s",
+                      textAlign:"center"}}>
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+              {bNet==="both"&&selP.length<8&&(
+                <div style={{marginTop:8,background:"#fff7ed",border:"1.5px solid #fed7aa",
+                  borderRadius:8,padding:"8px 11px",fontSize:12,color:"#92400e",lineHeight:1.5}}>
+                  ⚠️ <b>Heads up:</b> You have fewer than 8 players. Consider booking just one net
+                  so the other stays free for others.
+                </div>
+              )}
             </FFld>
+            {/* Prime hours note */}
+            {bDate&&bFrom&&(()=>{
+              const prime=isPrimeTime(bFrom);
+              return (
+                <div style={{marginTop:10,padding:"7px 10px",background:"#fffbeb",
+                  borderRadius:8,border:"1px solid #fde68a",
+                  display:"flex",alignItems:"flex-start",gap:5}}>
+                  <span style={{fontSize:11,flexShrink:0}}>⭐</span>
+                  <p style={{margin:0,fontSize:10,color:"#b45309",lineHeight:1.6}}>
+                    <b style={{color:"#92400e",whiteSpace:"nowrap"}}>Prime Hours</b>
+                    {" "}— Bookings are for max.{" "}
+                    {prime
+                      ? <b>1 hour</b>
+                      : <b>2 hours</b>}
+                    {" "}slots during{" "}
+                    <span style={{whiteSpace:"nowrap"}}>(<b>17–20</b> daily</span>
+                    {" "}&amp;{" "}
+                    <span style={{whiteSpace:"nowrap"}}><b>9–13</b> weekends)</span>
+                    {" "}and 2 hours at all other times to allow fair access to the nets for everyone.
+                    {prime&&<b style={{color:"#92400e"}}> Your selected start time is in a peak slot.</b>}
+                  </p>
+                </div>
+              );
+            })()}
             <FFld label="Note (optional)" style={{marginTop:10}}>
               <input style={iSt()} placeholder="e.g. Bring extra balls"
                 value={bNote} onChange={e=>setBNote(e.target.value)}/>
@@ -2475,15 +2803,17 @@ export default function App() {
           )}
 
           <SLbl>Who's coming? {selP.length>0&&`(${selP.length} selected)`}</SLbl>
+          {(["superadmin","admin","captain","vicecaptain"].includes(userRole))&&bRestrictTeam&&(
+            <div style={{background:"#eff6ff",border:"1.5px solid #bfdbfe",borderRadius:8,
+              padding:"8px 12px",marginBottom:10,fontSize:12,color:"#1e40af",lineHeight:1.5}}>
+              <b>👥 Auto-enroll on:</b> All members of <b>{bRestrictTeam}</b> will be
+              automatically added when you create this session.
+            </div>
+          )}
           <div style={{display:"flex",gap:8,marginBottom:10}}>
             <input style={iSt({flex:1,background:G.white})}
-              placeholder="🔍  Search…" value={pSearch}
+              placeholder="🔍  Search players…" value={pSearch}
               onChange={e=>setPSearch(e.target.value)}/>
-            <select style={iSt({width:"auto",minWidth:105,background:G.white,flexShrink:0})}
-              value={pFilter} onChange={e=>setPFilter(e.target.value)}>
-              <option value="All">All groups</option>
-              {ALL_TEAMS.map(t=><option key={t} value={t}>{t}</option>)}
-            </select>
           </div>
 
           {selP.length>0&&(
@@ -2592,22 +2922,6 @@ export default function App() {
               )}
             </>);
           })()}
-
-          {can(userRole,"deleteSession")&&<>
-            <SLbl>Restrict to Team <span style={{fontWeight:500,color:G.muted}}>(optional)</span></SLbl>
-            <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
-              padding:14,marginBottom:14}}>
-              <div style={{fontSize:12,color:G.muted,marginBottom:10}}>
-                Leave as <strong>Open to all</strong> for combined/general sessions.
-                Restricted sessions show a 🔒 badge and non-members cannot join.
-              </div>
-              <select style={iSt()} value={bRestrictTeam}
-                onChange={e=>setBRestrictTeam(e.target.value)}>
-                <option value="">🌍 Open to all</option>
-                {teams.map(t=><option key={t.id} value={t.name}>{t.name} only</option>)}
-              </select>
-            </div>
-          </>}
 
           <SLbl>Session Poll <span style={{fontWeight:500,color:G.muted}}>(optional)</span></SLbl>          <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
             padding:14,marginBottom:14}}>
@@ -2920,6 +3234,85 @@ export default function App() {
                 </div>
               )}
             </>);
+          })()}
+
+          {/* ── Comments ─────────────────────────────────────── */}
+          {(()=>{
+            const comments = selSess.comments || [];
+            const isInSession = selSess.players.includes(currentUser?.name)
+              || can(userRole,"deleteSession");
+            const fmtTs = ts => {
+              const d = new Date(ts);
+              return d.toLocaleDateString("en-GB",{day:"numeric",month:"short"})
+                + " · " + d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+            };
+            return (
+              <div style={{marginTop:24}}>
+                <div style={{fontWeight:900,fontSize:12,letterSpacing:1.2,
+                  textTransform:"uppercase",color:G.muted,marginBottom:10}}>
+                  💬 Comments {comments.length>0&&`(${comments.length})`}
+                </div>
+
+                {comments.length===0&&(
+                  <div style={{fontSize:12,color:G.muted,fontStyle:"italic",marginBottom:10}}>
+                    No comments yet.{isInSession?" Be the first!":""}
+                  </div>
+                )}
+
+                {comments.map(c=>(
+                  <div key={c.id} style={{background:G.cream,borderRadius:10,
+                    padding:"10px 13px",marginBottom:7,position:"relative"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",
+                      alignItems:"flex-start",gap:8}}>
+                      <div>
+                        <span style={{fontWeight:800,fontSize:12,color:G.green}}>
+                          {c.name}
+                        </span>
+                        <span style={{fontSize:11,color:G.muted,marginLeft:8}}>
+                          {fmtTs(c.ts)}
+                        </span>
+                      </div>
+                      {(c.name===currentUser?.name||can(userRole,"deleteSession"))&&(
+                        <button onClick={()=>handleDeleteComment(selSess.id,c.id)}
+                          style={{background:"none",border:"none",color:G.muted,
+                            fontSize:14,cursor:"pointer",padding:"0 2px",lineHeight:1,
+                            flexShrink:0}}>×</button>
+                      )}
+                    </div>
+                    <div style={{fontSize:13,color:G.text,marginTop:4,lineHeight:1.5}}>
+                      {c.text}
+                    </div>
+                  </div>
+                ))}
+
+                {isInSession ? (
+                  <div style={{display:"flex",gap:8,marginTop:6}}>
+                    <input
+                      value={commentText}
+                      onChange={e=>setCommentText(e.target.value)}
+                      onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){
+                        e.preventDefault();
+                        handlePostComment(selSess.id,commentText);
+                      }}}
+                      placeholder="Add a comment…"
+                      style={{...iSt({flex:1}),fontSize:13,padding:"9px 12px"}}/>
+                    <button onClick={()=>handlePostComment(selSess.id,commentText)}
+                      disabled={!commentText.trim()}
+                      style={{background:commentText.trim()?G.green:"#e2e8f0",
+                        color:commentText.trim()?G.lime:G.muted,
+                        border:"none",borderRadius:10,padding:"9px 16px",
+                        fontSize:13,fontWeight:800,cursor:commentText.trim()?"pointer":"default",
+                        fontFamily:"inherit",flexShrink:0,transition:"all .15s"}}>
+                      Post
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>
+                    Join this session to leave a comment.
+                  </div>
+                )}
+              </div>
+            );
           })()}
 
           {can(userRole,"deleteSession")&&(()=>{
@@ -3667,7 +4060,7 @@ export default function App() {
           <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
             padding:14,marginBottom:8}}>
             <div style={{fontSize:12,color:G.muted,marginBottom:10,lineHeight:1.5}}>
-              Block the ground on match days or events so members know nets aren't available.
+              Mark dates when the nets are unavailable (match days, events). Members will see these on the schedule.
             </div>
             {/* Import 2026 fixtures button */}
             {(()=>{
@@ -3710,72 +4103,112 @@ export default function App() {
                 </div>
               );
             })()}
-            {/* Existing blocks */}
-            {blockCals.filter(b=>isFuture(b.date)||b.date===todayStr())
-              .sort((a,b)=>a.date.localeCompare(b.date))
-              .map(b=>(
-              <div key={b.id} style={{display:"flex",justifyContent:"space-between",
-                alignItems:"center",padding:"8px 10px",background:G.cream,
-                borderRadius:8,marginBottom:6,gap:8}}>
-                <div>
-                  <div style={{fontWeight:700,fontSize:13,color:G.text}}>{b.label}</div>
-                  <div style={{fontSize:11,color:G.muted}}>{fmtShort(b.date)} · {b.from}–{b.to}</div>
+            {/* Existing blocks — show 5, rest behind toggle */}
+            {(()=>{
+              const upcoming = blockCals
+                .filter(b=>isFuture(b.date)||b.date===todayStr())
+                .sort((a,b)=>a.date.localeCompare(b.date));
+              const visible = showAllBlocks ? upcoming : upcoming.slice(0,5);
+              return (<>
+                {upcoming.length===0&&(
+                  <div style={{fontSize:12,color:G.muted,fontStyle:"italic",marginBottom:8}}>
+                    No upcoming blocked dates yet.
+                  </div>
+                )}
+                {visible.map(b=>(
+                  <div key={b.id} style={{display:"flex",justifyContent:"space-between",
+                    alignItems:"center",padding:"8px 10px",background:G.cream,
+                    borderRadius:8,marginBottom:6,gap:8}}>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:13,color:G.text}}>{b.label}</div>
+                      <div style={{fontSize:11,color:G.muted}}>{fmtShort(b.date)} · {b.from}–{b.to}</div>
+                    </div>
+                    <button onClick={()=>{
+                        saveBlockCals(blockCals.filter(x=>x.id!==b.id));
+                        logAction("blockcal",`Removed block: ${b.date} ${b.from}–${b.to} "${b.label}"`);
+                      }}
+                      style={{background:"none",border:"none",color:G.red,fontSize:16,
+                        cursor:"pointer",padding:"2px 6px",lineHeight:1}}>×</button>
+                  </div>
+                ))}
+                {upcoming.length>5&&(
+                  <button onClick={()=>setShowAllBlocks(v=>!v)}
+                    style={{background:"none",border:`1px dashed ${G.border}`,borderRadius:8,
+                      width:"100%",padding:"7px",fontSize:12,fontWeight:700,color:G.muted,
+                      cursor:"pointer",fontFamily:"inherit",marginBottom:6}}>
+                    {showAllBlocks
+                      ? "▲ Show fewer"
+                      : `▼ Show all ${upcoming.length} blocked dates`}
+                  </button>
+                )}
+              </>);
+            })()}
+            {/* Add new block — prominent button */}
+            <div style={{marginTop:8}}>
+              {!showBlockForm?(
+                <button type="button" onClick={()=>setShowBlockForm(true)}
+                  style={{width:"100%",background:G.green,color:G.lime,border:"none",
+                    borderRadius:10,padding:"11px",fontSize:13,fontWeight:800,
+                    cursor:"pointer",fontFamily:"inherit"}}>
+                  🚫 Block a Date When Nets Are Unavailable
+                </button>
+              ):(
+                <div style={{background:G.cream,borderRadius:10,padding:"12px",
+                  border:`1.5px solid ${G.border}`}}>
+                  <div style={{fontWeight:800,fontSize:13,color:G.text,marginBottom:10}}>
+                    🚫 Add a Blocked Date
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                    <FFld label="Reason / Event name">
+                      <input placeholder="e.g. Div 3 Home Match vs Svanholm"
+                        style={iSt({padding:"9px 12px",fontSize:13})}
+                        value={bCalLabel} onChange={e=>setBCalLabel(e.target.value)}/>
+                    </FFld>
+                    <FFld label="Date">
+                      <input type="date" style={iSt({padding:"9px 12px",fontSize:13})}
+                        value={bCalDate} onChange={e=>setBCalDate(e.target.value)}/>
+                    </FFld>
+                    <div style={{display:"flex",gap:8}}>
+                      <FFld label="From" style={{flex:1}}>
+                        <input type="time" style={iSt({padding:"9px 12px",fontSize:13})}
+                          value={bCalFrom} onChange={e=>setBCalFrom(e.target.value)}/>
+                      </FFld>
+                      <FFld label="To" style={{flex:1}}>
+                        <input type="time" style={iSt({padding:"9px 12px",fontSize:13})}
+                          value={bCalTo} onChange={e=>setBCalTo(e.target.value)}/>
+                      </FFld>
+                    </div>
+                    {/* Clash detection */}
+                    {bCalDate&&(()=>{
+                      const clash = blockCals.find(b=>b.date===bCalDate&&
+                        timesOverlap(bCalFrom,bCalTo,b.from,b.to));
+                      return clash ? (
+                        <div style={{background:"#fff7ed",border:"1.5px solid #fed7aa",
+                          borderRadius:8,padding:"8px 11px",fontSize:12,color:"#92400e"}}>
+                          ⚠️ <b>Clash:</b> "{clash.label}" is already blocked on this date
+                          ({clash.from}–{clash.to}). Check before saving.
+                        </div>
+                      ) : null;
+                    })()}
+                    <div style={{display:"flex",gap:8}}>
+                      <Btn bg={G.green} col={G.lime} full onClick={()=>{
+                        if(!bCalDate){showToast("Please pick a date");return;}
+                        const lbl = bCalLabel.trim()||"Nets Blocked";
+                        saveBlockCals([...blockCals,{
+                          id:uid(),date:bCalDate,from:bCalFrom,to:bCalTo,label:lbl}]);
+                        logAction("blockcal",`Blocked nets: ${bCalDate} ${bCalFrom}–${bCalTo} "${lbl}"`);
+                        setBCalDate("");setBCalFrom("10:00");setBCalTo("14:00");
+                        setBCalLabel("");setShowBlockForm(false);
+                        showToast("Date blocked ✓");
+                      }}>✓ Save Blocked Date</Btn>
+                      <Btn bg={G.cream} col={G.text} onClick={()=>setShowBlockForm(false)}>
+                        Cancel
+                      </Btn>
+                    </div>
+                  </div>
                 </div>
-                <button onClick={()=>{
-                    saveBlockCals(blockCals.filter(x=>x.id!==b.id));
-                    logAction("blockcal",`Removed block: ${b.date} ${b.from}–${b.to} "${b.label}"`);
-                  }}
-                  style={{background:"none",border:"none",color:G.red,fontSize:16,
-                    cursor:"pointer",padding:"2px 6px",lineHeight:1}}>×</button>
-              </div>
-            ))}
-            {/* Add new block form */}
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-              marginBottom:showBlockForm?12:0,marginTop:blockCals.filter(b=>isFuture(b.date)||b.date===todayStr()).length>0?10:0}}>
-              <div style={{fontSize:12,fontWeight:700,color:G.muted}}>
-                {blockCals.filter(b=>isFuture(b.date)||b.date===todayStr()).length===0&&"No upcoming blocks"}
-              </div>
-              <button type="button" onClick={()=>setShowBlockForm(v=>!v)}
-                style={{background:showBlockForm?G.redBg:G.cream,border:`1px solid ${G.border}`,
-                  borderRadius:8,padding:"5px 12px",fontSize:12,fontWeight:700,
-                  cursor:"pointer",fontFamily:"inherit",
-                  color:showBlockForm?G.red:G.text}}>
-                {showBlockForm?"Cancel":"+ Block Date"}
-              </button>
+              )}
             </div>
-            {showBlockForm&&(
-              <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                <FFld label="Match / Event label">
-                  <input placeholder="e.g. Div 3 Home Match vs Svanholm"
-                    style={iSt({padding:"9px 12px",fontSize:13})}
-                    value={bCalLabel} onChange={e=>setBCalLabel(e.target.value)}/>
-                </FFld>
-                <FFld label="Date">
-                  <input type="date" style={iSt({padding:"9px 12px",fontSize:13})}
-                    value={bCalDate} onChange={e=>setBCalDate(e.target.value)}/>
-                </FFld>
-                <div style={{display:"flex",gap:8}}>
-                  <FFld label="From" style={{flex:1}}>
-                    <input type="time" style={iSt({padding:"9px 12px",fontSize:13})}
-                      value={bCalFrom} onChange={e=>setBCalFrom(e.target.value)}/>
-                  </FFld>
-                  <FFld label="To" style={{flex:1}}>
-                    <input type="time" style={iSt({padding:"9px 12px",fontSize:13})}
-                      value={bCalTo} onChange={e=>setBCalTo(e.target.value)}/>
-                  </FFld>
-                </div>
-                <Btn bg={G.green} col={G.lime} full onClick={()=>{
-                  if(!bCalDate){showToast("Please pick a date");return;}
-                  const lbl = bCalLabel.trim()||"Nets Blocked";
-                  saveBlockCals([...blockCals,{
-                    id:uid(),date:bCalDate,from:bCalFrom,to:bCalTo,label:lbl}]);
-                  logAction("blockcal",`Blocked ground: ${bCalDate} ${bCalFrom}–${bCalTo} "${lbl}"`);
-                  setBCalDate("");setBCalFrom("10:00");setBCalTo("14:00");
-                  setBCalLabel("");setShowBlockForm(false);
-                  showToast("Ground blocked ✓");
-                }}>🚫 Block This Date</Btn>
-              </div>
-            )}
           </div>
         </>}
 
@@ -3820,12 +4253,32 @@ export default function App() {
                           value={editingSlot.to}
                           onChange={e=>setEditingSlot({...editingSlot,to:e.target.value})}/>
                       </div>
-                      <select style={iSt({padding:"7px 10px",fontSize:13})}
-                        value={editingSlot.team}
-                        onChange={e=>setEditingSlot({...editingSlot,team:e.target.value})}>
-                        <option value="">No team</option>
-                        {teams.map(t=><option key={t.id} value={t.name}>{t.name}</option>)}
-                      </select>
+                      <div>
+                        <div style={{fontSize:11,fontWeight:700,color:G.muted,
+                          textTransform:"uppercase",letterSpacing:1.2,marginBottom:6}}>Teams</div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                          {teams.map(t=>{
+                            const curTeams = editingSlot.teams||[editingSlot.team].filter(Boolean);
+                            const sel = curTeams.includes(t.name);
+                            return (
+                              <button key={t.id} type="button"
+                                onClick={()=>{
+                                  const updated = sel
+                                    ? curTeams.filter(x=>x!==t.name)
+                                    : [...curTeams, t.name];
+                                  setEditingSlot({...editingSlot,
+                                    teams:updated, team:updated[0]||""});
+                                }}
+                                style={{background:sel?G.green:G.cream,color:sel?G.lime:G.text,
+                                  border:sel?`2px solid ${G.green}`:`1.5px solid ${G.border}`,
+                                  borderRadius:20,padding:"4px 10px",fontSize:12,fontWeight:700,
+                                  cursor:"pointer",fontFamily:"inherit",transition:"all .1s"}}>
+                                {sel?"✓ ":""}{t.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                       <label style={{display:"flex",alignItems:"center",gap:7,fontSize:13,
                         fontWeight:700,color:G.text,cursor:"pointer"}}>
                         <input type="checkbox" checked={editingSlot.restrictTeam}
@@ -3862,7 +4315,7 @@ export default function App() {
                         </div>
                         <div style={{fontSize:11,color:G.muted,marginTop:2}}>
                           {DAYS[slot.day]} · {slot.from}–{slot.to}
-                          {slot.team&&` · ${slot.team}${slot.restrictTeam?" only":""}`}
+                          {(slot.teams?.length>0||slot.team)&&` · ${(slot.teams||[slot.team]).filter(Boolean).join(", ")}${slot.restrictTeam?" only":""}`}
                           {slot.activeTo&&` · ends ${fmtShort(slot.activeTo)}`}
                         </div>
                       </div>
@@ -3911,11 +4364,27 @@ export default function App() {
                   <input type="time" style={iSt({padding:"9px 10px",fontSize:13,flex:1})}
                     value={rTo} onChange={e=>setRTo(e.target.value)}/>
                 </div>
-                <select style={iSt({padding:"9px 12px",fontSize:13})}
-                  value={rTeam} onChange={e=>setRTeam(e.target.value)}>
-                  <option value="">No specific team</option>
-                  {teams.map(t=><option key={t.id} value={t.name}>{t.name}</option>)}
-                </select>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:G.muted,
+                    textTransform:"uppercase",letterSpacing:1.2,marginBottom:6}}>
+                    Teams (tap to select, or leave empty for all)
+                  </div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                    {teams.map(t=>{
+                      const sel = rTeam.includes(t.name);
+                      return (
+                        <button key={t.id} type="button"
+                          onClick={()=>setRTeam(ts=>sel?ts.filter(x=>x!==t.name):[...ts,t.name])}
+                          style={{background:sel?G.green:G.cream,color:sel?G.lime:G.text,
+                            border:sel?`2px solid ${G.green}`:`1.5px solid ${G.border}`,
+                            borderRadius:20,padding:"5px 12px",fontSize:12,fontWeight:700,
+                            cursor:"pointer",fontFamily:"inherit",transition:"all .1s"}}>
+                          {sel?"✓ ":""}{t.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
                 <label style={{display:"flex",alignItems:"center",gap:7,fontSize:13,
                   fontWeight:700,color:G.text,cursor:"pointer"}}>
                   <input type="checkbox" checked={rRestrict}
@@ -3936,11 +4405,11 @@ export default function App() {
                   onClick={()=>{
                     if(!rName.trim()){showToast("Give the slot a name");return;}
                     addRecurringSlot({
-                      name:rName.trim(), team:rTeam, restrictTeam:rRestrict,
+                      name:rName.trim(), team:rTeam[0]||"", teams:rTeam, restrictTeam:rRestrict,
                       day:rDay, from:rFrom, to:rTo,
                       activeFrom:rActiveFrom, activeTo:rActiveTo||null,
                     });
-                    setRName("");setRTeam("");setRRestrict(false);
+                    setRName("");setRTeam([]);setRRestrict(false);
                     setRDay(6);setRFrom("14:00");setRTo("15:30");
                     setRActiveFrom(todayStr());setRActiveTo("");
                   }}>
