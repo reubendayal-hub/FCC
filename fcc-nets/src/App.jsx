@@ -876,12 +876,24 @@ function WeatherBar({wx,setView}) {
     </div>
   );
   const today=wx.daily?.[0];
-  const w=wmo(today?.code);
+  // Prefer live /current data; fall back to nearest hourly hour
+  const cur = wx.current || (()=>{
+    const nowHour = `${String(new Date().getHours()).padStart(2,"0")}:00`;
+    const idx = (wx.hourly?.time||[]).findIndex(t=>t.startsWith(wx.today)&&t.slice(11,16)===nowHour);
+    if(idx<0) return null;
+    return {
+      temp:  Math.round(wx.hourly.temperature_2m[idx]),
+      feels: Math.round(wx.hourly.apparent_temperature[idx]),
+      code:  wx.hourly.weathercode[idx],
+      wind:  Math.round(wx.hourly.windspeed_10m[idx]*10)/10,
+    };
+  })();
+  const w=wmo(cur?.code ?? today?.code);
   const rainPeriods=calcRainPeriods(wx.hourly, wx.today);
   const rainStr=rainPeriods.length>0
     ? `Rain ${rainPeriods[0].from}–${rainPeriods[0].to}`
     : "No rain";
-  const windStr=today?.windMax!=null ? `${today.windMax} m/s` : "";
+  const windStr=cur?.wind!=null ? `${cur.wind} m/s` : (today?.windMax!=null ? `${today.windMax} m/s` : "");
   const isRainy = rainPeriods.length>0;
   return (
     <button onClick={()=>setView("weather")}
@@ -898,7 +910,7 @@ function WeatherBar({wx,setView}) {
           <div style={{flex:1,minWidth:0}}>
             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:1}}>
               <span style={{fontSize:13,fontWeight:900,color:"#fff"}}>
-                {today?.max!=null?`${today.max}°C`:"--°C"}
+                {cur?.temp!=null?`${cur.temp}°C`:today?.max!=null?`${today.max}°C`:"--°C"}
               </span>
               <span style={{fontSize:12,color:"rgba(255,255,255,.75)",fontWeight:600}}>
                 · {w.label}
@@ -992,16 +1004,16 @@ function WeatherPage({wx,setView}) {
             </div>
             <div style={{fontSize:46,fontWeight:900,color:"#fff",lineHeight:1,
               marginBottom:4}}>
-              {todayDaily?.max!=null ? `${todayDaily.max}°` : "--°"}
+              {wx.current?.temp!=null ? `${wx.current.temp}°` : todayDaily?.max!=null ? `${todayDaily.max}°` : "--°"}
               <span style={{fontSize:18,fontWeight:400,color:"rgba(255,255,255,.6)",
-                marginLeft:4}}>C</span>
+                marginLeft:4}}>C now</span>
             </div>
             <div style={{color:"rgba(255,255,255,.75)",fontSize:14,fontWeight:600,
               marginBottom:2}}>
-              {wmo(todayDaily?.code||0).label}
+              {wmo(wx.current?.code ?? todayDaily?.code ?? 0).label}
             </div>
             <div style={{color:"rgba(255,255,255,.5)",fontSize:12}}>
-              Feels like {todayHrs[0]?.feels??todayDaily?.min}°C
+              Feels like {wx.current?.feels??todayHrs[0]?.feels??todayDaily?.min}°C
               · Low {todayDaily?.min}° High {todayDaily?.max}°
             </div>
           </div>
@@ -1912,38 +1924,55 @@ export default function App() {
 
   // ── Weather fetch (Open-Meteo ECMWF — free, CORS-enabled) ────
   useEffect(()=>{
-    const url=`https://api.open-meteo.com/v1/forecast?`+
-      `latitude=${FCC_LAT}&longitude=${FCC_LON}`+
-      `&hourly=temperature_2m,apparent_temperature,precipitation,`+
-      `precipitation_probability,weathercode,windspeed_10m,visibility,is_day`+
-      `&daily=sunrise,sunset,precipitation_sum,weathercode,`+
-      `temperature_2m_max,temperature_2m_min,windspeed_10m_max,`+
-      `precipitation_probability_max`+
-      `&timezone=Europe%2FCopenhagen&forecast_days=7&wind_speed_unit=ms`;
-    fetch(url)
-      .then(r=>r.json())
-      .then(data=>{
-        const todayD=localDateStr();
-        const daily=(data.daily?.time||[]).map((date,i)=>({
-          date,
-          code:  data.daily.weathercode[i],
-          max:   Math.round(data.daily.temperature_2m_max[i]),
-          min:   Math.round(data.daily.temperature_2m_min[i]),
-          windMax: Math.round(data.daily.windspeed_10m_max[i]*10)/10,
-          rainSum: +(data.daily.precipitation_sum[i]||0).toFixed(1),
-          rainProb: data.daily.precipitation_probability_max[i]||0,
-          sunrise: data.daily.sunrise[i],
-          sunset:  data.daily.sunset[i],
-        }));
-        setWxData({
-          today: todayD,
-          hourly: data.hourly,
-          daily: daily,
-          // convenience: today's daily summary
-          daily0: daily[0],
-        });
-      })
-      .catch(()=>setWxData({error:true}));
+    function fetchWx() {
+      const url=`https://api.open-meteo.com/v1/forecast?`+
+        `latitude=${FCC_LAT}&longitude=${FCC_LON}`+
+        `&current=temperature_2m,apparent_temperature,precipitation,`+
+        `weathercode,windspeed_10m,is_day`+
+        `&hourly=temperature_2m,apparent_temperature,precipitation,`+
+        `precipitation_probability,weathercode,windspeed_10m,visibility,is_day`+
+        `&daily=sunrise,sunset,precipitation_sum,weathercode,`+
+        `temperature_2m_max,temperature_2m_min,windspeed_10m_max,`+
+        `precipitation_probability_max`+
+        `&timezone=Europe%2FCopenhagen&forecast_days=7&wind_speed_unit=ms`;
+      fetch(url, {cache:"no-store"})
+        .then(r=>r.json())
+        .then(data=>{
+          const todayD=localDateStr();
+          const daily=(data.daily?.time||[]).map((date,i)=>({
+            date,
+            code:  data.daily.weathercode[i],
+            max:   Math.round(data.daily.temperature_2m_max[i]),
+            min:   Math.round(data.daily.temperature_2m_min[i]),
+            windMax: Math.round(data.daily.windspeed_10m_max[i]*10)/10,
+            rainSum: +(data.daily.precipitation_sum[i]||0).toFixed(1),
+            rainProb: data.daily.precipitation_probability_max[i]||0,
+            sunrise: data.daily.sunrise[i],
+            sunset:  data.daily.sunset[i],
+          }));
+          setWxData({
+            today: todayD,
+            hourly: data.hourly,
+            daily: daily,
+            daily0: daily[0],
+            // Current conditions from the /current endpoint
+            current: data.current ? {
+              temp:   Math.round(data.current.temperature_2m),
+              feels:  Math.round(data.current.apparent_temperature),
+              precip: +(data.current.precipitation||0).toFixed(1),
+              code:   data.current.weathercode,
+              wind:   Math.round(data.current.windspeed_10m*10)/10,
+              isDay:  data.current.is_day,
+            } : null,
+            fetchedAt: Date.now(),
+          });
+        })
+        .catch(()=>setWxData({error:true}));
+    }
+    fetchWx();
+    // Re-fetch every 30 minutes so temperature stays current
+    const timer = setInterval(fetchWx, 30*60*1000);
+    return ()=>clearInterval(timer);
   },[]);
 
 
