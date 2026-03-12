@@ -893,18 +893,18 @@ function WeatherBar({wx,setView}) {
         boxShadow:"0 3px 12px rgba(20,83,45,.25)"}}>
       <div style={{display:"flex",alignItems:"stretch"}}>
         {/* Left: weather info */}
-        <div style={{flex:1,padding:"12px 14px",display:"flex",alignItems:"center",gap:10}}>
-          <span style={{fontSize:28,flexShrink:0,lineHeight:1}}>{w.emoji}</span>
+        <div style={{flex:1,padding:"9px 12px",display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:24,flexShrink:0,lineHeight:1}}>{w.emoji}</span>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
-              <span style={{fontSize:14,fontWeight:900,color:"#fff"}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:1}}>
+              <span style={{fontSize:13,fontWeight:900,color:"#fff"}}>
                 {today?.max!=null?`${today.max}°C`:"--°C"}
               </span>
               <span style={{fontSize:12,color:"rgba(255,255,255,.75)",fontWeight:600}}>
                 · {w.label}
               </span>
             </div>
-            <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+            <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
               <span style={{fontSize:10,color:isRainy?"#93c5fd":G.lime,fontWeight:700}}>
                 {isRainy?"🌧️ ":""}{rainStr}
               </span>
@@ -915,18 +915,14 @@ function WeatherBar({wx,setView}) {
         </div>
         {/* Right: CTA panel */}
         <div style={{background:"rgba(255,255,255,.1)",borderLeft:"1px solid rgba(255,255,255,.12)",
-          padding:"12px 14px",display:"flex",flexDirection:"column",
-          alignItems:"center",justifyContent:"center",gap:3,flexShrink:0,minWidth:80}}>
-          <span style={{fontSize:16}}>📡</span>
+          padding:"9px 13px",display:"flex",flexDirection:"column",
+          alignItems:"center",justifyContent:"center",gap:2,flexShrink:0,minWidth:72}}>
+          <span style={{fontSize:14}}>📡</span>
           <span style={{fontSize:9,fontWeight:800,color:G.lime,
-            textTransform:"uppercase",letterSpacing:1,whiteSpace:"nowrap"}}>
-            Detailed
+            textTransform:"uppercase",letterSpacing:.8,whiteSpace:"nowrap"}}>
+            Detailed Forecast
           </span>
-          <span style={{fontSize:9,fontWeight:800,color:G.lime,
-            textTransform:"uppercase",letterSpacing:1,whiteSpace:"nowrap"}}>
-            Forecast
-          </span>
-          <span style={{fontSize:14,color:G.lime,fontWeight:900,marginTop:1}}>›</span>
+          <span style={{fontSize:13,color:G.lime,fontWeight:900,lineHeight:1}}>›</span>
         </div>
       </div>
     </button>
@@ -3001,8 +2997,8 @@ export default function App() {
           </button>
           <div style={{flex:1}}/>
           {[
-            {key:"all",  label:"🏏 All"},
-            {key:"mine", label:"✋ Mine"},
+            {key:"all",  label:"🏏 All Sessions"},
+            {key:"mine", label:"✋ My Sessions"},
           ].map(({key,label})=>{
             const active = schedFilter===key;
             return (
