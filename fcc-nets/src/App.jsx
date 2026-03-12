@@ -860,16 +860,18 @@ function NetsTimeline({sessions,netsDate,setNetsDate,setView,setBDate,setBFrom,s
 // ─── Weather bar (schedule mini strip) ───────────────────────
 function WeatherBar({wx,setView}) {
   if(!wx) return (
-    <div style={{background:G.white,border:`1.5px solid ${G.border}`,borderRadius:12,
-      padding:"9px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
-      <div style={{width:16,height:16,borderRadius:"50%",border:`2px solid ${G.border}`,
-        borderTopColor:G.green,animation:"spin 1s linear infinite"}}/>
-      <span style={{fontSize:11,color:G.muted}}>Fetching Karlebo ground forecast…</span>
+    <div style={{background:`linear-gradient(135deg,#14532d,#1a6338)`,
+      border:"none",borderRadius:14,padding:"11px 14px",marginBottom:12,
+      display:"flex",alignItems:"center",gap:10,opacity:0.7}}>
+      <div style={{width:16,height:16,borderRadius:"50%",
+        border:"2px solid rgba(163,230,53,.4)",borderTopColor:G.lime,
+        animation:"spin 1s linear infinite",flexShrink:0}}/>
+      <span style={{fontSize:11,color:"rgba(255,255,255,.7)"}}>Fetching Karlebo ground forecast…</span>
     </div>
   );
   if(wx.error) return (
-    <div style={{background:"#fef2f2",border:"1.5px solid #fca5a5",borderRadius:12,
-      padding:"9px 14px",marginBottom:12}}>
+    <div style={{background:"#fef2f2",border:"1.5px solid #fca5a5",borderRadius:14,
+      padding:"11px 14px",marginBottom:12}}>
       <span style={{fontSize:11,color:"#991b1b"}}>⚠️ Weather unavailable — check connection</span>
     </div>
   );
@@ -877,27 +879,56 @@ function WeatherBar({wx,setView}) {
   const w=wmo(today?.code);
   const rainPeriods=calcRainPeriods(wx.hourly, wx.today);
   const rainStr=rainPeriods.length>0
-    ? `· 🌧️ Rain ${rainPeriods[0].from}–${rainPeriods[0].to} (${rainPeriods[0].mm}mm)`
-    : "";
-  const windStr=today?.windMax!=null ? `· 💨 ${today.windMax} m/s` : "";
+    ? `Rain ${rainPeriods[0].from}–${rainPeriods[0].to}`
+    : "No rain";
+  const windStr=today?.windMax!=null ? `${today.windMax} m/s` : "";
+  const isRainy = rainPeriods.length>0;
   return (
     <button onClick={()=>setView("weather")}
-      style={{width:"100%",background:G.white,border:`1.5px solid ${G.border}`,
-        borderRadius:12,padding:"9px 13px",marginBottom:12,
-        display:"flex",alignItems:"center",gap:8,cursor:"pointer",
-        fontFamily:"inherit",textAlign:"left",boxSizing:"border-box"}}>
-      <span style={{fontSize:20,flexShrink:0}}>{w.emoji}</span>
-      <div style={{flex:1,minWidth:0}}>
-        <span style={{fontSize:11,color:G.text,fontWeight:700}}>
-          {today?.max!=null?`${today.max}°C · `:""}
-          {w.label}
-          {" "}{rainStr} {windStr}
-        </span>
-        <span style={{fontSize:10,color:G.muted,marginLeft:4}}>
-          · Karlebo
-        </span>
+      style={{width:"100%",
+        background:`linear-gradient(135deg, #14532d 0%, #1a5c35 60%, #1e3a8a 100%)`,
+        border:"none",borderRadius:14,padding:"0",marginBottom:12,
+        cursor:"pointer",fontFamily:"inherit",textAlign:"left",
+        boxSizing:"border-box",overflow:"hidden",
+        boxShadow:"0 3px 12px rgba(20,83,45,.25)"}}>
+      <div style={{display:"flex",alignItems:"stretch"}}>
+        {/* Left: weather info */}
+        <div style={{flex:1,padding:"12px 14px",display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:28,flexShrink:0,lineHeight:1}}>{w.emoji}</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+              <span style={{fontSize:14,fontWeight:900,color:"#fff"}}>
+                {today?.max!=null?`${today.max}°C`:"--°C"}
+              </span>
+              <span style={{fontSize:12,color:"rgba(255,255,255,.75)",fontWeight:600}}>
+                · {w.label}
+              </span>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+              <span style={{fontSize:10,color:isRainy?"#93c5fd":G.lime,fontWeight:700}}>
+                {isRainy?"🌧️ ":""}{rainStr}
+              </span>
+              {windStr&&<span style={{fontSize:10,color:"rgba(255,255,255,.55)"}}>· 💨 {windStr}</span>}
+              <span style={{fontSize:10,color:"rgba(255,255,255,.4)"}}>· Karlebo</span>
+            </div>
+          </div>
+        </div>
+        {/* Right: CTA panel */}
+        <div style={{background:"rgba(255,255,255,.1)",borderLeft:"1px solid rgba(255,255,255,.12)",
+          padding:"12px 14px",display:"flex",flexDirection:"column",
+          alignItems:"center",justifyContent:"center",gap:3,flexShrink:0,minWidth:80}}>
+          <span style={{fontSize:16}}>📡</span>
+          <span style={{fontSize:9,fontWeight:800,color:G.lime,
+            textTransform:"uppercase",letterSpacing:1,whiteSpace:"nowrap"}}>
+            Detailed
+          </span>
+          <span style={{fontSize:9,fontWeight:800,color:G.lime,
+            textTransform:"uppercase",letterSpacing:1,whiteSpace:"nowrap"}}>
+            Forecast
+          </span>
+          <span style={{fontSize:14,color:G.lime,fontWeight:900,marginTop:1}}>›</span>
+        </div>
       </div>
-      <span style={{fontSize:11,color:G.green,fontWeight:700,flexShrink:0}}>›</span>
     </button>
   );
 }
@@ -1608,7 +1639,12 @@ export default function App() {
   const [rTo,         setRTo]        = useState("15:30");
   const [rActiveFrom, setRActiveFrom]= useState(todayStr());
   const [rActiveTo,   setRActiveTo]  = useState("");
+  const [rNet,        setRNet]       = useState("1"); // net for new recurring slot
   const [editingSlot, setEditingSlot]= useState(null);
+  // Permanently dismissed missing-member names (persisted in localStorage)
+  const [dismissedMissing, setDismissedMissing] = useState(()=>{
+    try { return JSON.parse(localStorage.getItem("fcc-dismissed-missing")||"[]"); } catch{ return []; }
+  });
 
   // Help / contact form
   const [helpMsg,  setHelpMsg]  = useState("");
@@ -1736,6 +1772,7 @@ export default function App() {
           label:slot.name, note:"", players:[], poll:[],
           restrictedTo: slot.restrictTeam ? slot.team : null,
           recurringId: slot.id,
+          net: slot.net || "1",
         });
       }
     });
@@ -4342,11 +4379,25 @@ export default function App() {
       logAction("system", `Seeded ${emailsToSeed.length} email${emailsToSeed.length>1?"s":""}: ${emailsToSeed.map(m=>m.name).join(", ")}`);
       showToast(`${emailsToSeed.length} email${emailsToSeed.length>1?"s":""} seeded ✓`);
     }
-    // Members in SEED list but missing from live Firebase data
+    // Members in SEED list but missing from live Firebase data (excluding dismissed)
     const existingNames = new Set(members.map(m=>m.name.toLowerCase()));
+    const dismissedSet = new Set(dismissedMissing.map(n=>n.toLowerCase()));
     const membersToImport = userRole==="superadmin"
-      ? SEED_MEMBERS.filter(m=>!existingNames.has(m.name.toLowerCase()))
+      ? SEED_MEMBERS.filter(m=>
+          !existingNames.has(m.name.toLowerCase()) &&
+          !dismissedSet.has(m.name.toLowerCase())
+        )
       : [];
+    function dismissMissingMember(name) {
+      const updated=[...dismissedMissing, name];
+      setDismissedMissing(updated);
+      try{ localStorage.setItem("fcc-dismissed-missing",JSON.stringify(updated)); }catch{}
+    }
+    function dismissAllMissing() {
+      const updated=[...dismissedMissing,...membersToImport.map(m=>m.name)];
+      setDismissedMissing(updated);
+      try{ localStorage.setItem("fcc-dismissed-missing",JSON.stringify(updated)); }catch{}
+    }
     function importMissingMembers() {
       const toAdd = membersToImport.map(m=>normMember({
         ...m,
@@ -4826,6 +4877,28 @@ export default function App() {
                           onChange={e=>setEditingSlot({...editingSlot,restrictTeam:e.target.checked})}/>
                         Restrict to this team only
                       </label>
+                      {/* Net picker */}
+                      <div>
+                        <div style={{fontSize:11,fontWeight:700,color:G.muted,
+                          textTransform:"uppercase",letterSpacing:1.2,marginBottom:6}}>Net</div>
+                        <div style={{display:"flex",gap:6}}>
+                          {[["1",<><NetIcon color={editingSlot.net==="1"?G.lime:G.text} size={13}/> Net 1</>],
+                            ["2",<><NetIcon color={editingSlot.net==="2"?G.lime:G.text} size={13}/> Net 2</>],
+                            ["both",<><BothNetsIcon color={editingSlot.net==="both"?G.lime:G.text} size={13}/> Both</>],
+                          ].map(([val,lbl])=>(
+                            <button key={val} type="button"
+                              onClick={()=>setEditingSlot({...editingSlot,net:val})}
+                              style={{flex:1,background:(editingSlot.net||"1")===val?G.green:G.cream,
+                                color:(editingSlot.net||"1")===val?G.lime:G.text,
+                                border:(editingSlot.net||"1")===val?`2px solid ${G.green}`:`1.5px solid ${G.border}`,
+                                borderRadius:9,padding:"7px 4px",fontSize:12,fontWeight:700,
+                                cursor:"pointer",fontFamily:"inherit",transition:"all .12s",
+                                display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+                              {lbl}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                       <div style={{display:"flex",flexDirection:"column",gap:8}}>
                         <FFld label="Active from">
                           <input type="date" style={iSt({padding:"7px 10px",fontSize:13})}
@@ -4856,6 +4929,8 @@ export default function App() {
                         </div>
                         <div style={{fontSize:11,color:G.muted,marginTop:2}}>
                           {DAYS[slot.day]} · {slot.from}–{slot.to}
+                          {" · "}<NetIcon color={G.muted} size={11}/>{" "}
+                          {slot.net==="both"?"Both Nets":`Net ${slot.net||"1"}`}
                           {(slot.teams?.length>0||slot.team)&&` · ${(slot.teams||[slot.team]).filter(Boolean).join(", ")}${slot.restrictTeam?" only":""}`}
                           {slot.activeTo&&` · ends ${fmtShort(slot.activeTo)}`}
                         </div>
@@ -4942,17 +5017,39 @@ export default function App() {
                       value={rActiveTo} onChange={e=>setRActiveTo(e.target.value)}/>
                   </FFld>
                 </div>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:G.muted,
+                    textTransform:"uppercase",letterSpacing:1.2,marginBottom:6}}>
+                    Net
+                  </div>
+                  <div style={{display:"flex",gap:8}}>
+                    {[["1",<><NetIcon color={rNet==="1"?G.lime:G.text} size={13}/> Net 1</>],
+                      ["2",<><NetIcon color={rNet==="2"?G.lime:G.text} size={13}/> Net 2</>],
+                      ["both",<><BothNetsIcon color={rNet==="both"?G.lime:G.text} size={13}/> Both</>],
+                    ].map(([val,lbl])=>(
+                      <button key={val} type="button" onClick={()=>setRNet(val)}
+                        style={{flex:1,background:rNet===val?G.green:G.cream,
+                          color:rNet===val?G.lime:G.text,
+                          border:rNet===val?`2px solid ${G.green}`:`1.5px solid ${G.border}`,
+                          borderRadius:9,padding:"8px 4px",fontSize:12,fontWeight:700,
+                          cursor:"pointer",fontFamily:"inherit",transition:"all .12s",
+                          display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
+                        {lbl}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <Btn bg={G.green} col={G.lime} full
                   onClick={()=>{
                     if(!rName.trim()){showToast("Give the slot a name");return;}
                     addRecurringSlot({
                       name:rName.trim(), team:rTeam[0]||"", teams:rTeam, restrictTeam:rRestrict,
-                      day:rDay, from:rFrom, to:rTo,
+                      day:rDay, from:rFrom, to:rTo, net:rNet,
                       activeFrom:rActiveFrom, activeTo:rActiveTo||null,
                     });
                     setRName("");setRTeam([]);setRRestrict(false);
                     setRDay(6);setRFrom("14:00");setRTo("15:30");
-                    setRActiveFrom(todayStr());setRActiveTo("");
+                    setRActiveFrom(todayStr());setRActiveTo("");setRNet("1");
                   }}>
                   ↻ Add Recurring Slot
                 </Btn>
@@ -5010,20 +5107,44 @@ export default function App() {
         {membersToImport.length > 0 && (
           <div style={{background:"#f0fdf4",border:"1.5px solid #86efac",
             borderRadius:12,padding:"14px 16px",marginBottom:16}}>
-            <div style={{fontWeight:900,fontSize:13,color:"#14532d",marginBottom:6}}>
-              👤 Members missing from app
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+              marginBottom:6}}>
+              <div style={{fontWeight:900,fontSize:13,color:"#14532d"}}>
+                👤 Members missing from app
+              </div>
+              <button onClick={dismissAllMissing}
+                style={{background:"none",border:"1px solid #86efac",borderRadius:7,
+                  padding:"3px 9px",fontSize:11,fontWeight:700,color:"#166534",
+                  cursor:"pointer",fontFamily:"inherit"}}>
+                Dismiss all
+              </button>
             </div>
             <div style={{fontSize:12,color:"#166534",marginBottom:10,lineHeight:1.5}}>
               <b>{membersToImport.length}</b> member{membersToImport.length>1?"s":""} are in the master list but haven't been added to the app yet.
-              Tap below to add them all in one go.
+              Tap a name to dismiss it permanently if they've left the club.
             </div>
-            <div style={{fontSize:11,color:"#4ade80",background:"#14532d",
-              borderRadius:7,padding:"7px 10px",marginBottom:10,lineHeight:1.7}}>
-              {membersToImport.map(m=>m.name).join(" · ")}
+            <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:10}}>
+              {membersToImport.map(m=>(
+                <div key={m.name} style={{display:"flex",alignItems:"center",gap:0,
+                  background:"#14532d",borderRadius:20,overflow:"hidden"}}>
+                  <span style={{fontSize:11,color:"#4ade80",padding:"4px 10px",fontWeight:600}}>
+                    {m.name}
+                  </span>
+                  <button onClick={()=>dismissMissingMember(m.name)}
+                    title="Dismiss — this person has left the club"
+                    style={{background:"rgba(255,255,255,.1)",border:"none",borderLeft:"1px solid rgba(255,255,255,.15)",
+                      color:"#86efac",padding:"4px 8px",fontSize:12,fontWeight:900,
+                      cursor:"pointer",fontFamily:"inherit",lineHeight:1}}>
+                    ×
+                  </button>
+                </div>
+              ))}
             </div>
-            <Btn bg="#14532d" col="#a3e635" onClick={importMissingMembers}>
-              Add {membersToImport.length} Missing Member{membersToImport.length>1?"s":""}
-            </Btn>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <Btn bg="#14532d" col="#a3e635" onClick={importMissingMembers}>
+                Add {membersToImport.length} Missing Member{membersToImport.length>1?"s":""}
+              </Btn>
+            </div>
           </div>
         )}
 
