@@ -384,6 +384,55 @@ const fmtLong      = ds => new Date(ds).toLocaleDateString("en-GB",{weekday:"lon
 const isToday      = ds => ds === todayStr();
 const isFuture     = ds => { const d=new Date(ds); d.setHours(23,59,59); return d>=new Date(); };
 
+// ─── Weather constants ────────────────────────────────────────
+const FCC_LAT = 55.917762, FCC_LON = 12.415680;
+const WMO = {
+  0:  {label:"Clear sky",         emoji:"☀️",  rain:false},
+  1:  {label:"Mainly clear",      emoji:"🌤️",  rain:false},
+  2:  {label:"Partly cloudy",     emoji:"⛅",  rain:false},
+  3:  {label:"Overcast",          emoji:"☁️",  rain:false},
+  45: {label:"Fog",               emoji:"🌫️",  rain:false},
+  48: {label:"Rime fog",          emoji:"🌫️",  rain:false},
+  51: {label:"Light drizzle",     emoji:"🌦️",  rain:true},
+  53: {label:"Drizzle",           emoji:"🌦️",  rain:true},
+  55: {label:"Heavy drizzle",     emoji:"🌧️",  rain:true},
+  61: {label:"Light rain",        emoji:"🌧️",  rain:true},
+  63: {label:"Rain",              emoji:"🌧️",  rain:true},
+  65: {label:"Heavy rain",        emoji:"🌧️",  rain:true},
+  71: {label:"Light snow",        emoji:"🌨️",  rain:false},
+  73: {label:"Snow",              emoji:"❄️",  rain:false},
+  75: {label:"Heavy snow",        emoji:"❄️",  rain:false},
+  77: {label:"Snow grains",       emoji:"🌨️",  rain:false},
+  80: {label:"Rain showers",      emoji:"🌦️",  rain:true},
+  81: {label:"Rain showers",      emoji:"🌧️",  rain:true},
+  82: {label:"Violent showers",   emoji:"⛈️",  rain:true},
+  85: {label:"Snow showers",      emoji:"🌨️",  rain:false},
+  86: {label:"Heavy snow showers",emoji:"❄️",  rain:false},
+  95: {label:"Thunderstorm",      emoji:"⛈️",  rain:true},
+  96: {label:"Thunderstorm+hail", emoji:"⛈️",  rain:true},
+  99: {label:"Thunderstorm+hail", emoji:"⛈️",  rain:true},
+};
+function wmo(code) { return WMO[code] || {label:"Unknown",emoji:"🌡️",rain:false}; }
+
+// Build rain periods from hourly data for a given date
+function calcRainPeriods(hourly, date) {
+  if(!hourly?.time) return [];
+  const periods=[]; let start=null, mmAcc=0;
+  hourly.time.forEach((t,i)=>{
+    if(!t.startsWith(date)) return;
+    const mm=hourly.precipitation[i]||0;
+    const isRain=mm>0.05;
+    if(isRain && start===null) { start=t.slice(11,16); mmAcc=mm; }
+    else if(isRain) { mmAcc+=mm; }
+    else if(!isRain && start!==null) {
+      periods.push({from:start, to:t.slice(11,16), mm:+mmAcc.toFixed(1)});
+      start=null; mmAcc=0;
+    }
+  });
+  if(start!==null) periods.push({from:start, to:"21:00", mm:+mmAcc.toFixed(1)});
+  return periods;
+}
+
 // ─── Nets timeline helpers ────────────────────────────────────
 const NET_COLORS = {
   "1": { bar:"#14532d", label:"#a3e635", barBg:"#f0fdf4", borderFree:"#bbf7d0", freeText:"#86efac" },
@@ -690,14 +739,18 @@ function NetsTimeline({sessions,netsDate,setNetsDate,setView,setBDate,setBFrom,s
         {dates.map(d=>{
           const f=fmtD(d), active=d===netsDate;
           const gauge=netAvailGauge(sessions,d);
+          const dow=new Date(d+"T12:00:00").getDay(); // 0=Sun,6=Sat
+          const isWeekend=dow===0||dow===6;
           return (
             <button key={d} onClick={()=>setNetsDate(d)}
-              style={{flexShrink:0,background:active?G.green:G.cream,
-                border:active?`2px solid ${G.green}`:`1.5px solid ${G.border}`,
+              style={{flexShrink:0,
+                background:active?G.green:isWeekend?"#e8f5e9":"#f9fafb",
+                border:active?`2px solid ${G.green}`:isWeekend?`1.5px solid #c8e6c9`:`1.5px solid ${G.border}`,
                 borderRadius:10,padding:"6px 8px 5px",cursor:"pointer",fontFamily:"inherit",
                 minWidth:44,textAlign:"center",transition:"all .15s",
                 boxShadow:active?"0 2px 6px rgba(20,83,45,.2)":"none"}}>
-              <div style={{fontSize:8,fontWeight:700,color:active?G.lime:G.muted,
+              <div style={{fontSize:8,fontWeight:700,
+                color:active?G.lime:isWeekend?G.green:G.muted,
                 textTransform:"uppercase"}}>{f.day}</div>
               <div style={{fontSize:14,fontWeight:900,color:active?G.lime:G.text,
                 margin:"1px 0"}}>{f.date}</div>
@@ -711,7 +764,7 @@ function NetsTimeline({sessions,netsDate,setNetsDate,setView,setBDate,setBFrom,s
 
       {/* Gauge legend */}
       <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
-        {[["#22c55e","Free"],["#84cc16","Some slots booked"],["#f59e0b","Busy"],["#ef4444","Fully booked"]].map(([c,l])=>(
+        {[["#22c55e","Free"],["#84cc16","Some Slots Booked"],["#f59e0b","Busy"],["#ef4444","Fully Booked"]].map(([c,l])=>(
           <div key={l} style={{display:"flex",alignItems:"center",gap:3}}>
             <div style={{width:6,height:6,borderRadius:"50%",background:c,flexShrink:0}}/>
             <span style={{fontSize:9,color:G.muted,fontWeight:600,whiteSpace:"nowrap"}}>{l}</span>
@@ -804,6 +857,389 @@ function NetsTimeline({sessions,netsDate,setNetsDate,setView,setBDate,setBFrom,s
   );
 }
 
+// ─── Weather bar (schedule mini strip) ───────────────────────
+function WeatherBar({wx,setView}) {
+  if(!wx) return (
+    <div style={{background:G.white,border:`1.5px solid ${G.border}`,borderRadius:12,
+      padding:"9px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+      <div style={{width:16,height:16,borderRadius:"50%",border:`2px solid ${G.border}`,
+        borderTopColor:G.green,animation:"spin 1s linear infinite"}}/>
+      <span style={{fontSize:11,color:G.muted}}>Fetching Karlebo ground forecast…</span>
+    </div>
+  );
+  if(wx.error) return (
+    <div style={{background:"#fef2f2",border:"1.5px solid #fca5a5",borderRadius:12,
+      padding:"9px 14px",marginBottom:12}}>
+      <span style={{fontSize:11,color:"#991b1b"}}>⚠️ Weather unavailable — check connection</span>
+    </div>
+  );
+  const today=wx.daily?.[0];
+  const w=wmo(today?.code);
+  const rainPeriods=calcRainPeriods(wx.hourly, wx.today);
+  const rainStr=rainPeriods.length>0
+    ? `· 🌧️ Rain ${rainPeriods[0].from}–${rainPeriods[0].to} (${rainPeriods[0].mm}mm)`
+    : "";
+  const windStr=today?.windMax!=null ? `· 💨 ${today.windMax} m/s` : "";
+  return (
+    <button onClick={()=>setView("weather")}
+      style={{width:"100%",background:G.white,border:`1.5px solid ${G.border}`,
+        borderRadius:12,padding:"9px 13px",marginBottom:12,
+        display:"flex",alignItems:"center",gap:8,cursor:"pointer",
+        fontFamily:"inherit",textAlign:"left",boxSizing:"border-box"}}>
+      <span style={{fontSize:20,flexShrink:0}}>{w.emoji}</span>
+      <div style={{flex:1,minWidth:0}}>
+        <span style={{fontSize:11,color:G.text,fontWeight:700}}>
+          {today?.max!=null?`${today.max}°C · `:""}
+          {w.label}
+          {" "}{rainStr} {windStr}
+        </span>
+        <span style={{fontSize:10,color:G.muted,marginLeft:4}}>
+          · Karlebo
+        </span>
+      </div>
+      <span style={{fontSize:11,color:G.green,fontWeight:700,flexShrink:0}}>›</span>
+    </button>
+  );
+}
+
+// ─── Full weather page ────────────────────────────────────────
+function WeatherPage({wx,setView}) {
+  const [tab, setTab] = React.useState("today");
+
+  if(!wx || wx.error) return (
+    <div style={{padding:"40px 20px",textAlign:"center",color:G.muted}}>
+      <div style={{fontSize:40,marginBottom:12}}>🌡️</div>
+      <div style={{fontWeight:800,color:G.text,marginBottom:6}}>
+        {!wx ? "Loading forecast…" : "Forecast unavailable"}
+      </div>
+      <div style={{fontSize:13}}>Please check your connection and try again.</div>
+      <button onClick={()=>setView("schedule")} style={{marginTop:20,background:G.green,
+        color:G.lime,border:"none",borderRadius:10,padding:"10px 22px",
+        fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+        ← Back
+      </button>
+    </div>
+  );
+
+  const {hourly, daily: dailyArr, today} = wx;
+  const todayDaily = dailyArr?.[0];
+
+  // Filter hourly for today
+  // Filter hourly for today (7:00–21:00)
+  const todayHrs = (hourly?.time||[]).reduce((acc,t,i)=>{
+    if(t.startsWith(wx.today)) acc.push({
+      time:t.slice(11,16),
+      temp:Math.round(hourly.temperature_2m[i]),
+      feels:Math.round(hourly.apparent_temperature[i]),
+      precip:+(hourly.precipitation[i]||0).toFixed(1),
+      prob:hourly.precipitation_probability[i]||0,
+      code:hourly.weathercode[i],
+      wind:+(hourly.windspeed_10m[i]||0).toFixed(1),
+      vis:hourly.visibility?.[i],
+      isDay:hourly.is_day?.[i],
+    });
+    return acc;
+  },[]).filter(h=>parseInt(h.time)>=7&&parseInt(h.time)<=21);
+
+  const rainPeriods = calcRainPeriods(hourly, wx.today);
+  const sunrise = todayDaily?.sunrise?.slice(11,16);
+  const sunset  = todayDaily?.sunset?.slice(11,16);
+
+  return (
+    <div style={{padding:"0 0 100px"}}>
+      {/* Hero card */}
+      <div style={{background:`linear-gradient(135deg, ${G.green} 0%, #1a4731 100%)`,
+        padding:"20px 18px 18px"}}>
+        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
+          <div>
+            <div style={{color:"rgba(255,255,255,.55)",fontSize:11,fontWeight:700,
+              textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>
+              📍 Karlebo Cricket Ground
+            </div>
+            <div style={{color:G.lime,fontWeight:900,fontSize:13,marginBottom:2}}>
+              {new Date(wx.today+"T12:00:00").toLocaleDateString("en-GB",
+                {weekday:"long",day:"numeric",month:"long"})}
+            </div>
+            <div style={{fontSize:46,fontWeight:900,color:"#fff",lineHeight:1,
+              marginBottom:4}}>
+              {todayDaily?.max!=null ? `${todayDaily.max}°` : "--°"}
+              <span style={{fontSize:18,fontWeight:400,color:"rgba(255,255,255,.6)",
+                marginLeft:4}}>C</span>
+            </div>
+            <div style={{color:"rgba(255,255,255,.75)",fontSize:14,fontWeight:600,
+              marginBottom:2}}>
+              {wmo(todayDaily?.code||0).label}
+            </div>
+            <div style={{color:"rgba(255,255,255,.5)",fontSize:12}}>
+              Feels like {todayHrs[0]?.feels??todayDaily?.min}°C
+              · Low {todayDaily?.min}° High {todayDaily?.max}°
+            </div>
+          </div>
+          <div style={{fontSize:64,lineHeight:1}}>{wmo(todayDaily?.code||0).emoji}</div>
+        </div>
+
+        {/* Sunrise / sunset row */}
+        {sunrise&&sunset&&(
+          <div style={{display:"flex",gap:16,marginTop:14,
+            background:"rgba(255,255,255,.08)",borderRadius:10,padding:"9px 14px"}}>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:10,color:"rgba(255,255,255,.5)",fontWeight:700,
+                textTransform:"uppercase",letterSpacing:.8}}>Sunrise</div>
+              <div style={{fontSize:16,fontWeight:900,color:G.lime}}>🌅 {sunrise}</div>
+            </div>
+            <div style={{width:1,background:"rgba(255,255,255,.15)"}}/>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:10,color:"rgba(255,255,255,.5)",fontWeight:700,
+                textTransform:"uppercase",letterSpacing:.8}}>Sunset</div>
+              <div style={{fontSize:16,fontWeight:900,color:G.lime}}>🌇 {sunset}</div>
+            </div>
+            <div style={{width:1,background:"rgba(255,255,255,.15)"}}/>
+            <div style={{textAlign:"center",flex:1}}>
+              <div style={{fontSize:10,color:"rgba(255,255,255,.5)",fontWeight:700,
+                textTransform:"uppercase",letterSpacing:.8}}>Daylight</div>
+              <div style={{fontSize:16,fontWeight:900,color:G.lime}}>
+                {(()=>{
+                  if(!sunrise||!sunset) return "--";
+                  const [sh,sm]=sunrise.split(":").map(Number);
+                  const [eh,em]=sunset.split(":").map(Number);
+                  const mins=(eh*60+em)-(sh*60+sm);
+                  return `${Math.floor(mins/60)}h ${mins%60}m`;
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Wind / humidity row */}
+        <div style={{display:"flex",gap:10,marginTop:10}}>
+          {[
+            ["💨","Wind",todayDaily?.windMax!=null?`${todayDaily.windMax} m/s`:"--"],
+            ["🌧️","Rain",todayDaily?.rainSum!=null?`${todayDaily.rainSum}mm`:"0mm"],
+            ["🎲","Rain%",todayDaily?.rainProb!=null?`${todayDaily.rainProb}%`:"--"],
+          ].map(([ico,lbl,val])=>(
+            <div key={lbl} style={{flex:1,background:"rgba(255,255,255,.08)",
+              borderRadius:9,padding:"8px 6px",textAlign:"center"}}>
+              <div style={{fontSize:14}}>{ico}</div>
+              <div style={{fontSize:9,color:"rgba(255,255,255,.45)",fontWeight:700,
+                textTransform:"uppercase",letterSpacing:.7,marginBottom:1}}>{lbl}</div>
+              <div style={{fontSize:13,fontWeight:800,color:"#fff"}}>{val}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{padding:"14px 14px 0"}}>
+        {/* Tabs */}
+        <div style={{display:"flex",gap:6,marginBottom:14,
+          background:G.cream,borderRadius:10,padding:4}}>
+          {[["today","Today"],["week","7-Day"]].map(([k,l])=>(
+            <button key={k} onClick={()=>setTab(k)}
+              style={{flex:1,background:tab===k?G.green:"transparent",
+                color:tab===k?G.lime:G.muted,border:"none",
+                borderRadius:7,padding:"7px",fontSize:12,fontWeight:800,
+                cursor:"pointer",fontFamily:"inherit",transition:"all .12s"}}>
+              {l}
+            </button>
+          ))}
+        </div>
+
+        {tab==="today"&&(
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+
+            {/* Rain periods highlight */}
+            {rainPeriods.length>0 ? (
+              <div style={{background:"#eff6ff",border:"1.5px solid #bfdbfe",
+                borderRadius:12,padding:"12px 14px"}}>
+                <div style={{fontWeight:800,fontSize:12,color:"#1e3a8a",marginBottom:6}}>
+                  🌧️ Rain expected today
+                </div>
+                {rainPeriods.map((p,i)=>(
+                  <div key={i} style={{display:"flex",justifyContent:"space-between",
+                    alignItems:"center",padding:"5px 0",
+                    borderTop:i>0?"1px solid #dbeafe":"none"}}>
+                    <span style={{fontSize:12,color:"#1e40af",fontWeight:700}}>
+                      {p.from} – {p.to}
+                    </span>
+                    <span style={{background:"#1e3a8a",color:"#bfdbfe",borderRadius:20,
+                      padding:"2px 10px",fontSize:11,fontWeight:800}}>
+                      {p.mm} mm
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{background:"#f0fdf4",border:"1.5px solid #bbf7d0",
+                borderRadius:12,padding:"12px 14px",display:"flex",gap:10,
+                alignItems:"center"}}>
+                <span style={{fontSize:20}}>✅</span>
+                <span style={{fontSize:12,fontWeight:700,color:"#166534"}}>
+                  No rain expected today — great day for cricket!
+                </span>
+              </div>
+            )}
+
+            {/* Hourly strip */}
+            <div style={{background:G.white,border:`1.5px solid ${G.border}`,
+              borderRadius:12,padding:"12px 14px"}}>
+              <div style={{fontSize:11,fontWeight:900,color:G.muted,
+                textTransform:"uppercase",letterSpacing:1.2,marginBottom:10}}>
+                Hourly — Today
+              </div>
+              <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4}}>
+                {todayHrs.map(h=>{
+                  const w2=wmo(h.code);
+                  const isRainy=h.precip>0.05;
+                  return (
+                    <div key={h.time} style={{flexShrink:0,textAlign:"center",
+                      background:isRainy?"#eff6ff":h.isDay?"#f9fafb":"#1a2e1a",
+                      borderRadius:9,padding:"8px 6px",minWidth:46,
+                      border:isRainy?"1.5px solid #bfdbfe":`1px solid ${G.border}`}}>
+                      <div style={{fontSize:9,fontWeight:700,
+                        color:h.isDay?G.muted:"rgba(255,255,255,.5)",
+                        marginBottom:2}}>{h.time}</div>
+                      <div style={{fontSize:16,marginBottom:2}}>{w2.emoji}</div>
+                      <div style={{fontSize:12,fontWeight:900,
+                        color:h.isDay?G.text:"#fff"}}>{h.temp}°</div>
+                      {isRainy&&<div style={{fontSize:9,color:"#1e40af",
+                        fontWeight:700,marginTop:1}}>{h.precip}mm</div>}
+                      <div style={{fontSize:9,color:h.isDay?G.muted:"rgba(255,255,255,.4)",
+                        marginTop:2}}>{h.wind}m/s</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Visibility / wind detail */}
+            {todayHrs.length>0&&(
+              <div style={{background:G.white,border:`1.5px solid ${G.border}`,
+                borderRadius:12,padding:"12px 14px"}}>
+                <div style={{fontSize:11,fontWeight:900,color:G.muted,
+                  textTransform:"uppercase",letterSpacing:1.2,marginBottom:8}}>
+                  Conditions at training time (17:00–20:00)
+                </div>
+                {todayHrs.filter(h=>parseInt(h.time)>=17&&parseInt(h.time)<=20).map(h=>(
+                  <div key={h.time} style={{display:"flex",justifyContent:"space-between",
+                    alignItems:"center",padding:"5px 0",
+                    borderBottom:`1px solid ${G.border}`}}>
+                    <span style={{fontWeight:700,fontSize:12,color:G.text}}>{h.time}</span>
+                    <span style={{fontSize:12}}>{wmo(h.code).emoji} {wmo(h.code).label}</span>
+                    <span style={{fontSize:12,color:G.muted}}>{h.temp}° · {h.wind}m/s</span>
+                    {h.vis&&<span style={{fontSize:11,color:G.muted}}>
+                      {h.vis>=10000?"Excellent":h.vis>=5000?"Good":h.vis>=2000?"Moderate":"Poor"} vis.
+                    </span>}
+                  </div>
+                ))}
+                {todayHrs.filter(h=>parseInt(h.time)>=17&&parseInt(h.time)<=20).length===0&&(
+                  <div style={{fontSize:12,color:G.muted}}>Outside forecast window</div>
+                )}
+              </div>
+            )}
+
+            {/* Source note */}
+            <div style={{textAlign:"center",padding:"4px 0"}}>
+              <span style={{fontSize:10,color:G.muted}}>
+                📡 Data: Open-Meteo (ECMWF model) · Same source as YR.no &amp; DMI
+              </span>
+            </div>
+          </div>
+        )}
+
+        {tab==="week"&&(
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {(dailyArr||[]).map((d,i)=>{
+              const dw=wmo(d.code||0);
+              const dayStr=new Date(d.date+"T12:00:00").toLocaleDateString("en-GB",
+                {weekday:"short",day:"numeric",month:"short"});
+              return (
+                <div key={d.date} style={{background:G.white,
+                  border:`1.5px solid ${G.border}`,borderRadius:12,
+                  padding:"12px 14px",display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{width:44,flexShrink:0}}>
+                    <div style={{fontSize:10,fontWeight:800,color:G.muted}}>{dayStr.split(" ")[0]}</div>
+                    <div style={{fontSize:13,fontWeight:900,color:G.text}}>
+                      {dayStr.split(" ").slice(1).join(" ")}
+                    </div>
+                  </div>
+                  <div style={{fontSize:26,flexShrink:0}}>{dw.emoji}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:12,fontWeight:700,color:G.text,
+                      marginBottom:2}}>{dw.label}</div>
+                    <div style={{fontSize:11,color:G.muted}}>
+                      {d.rainSum>0?`🌧️ ${d.rainSum}mm`:"No rain"}
+                      {d.rainProb>0?` · ${d.rainProb}% chance`:""}
+                      · 💨 {d.windMax}m/s
+                    </div>
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0}}>
+                    <div style={{fontSize:13,fontWeight:900,color:G.text}}>{d.max}°</div>
+                    <div style={{fontSize:11,color:G.muted}}>{d.min}°</div>
+                  </div>
+                </div>
+              );
+            })}
+            <div style={{textAlign:"center",padding:"4px 0"}}>
+              <span style={{fontSize:10,color:G.muted}}>
+                📡 Data: Open-Meteo (ECMWF model) · Same source as YR.no &amp; DMI
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Cricket net SVG icons ────────────────────────────────────
+function NetIcon({color="currentColor",size=18}) {
+  // Single cricket net: post + netting rectangle
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+      {/* Post */}
+      <line x1="4" y1="3" x2="4" y2="20"/>
+      {/* Top rail */}
+      <line x1="4" y1="4" x2="20" y2="4"/>
+      {/* Net frame */}
+      <rect x="4" y="4" width="16" height="12" rx="0.5" strokeWidth="1.8"/>
+      {/* Net grid — vertical */}
+      <line x1="9"  y1="4" x2="9"  y2="16" strokeWidth="0.9" strokeDasharray="0"/>
+      <line x1="14" y1="4" x2="14" y2="16" strokeWidth="0.9"/>
+      <line x1="19" y1="4" x2="19" y2="16" strokeWidth="0.9"/>
+      {/* Net grid — horizontal */}
+      <line x1="4" y1="8"  x2="20" y2="8"  strokeWidth="0.9"/>
+      <line x1="4" y1="12" x2="20" y2="12" strokeWidth="0.9"/>
+      {/* Ground line */}
+      <line x1="2" y1="20" x2="22" y2="20" strokeWidth="1.4"/>
+    </svg>
+  );
+}
+
+function BothNetsIcon({color="currentColor",size=18}) {
+  // Two nets side by side
+  return (
+    <svg width={size*1.5} height={size} viewBox="0 0 36 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+      {/* Net 1 */}
+      <line x1="2"  y1="3" x2="2"  y2="20"/>
+      <rect x="2"  y="4" width="13" height="11" rx="0.5" strokeWidth="1.6"/>
+      <line x1="6"  y1="4" x2="6"  y2="15" strokeWidth="0.8"/>
+      <line x1="10" y1="4" x2="10" y2="15" strokeWidth="0.8"/>
+      <line x1="14" y1="4" x2="14" y2="15" strokeWidth="0.8"/>
+      <line x1="2"  y1="8"  x2="15" y2="8"  strokeWidth="0.8"/>
+      <line x1="2"  y1="12" x2="15" y2="12" strokeWidth="0.8"/>
+      {/* Net 2 */}
+      <line x1="21" y1="3" x2="21" y2="20"/>
+      <rect x="21" y="4" width="13" height="11" rx="0.5" strokeWidth="1.6"/>
+      <line x1="25" y1="4" x2="25" y2="15" strokeWidth="0.8"/>
+      <line x1="29" y1="4" x2="29" y2="15" strokeWidth="0.8"/>
+      <line x1="33" y1="4" x2="33" y2="15" strokeWidth="0.8"/>
+      <line x1="21" y1="8"  x2="34" y2="8"  strokeWidth="0.8"/>
+      <line x1="21" y1="12" x2="34" y2="12" strokeWidth="0.8"/>
+      {/* Ground */}
+      <line x1="1" y1="20" x2="35" y2="20" strokeWidth="1.4"/>
+    </svg>
+  );
+}
+
 // ─── Session card ─────────────────────────────────────────────
 function SessCard({s,members,faded,onClick}) {
   return (
@@ -825,8 +1261,11 @@ function SessCard({s,members,faded,onClick}) {
             borderRadius:20,padding:"1px 8px",fontSize:10,fontWeight:800}}>↻</span>}
           {s.net&&<span style={{background:s.net==="both"?"#fef3c7":s.net==="2"?"#ede9fe":"#dcfce7",
             color:s.net==="both"?"#92400e":s.net==="2"?"#5b21b6":"#166534",
-            borderRadius:20,padding:"1px 8px",fontSize:10,fontWeight:800}}>
-            {s.net==="both"?"🎯 Both Nets":s.net==="2"?"🎯 Net 2":"🎯 Net 1"}
+            borderRadius:20,padding:"1px 8px",fontSize:10,fontWeight:800,
+            display:"inline-flex",alignItems:"center",gap:3}}>
+            {s.net==="both"
+              ? <><BothNetsIcon color="#92400e" size={11}/> Both Nets</>
+              : <><NetIcon color={s.net==="2"?"#5b21b6":"#166534"} size={11}/> Net {s.net}</>}
           </span>}
           {s.label&&<span style={{background:"#ede9fe",color:"#5b21b6",borderRadius:20,
             padding:"1px 8px",fontSize:10,fontWeight:800}}>{s.label}</span>}
@@ -1435,7 +1874,43 @@ export default function App() {
     }
   },[view]);
 
-  // ── Team CRUD ─────────────────────────────────────────────────
+  // ── Weather fetch (Open-Meteo ECMWF — free, CORS-enabled) ────
+  useEffect(()=>{
+    const url=`https://api.open-meteo.com/v1/forecast?`+
+      `latitude=${FCC_LAT}&longitude=${FCC_LON}`+
+      `&hourly=temperature_2m,apparent_temperature,precipitation,`+
+      `precipitation_probability,weathercode,windspeed_10m,visibility,is_day`+
+      `&daily=sunrise,sunset,precipitation_sum,weathercode,`+
+      `temperature_2m_max,temperature_2m_min,windspeed_10m_max,`+
+      `precipitation_probability_max`+
+      `&timezone=Europe%2FCopenhagen&forecast_days=7&wind_speed_unit=ms`;
+    fetch(url)
+      .then(r=>r.json())
+      .then(data=>{
+        const todayD=localDateStr();
+        const daily=(data.daily?.time||[]).map((date,i)=>({
+          date,
+          code:  data.daily.weathercode[i],
+          max:   Math.round(data.daily.temperature_2m_max[i]),
+          min:   Math.round(data.daily.temperature_2m_min[i]),
+          windMax: Math.round(data.daily.windspeed_10m_max[i]*10)/10,
+          rainSum: +(data.daily.precipitation_sum[i]||0).toFixed(1),
+          rainProb: data.daily.precipitation_probability_max[i]||0,
+          sunrise: data.daily.sunrise[i],
+          sunset:  data.daily.sunset[i],
+        }));
+        setWxData({
+          today: todayD,
+          hourly: data.hourly,
+          daily: daily,
+          // convenience: today's daily summary
+          daily0: daily[0],
+        });
+      })
+      .catch(()=>setWxData({error:true}));
+  },[]);
+
+
   function addTeam(e) {
     e.preventDefault();
     const n = newTName.trim();
@@ -1556,7 +2031,18 @@ export default function App() {
       logAction("session", `Added players to session on ${bDate} (${bFrom}–${bTo}): ${autoPlayers.join(", ")}`);
       showToast(`Players added to session on ${fmtShort(bDate)} ✓`);
     } else {
-      // Check for overlapping sessions — block if any of the selected players are already booked
+      // Check 1: net conflict — same net at overlapping time
+      const netConflict = sessions.find(s=>
+        s.date===bDate &&
+        timesOverlap(bFrom,bTo,s.from,s.to) &&
+        (s.net==="both"||bNet==="both"||s.net===bNet)
+      );
+      if(netConflict) {
+        showToast(`🚫 ${netConflict.net==="both"?"Both nets are":
+          `Net ${netConflict.net} is`} already booked ${netConflict.from}–${netConflict.to}`);
+        return;
+      }
+      // Check 2: player conflict — same player in an overlapping session
       const overlapping = sessions.filter(s=>
         s.date===bDate && timesOverlap(bFrom,bTo,s.from,s.to)
       );
@@ -1670,6 +2156,7 @@ export default function App() {
   const [blocksExpanded, setBlocksExpanded] = useState(false);
   const [showAllBlocks,  setShowAllBlocks]  = useState(false);
   const [netsDate,       setNetsDate]       = useState(todayStr());
+  const [wxData,         setWxData]         = useState(null); // weather data
   const [blockCals,     setBlockCals]     = useState([]);    // [{id,date,from,to,label}]
   const [bCalDate,      setBCalDate]      = useState("");
   const [bCalFrom,      setBCalFrom]      = useState("10:00");
@@ -2552,6 +3039,9 @@ export default function App() {
           );
         })()}
 
+        {/* Weather bar */}
+        <WeatherBar wx={wxData} setView={setView}/>
+
         {/* Nets timeline strip */}
         <NetsTimeline
           sessions={sessions}
@@ -2644,18 +3134,32 @@ export default function App() {
   // ── ADD / JOIN ──────────────────────────────────────────────
   if(view==="add") {
     const exactMatch = sessions.find(s=>s.date===bDate&&s.from===bFrom&&s.to===bTo);
-    // Sessions that overlap in time (but aren't an exact match)
+
+    // Helper: do two net values conflict?
+    function netsConflict(a, b) {
+      if(!a||!b) return false;
+      if(a==="both"||b==="both") return true; // "both" always conflicts
+      return a===b; // same net conflicts
+    }
+
+    // All sessions on same date/time (excluding exact match)
     const overlappingSessions = bDate ? sessions.filter(s=>
       s.date===bDate && !exactMatch && timesOverlap(bFrom,bTo,s.from,s.to)
     ) : [];
-    // Which of the selected players are already in an overlapping session
+
+    // Net clash: same net (or either is "both") at overlapping time
+    const netClash = overlappingSessions.find(s=>netsConflict(s.net, bNet));
+
+    // Player clash: any selected player already in ANY overlapping session
     const clashSess = overlappingSessions.find(s=>selP.some(p=>s.players.includes(p)));
     const clashPlayers = clashSess ? selP.filter(p=>clashSess.players.includes(p)) : [];
-    // Split: already IN that session vs just selected here
     const alreadyIn = clashSess ? clashPlayers.filter(p=>clashSess.players.includes(p) && selP.includes(p)) : [];
     const bookingUser = currentUser?.name;
     const userAlreadyIn = alreadyIn.includes(bookingUser);
     const othersAlreadyIn = alreadyIn.filter(p=>p!==bookingUser);
+
+    // Either type of clash blocks submission
+    const hasAnyClash = !exactMatch && (!!netClash || !!clashSess);
     return (
       <Shell>
         <AppHeader onBack={()=>{setView("schedule");setSelP([]);}}
@@ -2731,14 +3235,19 @@ export default function App() {
             </div>
             <FFld label="Net" style={{marginTop:10}}>
               <div style={{display:"flex",gap:8}}>
-                {[["1","🎯 Net 1"],["2","🎯 Net 2"],["both","🎯 Both Nets"]].map(([val,lbl])=>(
+                {[
+                  ["1",  <><NetIcon color={bNet==="1"?G.lime:G.text} size={16}/> Net 1</>],
+                  ["2",  <><NetIcon color={bNet==="2"?G.lime:G.text} size={16}/> Net 2</>],
+                  ["both",<><BothNetsIcon color={bNet==="both"?G.lime:G.text} size={16}/> Both</>],
+                ].map(([val,lbl])=>(
                   <button key={val} type="button" onClick={()=>setBNet(val)}
                     style={{flex:1,background:bNet===val?G.green:G.white,
                       color:bNet===val?G.lime:G.text,
                       border:bNet===val?`2px solid ${G.green}`:`1.5px solid ${G.border}`,
                       borderRadius:10,padding:"10px 6px",fontSize:13,fontWeight:700,
                       cursor:"pointer",fontFamily:"inherit",transition:"all .12s",
-                      textAlign:"center"}}>
+                      textAlign:"center",display:"flex",alignItems:"center",
+                      justifyContent:"center",gap:6}}>
                     {lbl}
                   </button>
                 ))}
@@ -2782,21 +3291,34 @@ export default function App() {
           </div>
 
           {/* ── Overlap warning ───────────────────────────────── */}
-          {clashSess&&(
-            <div style={{background:"#fff7ed",border:"1.5px solid #fed7aa",
+          {(netClash||clashSess)&&!exactMatch&&(
+            <div style={{background:"#fef2f2",border:"1.5px solid #fca5a5",
               borderRadius:12,padding:"13px 15px",marginBottom:12}}>
-              <div style={{fontWeight:900,fontSize:13,color:"#92400e",marginBottom:6}}>
-                ⚠️ Overlapping session detected
+              <div style={{fontWeight:900,fontSize:13,color:"#991b1b",marginBottom:6}}>
+                🚫 Booking not possible — time conflict
               </div>
-              <div style={{fontSize:12,color:"#78350f",lineHeight:1.7}}>
-                {userAlreadyIn && othersAlreadyIn.length===0 && (
-                  <>You're already booked into <b>{clashSess.label||"a session"}</b> ({clashSess.from}–{clashSess.to}) on this date. Please choose a different time.</>
+              <div style={{fontSize:12,color:"#7f1d1d",lineHeight:1.7}}>
+                {netClash&&(
+                  <div style={{marginBottom:clashSess?6:0}}>
+                    <b>{netClash.net==="both"?"Both nets are":
+                        `Net ${netClash.net} is`} already booked</b>{" "}
+                    {netClash.from}–{netClash.to}
+                    {netClash.label?` · ${netClash.label}`:""}.
+                    {" "}Choose a different time{bNet!==netClash.net?" or a different net":""}.
+                  </div>
                 )}
-                {userAlreadyIn && othersAlreadyIn.length>0 && (
-                  <>You and <b>{othersAlreadyIn.join(", ")}</b> are already in <b>{clashSess.label||"a session"}</b> ({clashSess.from}–{clashSess.to}) on this date. Please choose a different time.</>
-                )}
-                {!userAlreadyIn && othersAlreadyIn.length>0 && (
-                  <><b>{othersAlreadyIn.join(", ")}</b> {othersAlreadyIn.length>1?"are":"is"} already booked into <b>{clashSess.label||"a session"}</b> ({clashSess.from}–{clashSess.to}) on this date. Please choose a different time or deselect {othersAlreadyIn.length>1?"them":"this player"}.</>
+                {clashSess&&!netClash&&(
+                  <>
+                    {userAlreadyIn && othersAlreadyIn.length===0 && (
+                      <>You're already booked into <b>{clashSess.label||"a session"}</b> ({clashSess.from}–{clashSess.to}). Choose a different time.</>
+                    )}
+                    {userAlreadyIn && othersAlreadyIn.length>0 && (
+                      <>You and <b>{othersAlreadyIn.join(", ")}</b> are already in <b>{clashSess.label||"a session"}</b> ({clashSess.from}–{clashSess.to}). Choose a different time.</>
+                    )}
+                    {!userAlreadyIn && othersAlreadyIn.length>0 && (
+                      <><b>{othersAlreadyIn.join(", ")}</b> {othersAlreadyIn.length>1?"are":"is"} already in <b>{clashSess.label||"a session"}</b> ({clashSess.from}–{clashSess.to}). Deselect {othersAlreadyIn.length>1?"them":"this player"} or choose a different time.</>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -2989,7 +3511,11 @@ export default function App() {
             )}
           </div>
 
-          <Btn type="submit" bg={G.green} col={G.lime} full>🏏 Confirm Session</Btn>
+          <Btn type="submit" bg={hasAnyClash?G.muted:G.green} col={G.lime} full
+            disabled={hasAnyClash}
+            style={{opacity:hasAnyClash?0.5:1,cursor:hasAnyClash?"not-allowed":"pointer"}}>
+            {hasAnyClash?"🚫 Fix conflict above to continue":"🏏 Confirm Session"}
+          </Btn>
           <p style={{fontSize:11,color:G.muted,textAlign:"center",marginTop:8}}>
             Existing session at same date & time? Players are auto-added.
           </p>
@@ -3777,6 +4303,21 @@ export default function App() {
 
         </div>
         <BotNav view="profile" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
+        {toast&&<Toast msg={toast}/>}
+      </Shell>
+    );
+  }
+
+  // ── WEATHER ──────────────────────────────────────────────────
+  if(view==="weather") {
+    return (
+      <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
+          currentUser={currentUser} onLogout={handleLogout}/>}>
+        <AppHeader title="Ground Forecast" sub="Karlebo · 55.918°N 12.416°E"
+          onBack={()=>setView("schedule")}/>
+        <WeatherPage wx={wxData} setView={setView}/>
+        <BotNav view="schedule" setView={setView} userRole={userRole}
+          pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
         {toast&&<Toast msg={toast}/>}
       </Shell>
     );
