@@ -12,29 +12,66 @@ import BookingGrid from "./components/schedule/BookingGrid";
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
-  const [members, setMembers] = useState([]);
-  const [view, setView] = useState("schedule"); 
+  const [appData, setAppData] = useState({
+    members: [],
+    sessions: [],
+    teams: [],
+    recurring: [],
+    blocked: []
+  });
 
-  // Global Member Listener
+  // ─── EXACT FIREBASE PATHS FROM YOUR OLD APP ──────────────────
+  const refs = {
+    members:   doc(db, "fcc-nets", "members"),
+    sessions:  doc(db, "fcc-nets", "sessions"),
+    teams:     doc(db, "fcc-nets", "teams"),
+    recurring: doc(db, "fcc-nets", "recurring"),
+    blocked:   doc(db, "fcc-nets", "blocked"),
+  };
+
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, "appData", "members"), (docSnap) => {
-      if (docSnap.exists()) {
-        setMembers(docSnap.data().list || []);
-      }
+    // 1. Listen for Members
+    const unsubMembers = onSnapshot(refs.members, snap => {
+      setAppData(prev => ({ 
+        ...prev, 
+        members: snap.exists() ? JSON.parse(snap.data().value) : [] 
+      }));
     });
-    return () => unsub();
+
+    // 2. Listen for Sessions
+    const unsubSessions = onSnapshot(refs.sessions, snap => {
+      setAppData(prev => ({ 
+        ...prev, 
+        sessions: snap.exists() ? JSON.parse(snap.data().value) : [] 
+      }));
+    });
+
+    // 3. Listen for Teams
+    const unsubTeams = onSnapshot(refs.teams, snap => {
+      setAppData(prev => ({ 
+        ...prev, 
+        teams: snap.exists() ? JSON.parse(snap.data().value) : [] 
+      }));
+    });
+
+    return () => {
+      unsubMembers();
+      unsubSessions();
+      unsubTeams();
+    };
   }, []);
 
-  // 1. If not logged in, show the Login screen
   if (!currentUser) {
-    return <PinLogin members={members} onLogin={setCurrentUser} />;
+    return <PinLogin members={appData.members} onLogin={setCurrentUser} />;
   }
 
-  // 2. If logged in, wrap the active view in the Shell layout
   return (
-    <Shell currentUser={currentUser} setView={setView} onLogout={() => setCurrentUser(null)}>
-      {view === "schedule" && <BookingGrid currentUser={currentUser} members={members} />}
-      {view === "admin" && currentUser.role === "admin" && <AdminDashboard members={members} />}
+    <Shell currentUser={currentUser} setView={(v) => {}} onLogout={() => setCurrentUser(null)}>
+      <BookingGrid 
+        currentUser={currentUser} 
+        sessions={appData.sessions} 
+        members={appData.members}
+      />
     </Shell>
   );
 }
