@@ -11,14 +11,14 @@ import BookingGrid from "./components/schedule/BookingGrid";
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [view, setView] = useState("schedule");
+  const [loading, setLoading] = useState(true);
   const [appData, setAppData] = useState({
-    members: [], // Initialized as empty array
+    members: [],
     sessions: [],
     teams: []
   });
 
   useEffect(() => {
-    // Your specific database paths
     const refs = {
       members: doc(db, "fcc-nets", "members"),
       sessions: doc(db, "fcc-nets", "sessions"),
@@ -29,18 +29,25 @@ export default function App() {
       onSnapshot(ref, (snap) => {
         if (snap.exists()) {
           try {
-            // Your data is stored as a string in the "value" field
             const val = JSON.parse(snap.data().value || "[]");
             setAppData(prev => ({ ...prev, [key]: val }));
-          } catch (e) { console.error("JSON Parse error:", e); }
+          } catch (e) { console.error("Error parsing " + key, e); }
         }
+        if (key === "members") setLoading(false);
+      }, (err) => {
+        console.error("Firebase error:", err);
+        if (key === "members") setLoading(false);
       })
     );
     return () => unsubs.forEach(unsub => unsub());
   }, []);
 
+  if (loading) {
+    return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: G.cream, color: G.green, fontWeight: 800 }}>Loading Club Data...</div>;
+  }
+
   if (!currentUser) {
-    return <PinLogin members={appData.members || []} onLogin={setCurrentUser} />;
+    return <PinLogin members={appData.members} onLogin={setCurrentUser} />;
   }
 
   return (
