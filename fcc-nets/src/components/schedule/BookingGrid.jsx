@@ -84,3 +84,56 @@ export default function BookingGrid({ currentUser, sessions, members }) {
     </div>
   );
 }
+// ... (keep all constants and weather logic at the top)
+
+import SessionCard from "./SessionCard";
+
+export default function BookingGrid({ currentUser, sessions, members }) {
+  const [weather, setWeather] = useState(null);
+  const [netsDate, setNetsDate] = useState(localDateStr());
+
+  // ... (keep useEffect for weather and sessions)
+
+  const saveSessions = async (newList) => {
+    await updateDoc(doc(db, "fcc-nets", "sessions"), { value: JSON.stringify(newList) });
+  };
+
+  const handleBooking = async (id) => {
+    const updated = sessions.map(s => s.id === id ? { ...s, players: [...s.players, currentUser.name] } : s);
+    await saveSessions(updated);
+  };
+
+  const handleCancel = async (id) => {
+    const updated = sessions.map(s => s.id === id ? { ...s, players: s.players.filter(p => p !== currentUser.name) } : s);
+    await saveSessions(updated);
+  };
+
+  const daySessions = sessions.filter(s => s.date === netsDate);
+
+  return (
+    <div style={{ maxWidth: 800, margin: "0 auto", paddingBottom: 100 }}>
+      {/* ... Weather and Timeline components ... */}
+
+      <div style={{ marginTop: 20 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 900, color: G.muted, textTransform: "uppercase", marginBottom: 12 }}>
+          Sessions for {netsDate}
+        </h3>
+        {daySessions.length > 0 ? (
+          daySessions.map(s => (
+            <SessionCard 
+              key={s.id} 
+              session={s} 
+              currentUser={currentUser} 
+              onJoin={handleBooking} 
+              onCancel={handleCancel} 
+            />
+          ))
+        ) : (
+          <div style={{ padding: 40, textAlign: "center", background: "#fff", borderRadius: 16, border: `1px solid ${G.border}`, color: G.muted }}>
+            No sessions scheduled for this day.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
