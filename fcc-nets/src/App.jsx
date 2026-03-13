@@ -1390,16 +1390,18 @@ function BotNav({view,setView,userRole,pendingCount=0}) {
           display:"flex", flexDirection:"column", alignItems:"center", gap:3,
           padding:"6px 14px 5px",
           borderRadius:14,
-          background: on ? G.green : "transparent",
-          border: on ? `1.5px solid ${G.green}` : "1.5px solid transparent",
+          background: on
+            ? `linear-gradient(175deg, #1a6b38 0%, #14532d 55%, #0f3d21 100%)`
+            : "transparent",
+          border: on
+            ? `1.5px solid rgba(255,255,255,0.12)`
+            : "1.5px solid transparent",
+          boxShadow: on
+            ? `0 2px 8px rgba(20,83,45,.45), inset 0 1px 0 rgba(255,255,255,.15), inset 0 -1px 0 rgba(0,0,0,.2)`
+            : "none",
           transition:"all .18s",
           position:"relative",
         }}>
-          {on && <div style={{
-            position:"absolute", top:-1, left:"50%", transform:"translateX(-50%)",
-            width:28, height:3, borderRadius:"0 0 3px 3px",
-            background:G.lime,
-          }}/>}
           <div style={{
             color: on ? G.lime : "#94a3b8",
             transition:"color .15s",
@@ -1452,7 +1454,7 @@ function BotNav({view,setView,userRole,pendingCount=0}) {
     }}>
       <Tab id="schedule" icon={<IconSchedule on={active==="schedule"}/>} label="Schedule"/>
 
-      {/* Book — always green, filled when active */}
+      {/* Book */}
       <button onClick={()=>setView("add")} style={{
         background:"none", border:"none", cursor:"pointer",
         fontFamily:"'DM Sans',sans-serif",
@@ -1463,26 +1465,27 @@ function BotNav({view,setView,userRole,pendingCount=0}) {
           display:"flex", flexDirection:"column", alignItems:"center", gap:3,
           padding:"6px 14px 5px",
           borderRadius:14,
-          background: active==="add" ? G.green : `${G.green}22`,
-          border: `1.5px solid ${G.green}`,
+          background: active==="add"
+            ? `linear-gradient(175deg, #1a6b38 0%, #14532d 55%, #0f3d21 100%)`
+            : "transparent",
+          border: active==="add"
+            ? `1.5px solid rgba(255,255,255,0.12)`
+            : "1.5px solid transparent",
+          boxShadow: active==="add"
+            ? `0 2px 8px rgba(20,83,45,.45), inset 0 1px 0 rgba(255,255,255,.15), inset 0 -1px 0 rgba(0,0,0,.2)`
+            : "none",
           transition:"all .18s",
-          position:"relative",
         }}>
-          {active==="add" && <div style={{
-            position:"absolute", top:-1, left:"50%", transform:"translateX(-50%)",
-            width:28, height:3, borderRadius:"0 0 3px 3px",
-            background:G.lime,
-          }}/>}
           <div style={{
-            color: active==="add" ? G.lime : G.green,
+            color: active==="add" ? G.lime : "#94a3b8",
             transition:"color .15s",
             display:"flex", alignItems:"center", justifyContent:"center",
           }}>
             <IconBook on={active==="add"}/>
           </div>
           <span style={{
-            fontSize:10, fontWeight:800, letterSpacing:.3,
-            color: active==="add" ? G.lime : G.green,
+            fontSize:10, fontWeight: active==="add"?800:600, letterSpacing:.3,
+            color: active==="add" ? G.lime : "#94a3b8",
             transition:"color .15s",
           }}>Book</span>
         </div>
