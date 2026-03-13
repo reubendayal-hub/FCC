@@ -71,7 +71,7 @@ function calcRainPeriods(hourly, date) {
   if(start!==null) periods.push({from:start, to:"21:00", mm:+mmAcc.toFixed(1)});
   return periods;
 }
-// ==========================================
+
 // ─── Availability gauge (arc dial) ───────────────────────────
 function AvailGauge({gauge,active}) {
   const r=7,cx=10,cy=10,circ=2*Math.PI*r;
@@ -332,14 +332,20 @@ function NetsTimeline({sessions,netsDate,setNetsDate,setView,setBDate,setBFrom,s
     </div>
   );
 }
-// ==========================================
 
-  
+
+// ==========================================
+// ─── MAIN BOOKING GRID COMPONENT ──────────────────────────────
+// ==========================================
+export default function BookingGrid({ currentUser, members }) {
+  const [sessions, setSessions] = useState([]);
+  const [weatherData, setWeatherData] = useState(null);
+
   // ── Global Sessions Listener ────────────────────────────────
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "appData", "sessions"), (docSnap) => {
       if (docSnap.exists()) {
-        setSessions(docSnap.data().data || {});
+        setSessions(docSnap.data().data || []);
       }
     });
     return () => unsub();
@@ -368,107 +374,4 @@ function NetsTimeline({sessions,netsDate,setNetsDate,setView,setBDate,setBFrom,s
             code:  data.daily.weathercode[i],
             max:   Math.round(data.daily.temperature_2m_max[i]),
             min:   Math.round(data.daily.temperature_2m_min[i]),
-            windMax: Math.round(data.daily.windspeed_10m_max[i]*10)/10,
-            rainSum: +(data.daily.precipitation_sum[i]||0).toFixed(1),
-            rainProb: data.daily.precipitation_probability_max[i]||0,
-            sunrise: data.daily.sunrise[i],
-            sunset:  data.daily.sunset[i],
-          }));
-          
-          setWeatherData({ 
-            today: todayD,
-            hourly: data.hourly,
-            daily: daily,
-            daily0: daily[0],
-            current: data.current ? {
-              temp:   Math.round(data.current.temperature_2m),
-              feels:  Math.round(data.current.apparent_temperature),
-              precip: +(data.current.precipitation||0).toFixed(1),
-              code:   data.current.weathercode,
-              wind:   Math.round(data.current.windspeed_10m*10)/10,
-              isDay:  data.current.is_day,
-            } : null,
-            fetchedAt: Date.now(),
-          });
-        })
-        .catch(()=>setWeatherData({error:true}));
-    }
-    fetchWx();
-    const timer = setInterval(fetchWx, 30*60*1000);
-    return ()=>clearInterval(timer);
-  },[]);
-
-
-  // ==========================================
-// ==========================================
-  // ✂️ BOOKING HANDLERS
-  // ==========================================
-
-  const handleBooking = async (sessionId) => {
-    if (!currentUser) return;
-    
-    try {
-      // Create a new array with the current user added to the specific session's players array
-      const updatedSessions = sessions.map(session => {
-        if (session.id === sessionId && !session.players.includes(currentUser.name)) {
-          return { ...session, players: [...session.players, currentUser.name] };
-        }
-        return session;
-      });
-
-      // Push the updated array back to Firebase
-      await updateDoc(doc(db, "appData", "sessions"), { data: updatedSessions });
-    } catch (error) {
-      console.error("Error booking session:", error);
-      alert("Failed to book session. Please try again.");
-    }
-  };
-
-  const handleCancel = async (sessionId) => {
-    if (!currentUser) return;
-    
-    try {
-      // Create a new array with the current user removed from the specific session's players array
-      const updatedSessions = sessions.map(session => {
-        if (session.id === sessionId) {
-          return { ...session, players: session.players.filter(p => p !== currentUser.name) };
-        }
-        return session;
-      });
-
-      // Push the updated array back to Firebase
-      await updateDoc(doc(db, "appData", "sessions"), { data: updatedSessions });
-    } catch (error) {
-      console.error("Error cancelling session:", error);
-      alert("Failed to cancel session. Please try again.");
-    }
-  };
-  // ==========================================
-
-
-
-  return (
-    <div style={{ maxWidth: 800, margin: "0 auto", paddingBottom: 100 }}>
-      
-      {/* 1. The Weather Widget */}
-      {weatherData && (
-        <WeatherBar weatherData={weatherData} /> 
-      )}
-
-      {/* 2. The Nets Timeline Strip */}
-      <NetsTimeline 
-        sessions={sessions} 
-        netsDate={todayStr()} // Or whatever state you use for the selected date
-        setNetsDate={() => {}} 
-        setView={() => {}} 
-        setBDate={() => {}} 
-        setBFrom={() => {}} 
-        setBTo={() => {}} 
-        setBNet={() => {}} 
-      />
-
-    </div>
-  );
-
-
-
+            windMax: Math.round(data.
