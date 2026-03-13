@@ -22,6 +22,9 @@ export default function PinLogin({ members = [], onLogin }) {
     }
   };
 
+  // Safe Member List: Ensures we don't crash if data is still loading
+  const safeMembers = Array.isArray(members) ? [...members] : [];
+
   return (
     <div style={{ minHeight: "100vh", backgroundColor: G.cream, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <div style={{ background: "#fff", padding: 30, borderRadius: 20, width: "100%", maxWidth: 400, textAlign: "center" }}>
@@ -29,11 +32,10 @@ export default function PinLogin({ members = [], onLogin }) {
         
         {!selectedUser ? (
           <div style={{ maxHeight: 400, overflowY: "auto", border: `1px solid ${G.border}`, borderRadius: 12 }}>
-            {/* The Guard: (members || []) ensures it never reads null */}
-            {(members || []).length === 0 ? (
-              <div style={{ padding: 20 }}>Loading members...</div>
+            {safeMembers.length === 0 ? (
+              <div style={{ padding: 20, color: G.muted }}>Loading club members...</div>
             ) : (
-              members.sort((a,b) => a.name.localeCompare(b.name)).map(m => (
+              safeMembers.sort((a,b) => a.name.localeCompare(b.name)).map(m => (
                 <div key={m.id} onClick={() => setSelectedUser(m)} style={{ padding: 15, borderBottom: `1px solid ${G.border}`, cursor: "pointer", fontWeight: 600 }}>
                   {m.name}
                 </div>
