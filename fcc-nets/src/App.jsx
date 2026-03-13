@@ -1388,20 +1388,20 @@ function BotNav({view,setView,userRole,pendingCount=0}) {
       }}>
         <div style={{
           display:"flex", flexDirection:"column", alignItems:"center", gap:3,
-          padding:"6px 16px 5px",
+          padding:"6px 14px 5px",
           borderRadius:14,
-          background: on ? `${G.green}18` : "transparent",
-          border: on ? `1.5px solid ${G.green}30` : "1.5px solid transparent",
+          background: on ? G.green : "transparent",
+          border: on ? `1.5px solid ${G.green}` : "1.5px solid transparent",
           transition:"all .18s",
           position:"relative",
         }}>
           {on && <div style={{
             position:"absolute", top:-1, left:"50%", transform:"translateX(-50%)",
             width:28, height:3, borderRadius:"0 0 3px 3px",
-            background:G.green,
+            background:G.lime,
           }}/>}
           <div style={{
-            color: on ? G.green : "#94a3b8",
+            color: on ? G.lime : "#94a3b8",
             transition:"color .15s",
             position:"relative",
             display:"flex", alignItems:"center", justifyContent:"center",
@@ -1418,7 +1418,7 @@ function BotNav({view,setView,userRole,pendingCount=0}) {
           </div>
           <span style={{
             fontSize:10, fontWeight: on?800:600, letterSpacing:.3,
-            color: on ? G.green : "#94a3b8",
+            color: on ? G.lime : "#94a3b8",
             transition:"color .15s",
           }}>{label}</span>
         </div>
@@ -1452,7 +1452,7 @@ function BotNav({view,setView,userRole,pendingCount=0}) {
     }}>
       <Tab id="schedule" icon={<IconSchedule on={active==="schedule"}/>} label="Schedule"/>
 
-      {/* Book — styled as a filled green pill tab */}
+      {/* Book — always green, filled when active */}
       <button onClick={()=>setView("add")} style={{
         background:"none", border:"none", cursor:"pointer",
         fontFamily:"'DM Sans',sans-serif",
@@ -1463,10 +1463,8 @@ function BotNav({view,setView,userRole,pendingCount=0}) {
           display:"flex", flexDirection:"column", alignItems:"center", gap:3,
           padding:"6px 14px 5px",
           borderRadius:14,
-          background: active==="add"
-            ? G.green
-            : `${G.green}18`,
-          border: `1.5px solid ${active==="add" ? G.green : `${G.green}40`}`,
+          background: active==="add" ? G.green : `${G.green}22`,
+          border: `1.5px solid ${G.green}`,
           transition:"all .18s",
           position:"relative",
         }}>
@@ -1483,7 +1481,7 @@ function BotNav({view,setView,userRole,pendingCount=0}) {
             <IconBook on={active==="add"}/>
           </div>
           <span style={{
-            fontSize:10, fontWeight: active==="add"?800:700, letterSpacing:.3,
+            fontSize:10, fontWeight:800, letterSpacing:.3,
             color: active==="add" ? G.lime : G.green,
             transition:"color .15s",
           }}>Book</span>
