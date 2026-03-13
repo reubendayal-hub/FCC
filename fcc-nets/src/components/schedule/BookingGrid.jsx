@@ -82,8 +82,49 @@ export default function BookingGrid({ currentUser, members }) {
 
 
   // ==========================================
-  // ✂️ PASTE YOUR BOOKING HANDLERS HERE ✂️
-  // (Did you find them using the search terms?)
+// ==========================================
+  // ✂️ BOOKING HANDLERS
+  // ==========================================
+
+  const handleBooking = async (sessionId) => {
+    if (!currentUser) return;
+    
+    try {
+      // Create a new array with the current user added to the specific session's players array
+      const updatedSessions = sessions.map(session => {
+        if (session.id === sessionId && !session.players.includes(currentUser.name)) {
+          return { ...session, players: [...session.players, currentUser.name] };
+        }
+        return session;
+      });
+
+      // Push the updated array back to Firebase
+      await updateDoc(doc(db, "appData", "sessions"), { data: updatedSessions });
+    } catch (error) {
+      console.error("Error booking session:", error);
+      alert("Failed to book session. Please try again.");
+    }
+  };
+
+  const handleCancel = async (sessionId) => {
+    if (!currentUser) return;
+    
+    try {
+      // Create a new array with the current user removed from the specific session's players array
+      const updatedSessions = sessions.map(session => {
+        if (session.id === sessionId) {
+          return { ...session, players: session.players.filter(p => p !== currentUser.name) };
+        }
+        return session;
+      });
+
+      // Push the updated array back to Firebase
+      await updateDoc(doc(db, "appData", "sessions"), { data: updatedSessions });
+    } catch (error) {
+      console.error("Error cancelling session:", error);
+      alert("Failed to cancel session. Please try again.");
+    }
+  };
   // ==========================================
 
 
@@ -108,3 +149,4 @@ export default function BookingGrid({ currentUser, members }) {
     </div>
   );
 }
+
