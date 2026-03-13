@@ -1426,6 +1426,15 @@ function BotNav({view,setView,userRole,pendingCount=0}) {
     );
   };
 
+  const IconBook = ({on}) => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={on?2.5:1.8} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9"/>
+      <line x1="12" y1="7" x2="12" y2="17"/>
+      <line x1="7" y1="12" x2="17" y2="12"/>
+    </svg>
+  );
+
   return (
     <div className="fcc-mobile-only" style={{
       position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)",
@@ -1435,7 +1444,7 @@ function BotNav({view,setView,userRole,pendingCount=0}) {
       borderTop:"1px solid rgba(0,0,0,0.06)",
       boxShadow:"0 -6px 32px rgba(0,0,0,0.10), 0 -1px 0 rgba(0,0,0,0.04)",
       display:"grid",
-      gridTemplateColumns: isAdmin ? "1fr auto 1fr 1fr" : "1fr auto 1fr",
+      gridTemplateColumns: isAdmin ? "1fr 1fr 1fr 1fr" : "1fr 1fr 1fr",
       alignItems:"center",
       padding:"6px 8px",
       paddingBottom:"max(10px, env(safe-area-inset-bottom))",
@@ -1443,30 +1452,43 @@ function BotNav({view,setView,userRole,pendingCount=0}) {
     }}>
       <Tab id="schedule" icon={<IconSchedule on={active==="schedule"}/>} label="Schedule"/>
 
-      {/* Book — centre CTA */}
-      <div style={{display:"flex", flexDirection:"column", alignItems:"center", gap:0, padding:"0 8px"}}>
-        <button onClick={()=>setView("add")} style={{
-          width:52, height:52, borderRadius:"50%", border:"none", cursor:"pointer",
+      {/* Book — styled as a filled green pill tab */}
+      <button onClick={()=>setView("add")} style={{
+        background:"none", border:"none", cursor:"pointer",
+        fontFamily:"'DM Sans',sans-serif",
+        display:"flex", flexDirection:"column", alignItems:"center",
+        justifyContent:"center", width:"100%", padding:"6px 4px 2px",
+      }}>
+        <div style={{
+          display:"flex", flexDirection:"column", alignItems:"center", gap:3,
+          padding:"6px 14px 5px",
+          borderRadius:14,
           background: active==="add"
-            ? `linear-gradient(145deg,#166534,${G.green})`
-            : `linear-gradient(145deg,#16a34a,${G.green})`,
-          display:"flex", alignItems:"center", justifyContent:"center",
-          boxShadow: active==="add"
-            ? `0 0 0 3px ${G.lime}90, 0 6px 20px rgba(20,83,45,.5)`
-            : "0 4px 14px rgba(20,83,45,.38), 0 1px 3px rgba(0,0,0,.15)",
-          transform: "translateY(-10px)",
+            ? G.green
+            : `${G.green}18`,
+          border: `1.5px solid ${active==="add" ? G.green : `${G.green}40`}`,
           transition:"all .18s",
+          position:"relative",
         }}>
-          <span style={{fontSize:26, color:"#fff", fontWeight:300, lineHeight:1,
-            transform:active==="add"?"rotate(45deg)":"rotate(0)",
-            transition:"transform .2s", display:"block", marginTop:-1}}>+</span>
-        </button>
-        <span style={{
-          fontSize:10, fontWeight:active==="add"?800:600, letterSpacing:.3,
-          color:active==="add"?G.green:"#94a3b8", marginTop:-6,
-          transition:"color .15s",
-        }}>Book</span>
-      </div>
+          {active==="add" && <div style={{
+            position:"absolute", top:-1, left:"50%", transform:"translateX(-50%)",
+            width:28, height:3, borderRadius:"0 0 3px 3px",
+            background:G.lime,
+          }}/>}
+          <div style={{
+            color: active==="add" ? G.lime : G.green,
+            transition:"color .15s",
+            display:"flex", alignItems:"center", justifyContent:"center",
+          }}>
+            <IconBook on={active==="add"}/>
+          </div>
+          <span style={{
+            fontSize:10, fontWeight: active==="add"?800:700, letterSpacing:.3,
+            color: active==="add" ? G.lime : G.green,
+            transition:"color .15s",
+          }}>Book</span>
+        </div>
+      </button>
 
       <Tab id="admin" icon={<IconMembers on={active==="admin"}/>} label="Admin" badge={isAdmin?pendingCount:0}/>
       {isAdmin && (
