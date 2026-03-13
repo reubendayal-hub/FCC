@@ -1,7 +1,7 @@
 // src/components/schedule/BookingGrid.jsx
 import React, { useState, useEffect } from "react";
 import { db } from "../../firebase";
-import { doc, onSnapshot, updateDoc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { G } from "../../utils/theme";
 
 // ─── Constants & Date Helpers ─────────────────────────────────
@@ -9,21 +9,15 @@ const FCC_LAT = 55.917762, FCC_LON = 12.415680;
 
 const localDateStr  = (d=new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 const todayStr      = () => localDateStr();
-const tomorrowStr   = () => { const d=new Date(); d.setDate(d.getDate()+1); return localDateStr(d); };
 
 // ─── Nets Timeline Helpers ────────────────────────────────────
 const NET_COLORS = {
   "1": { bar:"#14532d", label:"#a3e635", barBg:"#f0fdf4", borderFree:"#bbf7d0", freeText:"#86efac" },
   "2": { bar:"#1e3a8a", label:"#bfdbfe", barBg:"#eff6ff", borderFree:"#bfdbfe", freeText:"#93c5fd" },
 };
-const PRIME_ZONES   = [{from:"17:00",to:"20:00"},{from:"09:00",to:"13:00"}];
 const NET_DAY_START = 8*60, NET_DAY_END = 21*60, NET_SPAN = NET_DAY_END - NET_DAY_START;
 const netPct = m => Math.max(0,Math.min(100,(m-NET_DAY_START)/NET_SPAN*100));
 const toMinsNet = t => { const [h,mn]=t.split(":").map(Number); return h*60+mn; };
-function isPrimeTime(fromStr) {
-  const m=toMinsNet(fromStr);
-  return PRIME_ZONES.some(z=>m>=toMinsNet(z.from)&&m<toMinsNet(z.to));
-}
 
 // ─── Weather Helpers ──────────────────────────────────────────
 const WMO = {
@@ -89,20 +83,6 @@ function AvailGauge({gauge,active}) {
         strokeDasharray={`${filled} ${circ-filled}`}
         strokeDashoffset={circ*0.125} strokeLinecap="round"
         transform={`rotate(135 ${cx} ${cy})`}/>
-    </svg>
-  );
-}
-
-// ─── Group-of-people icon (3 silhouettes) ─────────────────────
-function GroupIcon({color,size=18}) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 20" fill={color}>
-      <circle cx="7"  cy="5" r="3.2"/>
-      <path d="M7 10c-3.5 0-5.5 1.6-5.5 3v2h11v-2c0-1.4-2-3-5.5-3z"/>
-      <circle cx="25" cy="5" r="3.2"/>
-      <path d="M25 10c-3.5 0-5.5 1.6-5.5 3v2h11v-2c0-1.4-2-3-5.5-3z"/>
-      <circle cx="16" cy="4" r="3.8"/>
-      <path d="M16 9.5c-4 0-6.5 1.8-6.5 3.2v2.3h13v-2.3c0-1.4-2.5-3.2-6.5-3.2z"/>
     </svg>
   );
 }
@@ -244,7 +224,6 @@ function NetsTimeline({sessions,netsDate,setNetsDate,setView,setBDate,setBFrom,s
   }
 
   const barRefs={};
-  const netPct = m => ((m-NET_DAY_START)/(NET_DAY_END-NET_DAY_START))*100;
 
   return (
     <div style={{background:"#fff",borderRadius:14,padding:"12px 13px",
@@ -337,7 +316,7 @@ function NetsTimeline({sessions,netsDate,setNetsDate,setView,setBDate,setBFrom,s
 // ==========================================
 // ─── MAIN BOOKING GRID COMPONENT ──────────────────────────────
 // ==========================================
-export default function BookingGrid({ currentUser, members }) {
+export default function BookingGrid() {
   const [sessions, setSessions] = useState([]);
   const [weatherData, setWeatherData] = useState(null);
 
@@ -374,4 +353,56 @@ export default function BookingGrid({ currentUser, members }) {
             code:  data.daily.weathercode[i],
             max:   Math.round(data.daily.temperature_2m_max[i]),
             min:   Math.round(data.daily.temperature_2m_min[i]),
-            windMax: Math.round(data.
+            windMax: Math.round(data.daily.windspeed_10m_max[i]*10)/10,
+            rainSum: +(data.daily.precipitation_sum[i]||0).toFixed(1),
+            rainProb: data.daily.precipitation_probability_max[i]||0,
+            sunrise: data.daily.sunrise[i],
+            sunset:  data.daily.sunset[i],
+          }));
+          
+          setWeatherData({ 
+            today: todayD,
+            hourly: data.hourly,
+            daily: daily,
+            daily0: daily[0],
+            current: data.current ? {
+              temp:   Math.round(data.current.temperature_2m),
+              feels:  Math.round(data.current.apparent_temperature),
+              precip: +(data.current.precipitation||0).toFixed(1),
+              code:   data.current.weathercode,
+              wind:   Math.round(data.current.windspeed_10m*10)/10,
+              isDay:  data.current.is_day,
+            } : null,
+            fetchedAt: Date.now(),
+          });
+        })
+        .catch(()=>setWeatherData({error:true}));
+    }
+    fetchWx();
+    const timer = setInterval(fetchWx, 30*60*1000);
+    return ()=>clearInterval(timer);
+  },[]);
+
+  return (
+    <div style={{ maxWidth: 800, margin: "0 auto", paddingBottom: 100 }}>
+      
+      {/* 1. The Weather Widget */}
+      {weatherData && (
+        <WeatherBar wx={weatherData} setView={() => {}} /> 
+      )}
+
+      {/* 2. The Nets Timeline Strip */}
+      <NetsTimeline 
+        sessions={sessions} 
+        netsDate={todayStr()} 
+        setNetsDate={() => {}} 
+        setView={() => {}} 
+        setBDate={() => {}} 
+        setBFrom={() => {}} 
+        setBTo={() => {}} 
+        setBNet={() => {}} 
+      />
+
+    </div>
+  );
+}
