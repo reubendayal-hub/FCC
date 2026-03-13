@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { db } from "./firebase";
 import { doc, onSnapshot } from "firebase/firestore";
-import { G, FCC_LOGO } from "./utils/theme";
+import { G } from "./utils/theme";
 
 // Components
 import Shell from "./components/layout/Shell";
@@ -14,26 +14,24 @@ export default function App() {
   const [appData, setAppData] = useState({
     members: [],
     sessions: [],
-    teams: [],
-    blocked: [],
-    recurring: []
+    teams: []
   });
 
-  // EXACT REFS FROM YOUR ORIGINAL CODE
-  const refs = {
-    members: doc(db, "fcc-nets", "members"),
-    sessions: doc(db, "fcc-nets", "sessions"),
-    teams: doc(db, "fcc-nets", "teams"),
-    blocked: doc(db, "fcc-nets", "blocked"),
-    recurring: doc(db, "fcc-nets", "recurring")
-  };
-
   useEffect(() => {
+    const refs = {
+      members: doc(db, "fcc-nets", "members"),
+      sessions: doc(db, "fcc-nets", "sessions"),
+      teams: doc(db, "fcc-nets", "teams")
+    };
+
     const unsubs = Object.entries(refs).map(([key, ref]) => 
       onSnapshot(ref, (snap) => {
         if (snap.exists()) {
-          const val = JSON.parse(snap.data().value || "[]");
-          setAppData(prev => ({ ...prev, [key]: val }));
+          // IMPORTANT: Your data is stored as a string in the "value" field
+          try {
+            const val = JSON.parse(snap.data().value || "[]");
+            setAppData(prev => ({ ...prev, [key]: val }));
+          } catch (e) { console.error("Parse error for " + key, e); }
         }
       })
     );
@@ -41,7 +39,8 @@ export default function App() {
   }, []);
 
   if (!currentUser) {
-    return <PinLogin members={appData.members} onLogin={setCurrentUser} />;
+    // We pass an empty array if members hasn't loaded yet to prevent the .sort() error
+    return <PinLogin members={appData.members || []} onLogin={setCurrentUser} />;
   }
 
   return (
@@ -49,13 +48,9 @@ export default function App() {
       {view === "schedule" && (
         <BookingGrid 
           currentUser={currentUser} 
-          sessions={appData.sessions} 
-          members={appData.members}
-          teams={appData.teams}
-          blocked={appData.blocked}
+          sessions={appData.sessions || []} 
         />
       )}
-      {/* Admin Panel and others will be added here next */}
     </Shell>
   );
 }
