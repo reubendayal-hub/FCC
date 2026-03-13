@@ -1,25 +1,113 @@
 // src/components/schedule/BookingGrid.jsx
 import React, { useState, useEffect } from "react";
 import { db } from "../../firebase";
-import { doc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { G } from "../../utils/theme";
 
-// ── Constants & Helpers ─────────────────────────────────────
-const FCC_LAT = 55.917762;
-const FCC_LON = 12.4167; // Double check this matches your old App.jsx exactly
+// ─── Constants & Date Helpers ─────────────────────────────────
+const FCC_LAT = 55.917762, FCC_LON = 12.415680;
 
 const localDateStr  = (d=new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 const todayStr      = () => localDateStr();
 const tomorrowStr   = () => { const d=new Date(); d.setDate(d.getDate()+1); return localDateStr(d); };
 
-export default function BookingGrid({ currentUser, members }) {
-  const [weekOffset, setWeekOffset] = useState(0);
-  const [sessions, setSessions] = useState({});
-  const [weatherData, setWeatherData] = useState(null);
+// ─── Nets Timeline Helpers ────────────────────────────────────
+const NET_COLORS = {
+  "1": { bar:"#14532d", label:"#a3e635", barBg:"#f0fdf4", borderFree:"#bbf7d0", freeText:"#86efac" },
+  "2": { bar:"#1e3a8a", label:"#bfdbfe", barBg:"#eff6ff", borderFree:"#bfdbfe", freeText:"#93c5fd" },
+};
+const PRIME_ZONES   = [{from:"17:00",to:"20:00"},{from:"09:00",to:"13:00"}];
+const NET_DAY_START = 8*60, NET_DAY_END = 21*60, NET_SPAN = NET_DAY_END - NET_DAY_START;
+const netPct = m => Math.max(0,Math.min(100,(m-NET_DAY_START)/NET_SPAN*100));
+const toMinsNet = t => { const [h,mn]=t.split(":").map(Number); return h*60+mn; };
+function isPrimeTime(fromStr) {
+  const m=toMinsNet(fromStr);
+  return PRIME_ZONES.some(z=>m>=toMinsNet(z.from)&&m<toMinsNet(z.to));
+}
 
+// ─── Weather Helpers ──────────────────────────────────────────
+const WMO = {
+  0:  {label:"Clear sky",         emoji:"☀️",  rain:false},
+  1:  {label:"Mainly clear",      emoji:"🌤️",  rain:false},
+  2:  {label:"Partly cloudy",     emoji:"⛅",  rain:false},
+  3:  {label:"Overcast",          emoji:"☁️",  rain:false},
+  45: {label:"Fog",               emoji:"🌫️",  rain:false},
+  48: {label:"Rime fog",          emoji:"🌫️",  rain:false},
+  51: {label:"Light drizzle",     emoji:"🌦️",  rain:true},
+  53: {label:"Drizzle",           emoji:"🌦️",  rain:true},
+  55: {label:"Heavy drizzle",     emoji:"🌧️",  rain:true},
+  61: {label:"Light rain",        emoji:"🌧️",  rain:true},
+  63: {label:"Rain",              emoji:"🌧️",  rain:true},
+  65: {label:"Heavy rain",        emoji:"🌧️",  rain:true},
+  71: {label:"Light snow",        emoji:"🌨️",  rain:false},
+  73: {label:"Snow",              emoji:"❄️",  rain:false},
+  75: {label:"Heavy snow",        emoji:"❄️",  rain:false},
+  77: {label:"Snow grains",       emoji:"🌨️",  rain:false},
+  80: {label:"Rain showers",      emoji:"🌦️",  rain:true},
+  81: {label:"Rain showers",      emoji:"🌧️",  rain:true},
+  82: {label:"Violent showers",   emoji:"⛈️",  rain:true},
+  85: {label:"Snow showers",      emoji:"🌨️",  rain:false},
+  86: {label:"Heavy snow showers",emoji:"❄️",  rain:false},
+  95: {label:"Thunderstorm",      emoji:"⛈️",  rain:true},
+  96: {label:"Thunderstorm+hail", emoji:"⛈️",  rain:true},
+  99: {label:"Thunderstorm+hail", emoji:"⛈️",  rain:true},
+};
+function wmo(code) { return WMO[code] || {label:"Unknown",emoji:"🌡️",rain:false}; }
+
+function calcRainPeriods(hourly, date) {
+  if(!hourly?.time) return [];
+  const periods=[]; let start=null, mmAcc=0;
+  hourly.time.forEach((t,i)=>{
+    if(!t.startsWith(date)) return;
+    const mm=hourly.precipitation[i]||0;
+    const isRain=mm>0.05;
+    if(isRain && start===null) { start=t.slice(11,16); mmAcc=mm; }
+    else if(isRain) { mmAcc+=mm; }
+    else if(!isRain && start!==null) {
+      periods.push({from:start, to:t.slice(11,16), mm:+mmAcc.toFixed(1)});
+      start=null; mmAcc=0;
+    }
+  });
+  if(start!==null) periods.push({from:start, to:"21:00", mm:+mmAcc.toFixed(1)});
+  return periods;
+}
 // ==========================================
-// 1. PASTE YOUR UI BUILDING BLOCKS HERE
-  function netAvailGauge(sessions, date) {
+// ─── Availability gauge (arc dial) ───────────────────────────
+function AvailGauge({gauge,active}) {
+  const r=7,cx=10,cy=10,circ=2*Math.PI*r;
+  const arcLen=circ*0.75, filled=arcLen*(gauge.pct/100);
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20">
+      <circle cx={cx} cy={cy} r={r} fill="none"
+        stroke={active?"rgba(255,255,255,.15)":"#e5e7eb"} strokeWidth="3"
+        strokeDasharray={`${arcLen} ${circ-arcLen}`}
+        strokeDashoffset={circ*0.125} strokeLinecap="round"
+        transform={`rotate(135 ${cx} ${cy})`}/>
+      <circle cx={cx} cy={cy} r={r} fill="none"
+        stroke={active?(gauge.pct===0?"rgba(163,230,53,.8)":gauge.color):gauge.color}
+        strokeWidth="3"
+        strokeDasharray={`${filled} ${circ-filled}`}
+        strokeDashoffset={circ*0.125} strokeLinecap="round"
+        transform={`rotate(135 ${cx} ${cy})`}/>
+    </svg>
+  );
+}
+
+// ─── Group-of-people icon (3 silhouettes) ─────────────────────
+function GroupIcon({color,size=18}) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 20" fill={color}>
+      <circle cx="7"  cy="5" r="3.2"/>
+      <path d="M7 10c-3.5 0-5.5 1.6-5.5 3v2h11v-2c0-1.4-2-3-5.5-3z"/>
+      <circle cx="25" cy="5" r="3.2"/>
+      <path d="M25 10c-3.5 0-5.5 1.6-5.5 3v2h11v-2c0-1.4-2-3-5.5-3z"/>
+      <circle cx="16" cy="4" r="3.8"/>
+      <path d="M16 9.5c-4 0-6.5 1.8-6.5 3.2v2.3h13v-2.3c0-1.4-2.5-3.2-6.5-3.2z"/>
+    </svg>
+  );
+}
+
+function netAvailGauge(sessions, date) {
   const span=NET_DAY_END-NET_DAY_START;
   const booked=(net)=>sessions
     .filter(s=>s.date===date&&(s.net===net||s.net==="both"))
@@ -34,32 +122,8 @@ export default function BookingGrid({ currentUser, members }) {
   if(bp<60)   return {pct:bp, color:"#f59e0b"};
   return           {pct:bp, color:"#ef4444"};
 }
-  // ─── Group-of-people icon (3 silhouettes) ─────────────────────
-function GroupIcon({color,size=18}) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 20" fill={color}>
-      <circle cx="7"  cy="5" r="3.2"/>
-      <path d="M7 10c-3.5 0-5.5 1.6-5.5 3v2h11v-2c0-1.4-2-3-5.5-3z"/>
-      <circle cx="25" cy="5" r="3.2"/>
-      <path d="M25 10c-3.5 0-5.5 1.6-5.5 3v2h11v-2c0-1.4-2-3-5.5-3z"/>
-      <circle cx="16" cy="4" r="3.8"/>
-      <path d="M16 9.5c-4 0-6.5 1.8-6.5 3.2v2.3h13v-2.3c0-1.4-2.5-3.2-6.5-3.2z"/>
-    </svg>
-  );
-}
-  // ─── Nets Timeline Strip ──────────────────────────────────────
-function NetsTimeline({sessions,netsDate,setNetsDate,setView,setBDate,setBFrom,setBTo,setBNet}) {
-  // Build 14-day window starting today
-  const today = new Date(); today.setHours(0,0,0,0);
-  const dates = Array.from({length:14},(_,i)=>{
-    const d=new Date(today); d.setDate(today.getDate()+i);
-    return localDateStr(d);
-  });
-  const fmtD = ds => {
-    const d=new Date(ds+"T12:00:00");
-    return {day:d.toLocaleDateString("en-GB",{weekday:"short"}),date:d.getDate()};
-  };
-  // ─── Weather bar (schedule mini strip) ───────────────────────
+
+// ─── Weather bar (schedule mini strip) ───────────────────────
 function WeatherBar({wx,setView}) {
   if(!wx) return (
     <div style={{background:`linear-gradient(135deg,#14532d,#1a6338)`,
@@ -78,7 +142,6 @@ function WeatherBar({wx,setView}) {
     </div>
   );
   const today=wx.daily?.[0];
-  // Prefer live /current data; fall back to nearest hourly hour
   const cur = wx.current || (()=>{
     const nowHour = `${String(new Date().getHours()).padStart(2,"0")}:00`;
     const idx = (wx.hourly?.time||[]).findIndex(t=>t.startsWith(wx.today)&&t.slice(11,16)===nowHour);
@@ -106,7 +169,6 @@ function WeatherBar({wx,setView}) {
         boxSizing:"border-box",overflow:"hidden",
         boxShadow:"0 3px 12px rgba(20,83,45,.25)"}}>
       <div style={{display:"flex",alignItems:"stretch"}}>
-        {/* Left: weather info */}
         <div style={{flex:1,padding:"9px 12px",display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontSize:24,flexShrink:0,lineHeight:1}}>{w.emoji}</span>
           <div style={{flex:1,minWidth:0}}>
@@ -127,7 +189,6 @@ function WeatherBar({wx,setView}) {
             </div>
           </div>
         </div>
-        {/* Right: CTA panel */}
         <div style={{background:"rgba(255,255,255,.1)",borderLeft:"1px solid rgba(255,255,255,.12)",
           padding:"9px 13px",display:"flex",flexDirection:"column",
           alignItems:"center",justifyContent:"center",gap:3,flexShrink:0,minWidth:90}}>
@@ -145,7 +206,132 @@ function WeatherBar({wx,setView}) {
     </button>
   );
 }
-// Paste AvailGauge, GroupIcon, NetsTimeline, and the Weather Bar here
+
+// ─── Nets Timeline Strip ──────────────────────────────────────
+function NetsTimeline({sessions,netsDate,setNetsDate,setView,setBDate,setBFrom,setBTo,setBNet}) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dates = Array.from({length:14},(_,i)=>{
+    const d=new Date(today); d.setDate(today.getDate()+i);
+    return localDateStr(d);
+  });
+  const fmtD = ds => {
+    const d=new Date(ds+"T12:00:00");
+    return {day:d.toLocaleDateString("en-GB",{weekday:"short"}),date:d.getDate()};
+  };
+
+  const daySessions = sessions.filter(s=>s.date===netsDate);
+
+  function handleBarClick(e,net,barEl) {
+    if(!barEl) return;
+    const rect=barEl.getBoundingClientRect();
+    const ratio=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
+    const raw=NET_DAY_START+ratio*(NET_DAY_END-NET_DAY_START);
+    const snapped=Math.round(raw/15)*15;
+    const isBooked=daySessions.some(s=>{
+      if(s.net!==net&&s.net!=="both") return false;
+      return snapped>=toMinsNet(s.from)&&snapped<toMinsNet(s.to);
+    });
+    if(isBooked) return;
+    const fromMins=Math.min(snapped,NET_DAY_END-60);
+    const durMins=60;
+    const toMins2=Math.min(fromMins+durMins,NET_DAY_END);
+    const fmt=m=>`${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`;
+    setBDate(netsDate);
+    setBFrom(fmt(fromMins));
+    setBTo(fmt(toMins2));
+    setBNet(net);
+    setView("add");
+  }
+
+  const barRefs={};
+  const netPct = m => ((m-NET_DAY_START)/(NET_DAY_END-NET_DAY_START))*100;
+
+  return (
+    <div style={{background:"#fff",borderRadius:14,padding:"12px 13px",
+      border:`1.5px solid ${G.border}`,marginBottom:12}}>
+
+      <div style={{display:"flex",gap:5,marginBottom:10,overflowX:"auto",paddingBottom:2}}>
+        {dates.map(d=>{
+          const f=fmtD(d), active=d===netsDate;
+          const gauge=netAvailGauge(sessions,d);
+          const dow=new Date(d+"T12:00:00").getDay();
+          const isWeekend=dow===0||dow===6;
+          return (
+            <button key={d} onClick={()=>setNetsDate(d)}
+              style={{flexShrink:0,
+                background:active?G.green:isWeekend?"#e8f5e9":"#f9fafb",
+                border:active?`2px solid ${G.green}`:isWeekend?`1.5px solid #c8e6c9`:`1.5px solid ${G.border}`,
+                borderRadius:10,padding:"6px 8px 5px",cursor:"pointer",fontFamily:"inherit",
+                minWidth:44,textAlign:"center",transition:"all .15s",
+                boxShadow:active?"0 2px 6px rgba(20,83,45,.2)":"none"}}>
+              <div style={{fontSize:8,fontWeight:700,
+                color:active?G.lime:isWeekend?G.green:G.muted,
+                textTransform:"uppercase"}}>{f.day}</div>
+              <div style={{fontSize:14,fontWeight:900,color:active?G.lime:G.text,
+                margin:"1px 0"}}>{f.date}</div>
+              <div style={{display:"flex",justifyContent:"center",marginTop:1}}>
+                <AvailGauge gauge={gauge} active={active}/>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{display:"flex",marginBottom:3}}>
+        <div style={{width:54,flexShrink:0}}/>
+        <div style={{flex:1,position:"relative",height:13}}>
+          {[8,10,12,14,16,18,20].map(h=>(
+            <span key={h} style={{position:"absolute",
+              left:`${netPct(h*60)}%`,transform:"translateX(-50%)",
+              fontSize:9,color:G.muted,fontWeight:600}}>{h}:00</span>
+          ))}
+        </div>
+      </div>
+
+      {["1","2"].map(net=>{
+        const nc=NET_COLORS[net];
+        const netSess=daySessions.filter(s=>s.net===net||s.net==="both")
+          .sort((a,b)=>toMinsNet(a.from)-toMinsNet(b.from));
+        const isFree=netSess.length===0;
+        
+        return (
+          <div key={net} style={{display:"flex",alignItems:"center",gap:7,marginBottom:7}}>
+            <div style={{width:54,flexShrink:0,textAlign:"right"}}>
+              <span style={{background:nc.bar,color:nc.label,borderRadius:6,
+                padding:"3px 7px",fontSize:10,fontWeight:900}}>Net {net}</span>
+            </div>
+            <div ref={el=>{barRefs[net]=el;}}
+              onClick={e=>handleBarClick(e,net,barRefs[net])}
+              style={{flex:1,height:38,background:nc.barBg,borderRadius:8,
+                position:"relative",border:`1.5px solid ${isFree?nc.borderFree:G.border}`,
+                overflow:"hidden",cursor:"crosshair"}}>
+              {[10,12,14,16,18,20].map(h=>(
+                <div key={h} style={{position:"absolute",left:`${netPct(h*60)}%`,
+                  top:0,bottom:0,width:1,background:"rgba(0,0,0,.05)",pointerEvents:"none"}}/>
+              ))}
+              {netSess.map(s=>{
+                const w=netPct(toMinsNet(s.to))-netPct(toMinsNet(s.from));
+                return (
+                  <div key={s.id} style={{position:"absolute",
+                    left:`${netPct(toMinsNet(s.from))}%`,width:`${w}%`,
+                    top:3,bottom:3,background:"#22c55e",borderRadius:5,
+                    padding:"0 5px",overflow:"hidden",cursor:"default",
+                    display:"flex",alignItems:"center",
+                    boxShadow:"0 1px 3px rgba(0,0,0,.15)"}}>
+                    <span style={{color:"#fff",fontSize:9,fontWeight:800,
+                      whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                      {s.label||"Booked"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 // ==========================================
 
   
@@ -283,5 +469,6 @@ function WeatherBar({wx,setView}) {
 
     </div>
   );
+
 
 
