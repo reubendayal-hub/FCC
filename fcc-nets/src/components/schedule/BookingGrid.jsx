@@ -19,35 +19,51 @@ export default function BookingGrid({ currentUser, sessions = [] }) {
     await updateDoc(doc(db, "fcc-nets", "sessions"), { value: JSON.stringify(newList) });
   };
 
-  const daySessions = (sessions || []).filter(s => s.date === netsDate);
+  const currentSessions = Array.isArray(sessions) ? sessions : [];
+  const daySessions = currentSessions.filter(s => s.date === netsDate);
 
   return (
-    <div style={{ padding: 10 }}>
-      {weather && <div style={{ background: G.green, color: "#fff", padding: 15, borderRadius: 12, marginBottom: 15 }}>Karlebo: {Math.round(weather.temperature_2m)}°C</div>}
+    <div style={{ padding: 10, maxWidth: 600, margin: "0 auto" }}>
+      {weather && (
+        <div style={{ background: G.green, color: "#fff", padding: 15, borderRadius: 12, marginBottom: 15 }}>
+          Karlebo Ground: {Math.round(weather.temperature_2m)}°C
+        </div>
+      )}
       
       <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 15 }}>
         {[0,1,2,3,4,5,6].map(i => {
           const d = new Date(); d.setDate(d.getDate() + i);
           const ds = d.toISOString().split('T')[0];
-          return <button key={ds} onClick={() => setNetsDate(ds)} style={{ padding: 10, background: netsDate === ds ? G.green : "#fff", color: netsDate === ds ? "#fff" : G.text, borderRadius: 10 }}>{d.getDate()}</button>
+          return (
+            <button key={ds} onClick={() => setNetsDate(ds)} style={{ 
+              padding: 10, borderRadius: 10, 
+              background: netsDate === ds ? G.green : "#fff", 
+              color: netsDate === ds ? "#fff" : G.text,
+              border: `1px solid ${G.border}`
+            }}>
+              {d.getDate()}
+            </button>
+          );
         })}
       </div>
 
-      {daySessions.map(s => (
+      {daySessions.length > 0 ? daySessions.map(s => (
         <SessionCard 
           key={s.id} 
           session={s} 
           currentUser={currentUser} 
           onJoin={(id) => {
-            const next = sessions.map(item => item.id === id ? { ...item, players: [...item.players, currentUser.name] } : item);
+            const next = currentSessions.map(item => item.id === id ? { ...item, players: [...item.players, currentUser.name] } : item);
             saveSessions(next);
           }} 
           onCancel={(id) => {
-            const next = sessions.map(item => item.id === id ? { ...item, players: item.players.filter(p => p !== currentUser.name) } : item);
+            const next = currentSessions.map(item => item.id === id ? { ...item, players: item.players.filter(p => p !== currentUser.name) } : item);
             saveSessions(next);
           }} 
         />
-      ))}
+      )) : (
+        <div style={{ textAlign: "center", padding: 40, color: G.muted }}>No sessions scheduled.</div>
+      )}
     </div>
   );
 }
