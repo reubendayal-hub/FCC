@@ -1,64 +1,43 @@
-// src/App.jsx
 import React, { useState, useEffect } from "react";
 import { db } from "./firebase";
 import { doc, onSnapshot } from "firebase/firestore";
 import { G, FCC_LOGO } from "./utils/theme";
 
-// Component Imports
+// Components
 import Shell from "./components/layout/Shell";
 import PinLogin from "./components/auth/PinLogin";
-import AdminDashboard from "./components/admin/AdminDashboard";
 import BookingGrid from "./components/schedule/BookingGrid";
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
+  const [view, setView] = useState("schedule");
   const [appData, setAppData] = useState({
     members: [],
     sessions: [],
     teams: [],
-    recurring: [],
-    blocked: []
+    blocked: [],
+    recurring: []
   });
 
-  // ─── EXACT FIREBASE PATHS FROM YOUR OLD APP ──────────────────
+  // EXACT REFS FROM YOUR ORIGINAL CODE
   const refs = {
-    members:   doc(db, "fcc-nets", "members"),
-    sessions:  doc(db, "fcc-nets", "sessions"),
-    teams:     doc(db, "fcc-nets", "teams"),
-    recurring: doc(db, "fcc-nets", "recurring"),
-    blocked:   doc(db, "fcc-nets", "blocked"),
+    members: doc(db, "fcc-nets", "members"),
+    sessions: doc(db, "fcc-nets", "sessions"),
+    teams: doc(db, "fcc-nets", "teams"),
+    blocked: doc(db, "fcc-nets", "blocked"),
+    recurring: doc(db, "fcc-nets", "recurring")
   };
 
   useEffect(() => {
-    // 1. Listen for Members
-    const unsubMembers = onSnapshot(refs.members, snap => {
-      setAppData(prev => ({ 
-        ...prev, 
-        members: snap.exists() ? JSON.parse(snap.data().value) : [] 
-      }));
-    });
-
-    // 2. Listen for Sessions
-    const unsubSessions = onSnapshot(refs.sessions, snap => {
-      setAppData(prev => ({ 
-        ...prev, 
-        sessions: snap.exists() ? JSON.parse(snap.data().value) : [] 
-      }));
-    });
-
-    // 3. Listen for Teams
-    const unsubTeams = onSnapshot(refs.teams, snap => {
-      setAppData(prev => ({ 
-        ...prev, 
-        teams: snap.exists() ? JSON.parse(snap.data().value) : [] 
-      }));
-    });
-
-    return () => {
-      unsubMembers();
-      unsubSessions();
-      unsubTeams();
-    };
+    const unsubs = Object.entries(refs).map(([key, ref]) => 
+      onSnapshot(ref, (snap) => {
+        if (snap.exists()) {
+          const val = JSON.parse(snap.data().value || "[]");
+          setAppData(prev => ({ ...prev, [key]: val }));
+        }
+      })
+    );
+    return () => unsubs.forEach(unsub => unsub());
   }, []);
 
   if (!currentUser) {
@@ -66,12 +45,17 @@ export default function App() {
   }
 
   return (
-    <Shell currentUser={currentUser} setView={(v) => {}} onLogout={() => setCurrentUser(null)}>
-      <BookingGrid 
-        currentUser={currentUser} 
-        sessions={appData.sessions} 
-        members={appData.members}
-      />
+    <Shell currentUser={currentUser} setView={setView} onLogout={() => setCurrentUser(null)}>
+      {view === "schedule" && (
+        <BookingGrid 
+          currentUser={currentUser} 
+          sessions={appData.sessions} 
+          members={appData.members}
+          teams={appData.teams}
+          blocked={appData.blocked}
+        />
+      )}
+      {/* Admin Panel and others will be added here next */}
     </Shell>
   );
 }
