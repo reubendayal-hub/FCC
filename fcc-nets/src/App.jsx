@@ -1434,7 +1434,9 @@ function BotNav({view,setView,userRole,pendingCount=0}) {
       backdropFilter:"blur(16px)", WebkitBackdropFilter:"blur(16px)",
       borderTop:"1px solid rgba(0,0,0,0.06)",
       boxShadow:"0 -6px 32px rgba(0,0,0,0.10), 0 -1px 0 rgba(0,0,0,0.04)",
-      display:"grid", gridTemplateColumns:"1fr auto 1fr", alignItems:"center",
+      display:"grid",
+      gridTemplateColumns: isAdmin ? "1fr auto 1fr 1fr" : "1fr auto 1fr",
+      alignItems:"center",
       padding:"6px 8px",
       paddingBottom:"max(10px, env(safe-area-inset-bottom))",
       gap:4,
@@ -1466,9 +1468,11 @@ function BotNav({view,setView,userRole,pendingCount=0}) {
         }}>Book</span>
       </div>
 
-      {isAdmin ? (
-        <Tab id="admin" icon={<IconMembers on={active==="admin"}/>} label="Admin" badge={pendingCount}/>
-      ) : (
+      <Tab id="admin" icon={<IconMembers on={active==="admin"}/>} label="Admin" badge={isAdmin?pendingCount:0}/>
+      {isAdmin && (
+        <Tab id="profile" icon={<IconProfile on={active==="profile"}/>} label="Profile"/>
+      )}
+      {!isAdmin && (
         <Tab id="profile" icon={<IconProfile on={active==="profile"}/>} label="Profile"/>
       )}
     </div>
