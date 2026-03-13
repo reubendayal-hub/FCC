@@ -12,12 +12,13 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [view, setView] = useState("schedule");
   const [appData, setAppData] = useState({
-    members: [],
+    members: [], // Initialized as empty array
     sessions: [],
     teams: []
   });
 
   useEffect(() => {
+    // Your specific database paths
     const refs = {
       members: doc(db, "fcc-nets", "members"),
       sessions: doc(db, "fcc-nets", "sessions"),
@@ -27,11 +28,11 @@ export default function App() {
     const unsubs = Object.entries(refs).map(([key, ref]) => 
       onSnapshot(ref, (snap) => {
         if (snap.exists()) {
-          // IMPORTANT: Your data is stored as a string in the "value" field
           try {
+            // Your data is stored as a string in the "value" field
             const val = JSON.parse(snap.data().value || "[]");
             setAppData(prev => ({ ...prev, [key]: val }));
-          } catch (e) { console.error("Parse error for " + key, e); }
+          } catch (e) { console.error("JSON Parse error:", e); }
         }
       })
     );
@@ -39,7 +40,6 @@ export default function App() {
   }, []);
 
   if (!currentUser) {
-    // We pass an empty array if members hasn't loaded yet to prevent the .sort() error
     return <PinLogin members={appData.members || []} onLogin={setCurrentUser} />;
   }
 
