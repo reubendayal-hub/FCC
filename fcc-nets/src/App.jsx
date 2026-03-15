@@ -1952,7 +1952,7 @@ export default function App() {
   // Add session form
   const [bDate,    setBDate]    = useState("");
   const [bFrom,    setBFrom]    = useState("18:00");
-  const [bTo,      setBTo]      = useState("20:00");
+  const [bTo,      setBTo]      = useState("19:00");
   const [bNote,    setBNote]    = useState("");
   const [bLabel,   setBLabel]   = useState("");
   const [bNet,     setBNet]     = useState("1");  // "1" | "2" | "both"
@@ -2452,10 +2452,18 @@ export default function App() {
     if(!bDate||selP.length===0){showToast("Pick a date & at least one player");return;}
     const pollOptions = bPollOpts.map(o=>({...o, votes:[]}));
     const restrictedTo = bRestrictTeam || null;
-
-    // Auto-enroll: only when session is restricted to a team
-    let autoPlayers = [...selP];
     const isLeader = ["superadmin","admin","captain","vicecaptain"].includes(userRole);
+
+    // Prime time enforcement for members
+    if(!isLeader) {
+      const prime = isPrimeTime(bFrom);
+      const maxMins = toMinsNet(bFrom) + (prime ? 60 : 120);
+      if(toMinsNet(bTo) > maxMins) {
+        const allowed = prime ? "1 hour" : "2 hours";
+        showToast(`⭐ Prime hours: max ${allowed} per booking at this time`);
+        return;
+      }
+    }
     if(isLeader && restrictedTo) {
       const teamMembers = members
         .filter(m => (m.teams||[]).includes(restrictedTo))
@@ -3723,9 +3731,10 @@ export default function App() {
                     }}>
                     {Array.from({length:24},(_,i)=>{
                       const h=String(i).padStart(2,"0");
-                      const prime=bFrom?isPrimeTime(bFrom):false;
+                      const isLeader=["superadmin","admin","captain","vicecaptain"].includes(userRole);
+                      const prime=(!isLeader)&&bFrom?isPrimeTime(bFrom):false;
                       const maxMins=toMinsNet(bFrom)+(prime?60:120);
-                      const disabled=i*60>maxMins||i*60<=toMinsNet(bFrom);
+                      const disabled=(!isLeader)&&(i*60>maxMins||i*60<=toMinsNet(bFrom));
                       return <option key={h} value={h} disabled={disabled}>{h}</option>;
                     })}
                   </select>
@@ -3769,8 +3778,8 @@ export default function App() {
                 </div>
               )}
             </FFld>
-            {/* Prime hours note */}
-            {bDate&&bFrom&&(()=>{
+            {/* Prime hours note — members only */}
+            {bDate&&bFrom&&!["superadmin","admin","captain","vicecaptain"].includes(userRole)&&(()=>{
               const prime=isPrimeTime(bFrom);
               return (
                 <div style={{marginTop:10,padding:"7px 10px",background:"#fffbeb",
@@ -3804,31 +3813,83 @@ export default function App() {
             <div style={{background:"#fef2f2",border:"1.5px solid #fca5a5",
               borderRadius:12,padding:"13px 15px",marginBottom:12}}>
               <div style={{fontWeight:900,fontSize:13,color:"#991b1b",marginBottom:6}}>
-                🚫 Booking not possible — time conflict
+                🚫 Time conflict detected
               </div>
-              <div style={{fontSize:12,color:"#7f1d1d",lineHeight:1.7}}>
+              <div style={{fontSize:12,color:"#7f1d1d",lineHeight:1.7,marginBottom:10}}>
                 {netClash&&(
                   <div style={{marginBottom:clashSess?6:0}}>
                     <b>{netClash.net==="both"?"Both nets are":
                         `Net ${netClash.net} is`} already booked</b>{" "}
                     {netClash.from}–{netClash.to}
                     {netClash.label?` · ${netClash.label}`:""}.
-                    {" "}Choose a different time{bNet!==netClash.net?" or a different net":""}.
+                    {" "}Pick a different time{bNet!==netClash.net?" or switch nets":""}.
                   </div>
                 )}
                 {clashSess&&!netClash&&(
                   <>
                     {userAlreadyIn && othersAlreadyIn.length===0 && (
-                      <>You're already booked into <b>{clashSess.label||"a session"}</b> ({clashSess.from}–{clashSess.to}). Choose a different time.</>
+                      <>You're already in <b>{clashSess.label||"a session"}</b> ({clashSess.from}–{clashSess.to}).</>
                     )}
                     {userAlreadyIn && othersAlreadyIn.length>0 && (
-                      <>You and <b>{othersAlreadyIn.join(", ")}</b> are already in <b>{clashSess.label||"a session"}</b> ({clashSess.from}–{clashSess.to}). Choose a different time.</>
+                      <>You and <b>{othersAlreadyIn.join(", ")}</b> are already in <b>{clashSess.label||"a session"}</b> ({clashSess.from}–{clashSess.to}).</>
                     )}
                     {!userAlreadyIn && othersAlreadyIn.length>0 && (
-                      <><b>{othersAlreadyIn.join(", ")}</b> {othersAlreadyIn.length>1?"are":"is"} already in <b>{clashSess.label||"a session"}</b> ({clashSess.from}–{clashSess.to}). Deselect {othersAlreadyIn.length>1?"them":"this player"} or choose a different time.</>
+                      <><b>{othersAlreadyIn.join(", ")}</b> {othersAlreadyIn.length>1?"are":"is"} already in <b>{clashSess.label||"a session"}</b> ({clashSess.from}–{clashSess.to}).</>
                     )}
                   </>
                 )}
+              </div>
+              {/* Action buttons */}
+              <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                {clashSess&&!netClash&&(
+                  <button type="button"
+                    onClick={()=>{setSelSess(clashSess);setView("session");setSelP([]);}}
+                    style={{width:"100%",padding:"9px 12px",borderRadius:9,
+                      border:"1.5px solid #fca5a5",background:"#fff",
+                      color:"#991b1b",fontWeight:700,fontSize:12,
+                      cursor:"pointer",fontFamily:"inherit",textAlign:"left",
+                      display:"flex",alignItems:"center",gap:8}}>
+                    <span>👉</span>
+                    <span>View <b>{clashSess.label||"that session"}</b> and join instead</span>
+                  </button>
+                )}
+                {netClash&&(
+                  <div style={{fontSize:11,color:"#991b1b",fontWeight:700}}>
+                    Suggested times nearby:
+                    <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
+                      {(()=>{
+                        // Suggest slots before and after the clash
+                        const clashEnd = netClash.to;
+                        const clashStart = netClash.from;
+                        const dur = toMinsNet(bTo)-toMinsNet(bFrom);
+                        const beforeFrom = `${String(Math.floor((toMinsNet(clashStart)-dur)/60)).padStart(2,"0")}:${String((toMinsNet(clashStart)-dur)%60).padStart(2,"0")}`;
+                        const afterTo   = `${String(Math.floor((toMinsNet(clashEnd)+dur)/60)).padStart(2,"0")}:${String((toMinsNet(clashEnd)+dur)%60).padStart(2,"0")}`;
+                        return [
+                          {label:`Before: ${beforeFrom}–${clashStart}`, from:beforeFrom, to:clashStart},
+                          {label:`After: ${clashEnd}–${afterTo}`, from:clashEnd, to:afterTo},
+                        ].filter(s=>toMinsNet(s.from)>=0&&toMinsNet(s.to)<=toMinsNet("22:00")).map(s=>(
+                          <button key={s.from} type="button"
+                            onClick={()=>{setBFrom(s.from);setBTo(s.to);}}
+                            style={{padding:"5px 10px",borderRadius:20,border:"1.5px solid #fca5a5",
+                              background:"#fff",color:"#991b1b",fontWeight:700,fontSize:11,
+                              cursor:"pointer",fontFamily:"inherit"}}>
+                            {s.label}
+                          </button>
+                        ));
+                      })()}
+                    </div>
+                  </div>
+                )}
+                <button type="button"
+                  onClick={()=>{setBDate("");setBFrom("18:00");setBTo("20:00");}}
+                  style={{width:"100%",padding:"9px 12px",borderRadius:9,
+                    border:"1.5px solid #fca5a5",background:"#fff",
+                    color:"#7f1d1d",fontWeight:600,fontSize:12,
+                    cursor:"pointer",fontFamily:"inherit",textAlign:"left",
+                    display:"flex",alignItems:"center",gap:8}}>
+                  <span>🗓️</span>
+                  <span>Pick a different date / time</span>
+                </button>
               </div>
             </div>
           )}
