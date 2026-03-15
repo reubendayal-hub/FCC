@@ -59,15 +59,15 @@ const ROLE_META = {
 // Senior teams can have captains/vice captains; youth cannot
 // ─── Default teams (loaded from storage, editable by admins) ──
 const DEFAULT_TEAMS = [
-  {id:"div2",  name:"Div 2",      senior:true},
-  {id:"div3",  name:"Div 3",      senior:true},
-  {id:"div4",  name:"Div 4",      senior:true},
-  {id:"womens",name:"Women's",    senior:true},
-  {id:"u18",   name:"U18",        senior:false},
-  {id:"u15",   name:"U15",        senior:false},
-  {id:"u15g",  name:"U15 Girls",  senior:false},
-  {id:"u13",   name:"U13",        senior:false},
-  {id:"u11",   name:"U11",        senior:false},
+  {id:"div2",  name:"Div 2",      senior:true,  coaches:[]},
+  {id:"div3",  name:"Div 3",      senior:true,  coaches:[]},
+  {id:"div4",  name:"Div 4",      senior:true,  coaches:[]},
+  {id:"womens",name:"Women's",    senior:true,  coaches:["Arun Krishnamurthy"]},
+  {id:"u18",   name:"U18",        senior:false, coaches:[]},
+  {id:"u15",   name:"U15",        senior:false, coaches:["Zeb Pirzada"]},
+  {id:"u15g",  name:"U15 Girls",  senior:false, coaches:["Zeb Pirzada","Rajesh Muthukumar","Kuda"]},
+  {id:"u13",   name:"U13",        senior:false, coaches:["Zeb Pirzada"]},
+  {id:"u11",   name:"U11",        senior:false, coaches:["Reuben Dayal","Aniket Sharma","Nitin Gupta"]},
 ];
 
 const TEAM_META = {
@@ -159,6 +159,12 @@ const CAN = {
   resetOtherPin:  ["superadmin"],
 };
 const can = (role, action) => (CAN[action]||[]).includes(role);
+// isCoach: members with isCoach:true get captain-level abilities
+function canOrCoach(role, action, member) {
+  if(can(role, action)) return true;
+  if(member?.isCoach && ["removePlayer","addOtherPlayer","deleteSession","sendReminder"].includes(action)) return true;
+  return false;
+}
 
 // 9pm cutoff: after 9pm the night before a session, members can't self-remove
 function isAfterCutoff(sessionDateStr) {
@@ -474,9 +480,15 @@ function netAvailGauge(sessions, date) {
 }
 
 // Normalise member — migrate old single `team` field to `teams` array
+// Known coaches — isCoach:true seeded on these members
+const KNOWN_COACHES = new Set([
+  "Reuben Dayal","Aniket Sharma","Arun Krishnamurthy","Zeb Pirzada",
+  "Nitin Gupta","Rajesh Muthukumar","Kuda",
+]);
 const normMember = m => ({
   ...m,
   teams: m.teams || (m.team ? [m.team] : []),
+  isCoach: m.isCoach ?? KNOWN_COACHES.has(m.name),
 });
 
 // ─── Profile completion ────────────────────────────────────────
@@ -1293,6 +1305,101 @@ function BothNetsIcon({color="currentColor",size=18}) {
   );
 }
 
+// ─── PlayerGroup — collapsible team section in session detail ──
+function PlayerGroup({team,players,members,lifts,selSess,isSelf,cutoff,canRemove,onRemove,onCarpoolEdit,onCarpoolSet,single}) {
+  const [open,setOpen]=React.useState(true); // default open
+  const tm=getTeamMeta(team);
+  const dispStop=d=>{const o=getLiftObj(d);if(!o.stop)return"";return o.stop==="Other"?(o.stopOther||"Other"):o.stop;};
+  return (
+    <div style={{marginBottom:10}}>
+      {/* Group header — hide toggle when only one group */}
+      {!single&&(
+        <button onClick={()=>setOpen(v=>!v)}
+          style={{width:"100%",display:"flex",alignItems:"center",gap:8,
+            padding:"7px 12px",borderRadius:10,border:"none",cursor:"pointer",
+            fontFamily:"inherit",marginBottom:4,
+            background:`${tm.bg}22`,}}>
+          <span style={{width:10,height:10,borderRadius:"50%",background:tm.bg,flexShrink:0}}/>
+          <span style={{fontWeight:800,fontSize:12,color:tm.bg,flex:1,textAlign:"left"}}>
+            {team}
+          </span>
+          <span style={{fontSize:11,color:G.muted,fontWeight:600}}>
+            {players.length} player{players.length!==1?"s":""}
+          </span>
+          <span style={{fontSize:12,color:G.muted}}>{open?"▲":"▼"}</span>
+        </button>
+      )}
+      {(open||single)&&players.map((p,i)=>{
+        const mem=members.find(m=>m.name===p);
+        const self=isSelf(p);
+        const liftObj=getLiftObj((lifts||{})[p]);
+        const liftPref=liftObj.pref;
+        const isO=liftPref==="offer",isN=liftPref==="need";
+        return (
+          <div key={p} style={{background:G.white,
+            border:`1.5px solid ${isO?"#86efac":isN?"#93c5fd":G.border}`,
+            borderRadius:10,padding:"10px 14px",marginBottom:6,
+            display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div style={{display:"flex",alignItems:"flex-start",gap:10,flex:1,minWidth:0}}>
+              <div style={{width:36,height:36,background:`${G.green}18`,borderRadius:"50%",
+                display:"flex",alignItems:"center",justifyContent:"center",
+                fontWeight:900,fontSize:13,color:G.green,flexShrink:0,marginTop:1}}>
+                {p.split(" ").map(w=>w[0]).join("").slice(0,2)}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:800,color:G.text,fontSize:15}}>
+                  {p}{self&&<span style={{color:G.muted,fontSize:12,fontWeight:500,marginLeft:6}}>(you)</span>}
+                  {mem?.isCoach&&<span style={{fontSize:12,marginLeft:5}} title="Coach">🧢</span>}
+                </div>
+                <div style={{display:"flex",gap:4,marginTop:2,flexWrap:"wrap"}}>
+                  {(mem?.teams||[]).map(t=><TeamPill key={t} team={t} sm/>)}
+                  {mem?.role&&mem.role!=="member"&&<RolePill role={mem.role}/>}
+                </div>
+                {/* Lift inline badge */}
+                {liftPref&&(
+                  <div style={{display:"flex",alignItems:"center",gap:5,marginTop:5,flexWrap:"wrap"}}>
+                    <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20,
+                      background:isO?"#dcfce7":isN?"#dbeafe":"rgba(0,0,0,.05)",
+                      color:isO?"#166534":isN?"#1e3a5f":G.muted,
+                      border:`0.5px solid ${isO?"#86efac":isN?"#93c5fd":"rgba(0,0,0,.1)"}`}}>
+                      {isO?"🚘 Offering lift":isN?"🙋 Needs lift":"🚀 Own transport"}
+                    </span>
+                    {isO&&liftObj.seats>0&&<span style={{fontSize:11,color:G.muted}}>💺 {liftObj.seats} seat{liftObj.seats>1?"s":""}</span>}
+                    {dispStop(liftObj)&&<span style={{fontSize:11,color:G.muted}}>📍 {dispStop(liftObj)}</span>}
+                    {liftObj.note&&<span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>"{liftObj.note}"</span>}
+                    {self&&!cutoff&&(
+                      <button onClick={()=>onCarpoolEdit(p)}
+                        style={{fontSize:11,background:"none",border:"none",color:G.muted,
+                          textDecoration:"underline",cursor:"pointer",fontFamily:"inherit",padding:0}}>
+                        Edit
+                      </button>
+                    )}
+                  </div>
+                )}
+                {!liftPref&&self&&!cutoff&&(
+                  <button onClick={onCarpoolSet}
+                    style={{marginTop:5,fontSize:11,fontWeight:700,padding:"3px 10px",
+                      borderRadius:20,border:`1px solid ${G.border}`,background:G.cream,
+                      color:G.muted,cursor:"pointer",fontFamily:"inherit"}}>
+                    🚘 Set car pool preference
+                  </button>
+                )}
+              </div>
+            </div>
+            {canRemove ? (
+              <Btn onClick={()=>onRemove(p)} bg={G.redBg} col={G.red} sm>Remove</Btn>
+            ) : self ? (
+              cutoff
+                ? <span style={{fontSize:11,color:G.muted,fontWeight:700}}>🔒 Locked</span>
+                : <Btn onClick={()=>onRemove(p)} bg={G.redBg} col={G.red} sm>Leave</Btn>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Session card ─────────────────────────────────────────────
 // ─── Carpool Bottom Sheet ─────────────────────────────────────
 function CarpoolSheet({sess,sessions,myName,liftDraft,setLiftDraft,liftEditing,setLiftEditing,saveSessions,selSess,setSelSess,onClose}) {
@@ -1568,7 +1675,15 @@ function CarpoolSheet({sess,sessions,myName,liftDraft,setLiftDraft,liftEditing,s
   );
 }
 
-function SessCard({s,members,faded,onClick,onCarpoolClick}) {
+function SessCard({s,members,teams,faded,onClick,onCarpoolClick}) {
+  // Derive coaches for this session
+  const sessionCoaches = s.coaches || (()=>{
+    if(s.restrictedTo) {
+      const t=teams?.find(t=>t.name===s.restrictedTo);
+      return t?.coaches||[];
+    }
+    return members.filter(m=>m.isCoach&&s.players.includes(m.name)).map(m=>m.name);
+  })();
   return (
     <div onClick={onClick} style={{background:isToday(s.date)?"#f7ffe8":G.white,
       borderRadius:14,padding:"13px 15px",marginBottom:9,
@@ -1598,12 +1713,25 @@ function SessCard({s,members,faded,onClick,onCarpoolClick}) {
             padding:"1px 8px",fontSize:10,fontWeight:800}}>{s.label}</span>}
         </div>
         <div style={{fontSize:12,color:G.muted,marginTop:2}}>{s.from} – {s.to}</div>
-        {/* Compact carpool chip */}
+        {/* Coach chips */}
+        {sessionCoaches.length>0&&(
+          <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:4}}>
+            {sessionCoaches.map(name=>(
+              <span key={name} style={{fontSize:10,fontWeight:700,padding:"1px 8px",
+                borderRadius:20,background:"#fef9c3",color:"#92400e",
+                border:"0.5px solid #fde68a",display:"inline-flex",alignItems:"center",gap:3}}>
+                🧢 {name.split(" ")[0]}
+              </span>
+            ))}
+          </div>
+        )}
         {(()=>{
           const lifts=s.lifts||{};
-          const offering=s.players.filter(p=>getLiftPref(lifts[p])==="offer").length;
-          const needing =s.players.filter(p=>getLiftPref(lifts[p])==="need").length;
-          const ownT    =s.players.filter(p=>getLiftPref(lifts[p])==="self").length;
+          // Count from ALL lifts keys, not just s.players — catches prefs set before joining
+          const liftPeople=Object.keys(lifts);
+          const offering=liftPeople.filter(p=>getLiftPref(lifts[p])==="offer").length;
+          const needing =liftPeople.filter(p=>getLiftPref(lifts[p])==="need").length;
+          const ownT    =liftPeople.filter(p=>getLiftPref(lifts[p])==="self").length;
           if(!offering&&!needing&&!ownT) return null;
           const parts=[];
           if(offering) parts.push(`🚘 ${offering}`);
@@ -3547,7 +3675,7 @@ export default function App() {
           <>
             {filteredUpcoming.length>0&&<>
               <SLbl mt={4}>Upcoming</SLbl>
-              {filteredUpcoming.map(s=><SessCard key={s.id} s={s} members={members}
+              {filteredUpcoming.map(s=><SessCard key={s.id} s={s} members={members} teams={teams}
                 onCarpoolClick={()=>{setLiftDraft(null);setCarpoolSheetSess(s);}}
                 onClick={()=>{setSelSess(s);setView("session");setLiftEditing(false);setLiftDraft(null);setNotInExpanded(false);setCarpoolFocus(false);}}/>)}
             </>}
@@ -3559,7 +3687,7 @@ export default function App() {
               const archived = filteredPast.slice(MAX_VISIBLE);
               return <>
                 <SLbl>Past</SLbl>
-                {visiblePast.map(s=><SessCard key={s.id} s={s} members={members} faded
+                {visiblePast.map(s=><SessCard key={s.id} s={s} members={members} teams={teams} faded
                   onCarpoolClick={()=>{setLiftDraft(null);setCarpoolSheetSess(s);}}
                   onClick={()=>{setSelSess(s);setView("session");setLiftEditing(false);setLiftDraft(null);setNotInExpanded(false);setCarpoolFocus(false);}}/>)}
                 {/* Toggle button */}
@@ -4129,13 +4257,13 @@ export default function App() {
     const isRestricted = !!selSess.restrictedTo;
     const userInTeam = !isRestricted
       || (userMem?.teams||[]).includes(selSess.restrictedTo)
-      || can(userRole,"deleteSession");
-    const canAddOthers = can(userRole,"addOtherPlayer");
+      || canOrCoach(userRole,"deleteSession",userMem);
+    const canAddOthers = canOrCoach(userRole,"addOtherPlayer",userMem);
     const cutoff = isAfterCutoff(selSess.date);
-    // Members not in session — admins/captains see all relevant, members only see own team
+    // Members not in session — admins/captains/coaches see all relevant, members only see own team
     const notIn = members.filter(m=>!selSess.players.includes(m.name))
       .filter(m=>{
-        if(isRestricted) return (m.teams||[]).includes(selSess.restrictedTo) || can(userRole,"deleteSession");
+        if(isRestricted) return (m.teams||[]).includes(selSess.restrictedTo) || canOrCoach(userRole,"deleteSession",userMem);
         if(!canAddOthers) return (m.teams||[]).some(t=>(userMem?.teams||[]).includes(t));
         return true;
       });
@@ -4190,6 +4318,35 @@ export default function App() {
               </span>
             </div>
           )}
+
+          {/* ── Coaches for this session ──────────────────── */}
+          {(()=>{
+            const sessCoaches = selSess.coaches || (()=>{
+              if(selSess.restrictedTo) {
+                const t=teams.find(t=>t.name===selSess.restrictedTo);
+                return t?.coaches||[];
+              }
+              return members.filter(m=>m.isCoach&&selSess.players.includes(m.name)).map(m=>m.name);
+            })();
+            const canEditCoaches = canOrCoach(userRole,"addOtherPlayer",userMem);
+            if(!sessCoaches.length&&!canEditCoaches) return null;
+            return (
+              <div style={{display:"flex",alignItems:"center",flexWrap:"wrap",
+                gap:6,marginBottom:12}}>
+                <span style={{fontSize:11,fontWeight:700,color:G.muted,
+                  textTransform:"uppercase",letterSpacing:1}}>🧢 Coaches</span>
+                {sessCoaches.length>0 ? sessCoaches.map(name=>(
+                  <span key={name} style={{fontSize:11,fontWeight:700,padding:"2px 10px",
+                    borderRadius:20,background:"#fef9c3",color:"#92400e",
+                    border:"0.5px solid #fde68a"}}>
+                    🧢 {name}
+                  </span>
+                )) : (
+                  <span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>None assigned</span>
+                )}
+              </div>
+            );
+          })()}
 
           <SLbl mt={4}>Players ({selSess.players.length})</SLbl>
           {/* ── Persistent carpool section ─────────────────── */}
@@ -4278,78 +4435,54 @@ export default function App() {
               </div>
             );
           })()}
-          {/* ── Players with inline carpool ──────────────────── */}
-          {selSess.players.map((p,i)=>{
-            const mem=members.find(m=>m.name===p);
-            const isSelf=currentUser?.name===p;
-            const liftObj=getLiftObj((selSess.lifts||{})[p]);
-            const liftPref=liftObj.pref;
-            const isO=liftPref==="offer",isN=liftPref==="need",isOwn=liftPref==="self";
-            const dispStopInline=d=>{const o=getLiftObj(d);if(!o.stop)return"";return o.stop==="Other"?(o.stopOther||"Other"):o.stop;};
-            return (
-              <div key={i} style={{background:G.white,
-                border:`1.5px solid ${isO?"#86efac":isN?"#93c5fd":G.border}`,
-                borderRadius:10,padding:"10px 14px",marginBottom:7,
-                display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <div style={{display:"flex",alignItems:"flex-start",gap:10,flex:1,minWidth:0}}>
-                  <div style={{width:36,height:36,background:`${G.green}18`,borderRadius:"50%",
-                    display:"flex",alignItems:"center",justifyContent:"center",
-                    fontWeight:900,fontSize:13,color:G.green,flexShrink:0,marginTop:1}}>
-                    {p.split(" ").map(w=>w[0]).join("").slice(0,2)}
-                  </div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontWeight:800,color:G.text,fontSize:15}}>
-                      {p}{isSelf&&<span style={{color:G.muted,fontSize:12,fontWeight:500,marginLeft:6}}>(you)</span>}
-                    </div>
-                    <div style={{display:"flex",gap:4,marginTop:2,flexWrap:"wrap"}}>
-                      {(mem?.teams||[]).map(t=><TeamPill key={t} team={t} sm/>)}
-                      {mem?.role&&mem.role!=="member"&&<RolePill role={mem.role}/>}
-                    </div>
-                    {/* Lift inline badge */}
-                    {liftPref&&(
-                      <div style={{display:"flex",alignItems:"center",gap:5,marginTop:5,flexWrap:"wrap"}}>
-                        <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20,
-                          background:isO?"#dcfce7":isN?"#dbeafe":"rgba(0,0,0,.05)",
-                          color:isO?"#166534":isN?"#1e3a5f":G.muted,
-                          border:`0.5px solid ${isO?"#86efac":isN?"#93c5fd":"rgba(0,0,0,.1)"}`}}>
-                          {isO?"🚘 Offering lift":isN?"🙋 Needs lift":"🚀 Own transport"}
-                        </span>
-                        {isO&&liftObj.seats>0&&<span style={{fontSize:11,color:G.muted}}>💺 {liftObj.seats} seat{liftObj.seats>1?"s":""}</span>}
-                        {dispStopInline(liftObj)&&<span style={{fontSize:11,color:G.muted}}>📍 {dispStopInline(liftObj)}</span>}
-                        {liftObj.note&&<span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>"{liftObj.note}"</span>}
-                        {isSelf&&!cutoff&&(
-                          <button onClick={()=>{setLiftDraft({...liftObj});setCarpoolSheetSess(selSess);}}
-                            style={{fontSize:11,background:"none",border:"none",color:G.muted,
-                              textDecoration:"underline",cursor:"pointer",fontFamily:"inherit",padding:0}}>
-                            Edit
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    {/* Self: no pref yet — show set button */}
-                    {!liftPref&&isSelf&&!cutoff&&(
-                      <button onClick={()=>{setLiftDraft(null);setCarpoolSheetSess(selSess);}}
-                        style={{marginTop:5,fontSize:11,fontWeight:700,padding:"3px 10px",
-                          borderRadius:20,border:`1px solid ${G.border}`,background:G.cream,
-                          color:G.muted,cursor:"pointer",fontFamily:"inherit"}}>
-                        🚘 Set car pool preference
-                      </button>
-                    )}
-                  </div>
-                </div>
-                {/* Remove / Leave button */}
-                {can(userRole,"removePlayer") ? (
-                  <Btn onClick={()=>handleLeave(selSess.id,p)}
-                    bg={G.redBg} col={G.red} sm>Remove</Btn>
-                ) : isSelf ? (
-                  cutoff
-                    ? <span style={{fontSize:11,color:G.muted,fontWeight:700}}>🔒 Locked</span>
-                    : <Btn onClick={()=>handleLeave(selSess.id,p)}
-                        bg={G.redBg} col={G.red} sm>Leave</Btn>
-                ) : null}
-              </div>
-            );
-          })}
+          {/* ── Players grouped by team, collapsible, alphabetical ── */}
+          {(()=>{
+            const lifts=selSess.lifts||{};
+            // Group players by their primary team relevant to this session
+            const ALL_SESS_TEAMS = [...new Set(selSess.players.flatMap(p=>{
+              const m=members.find(x=>x.name===p);
+              return (m?.teams||["Unassigned"]);
+            }))];
+            // Sort teams: restricted team first, then alpha
+            const sortedTeams=[...ALL_SESS_TEAMS].sort((a,b)=>{
+              if(a===selSess.restrictedTo) return -1;
+              if(b===selSess.restrictedTo) return 1;
+              return a.localeCompare(b);
+            });
+            // Build groups
+            const groups=sortedTeams.map(team=>({
+              team,
+              players:[...selSess.players]
+                .filter(p=>{
+                  const m=members.find(x=>x.name===p);
+                  const ts=m?.teams||[];
+                  if(team==="Unassigned") return ts.length===0;
+                  return ts.includes(team);
+                })
+                .sort((a,b)=>a.localeCompare(b)),
+            })).filter(g=>g.players.length>0);
+
+            // Deduplicate — each player appears in their first matching group only
+            const seen=new Set();
+            const dedupedGroups=groups.map(g=>({
+              ...g,
+              players:g.players.filter(p=>{ if(seen.has(p)) return false; seen.add(p); return true; })
+            })).filter(g=>g.players.length>0);
+
+            return dedupedGroups.map(({team,players})=>(
+              <PlayerGroup key={team} team={team} players={players} members={members}
+                lifts={lifts} selSess={selSess} isSelf={p=>currentUser?.name===p}
+                cutoff={cutoff} canRemove={canOrCoach(userRole,"removePlayer",userMem)}
+                onRemove={p=>handleLeave(selSess.id,p)}
+                onCarpoolEdit={p=>{
+                  const lo=getLiftObj((selSess.lifts||{})[p]);
+                  setLiftDraft({...lo});setCarpoolSheetSess(selSess);
+                }}
+                onCarpoolSet={()=>{setLiftDraft(null);setCarpoolSheetSess(selSess);}}
+                single={dedupedGroups.length===1}
+              />
+            ));
+          })()}
 
 
           {/* Poll voting */}
@@ -6183,6 +6316,22 @@ export default function App() {
                     )}
                     {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&pins[m.id]&&(
                       <Btn onClick={()=>resetPin(m.id)} bg={G.amberBg} col={G.amber} sm>🔑 Reset PIN</Btn>
+                    )}
+                    {/* Coach tag toggle — admins only */}
+                    {can(userRole,"assignRoles")&&(
+                      <button
+                        onClick={()=>{
+                          const updated=members.map(x=>x.id===m.id?{...x,isCoach:!m.isCoach}:x);
+                          saveMembers(updated);
+                          logAction("member",`${m.isCoach?"Removed":"Granted"} coach tag: ${m.name}`);
+                        }}
+                        style={{fontSize:10,fontWeight:700,padding:"3px 9px",borderRadius:20,
+                          border:`1px solid ${m.isCoach?"#fde68a":"rgba(0,0,0,.1)"}`,
+                          background:m.isCoach?"#fef9c3":"transparent",
+                          color:m.isCoach?"#92400e":G.muted,
+                          cursor:"pointer",fontFamily:"inherit",transition:"all .13s"}}>
+                        🧢 {m.isCoach?"Coach":"+ Coach"}
+                      </button>
                     )}
                     {/* Invite code — only for members with no email and no PIN yet, and no existing code */}
                     {can(userRole,"resetOtherPin")&&!pins[m.id]&&!m.email&&!EMAIL_SEED[m.name]&&!inviteCodes[m.id]&&(
