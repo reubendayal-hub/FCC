@@ -485,11 +485,20 @@ const KNOWN_COACHES = new Set([
   "Reuben Dayal","Aniket Sharma","Arun Krishnamurthy","Zeb Pirzada",
   "Nitin Gupta","Rajesh Muthukumar","Kuda",
 ]);
-const normMember = m => ({
-  ...m,
-  teams: m.teams || (m.team ? [m.team] : []),
-  isCoach: m.isCoach ?? KNOWN_COACHES.has(m.name),
-});
+// Youth player teams — members exclusively in these should NOT be auto-tagged as coach
+const YOUTH_PLAYER_TEAMS = new Set(["U11","U13","U15","U15 Girls","U18"]);
+const normMember = m => {
+  const memberTeams = m.teams || (m.team ? [m.team] : []);
+  // Only auto-apply isCoach if explicitly in KNOWN_COACHES
+  // AND not exclusively in youth player teams (coaches are adults, not child players)
+  const youthOnly = memberTeams.length>0 && memberTeams.every(t=>YOUTH_PLAYER_TEAMS.has(t));
+  const autoCoach = KNOWN_COACHES.has(m.name) && !youthOnly;
+  return {
+    ...m,
+    teams: memberTeams,
+    isCoach: m.isCoach ?? autoCoach,
+  };
+};
 
 // ─── Profile completion ────────────────────────────────────────
 function profileCompletion(m) {
@@ -1676,11 +1685,12 @@ function CarpoolSheet({sess,sessions,myName,liftDraft,setLiftDraft,liftEditing,s
 }
 
 function SessCard({s,members,teams,faded,onClick,onCarpoolClick}) {
-  // Coaches only meaningful for team-restricted sessions
-  const sessionCoaches = s.restrictedTo ? (
+  // Coaches: use stored s.coaches, or derive from sessionTeams/restrictedTo
+  const sessionCoaches = (s.restrictedTo||s.sessionTeams?.length) ? (
     s.coaches ||
-    (teams?.find(t=>t.name===s.restrictedTo)?.coaches) ||
-    []
+    [...new Set((s.sessionTeams||[s.restrictedTo].filter(Boolean)).flatMap(tn=>
+      teams?.find(t=>t.name===tn)?.coaches||[]
+    ))]
   ) : [];
   return (
     <div onClick={onClick} style={{background:isToday(s.date)?"#f7ffe8":G.white,
@@ -2089,6 +2099,7 @@ export default function App() {
   const carpoolRef = useRef(null);
   const sessionsRef = useRef([]); // always holds latest sessions, avoids stale closure in recurring effect
   const membersRef  = useRef([]); // same for members
+  const teamsRef    = useRef(DEFAULT_TEAMS); // same for teams
   const [bRestrictTeam, setBRestrictTeam] = useState("");
   const [selP,     setSelP]     = useState([]);
   const [pSearch,  setPSearch]  = useState("");
@@ -2201,6 +2212,7 @@ export default function App() {
           return {...t, coaches: t.coaches ?? def?.coaches ?? []};
         });
         setTeams(mergedTeams);
+        teamsRef.current = mergedTeams;
         setRecurring(   rr.exists() ? JSON.parse(rr.data().value) : []);
         setBlockCals(   br.exists() ? JSON.parse(br.data().value) : []);
         setInviteCodes( ir.exists() ? JSON.parse(ir.data().value) : {});
@@ -2223,7 +2235,7 @@ export default function App() {
   const saveSessions  = async u => { setSessions(u); sessionsRef.current=u; await setDoc(doc(db,"fccnets","sessions"), {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveMembers   = async u => { setMembers(u); membersRef.current=u; await setDoc(doc(db,"fccnets","members"),  {value:JSON.stringify(u)}).catch(()=>{}); };
   const savePins      = async u => { setPins(u);      await setDoc(doc(db,"fccnets","pins"),     {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveTeams     = async u => { setTeams(u);     await setDoc(doc(db,"fccnets","teams"),    {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveTeams     = async u => { setTeams(u); teamsRef.current=u; await setDoc(doc(db,"fccnets","teams"),    {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveRecurring = async u => { setRecurring(u); await setDoc(doc(db,"fccnets",RECURRING_KEY),{value:JSON.stringify(u)}).catch(()=>{}); };
   const saveBlockCals   = async u => { setBlockCals(u);   await setDoc(doc(db,"fccnets","blockcals"),   {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveInviteCodes = async u => { setInviteCodes(u);  await setDoc(doc(db,"fccnets","invitecodes"), {value:JSON.stringify(u)}).catch(()=>{}); };
@@ -2258,6 +2270,7 @@ export default function App() {
     if(loading || recurring.length===0) return;
     const liveSessions = sessionsRef.current;
     const liveMembers  = membersRef.current; // use ref to avoid stale closure
+    const liveTeams    = teamsRef.current;
     const today = new Date(); today.setHours(0,0,0,0);
     const toAdd = [];
     recurring.forEach(slot=>{
@@ -2276,10 +2289,17 @@ export default function App() {
           const autoPlayers = slotTeams.length
             ? liveMembers.filter(m=>(m.teams||[]).some(t=>slotTeams.includes(t))).map(m=>m.name)
             : [];
+          // Collect coaches from all slot teams
+          const slotCoaches = [...new Set(slotTeams.flatMap(tn=>{
+            const teamDef = (liveTeams||DEFAULT_TEAMS).find(t=>t.name===tn);
+            return teamDef?.coaches||[];
+          }))];
           toAdd.push({
             id:uid(), date:dateStr, from:slot.from, to:slot.to,
             label:slot.name, note:"", players:autoPlayers, poll:[],
             restrictedTo: slot.restrictTeam ? slot.team : null,
+            sessionTeams: slotTeams,
+            coaches: slotCoaches,
             recurringId: slot.id,
             net: slot.net || "1",
             lifts: {},
@@ -4321,26 +4341,61 @@ export default function App() {
             </div>
           )}
 
-          {/* ── Coaches for this session — restricted team sessions only ── */}
-          {selSess.restrictedTo&&(()=>{
-            const sessCoaches = selSess.coaches ||
-              teams.find(t=>t.name===selSess.restrictedTo)?.coaches ||
-              [];
+          {/* ── Coaches for this session — team sessions only ── */}
+          {(selSess.restrictedTo||selSess.sessionTeams?.length)&&(()=>{
+            const derivedCoaches = selSess.coaches !== undefined
+              ? selSess.coaches
+              : [...new Set((selSess.sessionTeams||[selSess.restrictedTo].filter(Boolean)).flatMap(tn=>
+                  teams.find(t=>t.name===tn)?.coaches||[]
+                ))];
+            const sessCoaches = derivedCoaches;
             const canEditCoaches = canOrCoach(userRole,"addOtherPlayer",userMem);
-            if(!sessCoaches.length&&!canEditCoaches) return null;
             return (
-              <div style={{display:"flex",alignItems:"center",flexWrap:"wrap",
-                gap:6,marginBottom:12}}>
-                <span style={{fontSize:11,fontWeight:700,color:G.muted,
-                  textTransform:"uppercase",letterSpacing:1}}>🧢 Coaches</span>
-                {sessCoaches.length>0 ? sessCoaches.map(name=>(
-                  <span key={name} style={{fontSize:11,fontWeight:700,padding:"2px 10px",
-                    borderRadius:20,background:"#fef9c3",color:"#92400e",
-                    border:"0.5px solid #fde68a"}}>
-                    🧢 Coach: {name}
-                  </span>
-                )) : (
-                  <span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>None assigned</span>
+              <div style={{marginBottom:14}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
+                  <span style={{fontSize:11,fontWeight:700,color:G.muted,
+                    textTransform:"uppercase",letterSpacing:1}}>🧢 Coaches</span>
+                  {sessCoaches.length>0 ? sessCoaches.map(name=>(
+                    <span key={name} style={{fontSize:11,fontWeight:700,padding:"2px 10px",
+                      borderRadius:20,background:"#fef9c3",color:"#92400e",
+                      border:"0.5px solid #fde68a"}}>
+                      🧢 {name}
+                    </span>
+                  )) : (
+                    <span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>None assigned</span>
+                  )}
+                </div>
+                {/* Coach editor — captains/admins/coaches only */}
+                {canEditCoaches&&(
+                  <div style={{marginTop:4}}>
+                    <div style={{fontSize:10,color:G.muted,marginBottom:5}}>
+                      Tap to add/remove coaches for this session:
+                    </div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                      {members.filter(m=>m.isCoach).sort((a,b)=>a.name.localeCompare(b.name)).map(m=>{
+                        const on=sessCoaches.includes(m.name);
+                        return (
+                          <button key={m.id} type="button"
+                            onClick={()=>{
+                              const newList=on
+                                ? sessCoaches.filter(n=>n!==m.name)
+                                : [...sessCoaches,m.name];
+                              const updSess={...selSess,coaches:newList};
+                              setSelSess(updSess);
+                              saveSessions(sessions.map(s=>s.id===selSess.id?updSess:s));
+                            }}
+                            style={{fontSize:11,fontWeight:700,padding:"3px 10px",
+                              borderRadius:20,cursor:"pointer",fontFamily:"inherit",
+                              background:on?"#fef9c3":"var(--color-bg,#f8fafc)",
+                              color:on?"#92400e":G.muted,
+                              border:`1px solid ${on?"#fde68a":"rgba(0,0,0,.1)"}`,
+                              transition:"all .13s"}}>
+                            {on?"🧢 ":"+ "}{m.name.split(" ")[0]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
               </div>
             );
@@ -5437,6 +5492,35 @@ export default function App() {
                   ) : (
                     <span style={{flex:1,fontWeight:800,fontSize:13,color:G.text}}>{t.name}</span>
                   )}
+                  {/* Coach assignments for this team */}
+                  <div style={{width:"100%",marginTop:6,paddingTop:6,
+                    borderTop:`1px solid ${G.border}`}}>
+                    <div style={{fontSize:10,fontWeight:700,color:G.muted,
+                      textTransform:"uppercase",letterSpacing:1,marginBottom:5}}>
+                      🧢 Coaches
+                    </div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                      {members.filter(m=>m.isCoach).sort((a,b)=>a.name.localeCompare(b.name)).map(m=>{
+                        const on=(t.coaches||[]).includes(m.name);
+                        return (
+                          <button key={m.id} type="button"
+                            onClick={()=>{
+                              const cur=t.coaches||[];
+                              const newList=on?cur.filter(n=>n!==m.name):[...cur,m.name];
+                              saveTeams(teams.map(x=>x.id===t.id?{...x,coaches:newList}:x));
+                            }}
+                            style={{fontSize:10,fontWeight:700,padding:"2px 8px",
+                              borderRadius:20,cursor:"pointer",fontFamily:"inherit",
+                              background:on?"#fef9c3":"transparent",
+                              color:on?"#92400e":G.muted,
+                              border:`1px solid ${on?"#fde68a":"rgba(0,0,0,.1)"}`,
+                              transition:"all .13s"}}>
+                            {on?"🧢 ":"+ "}{m.name.split(" ")[0]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                   {/* Senior / Youth toggle */}
                   <button type="button" onClick={()=>toggleTeamSenior(t.id)}
                     title={t.senior?"Senior (click to set Youth)":"Youth (click to set Senior)"}
