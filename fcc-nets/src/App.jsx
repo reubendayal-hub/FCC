@@ -1720,7 +1720,7 @@ function SessCard({s,members,teams,faded,onClick,onCarpoolClick}) {
             padding:"1px 8px",fontSize:10,fontWeight:800}}>{s.label}</span>}
         </div>
         <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:2}}>
-          <span style={{fontSize:12,color:G.muted}}>{s.from} – {s.to}</span>
+          <span style={{fontSize:12,color:G.muted,fontWeight:700}}>{s.from} – {s.to}</span>
           {/* Coach chips — max 3 visible, +N for rest */}
           {s.restrictedTo&&sessionCoaches.length>0&&<>
             {sessionCoaches.slice(0,3).map(name=>(
@@ -1763,16 +1763,16 @@ function SessCard({s,members,teams,faded,onClick,onCarpoolClick}) {
             </div>
           );
         })()}
-        {/* Player name chips — smaller to fit more */}
-        <div style={{marginTop:5,display:"flex",flexWrap:"wrap",gap:3}}>
+        {/* Player name chips — compact */}
+        <div style={{marginTop:5,display:"flex",flexWrap:"wrap",gap:2}}>
           {s.players.slice(0,12).map((p,i)=>{
             const mem=members.find(m=>m.name===p);
             const firstTeam=(mem?.teams||[])[0]||null;
             const tm=getTeamMeta(firstTeam||"Unassigned");
             return <span key={i} style={{background:tm.bg,color:tm.text,borderRadius:20,
-              padding:"1px 7px",fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{p}</span>;
+              padding:"0px 5px",fontSize:9,fontWeight:600,whiteSpace:"nowrap"}}>{p}</span>;
           })}
-          {s.players.length>12&&<span style={{fontSize:10,color:G.muted,padding:"1px 3px",
+          {s.players.length>12&&<span style={{fontSize:9,color:G.muted,padding:"0 3px",
             fontWeight:600}}>+{s.players.length-12}</span>}
         </div>
       </div>
