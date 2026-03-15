@@ -1719,20 +1719,27 @@ function SessCard({s,members,teams,faded,onClick,onCarpoolClick}) {
           {s.label&&<span style={{background:"#ede9fe",color:"#5b21b6",borderRadius:20,
             padding:"1px 8px",fontSize:10,fontWeight:800}}>{s.label}</span>}
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginTop:2}}>
+        <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:2}}>
           <span style={{fontSize:12,color:G.muted}}>{s.from} – {s.to}</span>
-          {/* Coach chips — only for restricted team sessions */}
-          {s.restrictedTo&&sessionCoaches.length>0&&sessionCoaches.map(name=>(
-            <span key={name} style={{fontSize:10,fontWeight:700,padding:"1px 8px",
-              borderRadius:20,background:"#fef9c3",color:"#92400e",
-              border:"0.5px solid #fde68a",display:"inline-flex",alignItems:"center",gap:3}}>
-              🧢 Coach: {name.split(" ")[0]}
-            </span>
-          ))}
+          {/* Coach chips — max 3 visible, +N for rest */}
+          {s.restrictedTo&&sessionCoaches.length>0&&<>
+            {sessionCoaches.slice(0,3).map(name=>(
+              <span key={name} style={{fontSize:10,fontWeight:700,padding:"1px 7px",
+                borderRadius:20,background:"#fef9c3",color:"#92400e",
+                border:"0.5px solid #fde68a",display:"inline-flex",alignItems:"center",gap:2}}>
+                🧢 {name.split(" ")[0]}
+              </span>
+            ))}
+            {sessionCoaches.length>3&&(
+              <span style={{fontSize:10,fontWeight:700,color:"#92400e",padding:"1px 5px",
+                borderRadius:20,background:"#fef9c3",border:"0.5px solid #fde68a"}}>
+                +{sessionCoaches.length-3}
+              </span>
+            )}
+          </>}
         </div>
         {(()=>{
           const lifts=s.lifts||{};
-          // Count from ALL lifts keys, not just s.players — catches prefs set before joining
           const liftPeople=Object.keys(lifts);
           const offering=liftPeople.filter(p=>getLiftPref(lifts[p])==="offer").length;
           const needing =liftPeople.filter(p=>getLiftPref(lifts[p])==="need").length;
@@ -1756,16 +1763,17 @@ function SessCard({s,members,teams,faded,onClick,onCarpoolClick}) {
             </div>
           );
         })()}
-        <div style={{marginTop:6,display:"flex",flexWrap:"wrap",gap:4}}>
-          {s.players.slice(0,5).map((p,i)=>{
+        {/* Player name chips — smaller to fit more */}
+        <div style={{marginTop:5,display:"flex",flexWrap:"wrap",gap:3}}>
+          {s.players.slice(0,12).map((p,i)=>{
             const mem=members.find(m=>m.name===p);
             const firstTeam=(mem?.teams||[])[0]||null;
             const tm=getTeamMeta(firstTeam||"Unassigned");
             return <span key={i} style={{background:tm.bg,color:tm.text,borderRadius:20,
-              padding:"2px 8px",fontSize:11,fontWeight:700}}>{p}</span>;
+              padding:"1px 7px",fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{p}</span>;
           })}
-          {s.players.length>5&&<span style={{fontSize:11,color:G.muted,padding:"2px 4px"}}>
-            +{s.players.length-5}</span>}
+          {s.players.length>12&&<span style={{fontSize:10,color:G.muted,padding:"1px 3px",
+            fontWeight:600}}>+{s.players.length-12}</span>}
         </div>
       </div>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,
