@@ -1698,29 +1698,33 @@ function SessCard({s,members,teams,faded,onClick,onCarpoolClick}) {
       opacity:faded?.48:1,cursor:"pointer",
       display:"flex",alignItems:"center",justifyContent:"space-between"}}>
       <div style={{flex:1,minWidth:0}}>
-        <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-          <span style={{fontSize:16,fontWeight:900,color:G.green,letterSpacing:"-.3px"}}>
-            {fmtShort(s.date)}
-          </span>
-          {isToday(s.date)&&<span style={{background:G.lime,color:G.green,borderRadius:20,
-            padding:"1px 8px",fontSize:10,fontWeight:900}}>TODAY</span>}
-          {s.restrictedTo&&<span style={{background:"#fef9c3",color:"#92400e",borderRadius:20,
-            padding:"1px 8px",fontSize:10,fontWeight:800}}>🔒 {s.restrictedTo}</span>}
-          {s.recurringId&&!s.restrictedTo&&<span style={{background:"#f0f9ff",color:"#0369a1",
-            borderRadius:20,padding:"1px 8px",fontSize:10,fontWeight:800}}>↻</span>}
-          {s.net&&<span style={{background:s.net==="both"?"#fef3c7":s.net==="2"?"#ede9fe":"#dcfce7",
-            color:s.net==="both"?"#92400e":s.net==="2"?"#5b21b6":"#166534",
-            borderRadius:20,padding:"1px 8px",fontSize:10,fontWeight:800,
-            display:"inline-flex",alignItems:"center",gap:3}}>
-            {s.net==="both"
-              ? <><BothNetsIcon color="#92400e" size={11}/> Both Nets</>
-              : <><NetIcon color={s.net==="2"?"#5b21b6":"#166534"} size={11}/> Net {s.net}</>}
-          </span>}
-          {s.label&&<span style={{background:"#ede9fe",color:"#5b21b6",borderRadius:20,
-            padding:"1px 8px",fontSize:10,fontWeight:800}}>{s.label}</span>}
-        </div>
-        <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:2}}>
-          <span style={{fontSize:12,color:G.muted,fontWeight:700}}>{s.from} – {s.to}</span>
+        {/* ── Date + time header — bordered ── */}
+        <div style={{background:isToday(s.date)?`${G.lime}22`:"rgba(0,0,0,.025)",
+          border:`1px solid ${isToday(s.date)?G.lime:G.border}`,
+          borderRadius:9,padding:"6px 10px",marginBottom:7}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+            <span style={{fontSize:16,fontWeight:900,color:G.green,letterSpacing:"-.3px"}}>
+              {fmtShort(s.date)}
+            </span>
+            {isToday(s.date)&&<span style={{background:G.lime,color:G.green,borderRadius:20,
+              padding:"1px 8px",fontSize:10,fontWeight:900}}>TODAY</span>}
+            {s.restrictedTo&&<span style={{background:"#fef9c3",color:"#92400e",borderRadius:20,
+              padding:"1px 8px",fontSize:10,fontWeight:800}}>🔒 {s.restrictedTo}</span>}
+            {s.recurringId&&!s.restrictedTo&&<span style={{background:"#f0f9ff",color:"#0369a1",
+              borderRadius:20,padding:"1px 8px",fontSize:10,fontWeight:800}}>↻</span>}
+            {s.net&&<span style={{background:s.net==="both"?"#fef3c7":s.net==="2"?"#ede9fe":"#dcfce7",
+              color:s.net==="both"?"#92400e":s.net==="2"?"#5b21b6":"#166534",
+              borderRadius:20,padding:"1px 8px",fontSize:10,fontWeight:800,
+              display:"inline-flex",alignItems:"center",gap:3}}>
+              {s.net==="both"
+                ? <><BothNetsIcon color="#92400e" size={11}/> Both Nets</>
+                : <><NetIcon color={s.net==="2"?"#5b21b6":"#166534"} size={11}/> Net {s.net}</>}
+            </span>}
+            {s.label&&<span style={{background:"#ede9fe",color:"#5b21b6",borderRadius:20,
+              padding:"1px 8px",fontSize:10,fontWeight:800}}>{s.label}</span>}
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:4}}>
+            <span style={{fontSize:12,color:G.green,fontWeight:800}}>{s.from} – {s.to}</span>
           {/* Coach chips — max 3 visible, +N for rest */}
           {s.restrictedTo&&sessionCoaches.length>0&&<>
             {sessionCoaches.slice(0,3).map(name=>(
@@ -1737,7 +1741,8 @@ function SessCard({s,members,teams,faded,onClick,onCarpoolClick}) {
               </span>
             )}
           </>}
-        </div>
+          </div>
+        </div>{/* end bordered header */}
         {(()=>{
           const lifts=s.lifts||{};
           const liftPeople=Object.keys(lifts);
