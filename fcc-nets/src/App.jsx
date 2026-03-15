@@ -439,6 +439,17 @@ const NET_COLORS = {
   "2": { bar:"#1e3a8a", label:"#bfdbfe", barBg:"#eff6ff", borderFree:"#bfdbfe", freeText:"#93c5fd" },
 };
 const PRIME_ZONES   = [{from:"17:00",to:"20:00"},{from:"09:00",to:"13:00"}];
+
+// ─── Car pool stops (Copenhagen → Karlebo corridor) ───────────
+const CARPOOL_STOPS = ["Nørrebro","Brønshøj","Nørreport","Lyngby St","Kokkedal St","Other"];
+
+// Normalise lift data — handles old string format & new object format
+function getLiftObj(d) {
+  if(!d) return {pref:"",seats:1,stop:"",stopOther:"",note:"",saved:false};
+  if(typeof d==="string") return {pref:d,seats:1,stop:"",stopOther:"",note:"",saved:true};
+  return d;
+}
+function getLiftPref(d) { return getLiftObj(d).pref||""; }
 const NET_DAY_START = 8*60, NET_DAY_END = 21*60, NET_SPAN = NET_DAY_END - NET_DAY_START;
 const netPct = m => Math.max(0,Math.min(100,(m-NET_DAY_START)/NET_SPAN*100));
 const toMinsNet = t => { const [h,mn]=t.split(":").map(Number); return h*60+mn; };
@@ -1313,6 +1324,24 @@ function SessCard({s,members,faded,onClick}) {
             padding:"1px 8px",fontSize:10,fontWeight:800}}>{s.label}</span>}
         </div>
         <div style={{fontSize:12,color:G.muted,marginTop:2}}>{s.from} – {s.to}</div>
+        {/* Compact carpool chip */}
+        {(()=>{
+          const lifts=s.lifts||{};
+          const offering=s.players.filter(p=>getLiftPref(lifts[p])==="offer").length;
+          const needing =s.players.filter(p=>getLiftPref(lifts[p])==="need").length;
+          if(!offering&&!needing) return null;
+          const parts=[];
+          if(offering) parts.push(`🚘 ${offering}`);
+          if(needing)  parts.push(`🙋 ${needing}`);
+          return (
+            <div style={{marginTop:4}}>
+              <span style={{fontSize:10,fontWeight:700,padding:"1px 8px",borderRadius:20,
+                background:"#f0fdf4",color:"#166534",border:"0.5px solid #86efac"}}>
+                {parts.join(" · ")} car pool
+              </span>
+            </div>
+          );
+        })()}
         <div style={{marginTop:6,display:"flex",flexWrap:"wrap",gap:4}}>
           {s.players.slice(0,5).map((p,i)=>{
             const mem=members.find(m=>m.name===p);
@@ -1643,6 +1672,9 @@ export default function App() {
   const [bNote,    setBNote]    = useState("");
   const [bLabel,   setBLabel]   = useState("");
   const [bNet,     setBNet]     = useState("1");  // "1" | "2" | "both"
+  const [bLift,    setBLift]    = useState("");   // "" | "offer" | "need" | "self"
+  const [liftEditing, setLiftEditing] = useState(false);  // carpool form open in session detail
+  const [liftDraft,   setLiftDraft]   = useState(null);   // draft lift object while editing
   const [bRestrictTeam, setBRestrictTeam] = useState("");
   const [selP,     setSelP]     = useState([]);
   const [pSearch,  setPSearch]  = useState("");
@@ -2150,15 +2182,36 @@ export default function App() {
       saveSessions([...sessions,{id:uid(),date:bDate,from:bFrom,to:bTo,
         players:[...autoPlayers],note:bNote.trim(),label:bLabel.trim(),
         net:bNet,
+        lifts: bLift && currentUser?.name ? {[currentUser.name]: {pref:bLift,seats:1,stop:"",stopOther:"",note:"",saved:true}} : {},
         restrictedTo,poll:pollOptions,comments:[]}]
         .sort((a,b)=>new Date(a.date)-new Date(b.date)));
       logAction("session", `Created session: ${bDate} ${bFrom}–${bTo}${bLabel?" «"+bLabel+"»":""}${restrictedTo?" ("+restrictedTo+" only)":""} — ${autoPlayers.length} player${autoPlayers.length>1?"s":""}: ${autoPlayers.join(", ")}`);
       const autoMsg = addedCount > 0 ? ` · ${addedCount} team member${addedCount>1?"s":""} auto-enrolled` : "";
       showToast(`Session booked for ${fmtShort(bDate)} ✓${autoMsg}`);
     }
-    setBDate("");setBNote("");setBLabel("");setBRestrictTeam("");setBNet("1");
+    setBDate("");setBNote("");setBLabel("");setBRestrictTeam("");setBNet("1");setBLift("");
     setSelP([currentUser?.name].filter(Boolean));setBPollOpts([...PRESET_POLL]);setBCustomOpt("");
     setView("schedule");
+  }
+
+  function setLiftPref(sessId, name, liftObj) {
+    // liftObj: {pref,seats,stop,stopOther,note,saved} or "" to clear
+    const updated = sessions.map(s => {
+      if(s.id !== sessId) return s;
+      const lifts = {...(s.lifts||{})};
+      if(liftObj && liftObj.pref) lifts[name] = liftObj;
+      else delete lifts[name];
+      return {...s, lifts};
+    });
+    saveSessions(updated);
+    if(selSess?.id === sessId) {
+      const newLifts = {...(selSess.lifts||{})};
+      if(liftObj && liftObj.pref) newLifts[name] = liftObj;
+      else delete newLifts[name];
+      setSelSess({...selSess, lifts: newLifts});
+    }
+    setLiftEditing(false);
+    setLiftDraft(null);
   }
 
   function handlePostComment(sessId, text) {
@@ -3165,12 +3218,12 @@ export default function App() {
             {filteredUpcoming.length>0&&<>
               <SLbl mt={4}>Upcoming</SLbl>
               {filteredUpcoming.map(s=><SessCard key={s.id} s={s} members={members}
-                onClick={()=>{setSelSess(s);setView("session");}}/>)}
+                onClick={()=>{setSelSess(s);setView("session");setLiftEditing(false);setLiftDraft(null);}}/>)}
             </>}
             {filteredPast.length>0&&<>
               <SLbl>Past</SLbl>
               {filteredPast.map(s=><SessCard key={s.id} s={s} members={members} faded
-                onClick={()=>{setSelSess(s);setView("session");}}/>)}
+                onClick={()=>{setSelSess(s);setView("session");setLiftEditing(false);setLiftDraft(null);}}/>)}
             </>}
           </>
         )}
@@ -3537,6 +3590,33 @@ export default function App() {
             </>);
           })()}
 
+          {/* Lift preference — only shown when current user is in the session */}
+          {selP.includes(currentUser?.name) && (
+            <div style={{marginBottom:14}}>
+              <SLbl>Your lift preference <span style={{fontWeight:500,color:G.muted}}>(optional)</span></SLbl>
+              <div style={{display:"flex",gap:8}}>
+                {[
+                  {val:"offer", label:"🚘 I can offer a lift", activeCol:"#14532d", activeTxt:"#a3e635"},
+                  {val:"need",  label:"🙋 I need a lift",      activeCol:"#1e3a5f", activeTxt:"#93c5fd"},
+                  {val:"self",  label:"🚀 Own transport",       activeCol:G.cream,   activeTxt:G.muted},
+                ].map(opt=>(
+                  <button key={opt.val} type="button"
+                    onClick={()=>setBLift(bLift===opt.val && opt.val!=="" ? "" : opt.val)}
+                    style={{
+                      flex:1, padding:"9px 6px", borderRadius:10, fontFamily:"inherit",
+                      fontSize:11, fontWeight:700, cursor:"pointer", border:"1.5px solid",
+                      borderColor: bLift===opt.val ? opt.activeCol : G.border,
+                      background:  bLift===opt.val ? opt.activeCol : G.white,
+                      color:       bLift===opt.val ? opt.activeTxt : G.muted,
+                      transition:"all .14s", lineHeight:1.3,
+                    }}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <SLbl>Session Poll <span style={{fontWeight:500,color:G.muted}}>(optional)</span></SLbl>          <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
             padding:14,marginBottom:14}}>
             {/* Preset options */}
@@ -3687,6 +3767,212 @@ export default function App() {
           )}
 
           <SLbl mt={4}>Players ({selSess.players.length})</SLbl>
+          {/* ── Car pool info section ───────────────────────── */}
+          {(()=>{
+            const lifts = selSess.lifts||{};
+            const myName = currentUser?.name;
+            const myRaw  = lifts[myName];
+            const myData = getLiftObj(myRaw);
+            // summary counts (excluding self — shown in their own row)
+            const offering = selSess.players.filter(p=>p!==myName&&getLiftPref(lifts[p])==="offer");
+            const needing  = selSess.players.filter(p=>p!==myName&&getLiftPref(lifts[p])==="need");
+            const anyOthers = offering.length||needing.length;
+            // Only show section if someone has set something OR user is in session
+            const userInSess = selSess.players.includes(myName);
+            if(!anyOthers && !userInSess) return null;
+
+            const PILL = (label, active, col, bg, bord, onClick) => (
+              <button onClick={onClick} style={{fontSize:11,fontWeight:700,padding:"5px 11px",
+                borderRadius:20,border:`1px solid ${active?bord:"rgba(0,0,0,.1)"}`,
+                background:active?bg:G.white,color:active?col:G.muted,
+                cursor:"pointer",fontFamily:"inherit",transition:"all .13s"}}>
+                {label}
+              </button>
+            );
+
+            const draft = liftDraft || myData;
+            const isO = draft.pref==="offer", isN = draft.pref==="need", isSelf = draft.pref==="self";
+
+            const dispStop = (d) => {
+              const obj = getLiftObj(d);
+              if(!obj.stop) return "";
+              return obj.stop==="Other" ? (obj.stopOther||"Other") : obj.stop;
+            };
+
+            return (
+              <div style={{background:"#f8fdf9",border:"1px solid #c6f0d0",borderRadius:12,
+                padding:"10px 13px",marginBottom:12}}>
+                <div style={{fontSize:10,fontWeight:800,color:G.muted,textTransform:"uppercase",
+                  letterSpacing:1.1,marginBottom:8}}>🚘 Car pool info</div>
+
+                {/* Other players summary */}
+                {anyOthers>0&&(
+                  <div style={{marginBottom:8,fontSize:12,lineHeight:1.7}}>
+                    {offering.map(name=>{
+                      const obj=getLiftObj(lifts[name]);
+                      const loc=dispStop(lifts[name]);
+                      return (
+                        <div key={name} style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                          <span style={{fontSize:10,fontWeight:700,padding:"1px 8px",borderRadius:20,
+                            background:"#dcfce7",color:"#166534",border:"0.5px solid #86efac"}}>
+                            🚘 Offering
+                          </span>
+                          <span style={{fontWeight:700,color:G.text,fontSize:12}}>{name}</span>
+                          {loc&&<span style={{fontSize:11,color:G.muted}}>📍{loc}</span>}
+                          {obj.seats>0&&<span style={{fontSize:11,color:G.muted}}>{obj.seats} seat{obj.seats>1?"s":""}</span>}
+                          {obj.note&&<span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>"{obj.note}"</span>}
+                        </div>
+                      );
+                    })}
+                    {needing.map(name=>{
+                      const obj=getLiftObj(lifts[name]);
+                      const loc=dispStop(lifts[name]);
+                      return (
+                        <div key={name} style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                          <span style={{fontSize:10,fontWeight:700,padding:"1px 8px",borderRadius:20,
+                            background:"#dbeafe",color:"#1e3a5f",border:"0.5px solid #93c5fd"}}>
+                            🙋 Needs lift
+                          </span>
+                          <span style={{fontWeight:700,color:G.text,fontSize:12}}>{name}</span>
+                          {loc&&<span style={{fontSize:11,color:G.muted}}>📍{loc}</span>}
+                          {obj.note&&<span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>"{obj.note}"</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* My preference — only if I'm in the session */}
+                {userInSess && !cutoff && (
+                  <div style={{borderTop:anyOthers?"0.5px solid #c6f0d0":"none",
+                    paddingTop:anyOthers?8:0}}>
+                    {/* Saved state — compact one-liner */}
+                    {myData.pref && !liftEditing ? (
+                      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                        <span style={{fontSize:10,fontWeight:700,padding:"1px 8px",borderRadius:20,
+                          background:isO?"#dcfce7":isN?"#dbeafe":"rgba(0,0,0,.05)",
+                          color:isO?"#166634":isN?"#1e3a5f":G.muted,
+                          border:`0.5px solid ${isO?"#86efac":isN?"#93c5fd":"rgba(0,0,0,.1)"}`}}>
+                          {isO?"🚘 Offering":isN?"🙋 Need lift":"🚀 Own transport"}
+                        </span>
+                        {isO&&myData.seats>0&&<span style={{fontSize:11,color:G.muted}}>{myData.seats} seat{myData.seats>1?"s":""}</span>}
+                        {dispStop(myData)&&<span style={{fontSize:11,color:G.muted}}>📍{dispStop(myData)}</span>}
+                        {myData.note&&<span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>"{myData.note}"</span>}
+                        <button onClick={()=>{setLiftDraft({...myData});setLiftEditing(true);}}
+                          style={{fontSize:11,background:"none",border:"none",color:G.muted,
+                            textDecoration:"underline",cursor:"pointer",fontFamily:"inherit",padding:0}}>
+                          Edit
+                        </button>
+                      </div>
+                    ) : (
+                      /* Editing / no pref yet */
+                      <div>
+                        <div style={{fontSize:11,color:G.muted,marginBottom:7,fontWeight:500}}>
+                          Your preference:
+                        </div>
+                        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+                          {PILL("🚘 Offer lift",  isO, "#166534","#f0fdf4","#86efac",
+                            ()=>setLiftDraft({...(liftDraft||{seats:1,stop:"",stopOther:"",note:""}),pref:isO?"":"offer"}))}
+                          {PILL("🙋 Need a lift", isN, "#1e3a5f","#eff6ff","#93c5fd",
+                            ()=>setLiftDraft({...(liftDraft||{seats:1,stop:"",stopOther:"",note:""}),pref:isN?"":"need"}))}
+                          {PILL("🚀 Own transport", isSelf, G.muted,"rgba(0,0,0,.05)","rgba(0,0,0,.2)",
+                            ()=>{
+                              const next={pref:"self",seats:0,stop:"",stopOther:"",note:"",saved:true};
+                              setLiftPref(selSess.id,myName,next);
+                            })}
+                        </div>
+                        {(isO||isN)&&(
+                          <div style={{background:G.white,border:"0.5px solid #c6f0d0",
+                            borderRadius:9,padding:"10px 12px"}}>
+                            {isO&&(
+                              <div style={{marginBottom:10}}>
+                                <div style={{fontSize:10,fontWeight:700,color:G.muted,
+                                  textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>
+                                  Seats available
+                                </div>
+                                <div style={{display:"flex",gap:6}}>
+                                  {[1,2,3,4].map(n=>{
+                                    const on=(liftDraft?.seats||1)===n;
+                                    return <button key={n}
+                                      onClick={()=>setLiftDraft(d=>({...d,seats:n}))}
+                                      style={{width:32,height:32,borderRadius:"50%",border:"1px solid",
+                                        borderColor:on?G.green:"rgba(0,0,0,.12)",
+                                        background:on?G.green:G.white,
+                                        color:on?G.lime:G.text,
+                                        fontFamily:"inherit",fontSize:13,fontWeight:700,
+                                        cursor:"pointer",display:"flex",alignItems:"center",
+                                        justifyContent:"center"}}>
+                                      {n}
+                                    </button>;
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                            <div style={{marginBottom:10}}>
+                              <div style={{fontSize:10,fontWeight:700,color:G.muted,
+                                textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>
+                                {isO?"Pickup stops on your route":"Where can you be picked up?"}
+                              </div>
+                              <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                                {CARPOOL_STOPS.map(st=>{
+                                  const on=(liftDraft?.stop||"")===st;
+                                  const ac=isO?"#166534":"#1e3a5f";
+                                  const ab=isO?"#f0fdf4":"#eff6ff";
+                                  const abord=isO?"#86efac":"#93c5fd";
+                                  return <button key={st}
+                                    onClick={()=>setLiftDraft(d=>({...d,stop:st}))}
+                                    style={{fontSize:11,fontWeight:600,padding:"4px 10px",
+                                      borderRadius:20,cursor:"pointer",fontFamily:"inherit",
+                                      border:`1px solid ${on?abord:"rgba(0,0,0,.1)"}`,
+                                      background:on?ab:G.white,
+                                      color:on?ac:G.muted,transition:"all .12s"}}>
+                                    {st}
+                                  </button>;
+                                })}
+                              </div>
+                              {liftDraft?.stop==="Other"&&(
+                                <input value={liftDraft?.stopOther||""}
+                                  onChange={e=>setLiftDraft(d=>({...d,stopOther:e.target.value}))}
+                                  placeholder="Your location…"
+                                  style={{marginTop:7,width:"100%",boxSizing:"border-box",
+                                    padding:"7px 10px",borderRadius:8,fontSize:12,
+                                    border:"0.5px solid rgba(0,0,0,.15)",fontFamily:"inherit",
+                                    background:G.white,color:G.text}}/>
+                              )}
+                            </div>
+                            <div>
+                              <div style={{fontSize:10,fontWeight:700,color:G.muted,
+                                textTransform:"uppercase",letterSpacing:1,marginBottom:5}}>
+                                Note <span style={{fontWeight:400,textTransform:"none"}}>(optional)</span>
+                              </div>
+                              <textarea rows={2} value={liftDraft?.note||""}
+                                onChange={e=>setLiftDraft(d=>({...d,note:e.target.value}))}
+                                placeholder={isO?"e.g. Leaving 16:00, WhatsApp me":"e.g. At stop from 16:15"}
+                                style={{width:"100%",boxSizing:"border-box",padding:"7px 10px",
+                                  borderRadius:8,fontSize:12,border:"0.5px solid rgba(0,0,0,.15)",
+                                  fontFamily:"inherit",resize:"none",background:G.white,color:G.text}}/>
+                            </div>
+                            <button
+                              onClick={()=>{
+                                const obj={...liftDraft,saved:true};
+                                setLiftPref(selSess.id,myName,obj);
+                              }}
+                              style={{width:"100%",marginTop:9,padding:"9px 0",borderRadius:9,
+                                border:"none",fontFamily:"inherit",fontSize:13,fontWeight:700,
+                                cursor:"pointer",
+                                background:isO?G.green:"#1e3a5f",
+                                color:isO?G.lime:"#bfdbfe"}}>
+                              Done ✓
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           {selSess.players.map((p,i)=>{
             const mem=members.find(m=>m.name===p);
             const isSelf=currentUser?.name===p;
@@ -3694,13 +3980,13 @@ export default function App() {
               <div key={i} style={{background:G.white,border:`1.5px solid ${G.border}`,
                 borderRadius:10,padding:"10px 14px",marginBottom:7,
                 display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0}}>
                   <div style={{width:36,height:36,background:`${G.green}18`,borderRadius:"50%",
                     display:"flex",alignItems:"center",justifyContent:"center",
-                    fontWeight:900,fontSize:13,color:G.green}}>
+                    fontWeight:900,fontSize:13,color:G.green,flexShrink:0}}>
                     {p.split(" ").map(w=>w[0]).join("").slice(0,2)}
                   </div>
-                  <div>
+                  <div style={{flex:1,minWidth:0}}>
                     <div style={{fontWeight:800,color:G.text,fontSize:15}}>
                       {p}{isSelf&&<span style={{color:G.muted,fontSize:12,fontWeight:500,marginLeft:6}}>(you)</span>}
                     </div>
