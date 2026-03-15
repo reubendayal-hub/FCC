@@ -1676,14 +1676,12 @@ function CarpoolSheet({sess,sessions,myName,liftDraft,setLiftDraft,liftEditing,s
 }
 
 function SessCard({s,members,teams,faded,onClick,onCarpoolClick}) {
-  // Derive coaches for this session
-  const sessionCoaches = s.coaches || (()=>{
-    if(s.restrictedTo) {
-      const t=teams?.find(t=>t.name===s.restrictedTo);
-      return t?.coaches||[];
-    }
-    return members.filter(m=>m.isCoach&&s.players.includes(m.name)).map(m=>m.name);
-  })();
+  // Coaches only meaningful for team-restricted sessions
+  const sessionCoaches = s.restrictedTo ? (
+    s.coaches ||
+    (teams?.find(t=>t.name===s.restrictedTo)?.coaches) ||
+    []
+  ) : [];
   return (
     <div onClick={onClick} style={{background:isToday(s.date)?"#f7ffe8":G.white,
       borderRadius:14,padding:"13px 15px",marginBottom:9,
@@ -1712,19 +1710,17 @@ function SessCard({s,members,teams,faded,onClick,onCarpoolClick}) {
           {s.label&&<span style={{background:"#ede9fe",color:"#5b21b6",borderRadius:20,
             padding:"1px 8px",fontSize:10,fontWeight:800}}>{s.label}</span>}
         </div>
-        <div style={{fontSize:12,color:G.muted,marginTop:2}}>{s.from} – {s.to}</div>
-        {/* Coach chips */}
-        {sessionCoaches.length>0&&(
-          <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:4}}>
-            {sessionCoaches.map(name=>(
-              <span key={name} style={{fontSize:10,fontWeight:700,padding:"1px 8px",
-                borderRadius:20,background:"#fef9c3",color:"#92400e",
-                border:"0.5px solid #fde68a",display:"inline-flex",alignItems:"center",gap:3}}>
-                🧢 {name.split(" ")[0]}
-              </span>
-            ))}
-          </div>
-        )}
+        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginTop:2}}>
+          <span style={{fontSize:12,color:G.muted}}>{s.from} – {s.to}</span>
+          {/* Coach chips — only for restricted team sessions */}
+          {s.restrictedTo&&sessionCoaches.length>0&&sessionCoaches.map(name=>(
+            <span key={name} style={{fontSize:10,fontWeight:700,padding:"1px 8px",
+              borderRadius:20,background:"#fef9c3",color:"#92400e",
+              border:"0.5px solid #fde68a",display:"inline-flex",alignItems:"center",gap:3}}>
+              🧢 Coach: {name.split(" ")[0]}
+            </span>
+          ))}
+        </div>
         {(()=>{
           const lifts=s.lifts||{};
           // Count from ALL lifts keys, not just s.players — catches prefs set before joining
@@ -2198,7 +2194,13 @@ export default function App() {
         setMembers(initialMembers);
         membersRef.current = initialMembers;
         setPins(        pr.exists() ? JSON.parse(pr.data().value) : {});
-        setTeams(       tr.exists() ? JSON.parse(tr.data().value) : DEFAULT_TEAMS);
+        // Merge coaches from DEFAULT_TEAMS into stored teams (adds coaches field if missing)
+        const storedTeams = tr.exists() ? JSON.parse(tr.data().value) : DEFAULT_TEAMS;
+        const mergedTeams = storedTeams.map(t => {
+          const def = DEFAULT_TEAMS.find(d=>d.name===t.name);
+          return {...t, coaches: t.coaches ?? def?.coaches ?? []};
+        });
+        setTeams(mergedTeams);
         setRecurring(   rr.exists() ? JSON.parse(rr.data().value) : []);
         setBlockCals(   br.exists() ? JSON.parse(br.data().value) : []);
         setInviteCodes( ir.exists() ? JSON.parse(ir.data().value) : {});
@@ -4319,15 +4321,11 @@ export default function App() {
             </div>
           )}
 
-          {/* ── Coaches for this session ──────────────────── */}
-          {(()=>{
-            const sessCoaches = selSess.coaches || (()=>{
-              if(selSess.restrictedTo) {
-                const t=teams.find(t=>t.name===selSess.restrictedTo);
-                return t?.coaches||[];
-              }
-              return members.filter(m=>m.isCoach&&selSess.players.includes(m.name)).map(m=>m.name);
-            })();
+          {/* ── Coaches for this session — restricted team sessions only ── */}
+          {selSess.restrictedTo&&(()=>{
+            const sessCoaches = selSess.coaches ||
+              teams.find(t=>t.name===selSess.restrictedTo)?.coaches ||
+              [];
             const canEditCoaches = canOrCoach(userRole,"addOtherPlayer",userMem);
             if(!sessCoaches.length&&!canEditCoaches) return null;
             return (
@@ -4339,7 +4337,7 @@ export default function App() {
                   <span key={name} style={{fontSize:11,fontWeight:700,padding:"2px 10px",
                     borderRadius:20,background:"#fef9c3",color:"#92400e",
                     border:"0.5px solid #fde68a"}}>
-                    🧢 {name}
+                    🧢 Coach: {name}
                   </span>
                 )) : (
                   <span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>None assigned</span>
