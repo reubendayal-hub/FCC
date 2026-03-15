@@ -1390,7 +1390,7 @@ function CarpoolSheet({sess,sessions,myName,liftDraft,setLiftDraft,liftEditing,s
                         </span>
                       </div>
                       <div style={{fontSize:11,color:G.muted,display:"flex",gap:6,flexWrap:"wrap"}}>
-                        {obj.seats>0&&<span>🪑 {obj.seats} seat{obj.seats>1?"s":""}</span>}
+                        {obj.seats>0&&<span>💺 {obj.seats} seat{obj.seats>1?"s":""}</span>}
                         {loc&&<span>📍 {loc}</span>}
                         {obj.note&&<span style={{fontStyle:"italic"}}>"{obj.note}"</span>}
                       </div>
@@ -1461,7 +1461,7 @@ function CarpoolSheet({sess,sessions,myName,liftDraft,setLiftDraft,liftEditing,s
                 <span style={{fontSize:12,fontWeight:700,color:isO?"#166534":isN?"#1e3a5f":G.muted}}>
                   {isO?"🚘 Offering lift":isN?"🙋 Needs lift":"🚀 Own transport"}
                 </span>
-                {isO&&myData.seats>0&&<span style={{fontSize:11,color:G.muted}}>🪑 {myData.seats} seat{myData.seats>1?"s":""}</span>}
+                {isO&&myData.seats>0&&<span style={{fontSize:11,color:G.muted}}>💺 {myData.seats} seat{myData.seats>1?"s":""}</span>}
                 {dispStop(myData)&&<span style={{fontSize:11,color:G.muted}}>📍 {dispStop(myData)}</span>}
                 {myData.note&&<span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>"{myData.note}"</span>}
                 <button onClick={()=>setLiftEditing(true)}
@@ -1964,6 +1964,7 @@ export default function App() {
   const [carpoolSheetSess, setCarpoolSheetSess] = useState(null); // bottom sheet session
   const carpoolRef = useRef(null);
   const sessionsRef = useRef([]); // always holds latest sessions, avoids stale closure in recurring effect
+  const membersRef  = useRef([]); // same for members
   const [bRestrictTeam, setBRestrictTeam] = useState("");
   const [selP,     setSelP]     = useState([]);
   const [pSearch,  setPSearch]  = useState("");
@@ -2065,7 +2066,9 @@ export default function App() {
         const initialSessions = sr.exists() ? JSON.parse(sr.data().value) : [];
         setSessions(initialSessions);
         sessionsRef.current = initialSessions;
-        setMembers(     mr.exists() ? JSON.parse(mr.data().value).map(normMember) : SEED_MEMBERS.map(normMember));
+        const initialMembers = mr.exists() ? JSON.parse(mr.data().value).map(normMember) : SEED_MEMBERS.map(normMember);
+        setMembers(initialMembers);
+        membersRef.current = initialMembers;
         setPins(        pr.exists() ? JSON.parse(pr.data().value) : {});
         setTeams(       tr.exists() ? JSON.parse(tr.data().value) : DEFAULT_TEAMS);
         setRecurring(   rr.exists() ? JSON.parse(rr.data().value) : []);
@@ -2088,7 +2091,7 @@ export default function App() {
   },[]);
 
   const saveSessions  = async u => { setSessions(u); sessionsRef.current=u; await setDoc(doc(db,"fccnets","sessions"), {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveMembers   = async u => { setMembers(u);   await setDoc(doc(db,"fccnets","members"),  {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveMembers   = async u => { setMembers(u); membersRef.current=u; await setDoc(doc(db,"fccnets","members"),  {value:JSON.stringify(u)}).catch(()=>{}); };
   const savePins      = async u => { setPins(u);      await setDoc(doc(db,"fccnets","pins"),     {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveTeams     = async u => { setTeams(u);     await setDoc(doc(db,"fccnets","teams"),    {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveRecurring = async u => { setRecurring(u); await setDoc(doc(db,"fccnets",RECURRING_KEY),{value:JSON.stringify(u)}).catch(()=>{}); };
@@ -2123,7 +2126,8 @@ export default function App() {
   // ── Auto-generate recurring sessions ─────────────────────────
   useEffect(()=>{
     if(loading || recurring.length===0) return;
-    const liveSessions = sessionsRef.current; // always latest — avoids stale closure
+    const liveSessions = sessionsRef.current;
+    const liveMembers  = membersRef.current; // use ref to avoid stale closure
     const today = new Date(); today.setHours(0,0,0,0);
     const toAdd = [];
     recurring.forEach(slot=>{
@@ -2136,14 +2140,21 @@ export default function App() {
         if(slot.activeTo   && dateStr > slot.activeTo)   continue;
         const exists = liveSessions.find(s=>
           s.recurringId===slot.id && s.date===dateStr);
-        if(!exists) toAdd.push({
-          id:uid(), date:dateStr, from:slot.from, to:slot.to,
-          label:slot.name, note:"", players:[], poll:[],
-          restrictedTo: slot.restrictTeam ? slot.team : null,
-          recurringId: slot.id,
-          net: slot.net || "1",
-          lifts: {},
-        });
+        if(!exists) {
+          // Auto-enroll members from the slot's teams
+          const slotTeams = slot.teams?.length ? slot.teams : (slot.team ? [slot.team] : []);
+          const autoPlayers = slotTeams.length
+            ? liveMembers.filter(m=>(m.teams||[]).some(t=>slotTeams.includes(t))).map(m=>m.name)
+            : [];
+          toAdd.push({
+            id:uid(), date:dateStr, from:slot.from, to:slot.to,
+            label:slot.name, note:"", players:autoPlayers, poll:[],
+            restrictedTo: slot.restrictTeam ? slot.team : null,
+            recurringId: slot.id,
+            net: slot.net || "1",
+            lifts: {},
+          });
+        }
       }
     });
     if(toAdd.length>0){
@@ -4162,7 +4173,7 @@ export default function App() {
                     <span style={{fontSize:10,fontWeight:700,padding:"1px 8px",borderRadius:20,
                       background:"#dcfce7",color:"#166534",border:"0.5px solid #86efac"}}>🚘 Offering</span>
                     <span style={{fontWeight:700,fontSize:12,color:G.text}}>{name}</span>
-                    {obj.seats>0&&<span style={{fontSize:11,color:G.muted}}>🪑{obj.seats}</span>}
+                    {obj.seats>0&&<span style={{fontSize:11,color:G.muted}}>💺{obj.seats}</span>}
                     {loc&&<span style={{fontSize:11,color:G.muted}}>📍{loc}</span>}
                     {obj.note&&<span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>"{obj.note}"</span>}
                   </div>;
@@ -4188,7 +4199,7 @@ export default function App() {
                       border:`0.5px solid ${isO?"#86efac":isN?"#93c5fd":"rgba(0,0,0,.1)"}`}}>
                       {isO?"🚘 You: Offering":isN?"🙋 You: Need lift":"🚀 You: Own transport"}
                     </span>
-                    {isO&&myLiftObj.seats>0&&<span style={{fontSize:11,color:G.muted}}>🪑{myLiftObj.seats}</span>}
+                    {isO&&myLiftObj.seats>0&&<span style={{fontSize:11,color:G.muted}}>💺{myLiftObj.seats}</span>}
                     {dispS(myLiftObj)&&<span style={{fontSize:11,color:G.muted}}>📍{dispS(myLiftObj)}</span>}
                     {myLiftObj.note&&<span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>"{myLiftObj.note}"</span>}
                     <button onClick={()=>{setLiftDraft({...myLiftObj});setCarpoolSheetSess(selSess);}}
@@ -4242,7 +4253,7 @@ export default function App() {
                           border:`0.5px solid ${isO?"#86efac":isN?"#93c5fd":"rgba(0,0,0,.1)"}`}}>
                           {isO?"🚘 Offering lift":isN?"🙋 Needs lift":"🚀 Own transport"}
                         </span>
-                        {isO&&liftObj.seats>0&&<span style={{fontSize:11,color:G.muted}}>🪑 {liftObj.seats} seat{liftObj.seats>1?"s":""}</span>}
+                        {isO&&liftObj.seats>0&&<span style={{fontSize:11,color:G.muted}}>💺 {liftObj.seats} seat{liftObj.seats>1?"s":""}</span>}
                         {dispStopInline(liftObj)&&<span style={{fontSize:11,color:G.muted}}>📍 {dispStopInline(liftObj)}</span>}
                         {liftObj.note&&<span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>"{liftObj.note}"</span>}
                         {isSelf&&!cutoff&&(
@@ -5821,8 +5832,8 @@ export default function App() {
             system:    {icon:"⚙️", label:"System",  col:"#374151", bg:"#f3f4f6"},
           };
           const ROLE_COLOURS = {
-            superadmin:"#14532d", admin:"#1e3a5f", captain:"#7c3aed",
-            vicecaptain:"#6b21a8", member:"#374151",
+            superadmin:"#86efac", admin:"#93c5fd", captain:"#c4b5fd",
+            vicecaptain:"#a5b4fc", member:"#94a3b8",
           };
           const filtered = logFilter==="all"
             ? auditLog
