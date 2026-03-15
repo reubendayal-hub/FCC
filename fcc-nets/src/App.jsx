@@ -1329,15 +1329,19 @@ function SessCard({s,members,faded,onClick}) {
           const lifts=s.lifts||{};
           const offering=s.players.filter(p=>getLiftPref(lifts[p])==="offer").length;
           const needing =s.players.filter(p=>getLiftPref(lifts[p])==="need").length;
-          if(!offering&&!needing) return null;
+          const ownT    =s.players.filter(p=>getLiftPref(lifts[p])==="self").length;
+          if(!offering&&!needing&&!ownT) return null;
           const parts=[];
           if(offering) parts.push(`🚘 ${offering}`);
           if(needing)  parts.push(`🙋 ${needing}`);
+          if(ownT)     parts.push(`🚀 ${ownT}`);
           return (
             <div style={{marginTop:4}}>
-              <span style={{fontSize:10,fontWeight:700,padding:"1px 8px",borderRadius:20,
-                background:"#f0fdf4",color:"#166534",border:"0.5px solid #86efac"}}>
-                {parts.join(" · ")} car pool
+              <span style={{fontSize:10,fontWeight:700,padding:"2px 9px",borderRadius:20,
+                background:"#f0fdf4",color:"#166534",border:"0.5px solid #86efac",
+                display:"inline-flex",alignItems:"center",gap:4}}>
+                {parts.join("  ")}
+                <span style={{fontWeight:500,opacity:.7}}>· car pool</span>
               </span>
             </div>
           );
@@ -2299,6 +2303,7 @@ export default function App() {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [schedFilter,   setSchedFilter]   = useState("all"); // "all" | "mine"
   const [blocksExpanded, setBlocksExpanded] = useState(false);
+  const [showPastAll,    setShowPastAll]    = useState(false);
   const [showAllBlocks,  setShowAllBlocks]  = useState(false);
   const [netsDate,       setNetsDate]       = useState(todayStr());
   const [wxData,         setWxData]         = useState(null); // weather data
@@ -3114,7 +3119,7 @@ export default function App() {
           ].map(({key,label})=>{
             const active = schedFilter===key;
             return (
-              <button key={key} onClick={()=>setSchedFilter(key)}
+              <button key={key} onClick={()=>{setSchedFilter(key);setShowPastAll(false);}}
                 style={{
                   padding:"6px 12px",borderRadius:20,cursor:"pointer",
                   fontFamily:"inherit",fontWeight:700,fontSize:12,border:"none",
@@ -3220,11 +3225,37 @@ export default function App() {
               {filteredUpcoming.map(s=><SessCard key={s.id} s={s} members={members}
                 onClick={()=>{setSelSess(s);setView("session");setLiftEditing(false);setLiftDraft(null);}}/>)}
             </>}
-            {filteredPast.length>0&&<>
-              <SLbl>Past</SLbl>
-              {filteredPast.map(s=><SessCard key={s.id} s={s} members={members} faded
-                onClick={()=>{setSelSess(s);setView("session");setLiftEditing(false);setLiftDraft(null);}}/>)}
-            </>}
+            {filteredPast.length>0&&(()=>{
+              const MAX_VISIBLE = 10;
+              const visiblePast = showPastAll
+                ? filteredPast.slice(0, MAX_VISIBLE)
+                : filteredPast.slice(0, 1);
+              const archived = filteredPast.slice(MAX_VISIBLE);
+              return <>
+                <SLbl>Past</SLbl>
+                {visiblePast.map(s=><SessCard key={s.id} s={s} members={members} faded
+                  onClick={()=>{setSelSess(s);setView("session");setLiftEditing(false);setLiftDraft(null);}}/>)}
+                {/* Toggle button */}
+                {filteredPast.length>1&&(
+                  <button onClick={()=>setShowPastAll(v=>!v)}
+                    style={{width:"100%",padding:"8px 0",background:"none",
+                      border:`1.5px dashed ${G.border}`,borderRadius:10,
+                      fontSize:12,fontWeight:700,color:G.muted,cursor:"pointer",
+                      fontFamily:"inherit",marginBottom:4}}>
+                    {showPastAll
+                      ? `▲ Show less`
+                      : `▼ Show ${Math.min(filteredPast.length-1, MAX_VISIBLE-1)} more past session${filteredPast.length>2?"s":""}`}
+                  </button>
+                )}
+                {/* Archived notice */}
+                {showPastAll&&archived.length>0&&(
+                  <div style={{fontSize:11,color:G.muted,textAlign:"center",
+                    padding:"6px 0 10px",fontWeight:500}}>
+                    {archived.length} older session{archived.length>1?"s":""} archived
+                  </div>
+                )}
+              </>;
+            })()}
           </>
         )}
 
