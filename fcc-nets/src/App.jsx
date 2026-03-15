@@ -1294,7 +1294,7 @@ function BothNetsIcon({color="currentColor",size=18}) {
 }
 
 // ─── Session card ─────────────────────────────────────────────
-function SessCard({s,members,faded,onClick}) {
+function SessCard({s,members,faded,onClick,onCarpoolClick}) {
   return (
     <div onClick={onClick} style={{background:isToday(s.date)?"#f7ffe8":G.white,
       borderRadius:14,padding:"13px 15px",marginBottom:9,
@@ -1337,9 +1337,12 @@ function SessCard({s,members,faded,onClick}) {
           if(ownT)     parts.push(`🚀 ${ownT}`);
           return (
             <div style={{marginTop:4}}>
-              <span style={{fontSize:10,fontWeight:700,padding:"2px 9px",borderRadius:20,
-                background:"#f0fdf4",color:"#166534",border:"0.5px solid #86efac",
-                display:"inline-flex",alignItems:"center",gap:4}}>
+              <span
+                onClick={onCarpoolClick ? e=>{e.stopPropagation();onCarpoolClick();} : undefined}
+                style={{fontSize:10,fontWeight:700,padding:"2px 9px",borderRadius:20,
+                  background:"#f0fdf4",color:"#166534",border:"0.5px solid #86efac",
+                  display:"inline-flex",alignItems:"center",gap:4,
+                  cursor:onCarpoolClick?"pointer":"default"}}>
                 {parts.join("  ")}
                 <span style={{fontWeight:500,opacity:.7}}>· car pool</span>
               </span>
@@ -1679,6 +1682,9 @@ export default function App() {
   const [bLift,    setBLift]    = useState("");   // "" | "offer" | "need" | "self"
   const [liftEditing, setLiftEditing] = useState(false);  // carpool form open in session detail
   const [liftDraft,   setLiftDraft]   = useState(null);   // draft lift object while editing
+  const [carpoolFocus,setCarpoolFocus]= useState(false);  // auto-scroll to carpool on open
+  const [notInExpanded,setNotInExpanded] = useState(false); // "not coming" section toggle
+  const carpoolRef = useRef(null);
   const [bRestrictTeam, setBRestrictTeam] = useState("");
   const [selP,     setSelP]     = useState([]);
   const [pSearch,  setPSearch]  = useState("");
@@ -1976,6 +1982,16 @@ export default function App() {
     setPickSearch("");
     setView("schedule");
   }
+
+  // ── Auto-scroll to carpool section when chip clicked ─────────
+  useEffect(()=>{
+    if(view==="session" && carpoolFocus && carpoolRef.current) {
+      setTimeout(()=>{
+        carpoolRef.current?.scrollIntoView({behavior:"smooth",block:"start"});
+      }, 120);
+      setCarpoolFocus(false);
+    }
+  },[view, carpoolFocus]);
 
   // ── Auto-select current user when opening Add Session ────────
   useEffect(()=>{
@@ -3223,7 +3239,8 @@ export default function App() {
             {filteredUpcoming.length>0&&<>
               <SLbl mt={4}>Upcoming</SLbl>
               {filteredUpcoming.map(s=><SessCard key={s.id} s={s} members={members}
-                onClick={()=>{setSelSess(s);setView("session");setLiftEditing(false);setLiftDraft(null);}}/>)}
+                onCarpoolClick={()=>{setSelSess(s);setView("session");setLiftEditing(false);setLiftDraft(null);setNotInExpanded(false);setCarpoolFocus(true);}}
+                onClick={()=>{setSelSess(s);setView("session");setLiftEditing(false);setLiftDraft(null);setNotInExpanded(false);setCarpoolFocus(false);}}/>)}
             </>}
             {filteredPast.length>0&&(()=>{
               const MAX_VISIBLE = 10;
@@ -3234,7 +3251,8 @@ export default function App() {
               return <>
                 <SLbl>Past</SLbl>
                 {visiblePast.map(s=><SessCard key={s.id} s={s} members={members} faded
-                  onClick={()=>{setSelSess(s);setView("session");setLiftEditing(false);setLiftDraft(null);}}/>)}
+                  onCarpoolClick={()=>{setSelSess(s);setView("session");setLiftEditing(false);setLiftDraft(null);setNotInExpanded(false);setCarpoolFocus(true);}}
+                  onClick={()=>{setSelSess(s);setView("session");setLiftEditing(false);setLiftDraft(null);setNotInExpanded(false);setCarpoolFocus(false);}}/>)}
                 {/* Toggle button */}
                 {filteredPast.length>1&&(
                   <button onClick={()=>setShowPastAll(v=>!v)}
@@ -3808,9 +3826,10 @@ export default function App() {
             const offering = selSess.players.filter(p=>p!==myName&&getLiftPref(lifts[p])==="offer");
             const needing  = selSess.players.filter(p=>p!==myName&&getLiftPref(lifts[p])==="need");
             const anyOthers = offering.length||needing.length;
-            // Only show section if someone has set something OR user is in session
+            // Show section if: others have set prefs, user is in session, OR user is allowed to join
             const userInSess = selSess.players.includes(myName);
-            if(!anyOthers && !userInSess) return null;
+            const userCanJoin = userInTeam; // already computed above
+            if(!anyOthers && !userInSess && !userCanJoin) return null;
 
             const PILL = (label, active, col, bg, bord, onClick) => (
               <button onClick={onClick} style={{fontSize:11,fontWeight:700,padding:"5px 11px",
@@ -3831,8 +3850,8 @@ export default function App() {
             };
 
             return (
-              <div style={{background:"#f8fdf9",border:"1px solid #c6f0d0",borderRadius:12,
-                padding:"10px 13px",marginBottom:12}}>
+              <div ref={carpoolRef} style={{background:"#f8fdf9",border:"1px solid #c6f0d0",borderRadius:12,
+                padding:"10px 13px",marginBottom:12,scrollMarginTop:12}}>
                 <div style={{fontSize:10,fontWeight:800,color:G.muted,textTransform:"uppercase",
                   letterSpacing:1.1,marginBottom:8}}>🚘 Car pool info</div>
 
@@ -3874,7 +3893,7 @@ export default function App() {
                 )}
 
                 {/* My preference — only if I'm in the session */}
-                {userInSess && !cutoff && (
+                {(userInSess || userCanJoin) && !cutoff && (
                   <div style={{borderTop:anyOthers?"0.5px solid #c6f0d0":"none",
                     paddingTop:anyOthers?8:0}}>
                     {/* Saved state — compact one-liner */}
@@ -3903,19 +3922,24 @@ export default function App() {
                         </div>
                         <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
                           {PILL("🚘 Offer lift",  isO, "#166534","#f0fdf4","#86efac",
-                            ()=>setLiftDraft({...(liftDraft||{seats:1,stop:"",stopOther:"",note:""}),pref:isO?"":"offer"}))}
+                            ()=>setLiftDraft(d=>({...(d||{seats:1,stop:"",stopOther:"",note:""}),pref:isO?"":"offer"})))}
                           {PILL("🙋 Need a lift", isN, "#1e3a5f","#eff6ff","#93c5fd",
-                            ()=>setLiftDraft({...(liftDraft||{seats:1,stop:"",stopOther:"",note:""}),pref:isN?"":"need"}))}
+                            ()=>setLiftDraft(d=>({...(d||{seats:1,stop:"",stopOther:"",note:""}),pref:isN?"":"need"})))}
                           {PILL("🚀 Own transport", isSelf, G.muted,"rgba(0,0,0,.05)","rgba(0,0,0,.2)",
-                            ()=>{
-                              const next={pref:"self",seats:0,stop:"",stopOther:"",note:"",saved:true};
-                              setLiftPref(selSess.id,myName,next);
-                            })}
+                            ()=>setLiftDraft(d=>({...(d||{seats:0,stop:"",stopOther:"",note:""}),pref:isSelf?"":"self"})))}
                         </div>
+                        {/* Own transport — just a Done button, no form needed */}
+                        {isSelf&&(
+                          <button onClick={()=>setLiftPref(selSess.id,myName,{...liftDraft,saved:true})}
+                            style={{width:"100%",padding:"9px 0",borderRadius:9,border:"none",
+                              fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer",
+                              background:G.muted,color:"#fff",marginBottom:4}}>
+                            Done ✓
+                          </button>
+                        )}
                         {(isO||isN)&&(
                           <div style={{background:G.white,border:"0.5px solid #c6f0d0",
-                            borderRadius:9,padding:"10px 12px"}}>
-                            {isO&&(
+                            borderRadius:9,padding:"10px 12px"}}>                            {isO&&(
                               <div style={{marginBottom:10}}>
                                 <div style={{fontSize:10,fontWeight:700,color:G.muted,
                                   textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>
@@ -4121,53 +4145,67 @@ export default function App() {
             });
             let divShown=false;
             const isSelf = name => name === currentUser?.name;
+            const label = canAddOthers ? "Add Players / Not Yet Signed Up" : "Not Yet Signed Up";
             return (<>
-              <SLbl>{canAddOthers ? "Add Players / Not Yet Signed Up" : "Not Yet Signed Up"}</SLbl>
-              {sortedKeys.map((t,idx)=>{
-                const isMine=myTsSet.has(t);
-                const showDiv=!isMine&&!divShown&&myTs.length>0&&idx>0;
-                if(showDiv) divShown=true;
-                return (
-                  <React.Fragment key={t}>
-                    {showDiv&&(
-                      <div style={{display:"flex",alignItems:"center",gap:8,margin:"4px 0 8px"}}>
-                        <div style={{flex:1,height:1,background:G.border}}/>
-                        <span style={{fontSize:10,fontWeight:900,letterSpacing:1.5,
-                          color:G.muted,textTransform:"uppercase"}}>Other Groups</span>
-                        <div style={{flex:1,height:1,background:G.border}}/>
+              {/* Toggle header */}
+              <button onClick={()=>setNotInExpanded(v=>!v)}
+                style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
+                  background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",
+                  padding:"4px 0 8px",marginTop:4}}>
+                <span style={{fontSize:12,fontWeight:900,letterSpacing:1.1,
+                  textTransform:"uppercase",color:G.muted}}>
+                  {label} ({notIn.length})
+                </span>
+                <span style={{fontSize:12,color:G.muted,fontWeight:700}}>
+                  {notInExpanded?"▲ hide":"▼ show"}
+                </span>
+              </button>
+              {notInExpanded&&<>
+                {sortedKeys.map((t,idx)=>{
+                  const isMine=myTsSet.has(t);
+                  const showDiv=!isMine&&!divShown&&myTs.length>0&&idx>0;
+                  if(showDiv) divShown=true;
+                  return (
+                    <React.Fragment key={t}>
+                      {showDiv&&(
+                        <div style={{display:"flex",alignItems:"center",gap:8,margin:"4px 0 8px"}}>
+                          <div style={{flex:1,height:1,background:G.border}}/>
+                          <span style={{fontSize:10,fontWeight:900,letterSpacing:1.5,
+                            color:G.muted,textTransform:"uppercase"}}>Other Groups</span>
+                          <div style={{flex:1,height:1,background:G.border}}/>
+                        </div>
+                      )}
+                      <div style={{marginBottom:12}}>
+                        <div style={{marginBottom:6}}><TeamPill team={t}/></div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+                          {grouped[t].map(m=>{
+                            const self = isSelf(m.name);
+                            const canAdd = canAddOthers || self;
+                            return (
+                              <button key={m.id}
+                                onClick={canAdd ? ()=>handleJoinDetail(m.name) : undefined}
+                                style={{background:canAdd?G.white:"#f1f5f9",
+                                  color:canAdd?G.text:G.muted,
+                                  border:`1.5px solid ${canAdd?G.border:"#e2e8f0"}`,
+                                  borderRadius:24,padding:"7px 14px",fontSize:13,fontWeight:700,
+                                  cursor:canAdd?"pointer":"default",fontFamily:"inherit",
+                                  opacity:canAdd?1:0.65}}>
+                                {canAdd ? `+ ${m.name}` : m.name}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                    )}
-                    <div style={{marginBottom:12}}>
-                      <div style={{marginBottom:6}}><TeamPill team={t}/></div>
-                      <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
-                        {grouped[t].map(m=>{
-                          const self = isSelf(m.name);
-                          // Members can only add themselves; captains/admins can add anyone
-                          const canAdd = canAddOthers || self;
-                          return (
-                            <button key={m.id}
-                              onClick={canAdd ? ()=>handleJoinDetail(m.name) : undefined}
-                              style={{background:canAdd?G.white:"#f1f5f9",
-                                color:canAdd?G.text:G.muted,
-                                border:`1.5px solid ${canAdd?G.border:"#e2e8f0"}`,
-                                borderRadius:24,padding:"7px 14px",fontSize:13,fontWeight:700,
-                                cursor:canAdd?"pointer":"default",fontFamily:"inherit",
-                                opacity:canAdd?1:0.65}}>
-                              {canAdd ? `+ ${m.name}` : m.name}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </React.Fragment>
-                );
-              })}
-              {!canAddOthers&&(
-                <div style={{fontSize:11,color:G.muted,marginBottom:12,fontStyle:"italic"}}>
-                  Only captains and admins can add other players.
-                  {cutoff && " Sign-ups are locked — contact your captain."}
-                </div>
-              )}
+                    </React.Fragment>
+                  );
+                })}
+                {!canAddOthers&&(
+                  <div style={{fontSize:11,color:G.muted,marginBottom:12,fontStyle:"italic"}}>
+                    Only captains and admins can add other players.
+                    {cutoff && " Sign-ups are locked — contact your captain."}
+                  </div>
+                )}
+              </>}
             </>);
           })()}
 
