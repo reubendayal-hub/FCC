@@ -1315,12 +1315,15 @@ function CarpoolSheet({sess,sessions,myName,liftDraft,setLiftDraft,liftEditing,s
   function saveLift(obj) {
     const newLifts = {...(sess.lifts||{})};
     if(obj && obj.pref) newLifts[myName] = obj; else delete newLifts[myName];
-    const updated = sessions.map(s=>s.id===sess.id?{...s,lifts:newLifts}:s);
+    const updatedSess = {...sess, lifts:newLifts};
+    const updated = sessions.map(s=>s.id===sess.id?updatedSess:s);
     saveSessions(updated);
-    if(selSess?.id===sess.id) setSelSess({...selSess,lifts:newLifts});
+    if(selSess?.id===sess.id) setSelSess(updatedSess);
+    // Update sheet's own sess so it re-renders showing saved state
+    // We do this by closing and the parent sees updated selSess/sessions
     setLiftDraft(null);
     setLiftEditing(false);
-    onClose();
+    onClose(); // close sheet — saved state now visible in session detail carpool section
   }
 
   const PILL = (label,active,col,bg,bord,onClick) => (
@@ -4117,21 +4120,92 @@ export default function App() {
           )}
 
           <SLbl mt={4}>Players ({selSess.players.length})</SLbl>
-          {/* Carpool prompt — shown when user has no preference set yet */}
-          {userInTeam && !cutoff && !getLiftPref((selSess.lifts||{})[currentUser?.name]) && (
-            <button onClick={()=>{setLiftDraft(null);setCarpoolSheetSess(selSess);}}
-              style={{width:"100%",display:"flex",alignItems:"center",gap:10,
-                padding:"11px 14px",marginBottom:10,borderRadius:10,cursor:"pointer",
-                fontFamily:"inherit",textAlign:"left",
-                background:"#f8fdf9",border:"1px solid #c6f0d0"}}>
-              <span style={{fontSize:20}}>🚘</span>
-              <div style={{flex:1}}>
-                <div style={{fontWeight:700,fontSize:13,color:G.green}}>Set your car pool preference</div>
-                <div style={{fontSize:11,color:G.muted,marginTop:1}}>Offer a lift, request one, or mark own transport</div>
+          {/* ── Persistent carpool section ─────────────────── */}
+          {userInTeam&&!cutoff&&(()=>{
+            const lifts=selSess.lifts||{};
+            const myName=currentUser?.name;
+            const myLiftObj=getLiftObj(lifts[myName]);
+            const myPref=myLiftObj.pref;
+            const isO=myPref==="offer",isN=myPref==="need",isSelf=myPref==="self";
+            const dispS=d=>{const o=getLiftObj(d);if(!o.stop)return"";return o.stop==="Other"?(o.stopOther||"Other"):o.stop;};
+            // Others who have set a pref (not current user)
+            const otherOffers=selSess.players.filter(p=>p!==myName&&getLiftPref(lifts[p])==="offer");
+            const otherNeeds =selSess.players.filter(p=>p!==myName&&getLiftPref(lifts[p])==="need");
+            const anyOthers=otherOffers.length||otherNeeds.length;
+            if(!myPref&&!anyOthers) {
+              // No prefs at all — show compact prompt
+              return (
+                <button onClick={()=>{setLiftDraft(null);setCarpoolSheetSess(selSess);}}
+                  style={{width:"100%",display:"flex",alignItems:"center",gap:10,
+                    padding:"11px 14px",marginBottom:10,borderRadius:10,cursor:"pointer",
+                    fontFamily:"inherit",textAlign:"left",
+                    background:"#f8fdf9",border:"1px solid #c6f0d0",boxSizing:"border-box"}}>
+                  <span style={{fontSize:20}}>🚘</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:700,fontSize:13,color:G.green}}>Car pool</div>
+                    <div style={{fontSize:11,color:G.muted,marginTop:1}}>Tap to set your travel preference</div>
+                  </div>
+                  <span style={{fontSize:16,color:G.green}}>›</span>
+                </button>
+              );
+            }
+            // At least one pref set — show full section
+            return (
+              <div style={{background:"#f8fdf9",border:"1px solid #c6f0d0",borderRadius:12,
+                padding:"10px 13px",marginBottom:12}}>
+                <div style={{fontSize:10,fontWeight:800,color:G.muted,textTransform:"uppercase",
+                  letterSpacing:1.1,marginBottom:8}}>🚘 Car pool</div>
+                {/* Others */}
+                {otherOffers.map(name=>{
+                  const obj=getLiftObj(lifts[name]);const loc=dispS(lifts[name]);
+                  return <div key={name} style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:4}}>
+                    <span style={{fontSize:10,fontWeight:700,padding:"1px 8px",borderRadius:20,
+                      background:"#dcfce7",color:"#166534",border:"0.5px solid #86efac"}}>🚘 Offering</span>
+                    <span style={{fontWeight:700,fontSize:12,color:G.text}}>{name}</span>
+                    {obj.seats>0&&<span style={{fontSize:11,color:G.muted}}>🪑{obj.seats}</span>}
+                    {loc&&<span style={{fontSize:11,color:G.muted}}>📍{loc}</span>}
+                    {obj.note&&<span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>"{obj.note}"</span>}
+                  </div>;
+                })}
+                {otherNeeds.map(name=>{
+                  const obj=getLiftObj(lifts[name]);const loc=dispS(lifts[name]);
+                  return <div key={name} style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:4}}>
+                    <span style={{fontSize:10,fontWeight:700,padding:"1px 8px",borderRadius:20,
+                      background:"#dbeafe",color:"#1e3a5f",border:"0.5px solid #93c5fd"}}>🙋 Needs lift</span>
+                    <span style={{fontWeight:700,fontSize:12,color:G.text}}>{name}</span>
+                    {loc&&<span style={{fontSize:11,color:G.muted}}>📍{loc}</span>}
+                    {obj.note&&<span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>"{obj.note}"</span>}
+                  </div>;
+                })}
+                {/* Divider before my row */}
+                {anyOthers>0&&<div style={{borderTop:`0.5px solid #c6f0d0`,margin:"6px 0"}}/>}
+                {/* My preference */}
+                {myPref ? (
+                  <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                    <span style={{fontSize:10,fontWeight:700,padding:"1px 8px",borderRadius:20,
+                      background:isO?"#dcfce7":isN?"#dbeafe":"rgba(0,0,0,.05)",
+                      color:isO?"#166534":isN?"#1e3a5f":G.muted,
+                      border:`0.5px solid ${isO?"#86efac":isN?"#93c5fd":"rgba(0,0,0,.1)"}`}}>
+                      {isO?"🚘 You: Offering":isN?"🙋 You: Need lift":"🚀 You: Own transport"}
+                    </span>
+                    {isO&&myLiftObj.seats>0&&<span style={{fontSize:11,color:G.muted}}>🪑{myLiftObj.seats}</span>}
+                    {dispS(myLiftObj)&&<span style={{fontSize:11,color:G.muted}}>📍{dispS(myLiftObj)}</span>}
+                    {myLiftObj.note&&<span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>"{myLiftObj.note}"</span>}
+                    <button onClick={()=>{setLiftDraft({...myLiftObj});setCarpoolSheetSess(selSess);}}
+                      style={{fontSize:11,background:"none",border:"none",color:G.muted,
+                        textDecoration:"underline",cursor:"pointer",fontFamily:"inherit",padding:0}}>Edit</button>
+                  </div>
+                ) : (
+                  <button onClick={()=>{setLiftDraft(null);setCarpoolSheetSess(selSess);}}
+                    style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,
+                      border:`1px solid #c6f0d0`,background:G.white,color:G.green,
+                      cursor:"pointer",fontFamily:"inherit"}}>
+                    🚘 Set your preference
+                  </button>
+                )}
               </div>
-              <span style={{fontSize:16,color:G.green}}>›</span>
-            </button>
-          )}
+            );
+          })()}
           {/* ── Players with inline carpool ──────────────────── */}
           {selSess.players.map((p,i)=>{
             const mem=members.find(m=>m.name===p);
