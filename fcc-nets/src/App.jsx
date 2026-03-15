@@ -159,10 +159,13 @@ const CAN = {
   resetOtherPin:  ["superadmin"],
 };
 const can = (role, action) => (CAN[action]||[]).includes(role);
-// isCoach: members with isCoach:true get captain-level abilities
-function canOrCoach(role, action, member) {
+// canOrCoach: coaches (derived from team.coaches[]) get captain-level abilities
+// Note: teams param optional — falls back to role check only if not provided
+function canOrCoach(role, action, member, teams) {
   if(can(role, action)) return true;
-  if(member?.isCoach && ["removePlayer","addOtherPlayer","deleteSession","sendReminder"].includes(action)) return true;
+  if(member && teams && ["removePlayer","addOtherPlayer","deleteSession","sendReminder"].includes(action)) {
+    return isCoachMember(member.name, teams);
+  }
   return false;
 }
 
@@ -481,24 +484,20 @@ function netAvailGauge(sessions, date) {
 
 // Normalise member — migrate old single `team` field to `teams` array
 // Known coaches — isCoach:true seeded on these members
-const KNOWN_COACHES = new Set([
-  "Reuben Dayal","Aniket Sharma","Arun Krishnamurthy","Zeb Pirzada",
-  "Nitin Gupta","Rajesh Muthukumar","Kuda",
-]);
-// Youth player teams — members exclusively in these should NOT be auto-tagged as coach
-const YOUTH_PLAYER_TEAMS = new Set(["U11","U13","U15","U15 Girls","U18"]);
-const normMember = m => {
-  const memberTeams = m.teams || (m.team ? [m.team] : []);
-  // Only auto-apply isCoach if explicitly in KNOWN_COACHES
-  // AND not exclusively in youth player teams (coaches are adults, not child players)
-  const youthOnly = memberTeams.length>0 && memberTeams.every(t=>YOUTH_PLAYER_TEAMS.has(t));
-  const autoCoach = KNOWN_COACHES.has(m.name) && !youthOnly;
-  return {
-    ...m,
-    teams: memberTeams,
-    isCoach: m.isCoach ?? autoCoach,
-  };
-};
+// normMember — never stores isCoach; derived dynamically from team.coaches[]
+const normMember = m => ({
+  ...m,
+  teams: m.teams || (m.team ? [m.team] : []),
+});
+
+// getCoachTeams(name, teams) — returns team names where this person is listed as coach
+function getCoachTeams(name, teams) {
+  return (teams||[]).filter(t=>(t.coaches||[]).includes(name)).map(t=>t.name);
+}
+// isCoachMember(name, teams) — true if they coach any team
+function isCoachMember(name, teams) {
+  return (teams||[]).some(t=>(t.coaches||[]).includes(name));
+}
 
 // ─── Profile completion ────────────────────────────────────────
 function profileCompletion(m) {
@@ -2122,6 +2121,7 @@ export default function App() {
   const [newTName,  setNewTName]  = useState("");
   const [newTSenior,setNewTSenior]= useState(false);
   const [editingTeam,setEditingTeam]= useState(null);
+  const [coachSearch, setCoachSearch] = useState({}); // {teamId: searchString}
   const [editingName, setEditingName] = useState(null); // {id, value}
 
   // Recurring slot form state
@@ -4279,13 +4279,13 @@ export default function App() {
     const isRestricted = !!selSess.restrictedTo;
     const userInTeam = !isRestricted
       || (userMem?.teams||[]).includes(selSess.restrictedTo)
-      || canOrCoach(userRole,"deleteSession",userMem);
-    const canAddOthers = canOrCoach(userRole,"addOtherPlayer",userMem);
+      || canOrCoach(userRole,"deleteSession",userMem,teams);
+    const canAddOthers = canOrCoach(userRole,"addOtherPlayer",userMem,teams);
     const cutoff = isAfterCutoff(selSess.date);
     // Members not in session — admins/captains/coaches see all relevant, members only see own team
     const notIn = members.filter(m=>!selSess.players.includes(m.name))
       .filter(m=>{
-        if(isRestricted) return (m.teams||[]).includes(selSess.restrictedTo) || canOrCoach(userRole,"deleteSession",userMem);
+        if(isRestricted) return (m.teams||[]).includes(selSess.restrictedTo) || canOrCoach(userRole,"deleteSession",userMem,teams);
         if(!canAddOthers) return (m.teams||[]).some(t=>(userMem?.teams||[]).includes(t));
         return true;
       });
@@ -4349,7 +4349,7 @@ export default function App() {
                   teams.find(t=>t.name===tn)?.coaches||[]
                 ))];
             const sessCoaches = derivedCoaches;
-            const canEditCoaches = canOrCoach(userRole,"addOtherPlayer",userMem);
+            const canEditCoaches = canOrCoach(userRole,"addOtherPlayer",userMem,teams);
             return (
               <div style={{marginBottom:14}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
@@ -4372,7 +4372,7 @@ export default function App() {
                       Tap to add/remove coaches for this session:
                     </div>
                     <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                      {members.filter(m=>m.isCoach).sort((a,b)=>a.name.localeCompare(b.name)).map(m=>{
+                      {members.filter(m=>isCoachMember(m.name,teams)).sort((a,b)=>a.name.localeCompare(b.name)).map(m=>{
                         const on=sessCoaches.includes(m.name);
                         return (
                           <button key={m.id} type="button"
@@ -4525,7 +4525,7 @@ export default function App() {
             return dedupedGroups.map(({team,players})=>(
               <PlayerGroup key={team} team={team} players={players} members={members}
                 lifts={lifts} selSess={selSess} isSelf={p=>currentUser?.name===p}
-                cutoff={cutoff} canRemove={canOrCoach(userRole,"removePlayer",userMem)}
+                cutoff={cutoff} canRemove={canOrCoach(userRole,"removePlayer",userMem,teams)}
                 onRemove={p=>handleLeave(selSess.id,p)}
                 onCarpoolEdit={p=>{
                   const lo=getLiftObj((selSess.lifts||{})[p]);
@@ -5492,35 +5492,6 @@ export default function App() {
                   ) : (
                     <span style={{flex:1,fontWeight:800,fontSize:13,color:G.text}}>{t.name}</span>
                   )}
-                  {/* Coach assignments for this team */}
-                  <div style={{width:"100%",marginTop:6,paddingTop:6,
-                    borderTop:`1px solid ${G.border}`}}>
-                    <div style={{fontSize:10,fontWeight:700,color:G.muted,
-                      textTransform:"uppercase",letterSpacing:1,marginBottom:5}}>
-                      🧢 Coaches
-                    </div>
-                    <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                      {members.filter(m=>m.isCoach).sort((a,b)=>a.name.localeCompare(b.name)).map(m=>{
-                        const on=(t.coaches||[]).includes(m.name);
-                        return (
-                          <button key={m.id} type="button"
-                            onClick={()=>{
-                              const cur=t.coaches||[];
-                              const newList=on?cur.filter(n=>n!==m.name):[...cur,m.name];
-                              saveTeams(teams.map(x=>x.id===t.id?{...x,coaches:newList}:x));
-                            }}
-                            style={{fontSize:10,fontWeight:700,padding:"2px 8px",
-                              borderRadius:20,cursor:"pointer",fontFamily:"inherit",
-                              background:on?"#fef9c3":"transparent",
-                              color:on?"#92400e":G.muted,
-                              border:`1px solid ${on?"#fde68a":"rgba(0,0,0,.1)"}`,
-                              transition:"all .13s"}}>
-                            {on?"🧢 ":"+ "}{m.name.split(" ")[0]}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
                   {/* Senior / Youth toggle */}
                   <button type="button" onClick={()=>toggleTeamSenior(t.id)}
                     title={t.senior?"Senior (click to set Youth)":"Youth (click to set Senior)"}
@@ -5568,6 +5539,95 @@ export default function App() {
               </label>
               <Btn type="submit" bg={G.green} col={G.lime}>+ Add</Btn>
             </form>
+          </div>
+        </>}
+
+        {/* ── Team Coaches ────────────────────────────────────── */}
+        {can(userRole,"addMember")&&<>
+          <SLbl mt={4}>🧢 Team Coaches</SLbl>
+          <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
+            padding:14,marginBottom:16}}>
+            <div style={{fontSize:12,color:G.muted,marginBottom:12,lineHeight:1.5}}>
+              Assign coaches to teams. Coaches appear on session cards and details.
+              This data will sync with the Trainer shift coordination system.
+            </div>
+            {teams.map(t=>{
+              const tCoaches = t.coaches||[];
+              const search = coachSearch[t.id]||"";
+              const suggestions = search.trim().length>1
+                ? members
+                    .filter(m=>m.name.toLowerCase().includes(search.toLowerCase())&&!tCoaches.includes(m.name))
+                    .sort((a,b)=>a.name.localeCompare(b.name))
+                    .slice(0,6)
+                : [];
+              return (
+                <div key={t.id} style={{marginBottom:14,paddingBottom:14,
+                  borderBottom:`1px solid ${G.border}`}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                    <span style={{fontWeight:800,fontSize:13,color:G.text}}>{t.name}</span>
+                    <span style={{fontSize:10,color:G.muted,background:G.cream,
+                      padding:"1px 7px",borderRadius:20,border:`1px solid ${G.border}`}}>
+                      {t.senior?"Senior":"Youth"}
+                    </span>
+                  </div>
+                  {/* Current coaches */}
+                  <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:6}}>
+                    {tCoaches.length===0&&(
+                      <span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>No coaches assigned</span>
+                    )}
+                    {tCoaches.map(name=>(
+                      <span key={name} style={{display:"inline-flex",alignItems:"center",gap:4,
+                        fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:20,
+                        background:"#fef9c3",color:"#92400e",border:"0.5px solid #fde68a"}}>
+                        🧢 {name}
+                        <button onClick={()=>{
+                          saveTeams(teams.map(x=>x.id===t.id
+                            ?{...x,coaches:tCoaches.filter(n=>n!==name)}:x));
+                          logAction("member",`Removed coach ${name} from ${t.name}`);
+                        }} style={{background:"none",border:"none",cursor:"pointer",
+                          color:"#92400e",padding:0,fontSize:13,lineHeight:1,fontWeight:900}}>
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  {/* Search to add */}
+                  <div style={{position:"relative"}}>
+                    <input
+                      placeholder="Search to add a coach…"
+                      value={search}
+                      onChange={e=>setCoachSearch(s=>({...s,[t.id]:e.target.value}))}
+                      style={iSt({padding:"7px 10px",fontSize:12,width:"100%",boxSizing:"border-box"})}/>
+                    {suggestions.length>0&&(
+                      <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:20,
+                        background:G.white,border:`1.5px solid ${G.border}`,
+                        borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,.1)",marginTop:2}}>
+                        {suggestions.map(m=>(
+                          <button key={m.id} type="button"
+                            onClick={()=>{
+                              saveTeams(teams.map(x=>x.id===t.id
+                                ?{...x,coaches:[...tCoaches,m.name]}:x));
+                              setCoachSearch(s=>({...s,[t.id]:""}));
+                              logAction("member",`Added coach ${m.name} to ${t.name}`);
+                            }}
+                            style={{width:"100%",textAlign:"left",padding:"8px 12px",
+                              background:"none",border:"none",borderBottom:`1px solid ${G.border}`,
+                              cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,
+                              color:G.text}}>
+                            {m.name}
+                            {getCoachTeams(m.name,teams).length>0&&(
+                              <span style={{fontSize:10,color:G.muted,marginLeft:6}}>
+                                (also coaches: {getCoachTeams(m.name,teams).join(", ")})
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </>}
 
@@ -6398,22 +6458,6 @@ export default function App() {
                     )}
                     {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&pins[m.id]&&(
                       <Btn onClick={()=>resetPin(m.id)} bg={G.amberBg} col={G.amber} sm>🔑 Reset PIN</Btn>
-                    )}
-                    {/* Coach tag toggle — admins only */}
-                    {can(userRole,"assignRoles")&&(
-                      <button
-                        onClick={()=>{
-                          const updated=members.map(x=>x.id===m.id?{...x,isCoach:!m.isCoach}:x);
-                          saveMembers(updated);
-                          logAction("member",`${m.isCoach?"Removed":"Granted"} coach tag: ${m.name}`);
-                        }}
-                        style={{fontSize:10,fontWeight:700,padding:"3px 9px",borderRadius:20,
-                          border:`1px solid ${m.isCoach?"#fde68a":"rgba(0,0,0,.1)"}`,
-                          background:m.isCoach?"#fef9c3":"transparent",
-                          color:m.isCoach?"#92400e":G.muted,
-                          cursor:"pointer",fontFamily:"inherit",transition:"all .13s"}}>
-                        🧢 {m.isCoach?"Coach":"+ Coach"}
-                      </button>
                     )}
                     {/* Invite code — only for members with no email and no PIN yet, and no existing code */}
                     {can(userRole,"resetOtherPin")&&!pins[m.id]&&!m.email&&!EMAIL_SEED[m.name]&&!inviteCodes[m.id]&&(
