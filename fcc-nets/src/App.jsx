@@ -1387,7 +1387,7 @@ function CarpoolSheet({sess,sessions,myName,liftDraft,setLiftDraft,liftEditing,s
                         </span>
                       </div>
                       <div style={{fontSize:11,color:G.muted,display:"flex",gap:6,flexWrap:"wrap"}}>
-                        {obj.seats>0&&<span>🪑 {obj.seats} seat{obj.seats>1?"s":""}</span>}
+                        {obj.seats>0&&<span>💺 {obj.seats} seat{obj.seats>1?"s":""}</span>}
                         {loc&&<span>📍 {loc}</span>}
                         {obj.note&&<span style={{fontStyle:"italic"}}>"{obj.note}"</span>}
                       </div>
@@ -1458,7 +1458,7 @@ function CarpoolSheet({sess,sessions,myName,liftDraft,setLiftDraft,liftEditing,s
                 <span style={{fontSize:12,fontWeight:700,color:isO?"#166534":isN?"#1e3a5f":G.muted}}>
                   {isO?"🚘 Offering lift":isN?"🙋 Needs lift":"🚀 Own transport"}
                 </span>
-                {isO&&myData.seats>0&&<span style={{fontSize:11,color:G.muted}}>🪑 {myData.seats} seat{myData.seats>1?"s":""}</span>}
+                {isO&&myData.seats>0&&<span style={{fontSize:11,color:G.muted}}>💺 {myData.seats} seat{myData.seats>1?"s":""}</span>}
                 {dispStop(myData)&&<span style={{fontSize:11,color:G.muted}}>📍 {dispStop(myData)}</span>}
                 {myData.note&&<span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>"{myData.note}"</span>}
                 <button onClick={()=>setLiftEditing(true)}
@@ -4146,7 +4146,7 @@ export default function App() {
                           border:`0.5px solid ${isO?"#86efac":isN?"#93c5fd":"rgba(0,0,0,.1)"}`}}>
                           {isO?"🚘 Offering lift":isN?"🙋 Needs lift":"🚀 Own transport"}
                         </span>
-                        {isO&&liftObj.seats>0&&<span style={{fontSize:11,color:G.muted}}>🪑 {liftObj.seats} seat{liftObj.seats>1?"s":""}</span>}
+                        {isO&&liftObj.seats>0&&<span style={{fontSize:11,color:G.muted}}>💺 {liftObj.seats} seat{liftObj.seats>1?"s":""}</span>}
                         {dispStopInline(liftObj)&&<span style={{fontSize:11,color:G.muted}}>📍 {dispStopInline(liftObj)}</span>}
                         {liftObj.note&&<span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>"{liftObj.note}"</span>}
                         {isSelf&&!cutoff&&(
