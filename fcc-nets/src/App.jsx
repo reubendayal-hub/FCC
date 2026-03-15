@@ -1387,7 +1387,7 @@ function CarpoolSheet({sess,sessions,myName,liftDraft,setLiftDraft,liftEditing,s
                         </span>
                       </div>
                       <div style={{fontSize:11,color:G.muted,display:"flex",gap:6,flexWrap:"wrap"}}>
-                        {obj.seats>0&&<span>💺 {obj.seats} seat{obj.seats>1?"s":""}</span>}
+                        {obj.seats>0&&<span>🪑 {obj.seats} seat{obj.seats>1?"s":""}</span>}
                         {loc&&<span>📍 {loc}</span>}
                         {obj.note&&<span style={{fontStyle:"italic"}}>"{obj.note}"</span>}
                       </div>
@@ -1458,7 +1458,7 @@ function CarpoolSheet({sess,sessions,myName,liftDraft,setLiftDraft,liftEditing,s
                 <span style={{fontSize:12,fontWeight:700,color:isO?"#166534":isN?"#1e3a5f":G.muted}}>
                   {isO?"🚘 Offering lift":isN?"🙋 Needs lift":"🚀 Own transport"}
                 </span>
-                {isO&&myData.seats>0&&<span style={{fontSize:11,color:G.muted}}>💺 {myData.seats} seat{myData.seats>1?"s":""}</span>}
+                {isO&&myData.seats>0&&<span style={{fontSize:11,color:G.muted}}>🪑 {myData.seats} seat{myData.seats>1?"s":""}</span>}
                 {dispStop(myData)&&<span style={{fontSize:11,color:G.muted}}>📍 {dispStop(myData)}</span>}
                 {myData.note&&<span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>"{myData.note}"</span>}
                 <button onClick={()=>setLiftEditing(true)}
@@ -2046,7 +2046,8 @@ export default function App() {
     };
     (async()=>{
       try {
-        const [mr,pr,tr,rr,br,ir,jr,ar] = await Promise.all([
+        const [sr,mr,pr,tr,rr,br,ir,jr,ar] = await Promise.all([
+          getDoc(refs.sessions),
           getDoc(refs.members),
           getDoc(refs.pins),
           getDoc(refs.teams),
@@ -2056,6 +2057,11 @@ export default function App() {
           getDoc(refs.joinrequests),
           getDoc(refs.auditlog),
         ]);
+        // Sessions MUST be loaded before setLoading(false) so sessionsRef is
+        // populated before the recurring useEffect runs — prevents lifts being wiped
+        const initialSessions = sr.exists() ? JSON.parse(sr.data().value) : [];
+        setSessions(initialSessions);
+        sessionsRef.current = initialSessions;
         setMembers(     mr.exists() ? JSON.parse(mr.data().value).map(normMember) : SEED_MEMBERS.map(normMember));
         setPins(        pr.exists() ? JSON.parse(pr.data().value) : {});
         setTeams(       tr.exists() ? JSON.parse(tr.data().value) : DEFAULT_TEAMS);
@@ -2069,6 +2075,7 @@ export default function App() {
       }
       setLoading(false);
     })();
+    // onSnapshot keeps sessions live for real-time updates after initial load
     const unsub = onSnapshot(refs.sessions, snap => {
       const val = snap.exists() ? JSON.parse(snap.data().value) : [];
       setSessions(val);
@@ -4110,6 +4117,21 @@ export default function App() {
           )}
 
           <SLbl mt={4}>Players ({selSess.players.length})</SLbl>
+          {/* Carpool prompt — shown when user has no preference set yet */}
+          {userInTeam && !cutoff && !getLiftPref((selSess.lifts||{})[currentUser?.name]) && (
+            <button onClick={()=>{setLiftDraft(null);setCarpoolSheetSess(selSess);}}
+              style={{width:"100%",display:"flex",alignItems:"center",gap:10,
+                padding:"11px 14px",marginBottom:10,borderRadius:10,cursor:"pointer",
+                fontFamily:"inherit",textAlign:"left",
+                background:"#f8fdf9",border:"1px solid #c6f0d0"}}>
+              <span style={{fontSize:20}}>🚘</span>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,fontSize:13,color:G.green}}>Set your car pool preference</div>
+                <div style={{fontSize:11,color:G.muted,marginTop:1}}>Offer a lift, request one, or mark own transport</div>
+              </div>
+              <span style={{fontSize:16,color:G.green}}>›</span>
+            </button>
+          )}
           {/* ── Players with inline carpool ──────────────────── */}
           {selSess.players.map((p,i)=>{
             const mem=members.find(m=>m.name===p);
@@ -4146,7 +4168,7 @@ export default function App() {
                           border:`0.5px solid ${isO?"#86efac":isN?"#93c5fd":"rgba(0,0,0,.1)"}`}}>
                           {isO?"🚘 Offering lift":isN?"🙋 Needs lift":"🚀 Own transport"}
                         </span>
-                        {isO&&liftObj.seats>0&&<span style={{fontSize:11,color:G.muted}}>💺 {liftObj.seats} seat{liftObj.seats>1?"s":""}</span>}
+                        {isO&&liftObj.seats>0&&<span style={{fontSize:11,color:G.muted}}>🪑 {liftObj.seats} seat{liftObj.seats>1?"s":""}</span>}
                         {dispStopInline(liftObj)&&<span style={{fontSize:11,color:G.muted}}>📍 {dispStopInline(liftObj)}</span>}
                         {liftObj.note&&<span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>"{liftObj.note}"</span>}
                         {isSelf&&!cutoff&&(
