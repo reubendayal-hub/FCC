@@ -2810,7 +2810,8 @@ export default function App() {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [schedFilter,   setSchedFilter]   = useState("all"); // "all" | "mine"
   const [blocksExpanded, setBlocksExpanded] = useState(false);
-  const [showPastAll,    setShowPastAll]    = useState(false);
+  const [showPastAll,       setShowPastAll]       = useState(false);
+  const [showUpcomingAll,   setShowUpcomingAll]   = useState(false);
   const [welcomeDismissed, setWelcomeDismissed] = useState(()=>{
     try{ return localStorage.getItem("fcc-welcome-v1")==="1"; }catch{ return false; }
   });
@@ -3589,68 +3590,75 @@ export default function App() {
     return (
     <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
         currentUser={currentUser} onLogout={handleLogout}/>}>
-      {/* ── Schedule header — custom compact layout ── */}
-      <div style={{background:G.green,padding:"12px 16px 10px",
-        position:"sticky",top:0,zIndex:100}}>
-        {/* Row 1: Logo + title + sign-out */}
-        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+      {/* ── Schedule header — B+D hybrid ── */}
+      <div style={{background:G.green,position:"sticky",top:0,zIndex:100}}>
+        {/* Compact single bar: logo · date+title · avatar */}
+        <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
           <img src={FCC_LOGO} alt="FCC" className="fcc-header-logo"
-            style={{width:48,height:48,borderRadius:"50%",objectFit:"cover",flexShrink:0,
-              border:"2px solid rgba(255,255,255,0.35)",
-              boxShadow:"0 2px 8px rgba(0,0,0,0.25)"}}/>
+            style={{width:30,height:30,borderRadius:"50%",objectFit:"cover",flexShrink:0,
+              border:"1.5px solid rgba(255,255,255,0.3)"}}/>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
-              fontSize:18,fontWeight:900,lineHeight:1.15}}>FCC Training</div>
-            <div style={{color:"rgba(255,255,255,0.55)",fontSize:11,marginTop:1}}>
-              Fredensborg Cricket Club
+            <div style={{fontSize:11,color:"rgba(255,255,255,.45)",
+              letterSpacing:"0.8px",textTransform:"uppercase",lineHeight:1}}>
+              {new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"})}
             </div>
+            <div style={{fontSize:15,fontWeight:900,color:G.white,lineHeight:1.2,
+              fontFamily:"'Playfair Display',serif",marginTop:1}}>Schedule</div>
           </div>
           <button onClick={handleLogout}
-            style={{background:"rgba(255,255,255,0.12)",border:"none",borderRadius:20,
-              padding:"5px 10px",color:"rgba(255,255,255,0.8)",fontSize:11,fontWeight:800,
-              cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:5,
-              flexShrink:0}}>
-            {currentUser.name.split(" ")[0]}
-            <span style={{opacity:.6,fontWeight:400}}>· sign out</span>
+            style={{display:"flex",alignItems:"center",gap:6,background:"none",
+              border:"none",cursor:"pointer",padding:0,flexShrink:0}}>
+            <div style={{width:28,height:28,borderRadius:"50%",
+              background:"rgba(255,255,255,.12)",
+              display:"flex",alignItems:"center",justifyContent:"center",
+              fontSize:13,color:"rgba(255,255,255,.8)"}}>
+              {currentUser.name.split(" ")[0][0]}
+            </div>
+            <span style={{fontSize:10,color:"rgba(255,255,255,.45)"}}>
+              {currentUser.name.split(" ")[0]}
+            </span>
           </button>
         </div>
-        {/* Row 2: filter tabs */}
-        <div style={{display:"flex",alignItems:"center",gap:6}}>
-          <div style={{flex:1}}/>
+
+        {/* Gold pill filter tabs */}
+        <div style={{padding:"0 14px 10px",display:"flex",gap:8}}>
           {[
             {key:"all",  label:"🏏 All Sessions"},
             {key:"mine", label:"✋ My Sessions"},
           ].map(({key,label})=>{
             const active = schedFilter===key;
             return (
-              <button key={key} onClick={()=>{setSchedFilter(key);setShowPastAll(false);}}
-                style={{
-                  padding:"6px 12px",borderRadius:20,cursor:"pointer",
-                  fontFamily:"inherit",fontWeight:700,fontSize:12,border:"none",
-                  transition:"all .15s",whiteSpace:"nowrap",
-                  background: active ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.15)",
-                  color: active ? G.green : "rgba(255,255,255,0.75)",
-                  boxShadow: active ? "0 1px 4px rgba(0,0,0,0.2)" : "none",
-                }}>
+              <button key={key}
+                onClick={()=>{setSchedFilter(key);setShowPastAll(false);setShowUpcomingAll(false);}}
+                style={{flex:1,padding:"7px 0",borderRadius:20,cursor:"pointer",
+                  fontFamily:"inherit",fontWeight:700,fontSize:11,
+                  transition:"all .15s",whiteSpace:"nowrap",textAlign:"center",
+                  background: active ? "#fbbf24" : "rgba(251,191,36,.15)",
+                  color: active ? "#1e3a5f" : "rgba(251,191,36,.7)",
+                  border: active ? "none" : "0.5px solid rgba(251,191,36,.3)"}}>
                 {label}
               </button>
             );
           })}
         </div>
 
+        {/* Reminder strips */}
         {can(userRole,"sendReminder")&&tomorrowSess.length>0&&(
-          <div style={{marginTop:8,background:"rgba(163,230,53,.13)",borderRadius:10,
-            padding:"9px 13px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <div style={{color:"rgba(255,255,255,.85)",fontSize:12,fontWeight:700}}>
+          <div style={{margin:"0 14px 10px",background:"rgba(251,191,36,.12)",
+            border:"0.5px solid rgba(251,191,36,.25)",
+            borderRadius:10,padding:"8px 12px",
+            display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div style={{color:"rgba(255,255,255,.75)",fontSize:11,fontWeight:700}}>
               📅 {tomorrowSess.reduce((n,s)=>n+s.players.length,0)} players booked tomorrow
             </div>
-            <Btn onClick={()=>openWA(tomorrowStr())} bg={G.lime} col={G.green} sm>📲 Send Reminder</Btn>
+            <Btn onClick={()=>openWA(tomorrowStr())} bg="#fbbf24" col="#1e3a5f" sm>📲 Send Reminder</Btn>
           </div>
         )}
         {can(userRole,"sendReminder")&&todaySess.length>0&&(
-          <div style={{marginTop:8,background:"rgba(255,255,255,.08)",borderRadius:10,
-            padding:"9px 13px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <div style={{color:"rgba(255,255,255,.85)",fontSize:12,fontWeight:700}}>🟢 Training TODAY</div>
+          <div style={{margin:"0 14px 10px",background:"rgba(255,255,255,.08)",
+            borderRadius:10,padding:"8px 12px",
+            display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div style={{color:"rgba(255,255,255,.8)",fontSize:11,fontWeight:700}}>🟢 Training TODAY</div>
             <Btn onClick={()=>openWA(todayStr())} bg="rgba(255,255,255,.18)" col={G.white} sm>📲 Share Today</Btn>
           </div>
         )}
@@ -3714,7 +3722,7 @@ export default function App() {
               ["🚪","Can't make a session? Sign yourself out before 9pm the night before"],
               ["🏏","Tap any session to see who's coming, vote in the poll, or set car pool"],
               ["➕","Need extra nets time? Tap Book at the bottom"],
-              ["👤","Fill in your profile — add your number so the club can reach you"],
+              ["👤","Fill in your profile — add your number and email so the club can reach you"],
             ].map(([icon,text],i)=>(
               <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,
                 marginBottom:8}}>
@@ -3771,12 +3779,30 @@ export default function App() {
           </div>
         ):(
           <>
-            {filteredUpcoming.length>0&&<>
-              <SLbl mt={4}>Upcoming</SLbl>
-              {filteredUpcoming.map(s=><SessCard key={s.id} s={s} members={members} teams={teams}
-                onCarpoolClick={()=>{setLiftDraft(null);setCarpoolSheetSess(s);}}
-                onClick={()=>{setSelSess(s);setView("session");setLiftEditing(false);setLiftDraft(null);setNotInExpanded(false);setCarpoolFocus(false);}}/>)}
-            </>}
+            {filteredUpcoming.length>0&&(()=>{
+              const UPCOMING_LIMIT = 5;
+              const visibleUpcoming = showUpcomingAll
+                ? filteredUpcoming
+                : filteredUpcoming.slice(0, UPCOMING_LIMIT);
+              const hiddenCount = filteredUpcoming.length - UPCOMING_LIMIT;
+              return <>
+                <SLbl mt={4}>Upcoming</SLbl>
+                {visibleUpcoming.map(s=><SessCard key={s.id} s={s} members={members} teams={teams}
+                  onCarpoolClick={()=>{setLiftDraft(null);setCarpoolSheetSess(s);}}
+                  onClick={()=>{setSelSess(s);setView("session");setLiftEditing(false);setLiftDraft(null);setNotInExpanded(false);setCarpoolFocus(false);}}/>)}
+                {filteredUpcoming.length>UPCOMING_LIMIT&&(
+                  <button onClick={()=>setShowUpcomingAll(v=>!v)}
+                    style={{width:"100%",padding:"8px 0",background:"none",
+                      border:`1.5px dashed ${G.border}`,borderRadius:10,
+                      fontSize:12,fontWeight:700,color:G.muted,cursor:"pointer",
+                      fontFamily:"inherit",marginBottom:4}}>
+                    {showUpcomingAll
+                      ? "▲ Show fewer"
+                      : `▼ Show ${hiddenCount} more upcoming session${hiddenCount>1?"s":""}`}
+                  </button>
+                )}
+              </>;
+            })()}
             {filteredPast.length>0&&(()=>{
               const MAX_VISIBLE = 10;
               const visiblePast = showPastAll
