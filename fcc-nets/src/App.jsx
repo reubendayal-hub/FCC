@@ -5230,34 +5230,69 @@ export default function App() {
       showToast("Opening your email app… ✓");
       setTimeout(()=>setView("profile"),1200);
     }
+    const QUICK_LINKS = [
+      {icon:"📅", title:"Getting started", desc:"How to log in and set your PIN for the first time"},
+      {icon:"🔁", title:"Weekly training", desc:"Your squad is auto-added — sign out if you can't make it"},
+      {icon:"➕", title:"Booking nets", desc:"Prime time (17–20h) is 1 hour max. All other times 2 hours"},
+      {icon:"🚘", title:"Car pool", desc:"Set a lift preference on any session — offer, need, or own transport"},
+      {icon:"🧢", title:"Coaches", desc:"Coach names appear on team sessions automatically"},
+      {icon:"🔒", title:"Sign-out deadline", desc:"You can leave a session until 9pm the night before"},
+    ];
     return (
       <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
           currentUser={currentUser} onLogout={handleLogout}/>}>
-        <AppHeader title="Help & Contact" sub="Send a message to your admin"
+        <AppHeader title="Help & Guide" sub="Everything you need to know"
           onBack={()=>setView("profile")}/>
-        <div style={{padding:"20px 16px 100px",display:"flex",flexDirection:"column",gap:16}}>
+        <div style={{padding:"16px 16px 100px",display:"flex",flexDirection:"column",gap:12}}>
 
-          {/* Info card */}
-          <div style={{background:G.white,border:`1.5px solid ${G.border}`,
-            borderRadius:14,padding:"16px 18px",display:"flex",gap:14,alignItems:"flex-start"}}>
-            <div style={{width:44,height:44,borderRadius:"50%",background:G.green,
-              flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",
-              fontSize:20}}>👋</div>
-            <div>
-              <div style={{fontWeight:800,fontSize:14,color:G.text,marginBottom:4}}>
-                Got a question or issue?
+          {/* Full guide CTA */}
+          <div style={{background:`linear-gradient(135deg,${G.green},${G.mid})`,
+            borderRadius:14,padding:"20px 18px",
+            display:"flex",alignItems:"center",gap:14}}>
+            <div style={{fontSize:36,flexShrink:0}}>📖</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:900,fontSize:15,color:G.lime,marginBottom:4}}>
+                Full App Guide
               </div>
-              <div style={{fontSize:13,color:G.muted,lineHeight:1.6}}>
-                Send a message to <b style={{color:G.text}}>Reuben</b> directly. Your name is included automatically so he knows who to reply to.
+              <div style={{fontSize:12,color:"rgba(255,255,255,.8)",lineHeight:1.5,marginBottom:12}}>
+                Screenshots, step-by-step walkthroughs, and everything explained clearly.
               </div>
+              <button
+                onClick={()=>window.open("https://training-app-guide.netlify.app","_blank")}
+                style={{background:G.lime,color:G.green,border:"none",borderRadius:20,
+                  padding:"9px 20px",fontWeight:900,fontSize:13,cursor:"pointer",
+                  fontFamily:"inherit",display:"flex",alignItems:"center",gap:6}}>
+                Open Guide →
+              </button>
             </div>
           </div>
+
+          {/* Quick reference cards */}
+          <div style={{fontSize:11,fontWeight:900,letterSpacing:1.5,color:G.muted,
+            textTransform:"uppercase",marginTop:4}}>Quick reference</div>
+          {QUICK_LINKS.map((q,i)=>(
+            <div key={i} style={{background:G.white,border:`1.5px solid ${G.border}`,
+              borderRadius:12,padding:"12px 14px",
+              display:"flex",alignItems:"flex-start",gap:12}}>
+              <span style={{fontSize:22,flexShrink:0,marginTop:1}}>{q.icon}</span>
+              <div>
+                <div style={{fontWeight:800,fontSize:13,color:G.text,marginBottom:2}}>{q.title}</div>
+                <div style={{fontSize:12,color:G.muted,lineHeight:1.5}}>{q.desc}</div>
+              </div>
+            </div>
+          ))}
+
+          {/* Divider */}
+          <div style={{borderTop:`1px solid ${G.border}`,marginTop:4}}/>
+          <div style={{fontSize:11,fontWeight:900,letterSpacing:1.5,color:G.muted,
+            textTransform:"uppercase"}}>Still need help? Message Reuben</div>
 
           {/* Category picker */}
           <div style={{background:G.white,border:`1.5px solid ${G.border}`,
             borderRadius:14,padding:"14px 16px"}}>
-            <div style={{fontSize:11,fontWeight:900,letterSpacing:1.5,color:G.muted,
-              textTransform:"uppercase",marginBottom:10}}>What's this about?</div>
+            <div style={{fontSize:11,fontWeight:700,color:G.muted,marginBottom:10}}>
+              What's this about?
+            </div>
             <div style={{display:"flex",flexDirection:"column",gap:6}}>
               {CATS.map(c=>(
                 <button key={c.id} onClick={()=>setHelpCat(c.id)}
@@ -5266,7 +5301,7 @@ export default function App() {
                     border:`1.5px solid ${helpCat===c.id ? G.green : G.border}`,
                     borderRadius:9,padding:"9px 12px",cursor:"pointer",
                     fontFamily:"inherit",transition:"all .12s"}}>
-                  <span style={{fontSize:14,fontWeight:700,
+                  <span style={{fontSize:13,fontWeight:700,
                     color:helpCat===c.id?"#fff":G.text,flex:1,textAlign:"left"}}>
                     {c.label}
                   </span>
@@ -5276,15 +5311,13 @@ export default function App() {
             </div>
           </div>
 
-          {/* Screenshot tip — shown when Technical selected */}
           {helpCat==="technical"&&(
             <div style={{background:"#fffbeb",border:"1.5px solid #fde68a",
               borderRadius:12,padding:"12px 14px",display:"flex",gap:10,alignItems:"flex-start"}}>
               <span style={{fontSize:18,flexShrink:0}}>📸</span>
               <div style={{fontSize:12,color:"#78350f",lineHeight:1.6}}>
-                <b>Tip:</b> A screenshot of the error or broken screen is really helpful for troubleshooting.
-                After hitting send, <b>attach your screenshot</b> to the email before you deliver it.
-                On iPhone: <b>Side + Volume Up</b>. On Android: <b>Power + Volume Down</b>.
+                <b>Tip:</b> A screenshot really helps. After hitting send, attach it to the email.
+                iPhone: <b>Side + Volume Up</b>. Android: <b>Power + Volume Down</b>.
               </div>
             </div>
           )}
@@ -5292,18 +5325,16 @@ export default function App() {
           {/* Message box */}
           <div style={{background:G.white,border:`1.5px solid ${G.border}`,
             borderRadius:14,padding:"14px 16px"}}>
-            <div style={{fontSize:11,fontWeight:900,letterSpacing:1.5,color:G.muted,
-              textTransform:"uppercase",marginBottom:10}}>Your message</div>
-            <textarea
-              rows={5}
-              placeholder="Describe your question or issue… (e.g. what happened, which screen you were on, what you expected vs what you saw)"
+            <div style={{fontSize:11,fontWeight:700,color:G.muted,
+              textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Your message</div>
+            <textarea rows={4}
+              placeholder="Describe your question or issue…"
               value={helpMsg}
               onChange={e=>setHelpMsg(e.target.value)}
               style={{width:"100%",borderRadius:9,border:`1.5px solid ${G.border}`,
                 padding:"11px 13px",fontSize:14,fontFamily:"'DM Sans',sans-serif",
                 fontWeight:500,background:G.cream,color:G.text,
-                outline:"none",boxSizing:"border-box",resize:"vertical",
-                lineHeight:1.6}}/>
+                outline:"none",boxSizing:"border-box",resize:"vertical",lineHeight:1.6}}/>
             <div style={{marginTop:6,fontSize:11,color:G.muted}}>
               Sending as: <b style={{color:G.text}}>{me.name}</b>
             </div>
@@ -5312,13 +5343,6 @@ export default function App() {
           <Btn bg={G.green} col={G.lime} full onClick={sendHelp}>
             📧 Send Message to Reuben
           </Btn>
-
-          <div style={{fontSize:11,color:G.muted,textAlign:"center",lineHeight:1.8}}>
-            This will open your email app with the message pre-filled.<br/>
-            Hit send to deliver it — and if it's a bug or error,{" "}
-            <b style={{color:G.text}}>attach a screenshot</b> if you can.
-            It really helps troubleshoot the problem faster.
-          </div>
 
         </div>
         <BotNav view="profile" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
