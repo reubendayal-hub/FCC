@@ -134,9 +134,9 @@ const THEMES = {
   },
 };
 const THEME_KEYS = Object.keys(THEMES);
-let _themeKey = "forest";
-try { _themeKey = localStorage.getItem("fcc-theme") || "forest"; } catch{}
-if(!THEMES[_themeKey]) _themeKey = "forest";
+let _themeKey = "navy";
+try { _themeKey = localStorage.getItem("fcc-theme") || "navy"; } catch{}
+if(!THEMES[_themeKey]) _themeKey = "navy";
 
 const PRESET_POLL = [
   {id:"batting",  label:"🏏 Batting Focus"},
