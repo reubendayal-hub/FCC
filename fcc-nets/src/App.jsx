@@ -3614,14 +3614,8 @@ export default function App() {
             <span style={{opacity:.6,fontWeight:400}}>· sign out</span>
           </button>
         </div>
-        {/* Row 2: Add/Join + filter tabs on same line */}
+        {/* Row 2: filter tabs */}
         <div style={{display:"flex",alignItems:"center",gap:6}}>
-          <button onClick={()=>setView("add")}
-            style={{background:G.lime,color:G.green,border:"none",borderRadius:20,
-              padding:"7px 14px",fontSize:12,fontWeight:900,cursor:"pointer",
-              fontFamily:"inherit",flexShrink:0,whiteSpace:"nowrap"}}>
-            + Add / Join
-          </button>
           <div style={{flex:1}}/>
           {[
             {key:"all",  label:"🏏 All Sessions"},
@@ -3723,13 +3717,26 @@ export default function App() {
               ["👤","Fill in your profile — add your number so the club can reach you"],
             ].map(([icon,text],i)=>(
               <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,
-                marginBottom:i<4?8:0}}>
+                marginBottom:8}}>
                 <span style={{fontSize:14,flexShrink:0,marginTop:1}}>{icon}</span>
                 <span style={{fontSize:12,color:"rgba(255,255,255,.85)",lineHeight:1.5}}>
                   {text}
                 </span>
               </div>
             ))}
+            {/* Guide links */}
+            <div style={{borderTop:"1px solid rgba(255,255,255,.15)",marginTop:10,paddingTop:10,
+              display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+              <button onClick={()=>window.open("https://training-app-guide.netlify.app","_blank")}
+                style={{background:G.lime,color:G.green,border:"none",borderRadius:20,
+                  padding:"6px 14px",fontWeight:900,fontSize:11,cursor:"pointer",
+                  fontFamily:"inherit"}}>
+                📖 Open full guide →
+              </button>
+              <span style={{fontSize:11,color:"rgba(255,255,255,.6)"}}>
+                or find it in My Profile → Help
+              </span>
+            </div>
           </div>
         )}
 
@@ -3899,7 +3906,7 @@ export default function App() {
     return (
       <Shell>
         <AppHeader onBack={()=>{setView("schedule");setSelP([]);}}
-          title="Add / Join a Session"
+          title="Book a Session"
           sub={exactMatch?"Session exists at this time":"Create or join a training session"}/>
         {/* Exact match warning — prominent, not just a subtitle */}
         {exactMatch&&(
