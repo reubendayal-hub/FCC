@@ -2627,6 +2627,9 @@ export default function App() {
         return;
       }
     }
+
+    // Auto-enroll team members when session is restricted
+    let autoPlayers = [...selP];
     if(isLeader && restrictedTo) {
       const teamMembers = members
         .filter(m => (m.teams||[]).includes(restrictedTo))
