@@ -646,12 +646,27 @@ const Btn = ({onClick,bg,col,children,full,sm,disabled,type="button"}) => (
 // ─── PIN pad ──────────────────────────────────────────────────
 function PinPad({ label, onDone, onCancel, error }) {
   const [val, setVal] = useState("");
+  const inputRef = React.useRef(null);
   const add = d => { if(val.length<4) setVal(v=>v+d); };
   const del = () => setVal(v=>v.slice(0,-1));
   useEffect(() => { if(val.length===4) onDone(val); }, [val]);
 
+  // Focus hidden input on mount so keyboard works immediately
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  const handleKey = e => {
+    if(e.key>="0"&&e.key<="9") add(e.key);
+    else if(e.key==="Backspace") del();
+  };
+
   return (
-    <div style={{textAlign:"center",padding:"60px 20px 24px"}}>
+    <div style={{textAlign:"center",padding:"60px 20px 24px"}}
+      onClick={()=>inputRef.current?.focus()}>
+      {/* Hidden input captures physical keyboard on mobile & desktop */}
+      <input ref={inputRef} type="tel" inputMode="numeric" pattern="[0-9]*"
+        value={val} readOnly
+        onKeyDown={handleKey}
+        style={{position:"absolute",opacity:0,width:1,height:1,pointerEvents:"none"}}/>
       <div style={{fontSize:15,fontWeight:800,color:G.text,marginBottom:24}}>{label}</div>
       {/* dots */}
       <div style={{display:"flex",justifyContent:"center",gap:14,marginBottom:32}}>
@@ -666,7 +681,8 @@ function PinPad({ label, onDone, onCancel, error }) {
       {/* keypad */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,maxWidth:220,margin:"0 auto"}}>
         {[1,2,3,4,5,6,7,8,9,"",0,"⌫"].map((k,i)=>(
-          <button key={i} onClick={()=>k==="⌫"?del():k!==""?add(String(k)):null}
+          <button key={i} type="button"
+            onClick={()=>{ k==="⌫"?del():k!==""?add(String(k)):null; inputRef.current?.focus(); }}
             style={{background: k===""?"transparent":G.white,
               border: k===""?"none":`1.5px solid ${G.border}`,
               borderRadius:12,padding:"16px 8px",fontSize:20,fontWeight:700,
@@ -677,7 +693,7 @@ function PinPad({ label, onDone, onCancel, error }) {
         ))}
       </div>
       {onCancel && (
-        <button onClick={onCancel} style={{marginTop:20,background:"transparent",
+        <button type="button" onClick={onCancel} style={{marginTop:20,background:"transparent",
           border:"none",color:G.muted,fontSize:14,fontWeight:700,cursor:"pointer",
           fontFamily:"inherit"}}>Cancel</button>
       )}
@@ -2795,6 +2811,9 @@ export default function App() {
   const [schedFilter,   setSchedFilter]   = useState("all"); // "all" | "mine"
   const [blocksExpanded, setBlocksExpanded] = useState(false);
   const [showPastAll,    setShowPastAll]    = useState(false);
+  const [welcomeDismissed, setWelcomeDismissed] = useState(()=>{
+    try{ return localStorage.getItem("fcc-welcome-v1")==="1"; }catch{ return false; }
+  });
   const [showAllBlocks,  setShowAllBlocks]  = useState(false);
   const [netsDate,       setNetsDate]       = useState(todayStr());
   const [wxData,         setWxData]         = useState(null); // weather data
@@ -3680,6 +3699,40 @@ export default function App() {
           );
         })()}
 
+        {/* ── Welcome card (dismissible, first login only) ── */}
+        {!welcomeDismissed&&(
+          <div style={{background:`linear-gradient(135deg,${G.green} 0%,${G.mid} 100%)`,
+            borderRadius:14,padding:"16px 16px 14px",marginBottom:14,position:"relative"}}>
+            <button onClick={()=>{
+              setWelcomeDismissed(true);
+              try{localStorage.setItem("fcc-welcome-v1","1");}catch{}
+            }} style={{position:"absolute",top:10,right:12,background:"rgba(255,255,255,.15)",
+              border:"none",borderRadius:20,width:24,height:24,cursor:"pointer",
+              color:"rgba(255,255,255,.8)",fontSize:16,fontFamily:"inherit",
+              display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>
+              ×
+            </button>
+            <div style={{fontWeight:900,fontSize:14,color:G.lime,marginBottom:12}}>
+              👋 Welcome to FCC Training
+            </div>
+            {[
+              ["📅","Your weekly training is already here — your squad is auto-added each week"],
+              ["🚪","Can't make a session? Sign yourself out before 9pm the night before"],
+              ["🏏","Tap any session to see who's coming, vote in the poll, or set car pool"],
+              ["➕","Need extra nets time? Tap Book at the bottom"],
+              ["👤","Fill in your profile — add your number so the club can reach you"],
+            ].map(([icon,text],i)=>(
+              <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,
+                marginBottom:i<4?8:0}}>
+                <span style={{fontSize:14,flexShrink:0,marginTop:1}}>{icon}</span>
+                <span style={{fontSize:12,color:"rgba(255,255,255,.85)",lineHeight:1.5}}>
+                  {text}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Weather bar */}
         <WeatherBar wx={wxData} setView={setView}/>
 
@@ -3847,7 +3900,24 @@ export default function App() {
       <Shell>
         <AppHeader onBack={()=>{setView("schedule");setSelP([]);}}
           title="Add / Join a Session"
-          sub={exactMatch?"Session exists — players will be added":"Create or join a training session"}/>
+          sub={exactMatch?"Session exists at this time":"Create or join a training session"}/>
+        {/* Exact match warning — prominent, not just a subtitle */}
+        {exactMatch&&(
+          <div style={{background:"#fef9c3",border:"1.5px solid #fde047",
+            borderRadius:12,padding:"12px 16px",margin:"0 16px 4px",
+            display:"flex",alignItems:"flex-start",gap:10}}>
+            <span style={{fontSize:18,flexShrink:0}}>📋</span>
+            <div>
+              <div style={{fontWeight:900,fontSize:13,color:"#92400e",marginBottom:3}}>
+                A session already exists at this time
+              </div>
+              <div style={{fontSize:12,color:"#78350f",lineHeight:1.5}}>
+                <b>{exactMatch.label||"Session"}</b> · {exactMatch.from}–{exactMatch.to} · {exactMatch.players.length} player{exactMatch.players.length!==1?"s":""} booked.
+                {" "}Submitting will <b>add the selected players</b> to that existing session.
+              </div>
+            </div>
+          </div>
+        )}
         <form onSubmit={handleAddSession} style={{padding:"14px 16px 20px"}}>
           <SLbl mt={4}>When?</SLbl>
           <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
