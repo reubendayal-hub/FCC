@@ -5509,9 +5509,36 @@ export default function App() {
         sub={`${members.length} members · ${teams.length} groups`}
         onBack={()=>setView("schedule")}/>
 
+      {/* ── Admin section index ─────────────────────────────── */}
+      <div style={{padding:"10px 16px 0",overflowX:"auto",
+        display:"flex",gap:6,flexWrap:"nowrap",
+        borderBottom:`1px solid ${G.border}`,paddingBottom:10}}>
+        {[
+          {label:"👥 Members",   id:"sec-members"},
+          {label:"➕ Add Member", id:"sec-add-member"},
+          {label:"🏏 Groups",    id:"sec-groups"},
+          {label:"🧢 Coaches",   id:"sec-coaches"},
+          {label:"🚫 Block Nets",id:"sec-blocknets"},
+          {label:"🔁 Recurring", id:"sec-recurring"},
+          {label:"👑 Audit Log", id:"sec-auditlog"},
+        ].map(({label,id})=>(
+          <button key={id}
+            onClick={()=>{
+              document.getElementById(id)?.scrollIntoView({behavior:"smooth",block:"start"});
+            }}
+            style={{flexShrink:0,padding:"5px 12px",borderRadius:20,
+              border:`1px solid ${G.border}`,background:G.white,
+              color:G.text,fontSize:11,fontWeight:700,cursor:"pointer",
+              fontFamily:"inherit",whiteSpace:"nowrap"}}>
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div style={{padding:"14px 16px 20px"}}>
 
         {/* ── Join Requests ──────────────────────────────────── */}
+        <div id="sec-members"/>
         {can(userRole,"addMember")&&joinRequests.filter(r=>r.status==="pending").length>0&&(()=>{
           const pending = joinRequests.filter(r=>r.status==="pending");
           function approveRequest(req) {
@@ -5593,7 +5620,7 @@ export default function App() {
 
         {/* Add member */}
         {can(userRole,"addMember")&&<>
-          <SLbl mt={4}>Add New Member</SLbl>
+          <SLbl mt={4}><span id="sec-add-member">Add New Member</span></SLbl>
           <form onSubmit={addMember} style={{background:G.white,borderRadius:12,
             border:`1.5px solid ${G.border}`,padding:14,marginBottom:20}}>
             <FFld label="Full Name">
@@ -5652,7 +5679,7 @@ export default function App() {
 
         {/* ── Manage Groups ─────────────────────────────────── */}
         {can(userRole,"addMember")&&<>
-          <SLbl mt={4}>Manage Groups</SLbl>
+          <SLbl mt={4}><span id="sec-groups">Manage Groups</span></SLbl>
           <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
             padding:14,marginBottom:20}}>
 
@@ -5724,7 +5751,7 @@ export default function App() {
 
         {/* ── Team Coaches ────────────────────────────────────── */}
         {can(userRole,"addMember")&&<>
-          <SLbl mt={4}>🧢 Team Coaches</SLbl>
+          <SLbl mt={4}><span id="sec-coaches">🧢 Team Coaches</span></SLbl>
           <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
             padding:14,marginBottom:16}}>
             <div style={{fontSize:12,color:G.muted,marginBottom:12,lineHeight:1.5}}>
@@ -5813,7 +5840,7 @@ export default function App() {
 
         {/* ── Block Nets Sessions ────────────────────────────── */}
         {can(userRole,"addMember")&&<>
-          <SLbl mt={4}>Block Nets Sessions</SLbl>
+          <SLbl mt={4}><span id="sec-blocknets">Block Nets Sessions</span></SLbl>
           <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
             padding:14,marginBottom:8}}>
             <div style={{fontSize:12,color:G.muted,marginBottom:10,lineHeight:1.5}}>
@@ -5971,7 +5998,7 @@ export default function App() {
 
         {/* ── Recurring Slots ───────────────────────────────── */}
         {can(userRole,"addMember")&&<>
-          <SLbl mt={4}>Recurring Slots</SLbl>
+          <SLbl mt={4}><span id="sec-recurring">Recurring Slots</span></SLbl>
           <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
             padding:14,marginBottom:20}}>
             <div style={{fontSize:12,color:G.muted,marginBottom:12,lineHeight:1.5}}>
@@ -6361,7 +6388,7 @@ export default function App() {
           }
           return (
             <>
-              <SLbl mt={4}>👑 Audit Log</SLbl>
+              <SLbl mt={4}><span id="sec-auditlog">👑 Audit Log</span></SLbl>
               <div style={{background:"#0c1a2e",borderRadius:14,overflow:"hidden",
                 border:"1.5px solid #1e3a5f",marginBottom:20}}>
 
