@@ -3189,15 +3189,26 @@ export default function App() {
         id: uid(),
         submittedAt: new Date().toISOString(),
         forChild: jrForChild,
-        // Player details
         playerName: jrForChild ? jrChildName.trim() : jrName.trim(),
         playerTeam: jrForChild ? jrChildTeam : jrTeam,
-        // Parent/submitter details (only stored if for child)
         parentName: jrForChild ? jrName.trim() : null,
         contact: jrContact.trim() || null,
         status: "pending",
       };
       saveJoinRequests([...joinRequests, req]);
+      // Notify Reuben by email — silent, non-blocking
+      fetch("/api/notify", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          type:"joinrequest",
+          data:{
+            name: req.playerName,
+            playerTeam: req.playerTeam,
+            message: req.parentName ? `Submitted by parent: ${req.parentName}${req.contact?" · "+req.contact:""}` : (req.contact||"")
+          }
+        })
+      }).catch(()=>{});
       setAuthView("joinrequestdone");
     }
 
@@ -5288,6 +5299,15 @@ export default function App() {
     function sendHelp() {
       if(!helpMsg.trim()) { showToast("Please write a message first"); return; }
       const cat = CATS.find(c=>c.id===helpCat)?.label || helpCat;
+      // Fire email notification silently (no await — don't block the user)
+      fetch("/api/notify", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          type:"help",
+          data:{ name:me.name, category:cat, message:helpMsg.trim() }
+        })
+      }).catch(()=>{}); // silent — member shouldn't see API errors
       const subject = encodeURIComponent(`FCC Training App — ${cat} — from ${me.name}`);
       const body = encodeURIComponent(
         `Hi Reuben,\n\nA message from the FCC Training app:\n\n`+
@@ -5297,7 +5317,7 @@ export default function App() {
       );
       window.open(`mailto:reuben.dayal@gmail.com?subject=${subject}&body=${body}`,"_self");
       setHelpMsg("");
-      showToast("Opening your email app… ✓");
+      showToast("Message sent ✓");
       setTimeout(()=>setView("profile"),1200);
     }
     const QUICK_LINKS = [
@@ -5510,9 +5530,9 @@ export default function App() {
         onBack={()=>setView("schedule")}/>
 
       {/* ── Admin section index ─────────────────────────────── */}
-      <div style={{padding:"10px 16px 0",overflowX:"auto",
-        display:"flex",gap:6,flexWrap:"nowrap",
-        borderBottom:`1px solid ${G.border}`,paddingBottom:10}}>
+      <div style={{padding:"10px 16px",
+        display:"flex",gap:6,flexWrap:"wrap",
+        borderBottom:`1px solid ${G.border}`}}>
         {[
           {label:"👥 Members",   id:"sec-members"},
           {label:"➕ Add Member", id:"sec-add-member"},
