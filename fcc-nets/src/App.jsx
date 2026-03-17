@@ -6467,18 +6467,6 @@ export default function App() {
         </>}{/* end adminSec.addmember */}
         </>}{/* end can addMember for addmember section */}
 
-        {/* Search + filter */}
-        <div style={{display:"flex",gap:8,marginBottom:14}}>
-          <input style={iSt({flex:1,background:G.white})}
-            placeholder="🔍  Search…" value={aSearch}
-            onChange={e=>setASearch(e.target.value)}/>
-          <select style={iSt({width:"auto",minWidth:110,background:G.white,flexShrink:0})}
-            value={aFilter} onChange={e=>setAFilter(e.target.value)}>
-            <option value="All">All groups</option>
-            {ALL_TEAMS.map(t=><option key={t} value={t}>{t}</option>)}
-          </select>
-        </div>
-
         {/* Role legend */}
         <div style={{background:G.white,borderRadius:10,border:`1.5px solid ${G.border}`,
           padding:"10px 14px",marginBottom:14}}>
@@ -7585,6 +7573,18 @@ export default function App() {
             </div>
           </div>
         )}
+
+        {/* Search + filter — below team jump bar */}
+        <div style={{display:"flex",gap:8,marginBottom:14}}>
+          <input style={iSt({flex:1,background:G.white})}
+            placeholder="🔍  Search members…" value={aSearch}
+            onChange={e=>setASearch(e.target.value)}/>
+          <select style={iSt({width:"auto",minWidth:110,background:G.white,flexShrink:0})}
+            value={aFilter} onChange={e=>setAFilter(e.target.value)}>
+            <option value="All">All groups</option>
+            {ALL_TEAMS.map(t=><option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
 
         {/* Member list */}
         {Object.entries(adminGrouped).map(([team,list])=>{
