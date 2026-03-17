@@ -15,6 +15,48 @@ const JOINREQS_KEY   = "joinrequests";
 const AUDITLOG_KEY   = "auditlog";
 
 // ─── 2026 Home Match Fixtures (Fredensborg ground only) ───────
+// ─── Privacy notice (GDPR) ────────────────────────────────────
+const PRIVACY_TEXT = `Fredensborg Cricket Club stores your name, email address, and phone number to manage your club membership and communicate about training, matches, and club activities. Your data is only accessible to club admins and coaches. It is stored securely on Google Firebase servers located in the EU (Frankfurt) and will not be shared with third parties. You have the right to access, correct, or request deletion of your data at any time by contacting the club admin. Data is retained for the duration of your membership and up to one year after. For members under 16, a parent or guardian must provide consent on their behalf.`;
+
+const PRIVACY_SECTIONS = [
+  {
+    title: "What data we collect",
+    body: "We store your full name, email address, and phone number. For youth members (under 16), we also store a link to the parent or guardian who registered on their behalf.",
+  },
+  {
+    title: "Why we collect it",
+    body: "To manage your club membership, communicate about training sessions and matches, coordinate car pooling to Karlebo Cricket Ground, and ensure we can reach you or your child's guardian in case of an emergency.",
+  },
+  {
+    title: "Who can see your data",
+    body: "Only club admins and coaches can view member contact details. Your data is never shared with third parties, advertisers, or other clubs.",
+  },
+  {
+    title: "Where it is stored",
+    body: "All data is stored on Google Firebase (Firestore), hosted in the EU on servers located in Frankfurt, Germany. Google is fully GDPR-compliant as an EU data processor.",
+  },
+  {
+    title: "How long we keep it",
+    body: "Your data is kept for the duration of your active club membership and up to one year after you leave. After that it is deleted on request.",
+  },
+  {
+    title: "Your rights",
+    body: "You have the right to: access a copy of your data, correct any inaccuracies, request deletion, and withdraw consent at any time. To exercise any of these rights, contact the club admin directly in the app (Profile → Help) or email fredensborgcricket.dk.",
+  },
+  {
+    title: "Children's data",
+    body: "For members under 16, we require a parent or guardian to provide consent before we process the child's data. This consent is recorded with a timestamp when the parent completes the account setup flow.",
+  },
+  {
+    title: "Lawful basis",
+    body: "We process adult member data under the lawful basis of Legitimate Interests (GDPR Article 6(1)(f)) — running a sports club requires contact information for operational and safety reasons. For children's data we rely on explicit parental consent (Article 6(1)(a) and Article 8).",
+  },
+  {
+    title: "Contact",
+    body: "For any data-related queries, contact Reuben Dayal (club admin) via the Help section of this app, or through fredensborgcricket.dk.",
+  },
+];
+
 // ─── Match Fixtures 2026 (home matches only — blocks nets) ────
 // Source: DCF 2026_Turnering_Schedule, 11-Mar-Consolidated
 // Away matches excluded — nets not needed for away games
@@ -2243,6 +2285,23 @@ export default function App() {
   const [jrChildName,setJrChildName]=useState("");
   const [jrChildTeam,setJrChildTeam]=useState("");
 
+  // ── Self-service verify/onboarding flow ────────────────────
+  const [vfStep,      setVfStep]      = useState("search");   // search|found|notfound|code|parent|done
+  const [vfSearch,    setVfSearch]    = useState("");
+  const [vfMatch,     setVfMatch]     = useState(null);        // matched member object
+  const [vfEmail,     setVfEmail]     = useState("");
+  const [vfPhone,     setVfPhone]     = useState("");
+  const [vfCode,      setVfCode]      = useState("");          // entered code
+  const [vfSentCode,  setVfSentCode]  = useState("");          // generated code (client-side ephemeral)
+  const [vfCodeExpiry,setVfCodeExpiry]= useState(null);
+  const [vfSending,   setVfSending]   = useState(false);
+  const [vfError,     setVfError]     = useState("");
+  const [vfConsent,   setVfConsent]   = useState(false);
+  const [vfIsParent,  setVfIsParent]  = useState(false);
+  const [vfChildName, setVfChildName] = useState("");
+  const [vfNewName,   setVfNewName]   = useState("");
+  const [vfNewTeam,   setVfNewTeam]   = useState("");
+
   const userRole = currentUser?.role || "member";
   const showToast = m => { setToast(m); setTimeout(()=>setToast(null),2700); };
 
@@ -3209,6 +3268,17 @@ export default function App() {
                 {members.length} members registered<br/>
                 <span style={{fontWeight:700,color:G.text}}>Start typing</span> to find your name
               </div>
+              <div style={{marginTop:20,paddingTop:20,borderTop:`1px solid ${G.border}`}}>
+                <div style={{fontSize:12,color:G.muted,marginBottom:10}}>
+                  First time? Setting up your account?
+                </div>
+                <button onClick={()=>{setVfStep("search");setVfSearch("");setVfMatch(null);setVfEmail("");setVfPhone("");setVfCode("");setVfError("");setVfConsent(false);setVfIsParent(false);setAuthView("verify");}}
+                  style={{background:G.white,color:G.green,border:`1.5px solid ${G.green}`,
+                    borderRadius:20,padding:"9px 22px",fontSize:13,fontWeight:800,
+                    cursor:"pointer",fontFamily:"inherit"}}>
+                  ✅ Verify / Set up my account
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -3351,6 +3421,421 @@ export default function App() {
   // ════════════════════════════════════════════════════════════
   // RENDER: Auth — Request submitted confirmation
   // ════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
+  // RENDER: Self-service Verify / Onboarding
+  // ════════════════════════════════════════════════════════════
+  if(!currentUser && authView==="verify") {
+    const ALL_TEAM_OPTS = teams.map(t=>t.name);
+    const vfFiltered = vfSearch.trim().length>=2
+      ? members.filter(m=>m.name.toLowerCase().includes(vfSearch.toLowerCase())).slice(0,8)
+      : [];
+
+    function generateCode() {
+      return String(Math.floor(100000+Math.random()*900000));
+    }
+
+    async function sendCode(email, name) {
+      setVfSending(true); setVfError("");
+      const code = generateCode();
+      try {
+        const r = await fetch("/api/send-verify",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({email, name, code})
+        });
+        if(!r.ok) throw new Error("Send failed");
+        setVfSentCode(code);
+        setVfCodeExpiry(Date.now()+15*60*1000);
+        setVfStep("code");
+      } catch(e) {
+        setVfError("Could not send email. Please check the address and try again.");
+      }
+      setVfSending(false);
+    }
+
+    function verifyCode() {
+      if(!vfSentCode) { setVfError("No code sent yet"); return; }
+      if(Date.now()>vfCodeExpiry) { setVfError("Code expired — please request a new one"); return; }
+      if(vfCode.trim()!==vfSentCode) { setVfError("Incorrect code — please try again"); return; }
+      // Code correct — activate account
+      if(vfMatch) {
+        // Update existing member with email/phone + consent
+        const updated = members.map(m=>m.id===vfMatch.id ? {
+          ...m,
+          email: vfEmail.trim()||m.email,
+          phone: vfPhone.trim()||m.phone,
+          emailVerified: true,
+          consentGiven: true,
+          consentDate: new Date().toISOString().slice(0,10),
+        } : m);
+        saveMembers(updated);
+        // Generate invite code so they can log in now
+        generateInviteCode(vfMatch.id);
+        logAction("member",`Self-verified email: ${vfMatch.name} — ${vfEmail}`);
+        setVfStep("done");
+      } else {
+        // New person — create join request with verified email
+        const req = {
+          id: uid(),
+          submittedAt: new Date().toISOString(),
+          forChild: vfIsParent,
+          playerName: vfIsParent ? vfChildName.trim() : vfNewName.trim(),
+          playerTeam: vfNewTeam||null,
+          parentName: vfIsParent ? vfNewName.trim() : null,
+          contact: vfPhone.trim()||null,
+          email: vfEmail.trim(),
+          emailVerified: true,
+          consentGiven: vfConsent,
+          consentDate: new Date().toISOString().slice(0,10),
+          status:"pending",
+        };
+        saveJoinRequests([...joinRequests, req]);
+        fetch("/api/notify",{method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({type:"joinrequest",data:{
+            name:req.playerName, playerTeam:req.playerTeam,
+            message:`Email verified: ${vfEmail}${req.parentName?" · Parent: "+req.parentName:""}`
+          }})}).catch(()=>{});
+        setVfStep("done");
+      }
+    }
+
+    const hdr = (title,sub) => (
+      <div style={{background:G.green,padding:"20px 20px 16px",textAlign:"center"}}>
+        <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
+          fontSize:18,fontWeight:900}}>{title}</div>
+        {sub&&<div style={{color:"rgba(255,255,255,0.6)",fontSize:12,marginTop:3}}>{sub}</div>}
+      </div>
+    );
+
+    // ── Step: done ────────────────────────────────────────────
+    if(vfStep==="done") return (
+      <Shell>
+        {hdr("All done! 🎉","FCC Training")}
+        <div style={{padding:"32px 24px",textAlign:"center"}}>
+          <div style={{fontSize:56,marginBottom:16}}>✅</div>
+          {vfMatch ? (<>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:900,
+              color:G.green,marginBottom:10}}>Account activated!</div>
+            <div style={{fontSize:14,color:G.muted,lineHeight:1.6,marginBottom:24}}>
+              Your email has been verified and your account is now set up.
+              Go back to the login screen and tap your name to log in.
+            </div>
+          </>) : (<>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:900,
+              color:G.green,marginBottom:10}}>Request submitted!</div>
+            <div style={{fontSize:14,color:G.muted,lineHeight:1.6,marginBottom:24}}>
+              Your email is verified. The admin will review your request and
+              you'll be added to the app shortly.
+            </div>
+          </>)}
+          <button onClick={()=>{setAuthView("pick");setVfStep("search");}}
+            style={{background:G.green,color:G.lime,border:"none",borderRadius:12,
+              padding:"12px 28px",fontSize:14,fontWeight:800,cursor:"pointer",
+              fontFamily:"inherit"}}>
+            ← Back to login
+          </button>
+        </div>
+      </Shell>
+    );
+
+    // ── Step: code verification ───────────────────────────────
+    if(vfStep==="code") return (
+      <Shell>
+        {hdr("Check your email","Enter the 6-digit code we sent you")}
+        <div style={{padding:"24px 20px 40px"}}>
+          <div style={{background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:12,
+            padding:"12px 16px",marginBottom:20,fontSize:13,color:"#166534"}}>
+            📧 Code sent to <b>{vfEmail}</b>. Check your inbox (and spam folder).
+          </div>
+          <div style={{marginBottom:16}}>
+            <label style={{fontSize:12,fontWeight:700,color:G.muted,display:"block",marginBottom:6}}>
+              ENTER 6-DIGIT CODE
+            </label>
+            <input value={vfCode} onChange={e=>setVfCode(e.target.value.replace(/\D/g,"").slice(0,6))}
+              inputMode="numeric" maxLength={6} placeholder="123456"
+              style={{...iSt({fontSize:24,textAlign:"center",letterSpacing:6,fontWeight:900,
+                padding:"14px",borderRadius:12})}}/>
+          </div>
+          {vfError&&<div style={{background:G.redBg,color:G.red,borderRadius:8,
+            padding:"8px 12px",fontSize:13,marginBottom:12}}>{vfError}</div>}
+          <Btn bg={G.green} col={G.lime} full
+            onClick={verifyCode} disabled={vfCode.length!==6}>
+            ✓ Verify Code
+          </Btn>
+          <button onClick={()=>sendCode(vfEmail,vfMatch?.name||vfNewName)}
+            style={{width:"100%",marginTop:10,background:"none",border:`1px solid ${G.border}`,
+              borderRadius:10,padding:"10px",fontSize:13,fontWeight:700,color:G.muted,
+              cursor:"pointer",fontFamily:"inherit"}}>
+            {vfSending?"Sending…":"Resend code"}
+          </button>
+          <button onClick={()=>setVfStep(vfMatch?"found":"notfound")}
+            style={{width:"100%",marginTop:8,background:"none",border:"none",
+              fontSize:12,color:G.muted,cursor:"pointer",fontFamily:"inherit"}}>
+            ← Back
+          </button>
+        </div>
+      </Shell>
+    );
+
+    // ── Step: found — existing member ─────────────────────────
+    if(vfStep==="found" && vfMatch) {
+      const hasEmail = !!(vfMatch.email||"").trim();
+      return (
+        <Shell>
+          {hdr(`Hi, ${vfMatch.name.split(" ")[0]}!`,"FCC Training — account setup")}
+          <div style={{padding:"20px 20px 40px"}}>
+            {/* Privacy notice */}
+            <div style={{background:G.cream,border:`1px solid ${G.border}`,borderRadius:10,
+              padding:"12px 14px",marginBottom:16,fontSize:11,color:G.muted,lineHeight:1.6}}>
+              <b style={{color:G.text}}>🔐 Privacy notice</b><br/>{PRIVACY_TEXT}
+            </div>
+
+            {hasEmail ? (<>
+              <div style={{background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:10,
+                padding:"12px 14px",marginBottom:16}}>
+                <div style={{fontWeight:800,fontSize:13,color:"#166534",marginBottom:4}}>
+                  ✅ We have an email on file
+                </div>
+                <div style={{fontSize:13,color:G.muted}}>
+                  {vfMatch.email.replace(/(.{2})(.*)(@.*)/, (m,a,b,c)=>a+"•".repeat(b.length)+c)}
+                </div>
+              </div>
+              <div style={{fontSize:13,color:G.muted,marginBottom:16,lineHeight:1.6}}>
+                Is this the correct email? We'll send a verification code to confirm.
+              </div>
+              <Btn bg={G.green} col={G.lime} full disabled={vfSending}
+                onClick={()=>{ setVfEmail(vfMatch.email); sendCode(vfMatch.email, vfMatch.name); }}>
+                {vfSending?"Sending…":"📧 Send verification code"}
+              </Btn>
+              <button onClick={()=>{setVfStep("search");}}
+                style={{width:"100%",marginTop:10,background:"none",border:`1px solid ${G.border}`,
+                  borderRadius:10,padding:"10px",fontSize:13,fontWeight:700,color:G.muted,
+                  cursor:"pointer",fontFamily:"inherit"}}>
+                Not me / use a different email
+              </button>
+            </>) : (<>
+              <div style={{fontSize:14,color:G.text,fontWeight:700,marginBottom:16}}>
+                We found your profile but don't have your email yet.
+                Add it below to activate your account.
+              </div>
+              <div style={{marginBottom:12}}>
+                <label style={{fontSize:12,fontWeight:700,color:G.muted,display:"block",marginBottom:5}}>
+                  YOUR EMAIL ADDRESS
+                </label>
+                <input type="email" value={vfEmail} onChange={e=>setVfEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  style={iSt({fontSize:15,padding:"12px 14px",borderRadius:10})}/>
+              </div>
+              <div style={{marginBottom:16}}>
+                <label style={{fontSize:12,fontWeight:700,color:G.muted,display:"block",marginBottom:5}}>
+                  PHONE NUMBER <span style={{fontWeight:400}}>(optional)</span>
+                </label>
+                <input type="tel" value={vfPhone} onChange={e=>setVfPhone(e.target.value)}
+                  placeholder="+45 XX XX XX XX"
+                  style={iSt({fontSize:15,padding:"12px 14px",borderRadius:10})}/>
+              </div>
+              {vfError&&<div style={{background:G.redBg,color:G.red,borderRadius:8,
+                padding:"8px 12px",fontSize:13,marginBottom:12}}>{vfError}</div>}
+              <Btn bg={G.green} col={G.lime} full disabled={!vfEmail.includes("@")||vfSending}
+                onClick={()=>sendCode(vfEmail,vfMatch.name)}>
+                {vfSending?"Sending…":"📧 Send verification code"}
+              </Btn>
+            </>)}
+            <button onClick={()=>setVfStep("search")}
+              style={{width:"100%",marginTop:8,background:"none",border:"none",
+                fontSize:12,color:G.muted,cursor:"pointer",fontFamily:"inherit"}}>
+              ← Back to search
+            </button>
+          </div>
+        </Shell>
+      );
+    }
+
+    // ── Step: notfound — new member/parent ────────────────────
+    if(vfStep==="notfound") return (
+      <Shell>
+        {hdr("Join Fredensborg CC","Set up your account")}
+        <div style={{padding:"20px 20px 40px"}}>
+          {/* Privacy notice */}
+          <div style={{background:G.cream,border:`1px solid ${G.border}`,borderRadius:10,
+            padding:"12px 14px",marginBottom:16,fontSize:11,color:G.muted,lineHeight:1.6}}>
+            <b style={{color:G.text}}>🔐 Privacy notice</b><br/>{PRIVACY_TEXT}
+          </div>
+
+          {/* Parent toggle */}
+          <label style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,
+            cursor:"pointer",padding:"10px 12px",background:G.cream,borderRadius:10,
+            border:`1px solid ${G.border}`}}>
+            <input type="checkbox" checked={vfIsParent}
+              onChange={e=>setVfIsParent(e.target.checked)}
+              style={{width:16,height:16,cursor:"pointer"}}/>
+            <span style={{fontSize:13,fontWeight:700,color:G.text}}>
+              I'm a parent registering on behalf of my child
+            </span>
+          </label>
+
+          {vfIsParent&&(
+            <div style={{marginBottom:12}}>
+              <label style={{fontSize:12,fontWeight:700,color:G.muted,display:"block",marginBottom:5}}>
+                CHILD'S NAME
+              </label>
+              <input value={vfChildName} onChange={e=>setVfChildName(e.target.value)}
+                placeholder="Child's full name"
+                style={iSt({fontSize:15,padding:"12px 14px",borderRadius:10})}/>
+            </div>
+          )}
+
+          <div style={{marginBottom:12}}>
+            <label style={{fontSize:12,fontWeight:700,color:G.muted,display:"block",marginBottom:5}}>
+              {vfIsParent?"YOUR NAME (parent/guardian)":"YOUR FULL NAME"}
+            </label>
+            <input value={vfNewName} onChange={e=>setVfNewName(e.target.value)}
+              placeholder="Full name"
+              style={iSt({fontSize:15,padding:"12px 14px",borderRadius:10})}/>
+          </div>
+
+          <div style={{marginBottom:12}}>
+            <label style={{fontSize:12,fontWeight:700,color:G.muted,display:"block",marginBottom:5}}>
+              TEAM / GROUP
+            </label>
+            <select value={vfNewTeam} onChange={e=>setVfNewTeam(e.target.value)}
+              style={iSt({fontSize:14,padding:"12px 14px",borderRadius:10})}>
+              <option value="">Select a group…</option>
+              {ALL_TEAM_OPTS.map(t=><option key={t} value={t}>{t}</option>)}
+              <option value="unsure">Not sure</option>
+            </select>
+          </div>
+
+          <div style={{marginBottom:12}}>
+            <label style={{fontSize:12,fontWeight:700,color:G.muted,display:"block",marginBottom:5}}>
+              EMAIL ADDRESS
+            </label>
+            <input type="email" value={vfEmail} onChange={e=>setVfEmail(e.target.value)}
+              placeholder="your@email.com"
+              style={iSt({fontSize:15,padding:"12px 14px",borderRadius:10})}/>
+          </div>
+
+          <div style={{marginBottom:16}}>
+            <label style={{fontSize:12,fontWeight:700,color:G.muted,display:"block",marginBottom:5}}>
+              PHONE <span style={{fontWeight:400}}>(optional)</span>
+            </label>
+            <input type="tel" value={vfPhone} onChange={e=>setVfPhone(e.target.value)}
+              placeholder="+45 XX XX XX XX"
+              style={iSt({fontSize:15,padding:"12px 14px",borderRadius:10})}/>
+          </div>
+
+          {/* Consent */}
+          <label style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:16,
+            cursor:"pointer",padding:"12px 14px",background:"#fffbeb",borderRadius:10,
+            border:"1px solid #fde68a"}}>
+            <input type="checkbox" checked={vfConsent}
+              onChange={e=>setVfConsent(e.target.checked)}
+              style={{width:16,height:16,cursor:"pointer",flexShrink:0,marginTop:2}}/>
+            <span style={{fontSize:12,color:"#78350f",lineHeight:1.6}}>
+              I consent to Fredensborg Cricket Club storing my {vfIsParent?"child's":""}  personal data
+              (name, email, phone) for the purpose of managing club membership and communications,
+              as described in the privacy notice above.
+              {vfIsParent&&" I confirm I have parental authority to provide this consent."}
+            </span>
+          </label>
+
+          {vfError&&<div style={{background:G.redBg,color:G.red,borderRadius:8,
+            padding:"8px 12px",fontSize:13,marginBottom:12}}>{vfError}</div>}
+
+          <Btn bg={G.green} col={G.lime} full
+            disabled={!vfConsent||!vfEmail.includes("@")||(vfIsParent?!vfChildName.trim():!vfNewName.trim())||vfSending}
+            onClick={()=>sendCode(vfEmail, vfNewName||"Member")}>
+            {vfSending?"Sending code…":"📧 Verify email & submit"}
+          </Btn>
+          <button onClick={()=>setVfStep("search")}
+            style={{width:"100%",marginTop:8,background:"none",border:"none",
+              fontSize:12,color:G.muted,cursor:"pointer",fontFamily:"inherit"}}>
+            ← Back to search
+          </button>
+        </div>
+      </Shell>
+    );
+
+    // ── Step: search ──────────────────────────────────────────
+    return (
+      <Shell>
+        {hdr("Set up your account","Fredensborg Cricket Club")}
+        <div style={{padding:"20px 20px 40px"}}>
+          <div style={{fontSize:14,color:G.muted,marginBottom:20,lineHeight:1.6}}>
+            First, let's find your profile. Type your name (or your child's name if you're a parent).
+          </div>
+          <div style={{position:"relative",marginBottom:16}}>
+            <span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",
+              fontSize:16,pointerEvents:"none"}}>🔍</span>
+            <input value={vfSearch} onChange={e=>setVfSearch(e.target.value)}
+              placeholder="Start typing a name…"
+              autoFocus
+              style={{...iSt({paddingLeft:44,fontSize:15,borderRadius:12,padding:"13px 14px 13px 44px"})}}/>
+          </div>
+          {vfFiltered.length>0&&(
+            <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:16}}>
+              {vfFiltered.map(m=>(
+                <button key={m.id} onClick={()=>{
+                    setVfMatch(m);
+                    setVfEmail(m.email||"");
+                    setVfPhone(m.phone||"");
+                    setVfStep("found");
+                  }}
+                  style={{display:"flex",alignItems:"center",gap:12,
+                    background:G.white,border:`1.5px solid ${G.border}`,borderRadius:10,
+                    padding:"11px 14px",cursor:"pointer",fontFamily:"inherit",
+                    textAlign:"left",transition:"border-color .12s"}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor=G.green}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=G.border}>
+                  <div style={{width:36,height:36,borderRadius:"50%",background:`${G.green}18`,
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                    fontSize:12,fontWeight:900,color:G.green,flexShrink:0}}>
+                    {m.name.split(" ").map(w=>w[0]).join("").slice(0,2)}
+                  </div>
+                  <div>
+                    <div style={{fontWeight:800,fontSize:14,color:G.text}}>{m.name}</div>
+                    <div style={{fontSize:11,color:G.muted}}>
+                      {(m.teams||[]).join(", ")||"No team assigned"}
+                      {m.email?" · ✉️ email on file":" · no email yet"}
+                    </div>
+                  </div>
+                  <span style={{marginLeft:"auto",fontSize:16,color:G.green}}>›</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {vfSearch.trim().length>=2&&vfFiltered.length===0&&(
+            <div style={{textAlign:"center",padding:"20px 0"}}>
+              <div style={{fontSize:13,color:G.muted,marginBottom:16}}>
+                Not found — you may not be in the system yet.
+              </div>
+              <button onClick={()=>{setVfNewName(vfSearch.trim());setVfStep("notfound");}}
+                style={{background:G.green,color:G.lime,border:"none",borderRadius:12,
+                  padding:"11px 24px",fontSize:13,fontWeight:800,cursor:"pointer",
+                  fontFamily:"inherit"}}>
+                ✋ Register as a new member
+              </button>
+            </div>
+          )}
+          <div style={{marginTop:24,paddingTop:16,borderTop:`1px solid ${G.border}`,
+            textAlign:"center"}}>
+            <button onClick={()=>{setVfStep("notfound");setVfNewName("");}}
+              style={{fontSize:12,color:G.muted,background:"none",border:"none",
+                cursor:"pointer",fontFamily:"inherit",textDecoration:"underline"}}>
+              I'm a new member / parent — register here
+            </button>
+          </div>
+          <button onClick={()=>setAuthView("pick")}
+            style={{width:"100%",marginTop:10,background:"none",border:`1px solid ${G.border}`,
+              borderRadius:10,padding:"10px",fontSize:13,fontWeight:700,color:G.muted,
+              cursor:"pointer",fontFamily:"inherit"}}>
+            ← Back to login
+          </button>
+        </div>
+      </Shell>
+    );
+  }
+
   if(!currentUser && authView==="joinrequestdone") return (
     <Shell>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",
@@ -3519,35 +4004,39 @@ export default function App() {
         <div style={{background:G.green,padding:"18px 20px 16px",textAlign:"center"}}>
           <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
             fontSize:19,fontWeight:900}}>Hi, {pendingMember?.name.split(" ")[0]}!</div>
-          <div style={{color:"rgba(255,255,255,0.6)",fontSize:12,marginTop:3}}>
-            FCC Training
-          </div>
+          <div style={{color:"rgba(255,255,255,0.6)",fontSize:12,marginTop:3}}>FCC Training</div>
         </div>
         <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",
-          padding:"0 28px"}}>
+          padding:"0 24px"}}>
           <div style={{textAlign:"center",maxWidth:320}}>
             <div style={{fontSize:52,marginBottom:16}}>🔒</div>
             <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,
               fontWeight:900,color:G.green,marginBottom:10}}>
-              Account not set up yet
+              Account not activated yet
             </div>
-            <div style={{fontSize:14,color:G.muted,lineHeight:1.6,marginBottom:24}}>
-              Your account needs to be activated before you can log in.
-              Please ask your admin to either add your email address or
-              generate an invite code for you.
+            <div style={{fontSize:14,color:G.muted,lineHeight:1.6,marginBottom:20}}>
+              Your profile exists but your account hasn't been set up with an email or access code yet.
             </div>
-            <div style={{background:"#f0fdf4",borderRadius:12,padding:"14px 16px",
-              fontSize:12,color:"#166534",lineHeight:1.7,textAlign:"left",
-              border:"1.5px solid #86efac",marginBottom:20}}>
-              <b>For admins:</b> Go to Admin Panel → find this member →
-              either add their email, or tap <b>🎟️ Gen Code</b> to create
-              a one-time invite code and share it with them.
-            </div>
+            <button onClick={()=>{
+                setVfStep("search");
+                setVfSearch(pendingMember?.name||"");
+                setVfMatch(pendingMember||null);
+                setVfEmail(pendingMember?.email||"");
+                setVfPhone(pendingMember?.phone||"");
+                setVfCode(""); setVfError(""); setVfConsent(false);
+                if(pendingMember) setVfStep("found");
+                setAuthView("verify");
+              }}
+              style={{width:"100%",background:G.green,color:G.lime,border:"none",
+                borderRadius:12,padding:"13px 20px",fontSize:14,fontWeight:800,
+                cursor:"pointer",fontFamily:"inherit",marginBottom:12}}>
+              ✅ Set up my account now
+            </button>
             <button onClick={()=>{setPendingMember(null);setAuthView("pick");}}
-              style={{background:G.green,color:G.lime,border:"none",borderRadius:24,
-                padding:"11px 28px",fontSize:14,fontWeight:800,cursor:"pointer",
-                fontFamily:"inherit"}}>
-              ← Back to login
+              style={{background:"none",color:G.muted,border:`1px solid ${G.border}`,
+                borderRadius:12,padding:"10px 20px",fontSize:13,fontWeight:700,
+                cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
+              ← Back
             </button>
           </div>
         </div>
@@ -3836,6 +4325,51 @@ export default function App() {
             </div>
           </div>
         )}
+
+        {/* ── GDPR consent banner — existing members without consent ── */}
+        {currentUser&&!members.find(m=>m.id===currentUser.id)?.consentGiven&&(()=>{
+          const dismissKey="fcc-gdpr-dismiss-v1";
+          const dismissed = (() => { try{ return sessionStorage.getItem(dismissKey)==="1"; }catch{ return false; } })();
+          if(dismissed) return null;
+          return (
+            <div style={{background:"#fffbeb",border:"1.5px solid #fde68a",
+              borderRadius:12,padding:"14px 16px",marginBottom:12,position:"relative"}}>
+              <div style={{fontWeight:800,fontSize:13,color:"#92400e",marginBottom:6}}>
+                🔐 A quick note about your data
+              </div>
+              <div style={{fontSize:12,color:"#78350f",lineHeight:1.6,marginBottom:12}}>
+                Fredensborg CC stores your name, email and phone to manage your membership
+                and communicate about training. Your data stays within the club and is never
+                shared externally.
+              </div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <button onClick={()=>{
+                    const updated=members.map(m=>m.id===currentUser.id?{...m,
+                      consentGiven:true,consentDate:new Date().toISOString().slice(0,10)}:m);
+                    saveMembers(updated);
+                    showToast("Thanks — privacy policy acknowledged ✓");
+                  }}
+                  style={{background:"#92400e",color:"#fff",border:"none",borderRadius:20,
+                    padding:"7px 16px",fontSize:12,fontWeight:800,
+                    cursor:"pointer",fontFamily:"inherit"}}>
+                  I understand ✓
+                </button>
+                <button onClick={()=>setView("privacy")}
+                  style={{background:"none",border:"1px solid #fde68a",borderRadius:20,
+                    padding:"7px 14px",fontSize:12,fontWeight:700,color:"#92400e",
+                    cursor:"pointer",fontFamily:"inherit"}}>
+                  Read full policy
+                </button>
+                <button onClick={()=>{ try{ sessionStorage.setItem(dismissKey,"1"); }catch{} }}
+                  style={{background:"none",border:"none",fontSize:12,color:"#b45309",
+                    cursor:"pointer",fontFamily:"inherit",textDecoration:"underline",
+                    marginLeft:"auto",padding:"7px 0"}}>
+                  Dismiss for now
+                </button>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Weather bar */}
         <WeatherBar wx={wxData} setView={setView}/>
@@ -5309,6 +5843,17 @@ export default function App() {
             <span style={{color:G.muted,fontSize:16}}>›</span>
           </button>
 
+          {/* Privacy & Data */}
+          <button type="button" onClick={()=>setView("privacy")}
+            style={{background:G.white,border:`1.5px solid ${G.border}`,
+              borderRadius:12,padding:"13px 16px",fontFamily:"inherit",
+              fontWeight:700,fontSize:14,color:G.text,cursor:"pointer",
+              width:"100%",display:"flex",alignItems:"center",gap:10,textAlign:"left"}}>
+            <span style={{fontSize:20}}>🔐</span>
+            <span style={{flex:1}}>Privacy &amp; Your Data</span>
+            <span style={{color:G.muted,fontSize:16}}>›</span>
+          </button>
+
           {/* Sign out */}
           <button type="button" onClick={handleLogout}
             style={{background:"none",border:`1.5px solid ${G.border}`,
@@ -5483,6 +6028,102 @@ export default function App() {
   }
 
   // ── WEATHER ──────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════
+  // RENDER: Privacy & Data
+  // ════════════════════════════════════════════════════════════
+  if(view==="privacy") {
+    const me = members.find(m=>m.id===currentUser.id)||currentUser;
+    const isYouth = (me.teams||[]).some(t=>["U11","U13","U15","U15 Girls","U18","U16"].includes(t));
+    return (
+      <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
+          currentUser={currentUser} onLogout={handleLogout}/>}>
+        <AppHeader title="Privacy & Your Data" sub="How Fredensborg CC uses your information"
+          onBack={()=>setView("profile")}/>
+        <div style={{padding:"16px 16px 100px"}}>
+
+          {/* Consent status */}
+          <div style={{
+            background: me.consentGiven ? "#f0fdf4" : "#fffbeb",
+            border: `1.5px solid ${me.consentGiven ? "#86efac" : "#fde68a"}`,
+            borderRadius:12,padding:"14px 16px",marginBottom:16,
+            display:"flex",alignItems:"flex-start",gap:12}}>
+            <span style={{fontSize:24,flexShrink:0}}>{me.consentGiven?"✅":"⚠️"}</span>
+            <div>
+              <div style={{fontWeight:800,fontSize:13,
+                color:me.consentGiven?"#166534":"#92400e",marginBottom:3}}>
+                {me.consentGiven
+                  ? `Privacy acknowledged${me.consentDate?" on "+me.consentDate:""}`
+                  : "You haven't acknowledged our privacy policy yet"}
+              </div>
+              <div style={{fontSize:12,color:me.consentGiven?"#166534":"#78350f",lineHeight:1.5}}>
+                {me.consentGiven
+                  ? "Your consent is on record. You can request changes or deletion at any time."
+                  : "Tap below to acknowledge how we use your data."}
+              </div>
+              {!me.consentGiven&&(
+                <button onClick={()=>{
+                    const updated=members.map(m=>m.id===me.id?{...m,
+                      consentGiven:true,consentDate:new Date().toISOString().slice(0,10)}:m);
+                    saveMembers(updated);
+                    showToast("Privacy policy acknowledged ✓");
+                  }}
+                  style={{marginTop:10,background:"#92400e",color:"#fff",border:"none",
+                    borderRadius:20,padding:"7px 16px",fontSize:12,fontWeight:800,
+                    cursor:"pointer",fontFamily:"inherit"}}>
+                  I acknowledge the privacy policy
+                </button>
+              )}
+            </div>
+          </div>
+
+          {isYouth&&!me.consentGiven&&(
+            <div style={{background:"#eff6ff",border:"1.5px solid #bfdbfe",borderRadius:10,
+              padding:"12px 14px",marginBottom:16,fontSize:12,color:"#1e40af",lineHeight:1.6}}>
+              👶 <b>Youth member note:</b> A parent or guardian should also complete the
+              account setup to formally record parental consent.
+              Share this link with them: <b>fcc-training.vercel.app</b> → "Verify / Set up my account"
+            </div>
+          )}
+
+          {/* Full policy sections */}
+          {PRIVACY_SECTIONS.map((s,i)=>(
+            <div key={i} style={{background:G.white,border:`1.5px solid ${G.border}`,
+              borderRadius:12,padding:"14px 16px",marginBottom:10}}>
+              <div style={{fontWeight:800,fontSize:13,color:G.text,marginBottom:6}}>
+                {s.title}
+              </div>
+              <div style={{fontSize:13,color:G.muted,lineHeight:1.65}}>
+                {s.body}
+              </div>
+            </div>
+          ))}
+
+          {/* Request deletion */}
+          <div style={{background:"#fef2f2",border:"1.5px solid #fca5a5",
+            borderRadius:12,padding:"14px 16px",marginTop:4}}>
+            <div style={{fontWeight:800,fontSize:13,color:"#991b1b",marginBottom:6}}>
+              Request data deletion or access
+            </div>
+            <div style={{fontSize:12,color:"#7f1d1d",lineHeight:1.6,marginBottom:12}}>
+              To request a copy of your data or ask for your account to be deleted,
+              contact the club admin. Your request will be handled within 30 days.
+            </div>
+            <button onClick={()=>setView("help")}
+              style={{background:"#991b1b",color:"#fff",border:"none",borderRadius:20,
+                padding:"8px 18px",fontSize:12,fontWeight:800,cursor:"pointer",
+                fontFamily:"inherit"}}>
+              Contact admin →
+            </button>
+          </div>
+
+        </div>
+        <BotNav view="profile" setView={setView} userRole={userRole}
+          pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
+        {toast&&<Toast msg={toast}/>}
+      </Shell>
+    );
+  }
+
   if(view==="weather") {
     return (
       <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
@@ -5576,6 +6217,7 @@ export default function App() {
         borderBottom:`1px solid ${G.border}`}}>
         {[
           {label:"👥 Members",   id:"sec-members"},
+          {label:"✅ Verifications", id:"sec-members"},
           {label:"➕ Add Member", id:"sec-add-member"},
           {label:"🏏 Groups",    id:"sec-groups"},
           {label:"🧢 Coaches",   id:"sec-coaches"},
@@ -5598,12 +6240,46 @@ export default function App() {
 
       <div style={{padding:"14px 16px 20px"}}>
 
+        {/* ── Self-verified members (email confirmed, no action needed) ── */}
+        {can(userRole,"addMember")&&(()=>{
+          const verified = members.filter(m=>m.emailVerified&&!m.pin&&!Object.keys(inviteCodes).find(id=>id===m.id));
+          if(!verified.length) return null;
+          return (
+            <div style={{background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:12,
+              padding:"12px 14px",marginBottom:12}}>
+              <div style={{fontWeight:800,fontSize:12,color:"#166534",marginBottom:8,
+                display:"flex",alignItems:"center",gap:6}}>
+                <span style={{background:"#16a34a",color:"#fff",borderRadius:99,
+                  fontSize:9,fontWeight:900,padding:"1px 6px"}}>{verified.length}</span>
+                ✅ Members who self-verified — generate invite codes to give them access
+              </div>
+              {verified.map(m=>(
+                <div key={m.id} style={{display:"flex",alignItems:"center",gap:10,
+                  padding:"8px 10px",background:G.white,borderRadius:8,marginBottom:6,
+                  border:`1px solid ${G.border}`}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:700,fontSize:13,color:G.text}}>{m.name}</div>
+                    <div style={{fontSize:11,color:G.muted}}>📧 {m.email}</div>
+                  </div>
+                  <Btn sm bg={G.green} col={G.lime}
+                    onClick={()=>{
+                      const code=generateInviteCode(m.id);
+                      setToast(`📋 Code for ${m.name.split(" ")[0]}: ${code}`);
+                      setTimeout(()=>setToast(null),6000);
+                    }}>
+                    🎟️ Give Access
+                  </Btn>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
         {/* ── Join Requests ──────────────────────────────────── */}
         <div id="sec-members"/>
         {can(userRole,"addMember")&&joinRequests.filter(r=>r.status==="pending").length>0&&(()=>{
           const pending = joinRequests.filter(r=>r.status==="pending");
           function approveRequest(req) {
-            // Create the member
             const playerTeam = req.playerTeam && req.playerTeam !== "I don't play / I'm a parent"
               ? req.playerTeam : null;
             const newMember = normMember({
@@ -5612,12 +6288,20 @@ export default function App() {
               team: playerTeam,
               teams: playerTeam ? [playerTeam] : [],
               role: "member",
-              email: null,
+              email: req.email||null,
+              phone: req.contact||null,
+              emailVerified: req.emailVerified||false,
+              consentGiven: req.consentGiven||false,
+              consentDate: req.consentDate||null,
               note: req.parentName
                 ? `Parent: ${req.parentName}${req.contact ? " · " + req.contact : ""}`
                 : req.contact || null,
             });
             saveMembers([...members, newMember]);
+            // Auto-generate invite code if email was verified
+            if(req.emailVerified && newMember.id) {
+              setTimeout(()=>generateInviteCode(newMember.id),500);
+            }
             saveJoinRequests(joinRequests.map(r=>r.id===req.id ? {...r,status:"approved"} : r));
             logAction("request", `Approved join request: ${req.playerName}${req.playerTeam?" → "+req.playerTeam:""}${req.forChild&&req.parentName?" (parent: "+req.parentName+")":""}`);
             showToast(`${req.playerName} added ✓`);
@@ -5645,12 +6329,18 @@ export default function App() {
                   borderRadius:12,padding:"12px 14px",marginBottom:10}}>
                   <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8}}>
                     <div style={{flex:1}}>
-                      <div style={{fontWeight:800,fontSize:14,color:G.text}}>
-                        {req.forChild ? "👶 " : "🙋 "}{req.playerName}
+                      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:3}}>
+                        <span style={{fontWeight:800,fontSize:14,color:G.text}}>
+                          {req.forChild ? "👶 " : "🙋 "}{req.playerName}
+                        </span>
+                        {req.emailVerified&&<span style={{fontSize:10,fontWeight:700,
+                          padding:"1px 7px",borderRadius:20,background:"#dcfce7",
+                          color:"#166534",border:"0.5px solid #86efac"}}>✅ email verified</span>}
                       </div>
-                      <div style={{fontSize:11,color:G.muted,marginTop:3,lineHeight:1.6}}>
+                      <div style={{fontSize:11,color:G.muted,lineHeight:1.6}}>
                         {req.playerTeam ? `Team: ${req.playerTeam}` : "No team specified"}
                         {req.forChild && req.parentName && ` · Parent: ${req.parentName}`}
+                        {req.email && ` · ${req.email}`}
                         {req.contact && ` · ${req.contact}`}
                         <br/>
                         <span style={{color:"#9ca3af",fontSize:10}}>
