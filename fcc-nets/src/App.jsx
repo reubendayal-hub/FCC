@@ -15,35 +15,68 @@ const JOINREQS_KEY   = "joinrequests";
 const AUDITLOG_KEY   = "auditlog";
 
 // ─── 2026 Home Match Fixtures (Fredensborg ground only) ───────
+// ─── Match Fixtures 2026 (home matches only — blocks nets) ────
+// Source: DCF 2026_Turnering_Schedule, 11-Mar-Consolidated
+// Away matches excluded — nets not needed for away games
 const MATCH_FIXTURES = [
-  // ── T20 Series 4 ──────────────────────────────────────────
-  { date:"2026-05-03", from:"13:00", to:"21:00", label:"T20 Series 4 — FCC vs Nørrebro" },
-  { date:"2026-07-05", from:"10:00", to:"19:00", label:"T20 Series 4 — FCC vs AB" },
-  { date:"2026-08-02", from:"15:00", to:"21:00", label:"T20 Series 4 — FCC vs Tåstrup" },
-  // ── T20 Series 5 ──────────────────────────────────────────
-  { date:"2026-05-16", from:"14:30", to:"21:00", label:"T20 Series 5 — FCC vs Himalaya" },
-  { date:"2026-07-05", from:"14:00", to:"21:00", label:"T20 Series 5 — FCC vs Tårnby" },
-  { date:"2026-07-11", from:"11:00", to:"19:00", label:"T20 Series 5 — FCC vs Tåstrup" },
-  // ── Div 2 (FCC1 = Fredensborg 1) ──────────────────────────
-  { date:"2026-05-17", from:"10:00", to:"19:00", label:"Div 2 — FCC vs Århus" },
-  { date:"2026-05-24", from:"11:00", to:"19:00", label:"Div 2 — FCC vs Himalaya" },
-  { date:"2026-06-07", from:"11:00", to:"19:00", label:"Div 2 — FCC vs Copenhagen" },
-  { date:"2026-07-26", from:"11:00", to:"19:00", label:"Div 2 — FCC vs Bella" },
-  { date:"2026-08-15", from:"11:00", to:"19:00", label:"Div 2 — FCC vs Kolding" },
-  { date:"2026-08-30", from:"11:00", to:"19:00", label:"Div 2 — FCC vs Frem" },
-  // ── Div 3 (FCC2 = Fredensborg 2) ──────────────────────────
-  { date:"2026-05-02", from:"13:00", to:"21:00", label:"Div 3 — FCC vs APMM" },
-  { date:"2026-05-31", from:"10:00", to:"18:00", label:"Div 3 — FCC vs Frem" },
-  { date:"2026-06-13", from:"14:00", to:"21:00", label:"Div 3 — FCC vs Hvidovre" },
-  { date:"2026-06-27", from:"10:00", to:"19:00", label:"Div 3 — FCC vs Ishøj" },
-  { date:"2026-08-22", from:"10:00", to:"19:00", label:"Div 3 — FCC vs APMM" },
-  { date:"2026-09-05", from:"15:00", to:"21:00", label:"Div 3 — FCC vs AB" },
-  // ── Div 4 (FCC3 = Fredensborg 3) ──────────────────────────
-  { date:"2026-05-10", from:"10:00", to:"19:00", label:"Div 4 — FCC vs Tårnby" },
-  { date:"2026-05-31", from:"15:00", to:"21:00", label:"Div 4 — FCC vs Albertslund" },
-  { date:"2026-06-14", from:"14:30", to:"21:00", label:"Div 4 — FCC vs Tåstrup" },
-  { date:"2026-08-01", from:"10:00", to:"19:00", label:"Div 4 — FCC vs Hvidovre" },
-  { date:"2026-08-09", from:"14:00", to:"21:00", label:"Div 4 — FCC vs Frem" },
+  // ── 2. Division ──────────────────────────────────────────────
+  { date:"2026-05-17", from:"10:00", to:"19:00", label:"Div 2 — FCC vs Århus 1" },
+  { date:"2026-05-24", from:"11:00", to:"20:00", label:"Div 2 — FCC vs Himalaya 1" },
+  { date:"2026-06-07", from:"11:00", to:"20:00", label:"Div 2 — FCC vs Copenhagen 1" },
+  { date:"2026-07-26", from:"11:00", to:"20:00", label:"Div 2 — FCC vs Bella 1" },
+  { date:"2026-08-15", from:"11:00", to:"20:00", label:"Div 2 — FCC vs Kolding 1" },
+  { date:"2026-08-30", from:"11:00", to:"20:00", label:"Div 2 — FCC vs Frem 1" },
+  // ── 3. Division Øst - B ──────────────────────────────────────
+  { date:"2026-05-02", from:"13:00", to:"21:00", label:"Div 3 — FCC vs APMM 1" },
+  { date:"2026-05-31", from:"10:00", to:"19:00", label:"Div 3 — FCC vs Frem 2" },
+  { date:"2026-06-13", from:"14:00", to:"21:00", label:"Div 3 — FCC vs Hvidovre 2" },
+  { date:"2026-06-27", from:"10:00", to:"19:00", label:"Div 3 — FCC vs Ishøj 3" },
+  { date:"2026-08-22", from:"10:00", to:"19:00", label:"Div 3 — FCC vs APMM 1" },
+  { date:"2026-09-05", from:"15:00", to:"21:00", label:"Div 3 — FCC vs AB 2" },
+  // ── 4. Division Øst ──────────────────────────────────────────
+  { date:"2026-05-10", from:"10:00", to:"19:00", label:"Div 4 — FCC vs Tårnby 1" },
+  { date:"2026-05-31", from:"15:00", to:"21:00", label:"Div 4 — FCC vs Albertslund 3" },
+  { date:"2026-06-14", from:"14:00", to:"21:00", label:"Div 4 — FCC vs Tåstrup 2" },
+  { date:"2026-08-01", from:"10:00", to:"19:00", label:"Div 4 — FCC vs Hvidovre 3" },
+  { date:"2026-08-09", from:"14:00", to:"21:00", label:"Div 4 — FCC vs Frem 3" },
+  // ── Kvinderækken ─────────────────────────────────────────────
+  { date:"2026-06-06", from:"10:00", to:"19:00", label:"Women's — FCC vs Esbjerg" },
+  { date:"2026-06-14", from:"10:00", to:"19:00", label:"Women's — FCC vs Svanholm" },
+  { date:"2026-08-02", from:"10:00", to:"19:00", label:"Women's — FCC vs KB" },
+  // ── Oldboys ──────────────────────────────────────────────────
+  { date:"2026-05-06", from:"18:00", to:"21:00", label:"OB — FCC vs Køge OB" },
+  { date:"2026-05-27", from:"18:00", to:"21:00", label:"OB — FCC vs Hvidovre OB" },
+  { date:"2026-06-18", from:"18:00", to:"21:00", label:"OB — FCC vs Forty Øst 1" },
+  { date:"2026-08-12", from:"18:00", to:"21:00", label:"OB — FCC vs Tåstrup OB" },
+  { date:"2026-08-18", from:"18:00", to:"21:00", label:"OB — FCC vs Svanholm OB" },
+  { date:"2026-08-25", from:"18:00", to:"21:00", label:"OB — FCC vs Ishøj OB" },
+  { date:"2026-09-03", from:"18:00", to:"21:00", label:"OB — FCC vs Hvidovre OB" },
+  // ── T20 Serie 4 ──────────────────────────────────────────────
+  { date:"2026-05-03", from:"13:00", to:"21:00", label:"T20 S4 — FCC vs Nørrebro 2" },
+  { date:"2026-07-05", from:"10:00", to:"18:00", label:"T20 S4 — FCC vs AB 2" },
+  { date:"2026-08-02", from:"15:00", to:"22:00", label:"T20 S4 — FCC vs Tåstrup 1" },
+  // ── T20 Serie 5 ──────────────────────────────────────────────
+  { date:"2026-05-16", from:"14:00", to:"22:00", label:"T20 S5 — FCC vs Himalaya 1" },
+  { date:"2026-07-05", from:"14:00", to:"22:00", label:"T20 S5 — FCC vs Tårnby 1" },
+  { date:"2026-07-11", from:"11:00", to:"19:00", label:"T20 S5 — FCC vs Tåstrup 2" },
+  // ── U13 ──────────────────────────────────────────────────────
+  { date:"2026-05-16", from:"10:00", to:"19:00", label:"U13 — FCC vs Glostrup U13" },
+  { date:"2026-05-25", from:"10:00", to:"19:00", label:"U13 — FCC vs Soraner U13" },
+  { date:"2026-06-13", from:"10:00", to:"19:00", label:"U13 — FCC vs Svanholm U13" },
+  { date:"2026-06-20", from:"13:00", to:"21:00", label:"U13 — FCC vs Roskilde U13" },
+  { date:"2026-08-09", from:"10:00", to:"19:00", label:"U13 — FCC vs KB U13" },
+  // ── U15 ──────────────────────────────────────────────────────
+  { date:"2026-04-26", from:"10:00", to:"19:00", label:"U15 — FCC vs KB U15" },
+  { date:"2026-05-23", from:"10:00", to:"19:00", label:"U15 — FCC vs Svanholm U15" },
+  { date:"2026-08-16", from:"14:00", to:"21:00", label:"U15 — FCC vs KB U15" },
+  { date:"2026-09-05", from:"10:00", to:"19:00", label:"U15 — FCC vs Glostrup U15" },
+  // ── U16 ──────────────────────────────────────────────────────
+  { date:"2026-08-03", from:"10:00", to:"19:00", label:"U16 — FCC vs Svanholm U16" },
+  { date:"2026-08-29", from:"10:00", to:"19:00", label:"U16 — FCC vs Glostrup U16" },
+  // ── U18 ──────────────────────────────────────────────────────
+  { date:"2026-06-21", from:"10:00", to:"19:00", label:"U18 — FCC vs Svanholm U18" },
+  { date:"2026-07-25", from:"10:00", to:"19:00", label:"U18 — FCC vs KB U18" },
+  { date:"2026-09-12", from:"10:00", to:"19:00", label:"U18 — FCC vs Glostrup U18" },
 ];
 
 // ─── Roles ────────────────────────────────────────────────────
@@ -1757,12 +1790,14 @@ function SessCard({s,members,teams,faded,onClick,onCarpoolClick}) {
                 : <><NetIcon color={s.net==="2"?"#5b21b6":"#166534"} size={11}/> Net {s.net}</>}
             </span>}
             {s.label&&<span style={{background:"#ede9fe",color:"#5b21b6",borderRadius:20,
-              padding:"1px 8px",fontSize:10,fontWeight:800}}>{s.label}</span>}
+              padding:"2px 10px",fontSize:11,fontWeight:800,letterSpacing:.1}}>{s.label}</span>}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:4}}>
             <span style={{fontSize:12,color:G.green,fontWeight:800}}>{s.from} – {s.to}</span>
           {/* Coach chips — max 3 visible, +N for rest */}
           {s.restrictedTo&&sessionCoaches.length>0&&<>
+            <span style={{fontSize:10,color:"rgba(255,255,255,.45)",fontWeight:600,
+              letterSpacing:.3}}>Coach:</span>
             {sessionCoaches.slice(0,3).map(name=>(
               <span key={name} style={{fontSize:10,fontWeight:700,padding:"1px 7px",
                 borderRadius:20,background:"#fef9c3",color:"#92400e",
