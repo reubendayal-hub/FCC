@@ -778,11 +778,25 @@ function NetsTimeline({sessions,netsDate,setNetsDate,setView,setBDate,setBFrom,s
   const barRefs={};
 
   return (
-    <div style={{background:G.white,borderRadius:14,padding:"12px 13px",
-      border:`1.5px solid ${G.border}`,marginBottom:12}}>
+    <div style={{
+      background:G.white,
+      borderRadius:14,
+      padding:"12px 13px",
+      border:`1.5px solid ${G.green}`,
+      marginBottom:12,
+      boxShadow:`0 4px 0 0 ${G.green}44, 0 6px 16px rgba(20,83,45,.12)`,
+      position:"relative",
+    }}>
+      {/* "Nets" label accent */}
+      <div style={{position:"absolute",top:-1,left:13,
+        background:G.green,borderRadius:"0 0 7px 7px",
+        padding:"1px 10px",fontSize:9,fontWeight:900,
+        color:G.lime,letterSpacing:1.2,textTransform:"uppercase"}}>
+        Nets Availability
+      </div>
 
       {/* Date strip */}
-      <div style={{display:"flex",gap:5,marginBottom:10,overflowX:"auto",paddingBottom:2}}>
+      <div style={{display:"flex",gap:5,marginBottom:10,overflowX:"auto",paddingBottom:2,marginTop:12}}>
         {dates.map(d=>{
           const f=fmtD(d), active=d===netsDate;
           const gauge=netAvailGauge(sessions,d);
@@ -795,7 +809,10 @@ function NetsTimeline({sessions,netsDate,setNetsDate,setView,setBDate,setBFrom,s
                 border:active?`2px solid ${G.green}`:isWeekend?`1.5px solid #c8e6c9`:`1.5px solid ${G.border}`,
                 borderRadius:10,padding:"6px 8px 5px",cursor:"pointer",fontFamily:"inherit",
                 minWidth:44,textAlign:"center",transition:"all .15s",
-                boxShadow:active?"0 2px 6px rgba(20,83,45,.2)":"none"}}>
+                boxShadow:active
+                  ?"0 3px 0 rgba(20,83,45,.4), inset 0 1px 0 rgba(255,255,255,.2)"
+                  :"none",
+                transform:active?"translateY(-1px)":"none"}}>
               <div style={{fontSize:8,fontWeight:700,
                 color:active?G.lime:isWeekend?G.green:G.muted,
                 textTransform:"uppercase"}}>{f.day}</div>
@@ -848,12 +865,15 @@ function NetsTimeline({sessions,netsDate,setNetsDate,setView,setBDate,setBFrom,s
           <div key={net} style={{display:"flex",alignItems:"center",gap:7,marginBottom:7}}>
             <div style={{width:54,flexShrink:0,textAlign:"right"}}>
               <span style={{background:nc.bar,color:nc.label,borderRadius:6,
-                padding:"3px 7px",fontSize:10,fontWeight:900}}>Net {net}</span>
+                padding:"3px 7px",fontSize:10,fontWeight:900,
+                boxShadow:"0 2px 0 rgba(0,0,0,.12)"}}>Net {net}</span>
             </div>
             <div ref={el=>{barRefs[net]=el;}}
               onClick={e=>handleBarClick(e,net,barRefs[net])}
               style={{flex:1,height:38,background:nc.barBg,borderRadius:8,
-                position:"relative",border:`1.5px solid ${isFree?nc.borderFree:G.border}`,
+                position:"relative",
+                border:`1.5px solid ${isFree?nc.borderFree:G.border}`,
+                boxShadow:"inset 0 2px 4px rgba(0,0,0,.06)",
                 overflow:"hidden",cursor:"crosshair"}}>
               {/* Prime shading */}
               {PRIME_ZONES.map((z,i)=>(
@@ -3605,22 +3625,31 @@ export default function App() {
             <div style={{fontSize:15,fontWeight:900,color:G.white,lineHeight:1.2,
               fontFamily:"'Playfair Display',serif",marginTop:1}}>Schedule</div>
           </div>
-          <button onClick={handleLogout}
-            style={{display:"flex",alignItems:"center",gap:6,background:"none",
-              border:"none",cursor:"pointer",padding:0,flexShrink:0}}>
-            <div style={{width:28,height:28,borderRadius:"50%",
-              background:"rgba(255,255,255,.12)",
+          <button onClick={()=>setView("profile")}
+            style={{display:"flex",alignItems:"center",gap:6,
+              background:"rgba(255,255,255,.1)",border:"0.5px solid rgba(255,255,255,.2)",
+              borderRadius:20,padding:"4px 10px 4px 5px",cursor:"pointer",flexShrink:0}}>
+            <div style={{width:22,height:22,borderRadius:"50%",
+              background:"rgba(255,255,255,.2)",
               display:"flex",alignItems:"center",justifyContent:"center",
-              fontSize:13,color:"rgba(255,255,255,.8)"}}>
+              fontSize:11,fontWeight:800,color:"rgba(255,255,255,.9)"}}>
               {currentUser.name.split(" ")[0][0]}
             </div>
-            <span style={{fontSize:10,color:"rgba(255,255,255,.45)"}}>
+            <span style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,.8)"}}>
               {currentUser.name.split(" ")[0]}
             </span>
+            <svg onClick={e=>{e.stopPropagation();handleLogout();}} width="13" height="13"
+              viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.5)" strokeWidth="2.5"
+              strokeLinecap="round" strokeLinejoin="round"
+              title="Sign out" style={{cursor:"pointer",marginLeft:2}}>
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
           </button>
         </div>
 
-        {/* Gold pill filter tabs */}
+        {/* Gold pill filter tabs — 3D pressed effect */}
         <div style={{padding:"0 14px 10px",display:"flex",gap:8}}>
           {[
             {key:"all",  label:"🏏 All Sessions"},
@@ -3631,11 +3660,19 @@ export default function App() {
               <button key={key}
                 onClick={()=>{setSchedFilter(key);setShowPastAll(false);setShowUpcomingAll(false);}}
                 style={{flex:1,padding:"7px 0",borderRadius:20,cursor:"pointer",
-                  fontFamily:"inherit",fontWeight:700,fontSize:11,
-                  transition:"all .15s",whiteSpace:"nowrap",textAlign:"center",
-                  background: active ? "#fbbf24" : "rgba(251,191,36,.15)",
-                  color: active ? "#1e3a5f" : "rgba(251,191,36,.7)",
-                  border: active ? "none" : "0.5px solid rgba(251,191,36,.3)"}}>
+                  fontFamily:"inherit",fontWeight:800,fontSize:11,
+                  transition:"all .12s",whiteSpace:"nowrap",textAlign:"center",
+                  background: active
+                    ? "linear-gradient(180deg,#fcd34d 0%,#f59e0b 100%)"
+                    : "rgba(251,191,36,.12)",
+                  color: active ? "#1e3a5f" : "rgba(251,191,36,.65)",
+                  border: active
+                    ? "1px solid #b45309"
+                    : "0.5px solid rgba(251,191,36,.3)",
+                  boxShadow: active
+                    ? "inset 0 1px 0 rgba(255,255,255,.35), inset 0 -2px 0 rgba(0,0,0,.15)"
+                    : "none",
+                  textShadow: active ? "0 1px 0 rgba(255,255,255,.3)" : "none"}}>
                 {label}
               </button>
             );
