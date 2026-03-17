@@ -1983,13 +1983,10 @@ function BotNav({view,setView,userRole,pendingCount=0}) {
         </div>
       </button>
 
-      <Tab id="admin" icon={<IconMembers on={active==="admin"}/>} label="Admin" badge={isAdmin?pendingCount:0}/>
       {isAdmin && (
-        <Tab id="profile" icon={<IconProfile on={active==="profile"}/>} label="Profile"/>
+        <Tab id="admin" icon={<IconMembers on={active==="admin"}/>} label="Admin" badge={pendingCount}/>
       )}
-      {!isAdmin && (
-        <Tab id="profile" icon={<IconProfile on={active==="profile"}/>} label="Profile"/>
-      )}
+      <Tab id="profile" icon={<IconProfile on={active==="profile"}/>} label="Profile"/>
     </div>
   );
 }
