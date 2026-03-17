@@ -2243,6 +2243,8 @@ export default function App() {
   // Admin state
   const [newName,  setNewName]  = useState("");
   const [newTeam,  setNewTeam]  = useState("Unassigned");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPhone, setNewPhone] = useState("");
   const [aSearch,  setASearch]  = useState("");
   const [aFilter,  setAFilter]  = useState("All");
   const [editingRole, setEditingRole] = useState(null);
@@ -2280,7 +2282,8 @@ export default function App() {
   // Request-to-join form state
   const [jrName,    setJrName]   = useState("");
   const [jrTeam,    setJrTeam]   = useState("");
-  const [jrContact, setJrContact]= useState("");
+  const [jrContact, setJrContact]= useState(""); // email
+  const [jrPhone,   setJrPhone]  = useState(""); // phone (separate)
   const [jrForChild,setJrForChild]=useState(false);
   const [jrChildName,setJrChildName]=useState("");
   const [jrChildTeam,setJrChildTeam]=useState("");
@@ -2919,10 +2922,16 @@ export default function App() {
       showToast("Member already exists"); return;
     }
     const teamLabel = newTeam==="Unassigned" ? "no team" : newTeam;
-    saveMembers([...members,{id:uid(),name:newName.trim(),
-      teams:newTeam==="Unassigned"?[]:[newTeam],role:"member"}]);
-    logAction("member", `Added member: ${newName.trim()} (${teamLabel})`);
-    setNewName(""); showToast("Member added ✓");
+    saveMembers([...members, normMember({
+      id:uid(), name:newName.trim(),
+      teams: newTeam==="Unassigned"?[]:[newTeam],
+      role:"member",
+      email: newEmail.trim()||null,
+      phone: newPhone.trim()||null,
+    })]);
+    logAction("member", `Added member: ${newName.trim()} (${teamLabel})${newEmail?" · "+newEmail:""}`);
+    setNewName(""); setNewEmail(""); setNewPhone("");
+    showToast("Member added ✓");
   }
 
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -3248,7 +3257,7 @@ export default function App() {
               </div>
               <button onClick={()=>{
                   setJrName(pickSearch.trim());
-                  setJrTeam(""); setJrContact(""); setJrForChild(false);
+                  setJrTeam(""); setJrContact(""); setJrPhone(""); setJrForChild(false);
                   setJrChildName(""); setJrChildTeam("");
                   setAuthView("joinrequest");
                 }}
@@ -3296,18 +3305,19 @@ export default function App() {
     function submitJoinRequest() {
       const nameToCheck = jrForChild ? jrChildName.trim() : jrName.trim();
       if(!nameToCheck) { showToast("Please enter a name"); return; }
+      const teamVal = jrForChild ? jrChildTeam : jrTeam;
       const req = {
         id: uid(),
         submittedAt: new Date().toISOString(),
         forChild: jrForChild,
         playerName: jrForChild ? jrChildName.trim() : jrName.trim(),
-        playerTeam: jrForChild ? jrChildTeam : jrTeam,
+        playerTeam: teamVal==="unsure" ? null : (teamVal||null),
         parentName: jrForChild ? jrName.trim() : null,
-        contact: jrContact.trim() || null,
+        email: jrContact.trim()||null,      // stored as email not contact
+        contact: jrPhone.trim()||null,       // phone in contact
         status: "pending",
       };
       saveJoinRequests([...joinRequests, req]);
-      // Notify Reuben by email — silent, non-blocking
       fetch("/api/notify", {
         method:"POST",
         headers:{"Content-Type":"application/json"},
@@ -3315,8 +3325,10 @@ export default function App() {
           type:"joinrequest",
           data:{
             name: req.playerName,
-            playerTeam: req.playerTeam,
-            message: req.parentName ? `Submitted by parent: ${req.parentName}${req.contact?" · "+req.contact:""}` : (req.contact||"")
+            playerTeam: req.playerTeam||"Not sure yet",
+            message: req.parentName
+              ? `Parent: ${req.parentName}${req.email?" · "+req.email:""}${req.contact?" · "+req.contact:""}`
+              : `${req.email||""}${req.contact?" · "+req.contact:""}`
           }
         })
       }).catch(()=>{});
@@ -3343,7 +3355,16 @@ export default function App() {
               textTransform:"uppercase",marginBottom:10}}>Who are you registering?</div>
             <div style={{display:"flex",gap:8}}>
               {[{v:false,label:"🙋 Myself"},{v:true,label:"👶 My child"}].map(opt=>(
-                <button key={String(opt.v)} onClick={()=>setJrForChild(opt.v)}
+                <button key={String(opt.v)} onClick={()=>{
+                    if(opt.v && !jrForChild) {
+                      // Switching TO child tab — move typed name to child field
+                      if(jrName.trim()) { setJrChildName(jrName.trim()); setJrName(""); }
+                    } else if(!opt.v && jrForChild) {
+                      // Switching BACK to myself — move child name back if parent name empty
+                      if(!jrName.trim() && jrChildName.trim()) { setJrName(jrChildName.trim()); setJrChildName(""); }
+                    }
+                    setJrForChild(opt.v);
+                  }}
                   style={{flex:1,padding:"10px 0",borderRadius:10,border:"none",
                     cursor:"pointer",fontFamily:"inherit",fontWeight:700,fontSize:13,
                     background:jrForChild===opt.v ? G.green : G.bg,
@@ -3371,10 +3392,15 @@ export default function App() {
                 </select>
               </FFld>
             )}
-            <FFld label="Your Email or Phone (optional — so we can contact you)">
-              <input placeholder="email or phone number"
+            <FFld label="Your Email">
+              <input type="email" placeholder="your@email.com"
                 style={iSt()} value={jrContact}
                 onChange={e=>setJrContact(e.target.value)}/>
+            </FFld>
+            <FFld label="Your Phone (optional)">
+              <input type="tel" placeholder="+45 XX XX XX XX"
+                style={iSt()} value={jrPhone||""}
+                onChange={e=>setJrPhone?.(e.target.value)}/>
             </FFld>
           </div>
 
@@ -3387,7 +3413,7 @@ export default function App() {
                 👶 Child's Details
               </div>
               <FFld label="Child's Full Name">
-                <input placeholder="e.g. Priya's child"
+                <input placeholder="Child's full name"
                   style={iSt()} value={jrChildName}
                   onChange={e=>setJrChildName(e.target.value)}/>
               </FFld>
@@ -3397,6 +3423,7 @@ export default function App() {
                   {teamOptions.filter(t=>t!==nonPlayerOption).map(t=>(
                     <option key={t} value={t}>{t}</option>
                   ))}
+                  <option value="unsure">I'm not sure</option>
                 </select>
               </FFld>
             </div>
@@ -6372,16 +6399,29 @@ export default function App() {
         {/* Add member */}
         {can(userRole,"addMember")&&<>
           <SLbl mt={4}><span id="sec-add-member">Add New Member</span></SLbl>
+          <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,
+            padding:"10px 14px",marginBottom:10,fontSize:12,color:"#1e40af",lineHeight:1.5}}>
+            💡 New members can also self-register at login — tap <b>"Verify / Set up my account"</b> on the login screen. Use the form below for admin-initiated additions only.
+          </div>
           <form onSubmit={addMember} style={{background:G.white,borderRadius:12,
-            border:`1.5px solid ${G.border}`,padding:14,marginBottom:20}}>
+            border:`1.5px solid ${G.border}`,padding:14,marginBottom:20,
+            display:"flex",flexDirection:"column",gap:10}}>
             <FFld label="Full Name">
               <input style={iSt()} placeholder="e.g. Arjun Sharma"
                 value={newName} onChange={e=>setNewName(e.target.value)} required/>
             </FFld>
-            <FFld label="Group / Team" style={{marginTop:10}}>
+            <FFld label="Group / Team">
               <select style={iSt()} value={newTeam} onChange={e=>setNewTeam(e.target.value)}>
                 {ALL_TEAMS.map(t=><option key={t} value={t}>{t}</option>)}
               </select>
+            </FFld>
+            <FFld label="Email (optional)">
+              <input type="email" style={iSt()} placeholder="their@email.com"
+                value={newEmail} onChange={e=>setNewEmail(e.target.value)}/>
+            </FFld>
+            <FFld label="Phone (optional)">
+              <input type="tel" style={iSt()} placeholder="+45 XX XX XX XX"
+                value={newPhone} onChange={e=>setNewPhone(e.target.value)}/>
             </FFld>
             <Btn type="submit" bg={G.green} col={G.lime} full>+ Add Member</Btn>
           </form>
