@@ -1771,27 +1771,34 @@ function SessCard({s,members,teams,faded,onClick,onCarpoolClick}) {
         <div style={{background:isToday(s.date)?`${G.lime}22`:"rgba(0,0,0,.025)",
           border:`1px solid ${isToday(s.date)?G.lime:G.border}`,
           borderRadius:9,padding:"6px 10px",marginBottom:7}}>
-          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-            <span style={{fontSize:16,fontWeight:900,color:G.green,letterSpacing:"-.3px"}}>
+          {/* Row 1: date + chips */}
+          <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
+            <span style={{fontSize:13,fontWeight:800,color:G.green,letterSpacing:"-.2px"}}>
               {fmtShort(s.date)}
             </span>
             {isToday(s.date)&&<span style={{background:G.lime,color:G.green,borderRadius:20,
-              padding:"1px 8px",fontSize:10,fontWeight:900}}>TODAY</span>}
+              padding:"1px 7px",fontSize:9,fontWeight:900}}>TODAY</span>}
             {s.restrictedTo&&<span style={{background:"#fef9c3",color:"#92400e",borderRadius:20,
-              padding:"1px 8px",fontSize:10,fontWeight:800}}>🔒 {s.restrictedTo}</span>}
+              padding:"1px 7px",fontSize:9,fontWeight:800}}>🔒 {s.restrictedTo}</span>}
             {s.recurringId&&!s.restrictedTo&&<span style={{background:"#f0f9ff",color:"#0369a1",
-              borderRadius:20,padding:"1px 8px",fontSize:10,fontWeight:800}}>↻</span>}
+              borderRadius:20,padding:"1px 7px",fontSize:9,fontWeight:800}}>↻</span>}
             {s.net&&<span style={{background:s.net==="both"?"#fef3c7":s.net==="2"?"#ede9fe":"#dcfce7",
               color:s.net==="both"?"#92400e":s.net==="2"?"#5b21b6":"#166534",
-              borderRadius:20,padding:"1px 8px",fontSize:10,fontWeight:800,
+              borderRadius:20,padding:"1px 7px",fontSize:9,fontWeight:800,
               display:"inline-flex",alignItems:"center",gap:3}}>
               {s.net==="both"
-                ? <><BothNetsIcon color="#92400e" size={11}/> Both Nets</>
-                : <><NetIcon color={s.net==="2"?"#5b21b6":"#166534"} size={11}/> Net {s.net}</>}
+                ? <><BothNetsIcon color="#92400e" size={10}/> Both Nets</>
+                : <><NetIcon color={s.net==="2"?"#5b21b6":"#166534"} size={10}/> Net {s.net}</>}
             </span>}
-            {s.label&&<span style={{background:"#ede9fe",color:"#5b21b6",borderRadius:20,
-              padding:"2px 10px",fontSize:11,fontWeight:800,letterSpacing:.1}}>{s.label}</span>}
           </div>
+          {/* Session name — prominent, own line */}
+          {s.label&&(
+            <div style={{fontWeight:900,fontSize:14,color:G.text,
+              marginTop:3,letterSpacing:"-.1px",lineHeight:1.2}}>
+              {s.label}
+            </div>
+          )}
+          {/* Row 2: time + coach */}
           <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:4}}>
             <span style={{fontSize:12,color:G.green,fontWeight:800}}>{s.from} – {s.to}</span>
           {/* Coach chips — max 3 visible, +N for rest */}
@@ -2868,6 +2875,8 @@ export default function App() {
     try{ return localStorage.getItem("fcc-welcome-v1")==="1"; }catch{ return false; }
   });
   const [showAllBlocks,  setShowAllBlocks]  = useState(false);
+  const [xlsParsed,      setXlsParsed]      = useState(null);  // {fixtures, allMatches} from uploaded DCF xlsx
+  const [xlsError,       setXlsError]       = useState(null);
   const [netsDate,       setNetsDate]       = useState(todayStr());
   const [wxData,         setWxData]         = useState(null); // weather data
   const [blockCals,     setBlockCals]     = useState([]);    // [{id,date,from,to,label}]
@@ -5962,6 +5971,157 @@ export default function App() {
                 </div>
               );
             })()}
+            {/* ── DCF Schedule Upload ──────────────────────────── */}
+            <div style={{marginBottom:14,padding:"12px 14px",background:G.cream,
+              borderRadius:10,border:`1px solid ${G.border}`}}>
+              <div style={{fontWeight:800,fontSize:12,color:G.text,marginBottom:4}}>
+                📥 Update from DCF Schedule (Excel)
+              </div>
+              <div style={{fontSize:11,color:G.muted,marginBottom:10,lineHeight:1.5}}>
+                When DCF publishes a new schedule, upload the Excel file here.
+                The app will extract all Fredensborg home fixtures and let you review before applying.
+              </div>
+              <input type="file" accept=".xlsx,.xls"
+                onChange={async e=>{
+                  setXlsError(null); setXlsParsed(null);
+                  const file = e.target.files?.[0]; if(!file) return;
+                  try {
+                    // Read file as ArrayBuffer then parse with SheetJS loaded dynamically
+                    const buf = await file.arrayBuffer();
+                    // Use SheetJS via CDN — inject script if not loaded
+                    if(!window.XLSX) {
+                      await new Promise((res,rej)=>{
+                        const s=document.createElement('script');
+                        s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+                        s.onload=res; s.onerror=rej;
+                        document.head.appendChild(s);
+                      });
+                    }
+                    const wb = window.XLSX.read(buf, {type:'array', cellDates:true});
+                    const sheet = wb.Sheets[wb.SheetNames[0]];
+                    const rows = window.XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+                    // Find header row
+                    const hIdx = rows.findIndex(r=>String(r[0]).toLowerCase().includes('num')||String(r[3]).toLowerCase().includes('date')||String(r[4]).toLowerCase().includes('date'));
+                    const dataRows = hIdx>=0 ? rows.slice(hIdx+1) : rows.slice(1);
+                    // Parse: col indices based on known DCF format
+                    // 0=num,1=series,2=division,3=match_type,4=date,5=time,6=team1,7=team2,8=ground
+                    const fixtures = []; const allMatches = [];
+                    dataRows.forEach(r=>{
+                      const team1=String(r[6]||'').trim();
+                      const team2=String(r[7]||'').trim();
+                      const ground=String(r[8]||'').trim();
+                      const division=String(r[2]||'').trim();
+                      if(!team1&&!team2) return;
+                      const isFred = team1.includes('Fredensborg')||team2.includes('Fredensborg');
+                      if(!isFred) return;
+                      // Parse date
+                      let dateStr='';
+                      const rawDate = r[4];
+                      if(rawDate instanceof Date) {
+                        dateStr = rawDate.toISOString().slice(0,10);
+                      } else if(rawDate) {
+                        const d = new Date(String(rawDate).split('-').reverse().join('-'));
+                        if(!isNaN(d)) dateStr = d.toISOString().slice(0,10);
+                      }
+                      if(!dateStr) return;
+                      const isHome = ground.toLowerCase().includes('fredensborg');
+                      const opp = team1.includes('Fredensborg') ? team2 : team1;
+                      const oppClean = opp.replace(/fredensborg\s*/i,'').trim();
+                      // Label: shorten division name
+                      const divShort = division
+                        .replace('2026 Turnering','').replace('2026 T20','T20')
+                        .replace('3. Division Øst - B','Div 3').replace('2. Division','Div 2')
+                        .replace('4. Division Øst','Div 4').replace('Kvinderækken','Women\'s')
+                        .replace('Oldboys Grp B','OB').trim();
+                      const label = `${divShort} — FCC vs ${oppClean}`;
+                      // Parse time for start hour
+                      let fromH=10;
+                      const ts=String(r[5]||'');
+                      const tm=ts.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+                      if(tm){
+                        fromH=parseInt(tm[1]);
+                        if(tm[3]&&tm[3].toUpperCase()==='PM'&&fromH<12) fromH+=12;
+                      }
+                      const from=`${String(fromH).padStart(2,'0')}:00`;
+                      const isT20=divShort.includes('T20')||divShort.includes('Serie');
+                      const toH=isT20?Math.min(fromH+8,22):Math.min(fromH+9,21);
+                      const to=`${String(toH).padStart(2,'0')}:00`;
+                      allMatches.push({dateStr,label,isHome,division:divShort,opp:oppClean});
+                      if(isHome) fixtures.push({date:dateStr,from,to,label});
+                    });
+                    setXlsParsed({fixtures, allMatches, fileName:file.name});
+                    e.target.value='';
+                  } catch(err){
+                    setXlsError(`Could not parse file: ${err.message}`);
+                    e.target.value='';
+                  }
+                }}
+                style={{fontSize:12,color:G.text,cursor:"pointer",fontFamily:"inherit",
+                  marginBottom:xlsParsed||xlsError?8:0}}/>
+              {xlsError&&(
+                <div style={{fontSize:12,color:G.red,background:G.redBg,
+                  borderRadius:8,padding:"8px 10px",marginTop:6}}>
+                  ⚠️ {xlsError}
+                </div>
+              )}
+              {xlsParsed&&(()=>{
+                const {fixtures,allMatches,fileName} = xlsParsed;
+                const homeCount = fixtures.length;
+                const awayCount = allMatches.filter(m=>!m.isHome).length;
+                // Compare with current blocks
+                const fixturePatterns = /^(Div [234]|T20 Series|OB —|Women'|U1[3568]|Serie [45]|2\. Div|3\. Div|4\. Div|U 1[356]|Kvinder|Oldboys)/i;
+                const existingFixBlocks = blockCals.filter(b=>fixturePatterns.test(b.label));
+                const newDates = new Set(fixtures.map(f=>f.date+f.label));
+                const oldDates = new Set(existingFixBlocks.map(b=>b.date+b.label));
+                const toAdd = fixtures.filter(f=>!oldDates.has(f.date+f.label));
+                const toRemove = existingFixBlocks.filter(b=>!newDates.has(b.date+b.label));
+                return (
+                  <div style={{background:G.white,border:`1.5px solid ${G.border}`,
+                    borderRadius:10,padding:"12px 14px"}}>
+                    <div style={{fontWeight:800,fontSize:12,color:G.text,marginBottom:6}}>
+                      📋 Parsed: {fileName}
+                    </div>
+                    <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:10}}>
+                      <span style={{fontSize:11,background:"#f0fdf4",color:"#166534",
+                        padding:"3px 9px",borderRadius:20,fontWeight:700}}>
+                        🏠 {homeCount} home fixtures
+                      </span>
+                      <span style={{fontSize:11,background:G.cream,color:G.muted,
+                        padding:"3px 9px",borderRadius:20,fontWeight:700}}>
+                        ✈️ {awayCount} away
+                      </span>
+                      {toAdd.length>0&&<span style={{fontSize:11,background:"#eff6ff",
+                        color:"#1e40af",padding:"3px 9px",borderRadius:20,fontWeight:700}}>
+                        ➕ {toAdd.length} new
+                      </span>}
+                      {toRemove.length>0&&<span style={{fontSize:11,background:"#fef2f2",
+                        color:G.red,padding:"3px 9px",borderRadius:20,fontWeight:700}}>
+                        🗑 {toRemove.length} removed
+                      </span>}
+                    </div>
+                    {toAdd.length===0&&toRemove.length===0?(
+                      <div style={{fontSize:12,color:"#166534",fontWeight:700}}>
+                        ✅ Already up to date — no changes needed
+                      </div>
+                    ):(
+                      <button onClick={()=>{
+                        const nonFixtureBlocks = blockCals.filter(b=>!fixturePatterns.test(b.label));
+                        const fresh = fixtures.map(f=>({...f,id:uid()}));
+                        saveBlockCals([...nonFixtureBlocks,...fresh]);
+                        logAction("blockcal",`Updated fixtures from ${fileName}: +${toAdd.length} added, -${toRemove.length} removed, ${homeCount} total`);
+                        showToast(`✓ Fixtures updated — ${homeCount} home matches`);
+                        setXlsParsed(null);
+                      }} style={{background:G.green,color:G.lime,border:"none",
+                        borderRadius:8,padding:"8px 16px",fontSize:12,fontWeight:800,
+                        cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
+                        ✓ Apply {homeCount} fixtures to Block Nets
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
             {/* Existing blocks — show 5, rest behind toggle */}
             {(()=>{
               const upcoming = blockCals
