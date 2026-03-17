@@ -2254,6 +2254,12 @@ export default function App() {
   const [newTSenior,setNewTSenior]= useState(false);
   const [editingTeam,setEditingTeam]= useState(null);
   const [coachSearch, setCoachSearch] = useState({}); // {teamId: searchString}
+  // Admin section collapse — true = open. Members+AddMember open by default, rest collapsed
+  const [adminSec, setAdminSec] = useState({
+    members:true, addmember:true, groups:false,
+    coaches:false, blocknets:false, recurring:false, auditlog:false
+  });
+  const toggleAdminSec = k => setAdminSec(s=>({...s,[k]:!s[k]}));
   const [editingName, setEditingName] = useState(null); // {id, value}
 
   // Recurring slot form state
@@ -6239,34 +6245,56 @@ export default function App() {
         onBack={()=>setView("schedule")}/>
 
       {/* ── Admin section index ─────────────────────────────── */}
-      <div style={{padding:"10px 16px",
-        display:"flex",gap:6,flexWrap:"wrap",
-        borderBottom:`1px solid ${G.border}`}}>
-        {[
-          {label:"👥 Members",   id:"sec-members"},
-          {label:"✅ Verifications", id:"sec-members"},
-          {label:"➕ Add Member", id:"sec-add-member"},
-          {label:"🏏 Groups",    id:"sec-groups"},
-          {label:"🧢 Coaches",   id:"sec-coaches"},
-          {label:"🚫 Block Nets",id:"sec-blocknets"},
-          {label:"🔁 Recurring", id:"sec-recurring"},
-          {label:"👑 Audit Log", id:"sec-auditlog"},
-        ].map(({label,id})=>(
-          <button key={id}
-            onClick={()=>{
-              document.getElementById(id)?.scrollIntoView({behavior:"smooth",block:"start"});
-            }}
-            style={{flexShrink:0,padding:"5px 12px",borderRadius:20,
-              border:`1px solid ${G.border}`,background:G.white,
-              color:G.text,fontSize:11,fontWeight:700,cursor:"pointer",
-              fontFamily:"inherit",whiteSpace:"nowrap"}}>
-            {label}
-          </button>
-        ))}
+      <div style={{padding:"10px 16px 12px",borderBottom:`1px solid ${G.border}`,
+        background:G.cream}}>
+        <div style={{fontSize:10,fontWeight:900,letterSpacing:1.5,color:G.muted,
+          textTransform:"uppercase",marginBottom:8}}>
+          Jump to section
+        </div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {[
+            {label:"👥 Members",    id:"sec-members",    key:"members"},
+            {label:"➕ Add Member", id:"sec-add-member", key:"addmember"},
+            {label:"🏏 Groups",     id:"sec-groups",     key:"groups"},
+            {label:"🧢 Coaches",    id:"sec-coaches",    key:"coaches"},
+            {label:"🚫 Block Nets", id:"sec-blocknets",  key:"blocknets"},
+            {label:"🔁 Recurring",  id:"sec-recurring",  key:"recurring"},
+            {label:"👑 Audit Log",  id:"sec-auditlog",   key:"auditlog"},
+          ].map(({label,id,key})=>(
+            <button key={id}
+              onClick={()=>{
+                // Open the section then scroll to it
+                setAdminSec(s=>({...s,[key]:true}));
+                setTimeout(()=>document.getElementById(id)?.scrollIntoView({behavior:"smooth",block:"start"}),50);
+              }}
+              style={{padding:"5px 12px",borderRadius:20,
+                border:`1px solid ${adminSec[key]?G.green:G.border}`,
+                background:adminSec[key]?`${G.green}12`:G.white,
+                color:adminSec[key]?G.green:G.text,
+                fontSize:11,fontWeight:700,cursor:"pointer",
+                fontFamily:"inherit",whiteSpace:"nowrap",transition:"all .13s"}}>
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div style={{padding:"14px 16px 20px"}}>
 
+        {/* ── Members section ─────────────────────────────────── */}
+        <div id="sec-members"/>
+        <button onClick={()=>toggleAdminSec("members")}
+          style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
+            background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",
+            padding:"8px 0",marginBottom:adminSec.members?8:14}}>
+          <span style={{fontWeight:900,fontSize:13,color:G.text}}>
+            👥 Members &amp; Verifications
+          </span>
+          <span style={{fontSize:12,color:G.muted,fontWeight:700}}>
+            {adminSec.members?"▲ collapse":"▼ show"}
+          </span>
+        </button>
+        {adminSec.members&&<>
         {/* ── Self-verified members (email confirmed, no action needed) ── */}
         {can(userRole,"addMember")&&(()=>{
           const verified = members.filter(m=>m.emailVerified&&!m.pin&&!Object.keys(inviteCodes).find(id=>id===m.id));
@@ -6395,10 +6423,21 @@ export default function App() {
             </>
           );
         })()}
+        </>}
 
-        {/* Add member */}
+        {/* ── Add Member section ──────────────────────────────── */}
         {can(userRole,"addMember")&&<>
-          <SLbl mt={4}><span id="sec-add-member">Add New Member</span></SLbl>
+        <div id="sec-add-member"/>
+        <button onClick={()=>toggleAdminSec("addmember")}
+          style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
+            background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",
+            padding:"8px 0",marginBottom:adminSec.addmember?8:14}}>
+          <span style={{fontWeight:900,fontSize:13,color:G.text}}>➕ Add New Member</span>
+          <span style={{fontSize:12,color:G.muted,fontWeight:700}}>
+            {adminSec.addmember?"▲ collapse":"▼ show"}
+          </span>
+        </button>
+        {adminSec.addmember&&<>
           <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,
             padding:"10px 14px",marginBottom:10,fontSize:12,color:"#1e40af",lineHeight:1.5}}>
             💡 New members can also self-register at login — tap <b>"Verify / Set up my account"</b> on the login screen. Use the form below for admin-initiated additions only.
@@ -6425,7 +6464,8 @@ export default function App() {
             </FFld>
             <Btn type="submit" bg={G.green} col={G.lime} full>+ Add Member</Btn>
           </form>
-        </>}
+        </>}{/* end adminSec.addmember */}
+        </>}{/* end can addMember for addmember section */}
 
         {/* Search + filter */}
         <div style={{display:"flex",gap:8,marginBottom:14}}>
@@ -6470,7 +6510,17 @@ export default function App() {
 
         {/* ── Manage Groups ─────────────────────────────────── */}
         {can(userRole,"addMember")&&<>
-          <SLbl mt={4}><span id="sec-groups">Manage Groups</span></SLbl>
+        <div id="sec-groups"/>
+        <button onClick={()=>toggleAdminSec("groups")}
+          style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
+            background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",
+            padding:"8px 0",marginBottom:adminSec.groups?8:14}}>
+          <span style={{fontWeight:900,fontSize:13,color:G.text}}>🏏 Manage Groups</span>
+          <span style={{fontSize:12,color:G.muted,fontWeight:700}}>
+            {adminSec.groups?"▲ collapse":"▼ show"}
+          </span>
+        </button>
+        {adminSec.groups&&<>
           <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
             padding:14,marginBottom:20}}>
 
@@ -6540,9 +6590,21 @@ export default function App() {
           </div>
         </>}
 
+        </>}
+
         {/* ── Team Coaches ────────────────────────────────────── */}
         {can(userRole,"addMember")&&<>
-          <SLbl mt={4}><span id="sec-coaches">🧢 Team Coaches</span></SLbl>
+        <div id="sec-coaches"/>
+        <button onClick={()=>toggleAdminSec("coaches")}
+          style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
+            background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",
+            padding:"8px 0",marginBottom:adminSec.coaches?8:14}}>
+          <span style={{fontWeight:900,fontSize:13,color:G.text}}>🧢 Team Coaches</span>
+          <span style={{fontSize:12,color:G.muted,fontWeight:700}}>
+            {adminSec.coaches?"▲ collapse":"▼ show"}
+          </span>
+        </button>
+        {adminSec.coaches&&<>
           <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
             padding:14,marginBottom:16}}>
             <div style={{fontSize:12,color:G.muted,marginBottom:12,lineHeight:1.5}}>
@@ -6629,9 +6691,21 @@ export default function App() {
           </div>
         </>}
 
+        </>}
+
         {/* ── Block Nets Sessions ────────────────────────────── */}
         {can(userRole,"addMember")&&<>
-          <SLbl mt={4}><span id="sec-blocknets">Block Nets Sessions</span></SLbl>
+        <div id="sec-blocknets"/>
+        <button onClick={()=>toggleAdminSec("blocknets")}
+          style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
+            background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",
+            padding:"8px 0",marginBottom:adminSec.blocknets?8:14}}>
+          <span style={{fontWeight:900,fontSize:13,color:G.text}}>🚫 Block Nets Sessions</span>
+          <span style={{fontSize:12,color:G.muted,fontWeight:700}}>
+            {adminSec.blocknets?"▲ collapse":"▼ show"}
+          </span>
+        </button>
+        {adminSec.blocknets&&<>
           <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
             padding:14,marginBottom:8}}>
             <div style={{fontSize:12,color:G.muted,marginBottom:10,lineHeight:1.5}}>
@@ -6961,9 +7035,21 @@ export default function App() {
           </div>
         </>}
 
+        </>}
+
         {/* ── Recurring Slots ───────────────────────────────── */}
         {can(userRole,"addMember")&&<>
-          <SLbl mt={4}><span id="sec-recurring">Recurring Slots</span></SLbl>
+        <div id="sec-recurring"/>
+        <button onClick={()=>toggleAdminSec("recurring")}
+          style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
+            background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",
+            padding:"8px 0",marginBottom:adminSec.recurring?8:14}}>
+          <span style={{fontWeight:900,fontSize:13,color:G.text}}>🔁 Recurring Slots</span>
+          <span style={{fontSize:12,color:G.muted,fontWeight:700}}>
+            {adminSec.recurring?"▲ collapse":"▼ show"}
+          </span>
+        </button>
+        {adminSec.recurring&&<>
           <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
             padding:14,marginBottom:20}}>
             <div style={{fontSize:12,color:G.muted,marginBottom:12,lineHeight:1.5}}>
@@ -7326,8 +7412,21 @@ export default function App() {
           </div>
         )}
 
+        </>}
+
         {/* ── Audit Log (superadmin only) ───────────────────── */}
-        {userRole==="superadmin"&&(()=>{
+        {userRole==="superadmin"&&<>
+        <div id="sec-auditlog"/>
+        <button onClick={()=>toggleAdminSec("auditlog")}
+          style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
+            background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",
+            padding:"8px 0",marginBottom:adminSec.auditlog?8:14}}>
+          <span style={{fontWeight:900,fontSize:13,color:G.text}}>👑 Audit Log</span>
+          <span style={{fontSize:12,color:G.muted,fontWeight:700}}>
+            {adminSec.auditlog?"▲ collapse":"▼ show"}
+          </span>
+        </button>
+        {adminSec.auditlog&&(()=>{
           const CATEGORY_META = {
             member:    {icon:"👤", label:"Member",   col:"#0369a1", bg:"#e0f2fe"},
             role:      {icon:"🏷️", label:"Role",     col:"#7c3aed", bg:"#ede9fe"},
@@ -7353,7 +7452,6 @@ export default function App() {
           }
           return (
             <>
-              <SLbl mt={4}><span id="sec-auditlog">👑 Audit Log</span></SLbl>
               <div style={{background:"#0c1a2e",borderRadius:14,overflow:"hidden",
                 border:"1.5px solid #1e3a5f",marginBottom:20}}>
 
@@ -7447,6 +7545,7 @@ export default function App() {
             </>
           );
         })()}
+        </>}
 
         {/* ── Team jump bar ─────────────────────────────────── */}
         {Object.keys(adminGrouped).length > 2 && (
