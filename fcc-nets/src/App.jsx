@@ -52,13 +52,13 @@ const MATCH_FIXTURES = [
   { date:"2026-08-25", from:"18:00", to:"21:00", label:"OB — FCC vs Ishøj OB" },
   { date:"2026-09-03", from:"18:00", to:"21:00", label:"OB — FCC vs Hvidovre OB" },
   // ── T20 Serie 4 ──────────────────────────────────────────────
-  { date:"2026-05-03", from:"13:00", to:"21:00", label:"T20 S4 — FCC vs Nørrebro 2" },
-  { date:"2026-07-05", from:"10:00", to:"18:00", label:"T20 S4 — FCC vs AB 2" },
-  { date:"2026-08-02", from:"15:00", to:"22:00", label:"T20 S4 — FCC vs Tåstrup 1" },
+  { date:"2026-05-03", from:"13:00", to:"21:00", label:"T20 Series 4 — FCC vs Nørrebro 2" },
+  { date:"2026-07-05", from:"10:00", to:"18:00", label:"T20 Series 4 — FCC vs AB 2" },
+  { date:"2026-08-02", from:"15:00", to:"22:00", label:"T20 Series 4 — FCC vs Tåstrup 1" },
   // ── T20 Serie 5 ──────────────────────────────────────────────
-  { date:"2026-05-16", from:"14:00", to:"22:00", label:"T20 S5 — FCC vs Himalaya 1" },
-  { date:"2026-07-05", from:"14:00", to:"22:00", label:"T20 S5 — FCC vs Tårnby 1" },
-  { date:"2026-07-11", from:"11:00", to:"19:00", label:"T20 S5 — FCC vs Tåstrup 2" },
+  { date:"2026-05-16", from:"14:00", to:"22:00", label:"T20 Series 5 — FCC vs Himalaya 1" },
+  { date:"2026-07-05", from:"14:00", to:"22:00", label:"T20 Series 5 — FCC vs Tårnby 1" },
+  { date:"2026-07-11", from:"11:00", to:"19:00", label:"T20 Series 5 — FCC vs Tåstrup 2" },
   // ── U13 ──────────────────────────────────────────────────────
   { date:"2026-05-16", from:"10:00", to:"19:00", label:"U13 — FCC vs Glostrup U13" },
   { date:"2026-05-25", from:"10:00", to:"19:00", label:"U13 — FCC vs Soraner U13" },
@@ -1796,7 +1796,7 @@ function SessCard({s,members,teams,faded,onClick,onCarpoolClick}) {
             <span style={{fontSize:12,color:G.green,fontWeight:800}}>{s.from} – {s.to}</span>
           {/* Coach chips — max 3 visible, +N for rest */}
           {s.restrictedTo&&sessionCoaches.length>0&&<>
-            <span style={{fontSize:10,color:"rgba(255,255,255,.45)",fontWeight:600,
+            <span style={{fontSize:10,color:G.muted,fontWeight:700,
               letterSpacing:.3}}>Coach:</span>
             {sessionCoaches.slice(0,3).map(name=>(
               <span key={name} style={{fontSize:10,fontWeight:700,padding:"1px 7px",
@@ -5898,44 +5898,67 @@ export default function App() {
             <div style={{fontSize:12,color:G.muted,marginBottom:10,lineHeight:1.5}}>
               Mark dates when the nets are unavailable (match days, events). Members will see these on the schedule.
             </div>
-            {/* Import 2026 fixtures button */}
+            {/* Import / sync 2026 fixtures */}
             {(()=>{
-              const alreadyImported = MATCH_FIXTURES.every(f=>
+              // A block "looks like a fixture" if its label contains common fixture patterns
+              const fixturePatterns = /^(Div [234]|T20 S|OB —|Women'|U1[3568]|Serie [45]|2\. Div|3\. Div|4\. Div|U 1[356]|Kvinder|Oldboys)/i;
+              const existingFixtureBlocks = blockCals.filter(b=>fixturePatterns.test(b.label));
+              const alreadyClean = MATCH_FIXTURES.every(f=>
                 blockCals.some(b=>b.date===f.date&&b.label===f.label));
-              const importedCount = MATCH_FIXTURES.filter(f=>
-                blockCals.some(b=>b.date===f.date&&b.label===f.label)).length;
-              const remaining = MATCH_FIXTURES.length - importedCount;
-              if(alreadyImported) return (
+
+              function syncFixtures() {
+                // Remove ALL existing fixture-style blocks, then add the current MATCH_FIXTURES
+                const nonFixtureBlocks = blockCals.filter(b=>!fixturePatterns.test(b.label));
+                const fresh = MATCH_FIXTURES.map(f=>({...f, id:uid()}));
+                const updated = [...nonFixtureBlocks, ...fresh];
+                saveBlockCals(updated);
+                logAction("blockcal",`Synced 2026 home match fixtures: ${fresh.length} blocks (removed ${existingFixtureBlocks.length} old)`);
+                showToast(`✓ ${fresh.length} match fixtures synced — ${existingFixtureBlocks.length} old blocks removed`);
+              }
+
+              if(alreadyClean) return (
                 <div style={{background:"#f0fdf4",border:"1.5px solid #bbf7d0",borderRadius:8,
-                  padding:"9px 12px",marginBottom:12,fontSize:12,color:"#166534",fontWeight:700}}>
-                  ✅ All 2026 home match fixtures imported ({MATCH_FIXTURES.length} blocks)
+                  padding:"9px 12px",marginBottom:12,display:"flex",
+                  alignItems:"center",justifyContent:"space-between",gap:10}}>
+                  <div style={{fontSize:12,color:"#166534",fontWeight:700}}>
+                    ✅ All {MATCH_FIXTURES.length} home fixtures synced
+                  </div>
+                  <button onClick={syncFixtures}
+                    style={{background:"none",border:"1px solid #bbf7d0",borderRadius:8,
+                      padding:"4px 10px",fontSize:11,fontWeight:700,color:"#166534",
+                      cursor:"pointer",fontFamily:"inherit",flexShrink:0}}>
+                    🔄 Re-sync
+                  </button>
                 </div>
               );
+
               return (
                 <div style={{background:"#eff6ff",border:"1.5px solid #bfdbfe",borderRadius:8,
-                  padding:"10px 12px",marginBottom:12,display:"flex",
-                  alignItems:"center",justifyContent:"space-between",gap:10}}>
-                  <div>
-                    <div style={{fontWeight:800,fontSize:12,color:"#1e40af"}}>
-                      🏏 Import 2026 Home Fixtures
+                  padding:"10px 12px",marginBottom:12}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+                    <div>
+                      <div style={{fontWeight:800,fontSize:12,color:"#1e40af"}}>
+                        🏏 Sync 2026 Home Fixtures
+                      </div>
+                      <div style={{fontSize:11,color:"#3b82f6",marginTop:2}}>
+                        {MATCH_FIXTURES.length} fixtures in schedule
+                        {existingFixtureBlocks.length>0&&` · ${existingFixtureBlocks.length} old blocks will be replaced`}
+                      </div>
                     </div>
-                    <div style={{fontSize:11,color:"#3b82f6",marginTop:2}}>
-                      {remaining} match block{remaining!==1?"s":""} not yet added
-                      {importedCount>0?` (${importedCount} already imported)`:""}
-                    </div>
+                    <button onClick={syncFixtures}
+                      style={{background:"#2563eb",color:"#fff",border:"none",borderRadius:8,
+                        padding:"7px 14px",fontSize:12,fontWeight:800,cursor:"pointer",
+                        fontFamily:"inherit",flexShrink:0,whiteSpace:"nowrap"}}>
+                      Sync All
+                    </button>
                   </div>
-                  <button onClick={async ()=>{
-                    const toAdd = MATCH_FIXTURES.filter(f=>
-                      !blockCals.some(b=>b.date===f.date&&b.label===f.label));
-                    const updated = [...blockCals, ...toAdd.map(f=>({...f,id:uid()}))];
-                    await saveBlockCals(updated);
-                    logAction("blockcal",`Imported ${toAdd.length} home match fixtures for 2026`);
-                    showToast(`${toAdd.length} match blocks imported ✓`);
-                  }} style={{background:"#2563eb",color:"#fff",border:"none",borderRadius:8,
-                    padding:"7px 14px",fontSize:12,fontWeight:800,cursor:"pointer",
-                    fontFamily:"inherit",flexShrink:0,whiteSpace:"nowrap"}}>
-                    Import All
-                  </button>
+                  {existingFixtureBlocks.length>0&&(
+                    <div style={{marginTop:8,fontSize:11,color:"#6b7280",
+                      background:"#fef9c3",borderRadius:6,padding:"6px 10px",
+                      border:"0.5px solid #fde68a"}}>
+                      ⚠️ You have {existingFixtureBlocks.length} existing fixture blocks — clicking Sync will replace them all with the updated list ({MATCH_FIXTURES.length} fixtures). Any manually added event blocks will be kept.
+                    </div>
+                  )}
                 </div>
               );
             })()}
