@@ -3075,7 +3075,8 @@ export default function App() {
   const [absCat,         setAbsCat]         = useState("Holiday");
   const [absNote,        setAbsNote]        = useState("");
   const [absConflicts,   setAbsConflicts]   = useState(null);
-  const [availView,      setAvailView]      = useState("team");
+  const [avTeam,         setAvTeam]         = useState("");   // team availability view selection
+  const [showMatches,    setShowMatches]    = useState(true); // match overlay toggle
   const [netsDate,       setNetsDate]       = useState(todayStr());
   const [wxData,         setWxData]         = useState(null); // weather data
   const [blockCals,     setBlockCals]     = useState([]);    // [{id,date,from,to,label}]
@@ -6464,7 +6465,6 @@ export default function App() {
     const userMem = members.find(m=>m.id===currentUser.id)||currentUser;
     const isAdmin = can(userRole,"accessMembers");
     const isCoach = isCoachMember(currentUser.name, teams);
-    const isCaptainOrVC = can(userRole,"sendReminder");
 
     const myCoachTeams = teams.filter(t=>(t.coaches||[]).includes(currentUser.name)).map(t=>t.name);
     const myPlayTeams  = userMem.teams||[];
@@ -6472,18 +6472,16 @@ export default function App() {
     const canSeeAll    = isAdmin || myCoachTeams.length>1;
     const teamOptions  = isAdmin ? teams.map(t=>t.name) : allVisible;
 
-    const [avTeam, setAvTeam] = React.useState(
-      myCoachTeams[0]||myPlayTeams[0]||(teams[0]?.name||"")
-    );
-    const [showMatches, setShowMatches] = React.useState(true);
+    // Default avTeam if not yet set
+    const effectiveTeam = avTeam || myCoachTeams[0]||myPlayTeams[0]||(teams[0]?.name||"");
 
     const today      = todayStr();
     const sixWeeks   = new Date(); sixWeeks.setDate(sixWeeks.getDate()+42);
     const sixWeeksStr= sixWeeks.toISOString().slice(0,10);
 
-    const squadMembers = avTeam==="All"
+    const squadMembers = effectiveTeam==="All"
       ? members
-      : members.filter(m=>(m.teams||[]).includes(avTeam));
+      : members.filter(m=>(m.teams||[]).includes(effectiveTeam));
 
     const catColour={Holiday:"#1e40af",Work:"#92400e",Injury:"#dc2626",Other:"#374151"};
     const catBg    ={Holiday:"#eff6ff",Work:"#fffbeb",Injury:"#fef2f2",Other:"#f3f4f6"};
@@ -6493,11 +6491,11 @@ export default function App() {
     // Training sessions relevant to this team
     const relevantSessions = sessions
       .filter(s=>s.date>=today&&s.date<=sixWeeksStr)
-      .filter(s=>avTeam==="All"?true:
-        (s.restrictedTo===avTeam||(s.sessionTeams||[]).includes(avTeam)||
+      .filter(s=>effectiveTeam==="All"?true:
+        (s.restrictedTo===effectiveTeam||(s.sessionTeams||[]).includes(effectiveTeam)||
          (!s.restrictedTo&&s.players.some(p=>{
            const m=members.find(x=>x.name===p);
-           return (m?.teams||[]).includes(avTeam);
+           return (m?.teams||[]).includes(effectiveTeam);
          }))))
       .sort((a,b)=>a.date.localeCompare(b.date)||a.from.localeCompare(b.from));
 
@@ -6505,7 +6503,7 @@ export default function App() {
     const relevantMatches = ALL_FIXTURES
       .filter(f=>f.date>=today&&f.date<=sixWeeksStr)
       .filter(f=>{
-        if(avTeam==="All") return true;
+        if(effectiveTeam==="All") return true;
         // Map team name to divisions
         const divMap = {
           "Div 2":["Div 2"],
@@ -6514,7 +6512,7 @@ export default function App() {
           "Women's":["Women's"],"U13":["U13"],"U15":["U15"],
           "U16":["U16"],"U18":["U18"],
         };
-        const validDivs = divMap[avTeam]||[];
+        const validDivs = divMap[effectiveTeam]||[];
         return validDivs.some(d=>f.division.includes(d)||f.label.includes(d));
       })
       .sort((a,b)=>a.date.localeCompare(b.date));
@@ -6537,15 +6535,15 @@ export default function App() {
             {canSeeAll&&(
               <button onClick={()=>setAvTeam("All")}
                 style={{padding:"6px 14px",borderRadius:20,
-                  border:`1px solid ${avTeam==="All"?G.green:G.border}`,
-                  background:avTeam==="All"?G.green:G.white,
-                  color:avTeam==="All"?G.lime:G.muted,
+                  border:`1px solid ${effectiveTeam==="All"?G.green:G.border}`,
+                  background:effectiveTeam==="All"?G.green:G.white,
+                  color:effectiveTeam==="All"?G.lime:G.muted,
                   fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
                 All teams
               </button>
             )}
             {teamOptions.map(tn=>{
-              const tm=getTeamMeta(tn); const on=avTeam===tn;
+              const tm=getTeamMeta(tn); const on=effectiveTeam===tn;
               return (
                 <button key={tn} onClick={()=>setAvTeam(tn)}
                   style={{padding:"6px 14px",borderRadius:20,border:"none",
@@ -6648,7 +6646,7 @@ export default function App() {
                       <div style={{fontWeight:800,fontSize:13,color:G.text}}>{f.label}</div>
                       <div style={{fontSize:10,color:G.muted,marginTop:1}}>
                         {f.home?"Home · Karlebo":"Away"}
-                        {avTeam==="All"&&<span style={{marginLeft:6,fontWeight:700,
+                        {effectiveTeam==="All"&&<span style={{marginLeft:6,fontWeight:700,
                           color:G.green}}>{f.division}</span>}
                       </div>
                     </div>
@@ -6664,7 +6662,7 @@ export default function App() {
 
                 {/* Training session cards */}
                 {daySessions.map(s=>{
-                  const squad  = avTeam==="All"?squadMembers:squadMembers.filter(m=>(m.teams||[]).includes(avTeam));
+                  const squad  = effectiveTeam==="All"?squadMembers:squadMembers.filter(m=>(m.teams||[]).includes(effectiveTeam));
                   const total  = squad.length;
                   const inSess = s.players.filter(p=>squad.some(m=>m.name===p)).length;
                   const awayFromSess = awayList.filter(m=>!s.players.includes(m.name));
