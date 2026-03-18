@@ -121,10 +121,10 @@ const MATCH_FIXTURES = [
   { date:"2026-09-12", from:"10:00", to:"19:00", label:"U18 — FCC vs Glostrup U18" },
 ];
 
-// ─── All 2026 FCC Fixtures (home + away, for availability view) ─
-// division key maps to app team name for filtering by captain's team
+// ─── All 2026 FCC Fixtures (home + away) — parsed from DCF schedule ─
+// All 89 Fredensborg matches. home=true where ground contains Fredensborg.
 const ALL_FIXTURES = [
-  // ── 2. Division (Div 2) ──────────────────────────────────────
+  // ── 2. Division ──────────────────────────────────────────────
   {date:"2026-05-10",label:"Div 2 @ Hvidovre 1",division:"Div 2",home:false},
   {date:"2026-05-17",label:"Div 2 vs Århus 1",division:"Div 2",home:true},
   {date:"2026-05-24",label:"Div 2 vs Himalaya 1",division:"Div 2",home:true},
@@ -137,7 +137,7 @@ const ALL_FIXTURES = [
   {date:"2026-08-22",label:"Div 2 @ Ikast-Brande 1",division:"Div 2",home:false},
   {date:"2026-08-23",label:"Div 2 @ Herning 1",division:"Div 2",home:false},
   {date:"2026-08-30",label:"Div 2 vs Frem 1",division:"Div 2",home:true},
-  // ── 3. Division Øst - B (Div 3) ──────────────────────────────
+  // ── 3. Division Øst - B ──────────────────────────────────────
   {date:"2026-04-26",label:"Div 3 @ AB 2",division:"Div 3",home:false},
   {date:"2026-05-02",label:"Div 3 vs APMM 1",division:"Div 3",home:true},
   {date:"2026-05-10",label:"Div 3 @ Ishøj 3",division:"Div 3",home:false},
@@ -148,7 +148,7 @@ const ALL_FIXTURES = [
   {date:"2026-08-08",label:"Div 3 @ Frem 2",division:"Div 3",home:false},
   {date:"2026-08-22",label:"Div 3 vs APMM 1",division:"Div 3",home:true},
   {date:"2026-09-05",label:"Div 3 vs AB 2",division:"Div 3",home:true},
-  // ── 4. Division Øst (Div 4) ──────────────────────────────────
+  // ── 4. Division Øst ──────────────────────────────────────────
   {date:"2026-05-10",label:"Div 4 vs Tårnby 1",division:"Div 4",home:true},
   {date:"2026-05-17",label:"Div 4 @ Glostrup 3",division:"Div 4",home:false},
   {date:"2026-05-31",label:"Div 4 vs Albertslund 3",division:"Div 4",home:true},
@@ -158,57 +158,57 @@ const ALL_FIXTURES = [
   {date:"2026-08-01",label:"Div 4 vs Hvidovre 3",division:"Div 4",home:true},
   {date:"2026-08-09",label:"Div 4 vs Frem 3",division:"Div 4",home:true},
   {date:"2026-08-22",label:"Div 4 @ Copenhagen 2",division:"Div 4",home:false},
-  // ── T20 Serie 4 ───────────────────────────────────────────────
-  {date:"2026-04-12",label:"T20 S4 @ Frem 1",division:"Div 3",home:false},
-  {date:"2026-04-19",label:"T20 S4 @ Hvidovre 2",division:"Div 3",home:false},
-  {date:"2026-05-03",label:"T20 S4 vs Nørrebro 2",division:"Div 3",home:true},
-  {date:"2026-07-05",label:"T20 S4 vs AB 2",division:"Div 3",home:true},
-  {date:"2026-08-02",label:"T20 S4 vs Tåstrup 1",division:"Div 3",home:true},
-  // ── T20 Serie 5 ───────────────────────────────────────────────
-  {date:"2026-04-12",label:"T20 S5 @ Bella 2",division:"Div 4",home:false},
-  {date:"2026-04-18",label:"T20 S5 @ Glostrup 3",division:"Div 4",home:false},
-  {date:"2026-05-16",label:"T20 S5 vs Himalaya 1",division:"Div 4",home:true},
-  {date:"2026-05-25",label:"T20 S5 @ Frem 2",division:"Div 4",home:false},
-  {date:"2026-07-05",label:"T20 S5 vs Tårnby 1",division:"Div 4",home:true},
-  {date:"2026-07-11",label:"T20 S5 vs Tåstrup 2",division:"Div 4",home:true},
-  // ── Oldboys (OB) ──────────────────────────────────────────────
-  {date:"2026-05-06",label:"OB vs Køge OB",division:"Div 3",home:true},
-  {date:"2026-05-22",label:"OB @ Tåstrup OB",division:"Div 3",home:false},
-  {date:"2026-05-27",label:"OB vs Hvidovre OB",division:"Div 3",home:true},
-  {date:"2026-06-01",label:"OB @ Svanholm OB",division:"Div 3",home:false},
-  {date:"2026-06-10",label:"OB @ Ishøj OB",division:"Div 3",home:false},
-  {date:"2026-06-18",label:"OB vs Forty Øst 1",division:"Div 3",home:true},
-  {date:"2026-06-24",label:"OB @ Hvidovre OB",division:"Div 3",home:false},
-  {date:"2026-07-02",label:"OB @ Køge OB",division:"Div 3",home:false},
-  {date:"2026-08-12",label:"OB vs Tåstrup OB",division:"Div 3",home:true},
-  {date:"2026-08-18",label:"OB vs Svanholm OB",division:"Div 3",home:true},
-  {date:"2026-08-25",label:"OB vs Ishøj OB",division:"Div 3",home:true},
-  {date:"2026-09-03",label:"OB vs Hvidovre OB",division:"Div 3",home:true},
   // ── Women's (Kvinderækken) ────────────────────────────────────
-  {date:"2026-05-17",label:"Women's @ Horsens",division:"Women's",home:false},
-  {date:"2026-05-17",label:"Women's @ Aarhus",division:"Women's",home:false},
-  {date:"2026-05-24",label:"Women's @ Glostrup",division:"Women's",home:false},
-  {date:"2026-06-06",label:"Women's vs Esbjerg",division:"Women's",home:true},
-  {date:"2026-06-14",label:"Women's vs Svanholm",division:"Women's",home:true},
-  {date:"2026-08-02",label:"Women's vs KB",division:"Women's",home:true},
-  {date:"2026-08-15",label:"Women's @ Fredericia",division:"Women's",home:false},
+  {date:"2026-05-17",label:"Women's @ Horsens Kvinder",division:"Women's",home:false},
+  {date:"2026-05-17",label:"Women's @ Aarhus Kvinder",division:"Women's",home:false},
+  {date:"2026-05-24",label:"Women's @ Glostrup kvinder",division:"Women's",home:false},
+  {date:"2026-06-06",label:"Women's vs Esbjerg Kvinder",division:"Women's",home:true},
+  {date:"2026-06-14",label:"Women's vs Svanholm Kvinder",division:"Women's",home:true},
+  {date:"2026-08-02",label:"Women's vs KB kvinder",division:"Women's",home:true},
+  {date:"2026-08-15",label:"Women's @ Fredericia kvinder",division:"Women's",home:false},
+  // ── Oldboys ──────────────────────────────────────────────────
+  {date:"2026-05-06",label:"OB vs Køge OB",division:"OB",home:true},
+  {date:"2026-05-22",label:"OB @ Tåstrup OB",division:"OB",home:false},
+  {date:"2026-05-27",label:"OB vs Hvidovre OB",division:"OB",home:true},
+  {date:"2026-06-01",label:"OB @ Svanholm OB",division:"OB",home:false},
+  {date:"2026-06-10",label:"OB @ Ishøj OB - 1",division:"OB",home:false},
+  {date:"2026-06-18",label:"OB vs Forty Øst 1",division:"OB",home:true},
+  {date:"2026-06-24",label:"OB @ Hvidovre OB",division:"OB",home:false},
+  {date:"2026-07-02",label:"OB @ Køge OB",division:"OB",home:false},
+  {date:"2026-08-12",label:"OB vs Tåstrup OB",division:"OB",home:true},
+  {date:"2026-08-18",label:"OB vs Svanholm OB",division:"OB",home:true},
+  {date:"2026-08-25",label:"OB vs Ishøj OB - 1",division:"OB",home:true},
+  {date:"2026-09-03",label:"OB vs Hvidovre OB",division:"OB",home:true},
+  // ── T20 Serie 4 ───────────────────────────────────────────────
+  {date:"2026-04-12",label:"T20 Serie 4 @ Frem 1",division:"T20 Serie 4",home:false},
+  {date:"2026-04-19",label:"T20 Serie 4 @ Hvidovre 2",division:"T20 Serie 4",home:false},
+  {date:"2026-05-03",label:"T20 Serie 4 vs Nørrebro 2",division:"T20 Serie 4",home:true},
+  {date:"2026-07-05",label:"T20 Serie 4 vs AB 2",division:"T20 Serie 4",home:true},
+  {date:"2026-08-02",label:"T20 Serie 4 vs Tåstrup 1",division:"T20 Serie 4",home:true},
+  // ── T20 Serie 5 ───────────────────────────────────────────────
+  {date:"2026-04-12",label:"T20 Serie 5 @ Bella 2",division:"T20 Serie 5",home:false},
+  {date:"2026-04-18",label:"T20 Serie 5 @ Glostrup 3",division:"T20 Serie 5",home:false},
+  {date:"2026-05-16",label:"T20 Serie 5 vs Himalaya 1",division:"T20 Serie 5",home:true},
+  {date:"2026-05-25",label:"T20 Serie 5 @ Frem 2",division:"T20 Serie 5",home:false},
+  {date:"2026-07-05",label:"T20 Serie 5 vs Tårnby 1",division:"T20 Serie 5",home:true},
+  {date:"2026-07-11",label:"T20 Serie 5 vs Tåstrup 2",division:"T20 Serie 5",home:true},
   // ── U13 ──────────────────────────────────────────────────────
   {date:"2026-04-25",label:"U13 @ Svanholm U13",division:"U13",home:false},
   {date:"2026-05-16",label:"U13 vs Glostrup U13",division:"U13",home:true},
-  {date:"2026-05-25",label:"U13 vs Soraner U13",division:"U13",home:true},
+  {date:"2026-05-25",label:"U13 vs Soraner U-13",division:"U13",home:true},
   {date:"2026-06-05",label:"U13 @ Roskilde U13",division:"U13",home:false},
   {date:"2026-06-13",label:"U13 vs Svanholm U13",division:"U13",home:true},
   {date:"2026-06-20",label:"U13 vs Roskilde U13",division:"U13",home:true},
   {date:"2026-08-09",label:"U13 vs KB U13",division:"U13",home:true},
-  {date:"2026-08-22",label:"U13 @ Soraner U13",division:"U13",home:false},
+  {date:"2026-08-22",label:"U13 @ Soraner U-13",division:"U13",home:false},
   {date:"2026-08-30",label:"U13 @ Glostrup U13",division:"U13",home:false},
   {date:"2026-09-06",label:"U13 @ KB U13",division:"U13",home:false},
   // ── U15 ──────────────────────────────────────────────────────
-  {date:"2026-04-26",label:"U15 vs KB U15",division:"U15",home:true},
-  {date:"2026-05-23",label:"U15 vs Svanholm U15",division:"U15",home:true},
+  {date:"2026-04-26",label:"U15 vs KB U15 - 1",division:"U15",home:true},
+  {date:"2026-05-23",label:"U15 vs Svanholm U15 - 1",division:"U15",home:true},
   {date:"2026-06-27",label:"U15 @ Glostrup U15",division:"U15",home:false},
-  {date:"2026-07-19",label:"U15 @ Svanholm U15",division:"U15",home:false},
-  {date:"2026-08-16",label:"U15 vs KB U15",division:"U15",home:true},
+  {date:"2026-07-19",label:"U15 @ Svanholm U15 - 1",division:"U15",home:false},
+  {date:"2026-08-16",label:"U15 vs KB U15 - 1",division:"U15",home:true},
   {date:"2026-09-05",label:"U15 vs Glostrup U15",division:"U15",home:true},
   // ── U16 ──────────────────────────────────────────────────────
   {date:"2026-06-28",label:"U16 @ KB U16",division:"U16",home:false},
@@ -224,7 +224,7 @@ const ALL_FIXTURES = [
   {date:"2026-07-25",label:"U18 vs KB U18",division:"U18",home:true},
   {date:"2026-08-01",label:"U18 @ Svanholm U18",division:"U18",home:false},
   {date:"2026-09-12",label:"U18 vs Glostrup U18",division:"U18",home:true},
-];
+]
 
 // Division → app team name mapping for filtering
 const DIVISION_TO_TEAM = {
@@ -5971,36 +5971,6 @@ export default function App() {
             )}
           </div>
 
-          {/* Theme switcher */}
-          <div style={{background:G.white,borderRadius:14,border:`1.5px solid ${G.border}`,
-            padding:"14px 16px"}}>
-            <div style={{fontSize:11,fontWeight:900,letterSpacing:1.5,color:G.muted,
-              textTransform:"uppercase",marginBottom:12}}>App Theme</div>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {THEME_KEYS.map(key=>{
-                const t=THEMES[key];
-                const active=themeKey===key;
-                return (
-                  <button key={key} onClick={()=>applyTheme(key)}
-                    style={{display:"flex",alignItems:"center",gap:12,
-                      background:active?t.headerBg:"transparent",
-                      border:`2px solid ${active?t.headerBg:G.border}`,
-                      borderRadius:10,padding:"10px 14px",cursor:"pointer",
-                      fontFamily:"inherit",transition:"all .15s"}}>
-                    <span style={{fontSize:20}}>{t.emoji}</span>
-                    <span style={{fontSize:14,fontWeight:700,
-                      color:active?"#fff":G.text,flex:1,textAlign:"left"}}>
-                      {t.label}
-                    </span>
-                    {active&&<span style={{fontSize:12,color:"rgba(255,255,255,.7)",fontWeight:700}}>
-                      Active ✓
-                    </span>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           {/* ── My Availability ───────────────────────────────── */}
           {(()=>{
             const myAbsences = (me.absences||[]).sort((a,b)=>a.from.localeCompare(b.from));
@@ -6165,6 +6135,36 @@ export default function App() {
               </div>
             );
           })()}
+
+          {/* Theme switcher */}
+          <div style={{background:G.white,borderRadius:14,border:`1.5px solid ${G.border}`,
+            padding:"14px 16px"}}>
+            <div style={{fontSize:11,fontWeight:900,letterSpacing:1.5,color:G.muted,
+              textTransform:"uppercase",marginBottom:12}}>App Theme</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {THEME_KEYS.map(key=>{
+                const t=THEMES[key];
+                const active=themeKey===key;
+                return (
+                  <button key={key} onClick={()=>applyTheme(key)}
+                    style={{display:"flex",alignItems:"center",gap:12,
+                      background:active?t.headerBg:"transparent",
+                      border:`2px solid ${active?t.headerBg:G.border}`,
+                      borderRadius:10,padding:"10px 14px",cursor:"pointer",
+                      fontFamily:"inherit",transition:"all .15s"}}>
+                    <span style={{fontSize:20}}>{t.emoji}</span>
+                    <span style={{fontSize:14,fontWeight:700,
+                      color:active?"#fff":G.text,flex:1,textAlign:"left"}}>
+                      {t.label}
+                    </span>
+                    {active&&<span style={{fontSize:12,color:"rgba(255,255,255,.7)",fontWeight:700}}>
+                      Active ✓
+                    </span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           {/* Help & Contact */}
           <button type="button" onClick={()=>setView("help")}
@@ -6476,8 +6476,7 @@ export default function App() {
     const effectiveTeam = avTeam || myCoachTeams[0]||myPlayTeams[0]||(teams[0]?.name||"");
 
     const today      = todayStr();
-    const sixWeeks   = new Date(); sixWeeks.setDate(sixWeeks.getDate()+42);
-    const sixWeeksStr= sixWeeks.toISOString().slice(0,10);
+    const seasonEnd  = "2026-09-30"; // full 2026 season
 
     const squadMembers = effectiveTeam==="All"
       ? members
@@ -6490,7 +6489,7 @@ export default function App() {
 
     // Training sessions relevant to this team
     const relevantSessions = sessions
-      .filter(s=>s.date>=today&&s.date<=sixWeeksStr)
+      .filter(s=>s.date>=today&&s.date<=seasonEnd)
       .filter(s=>effectiveTeam==="All"?true:
         (s.restrictedTo===effectiveTeam||(s.sessionTeams||[]).includes(effectiveTeam)||
          (!s.restrictedTo&&s.players.some(p=>{
@@ -6501,15 +6500,17 @@ export default function App() {
 
     // Matches relevant to this team — filter by division mapping
     const relevantMatches = ALL_FIXTURES
-      .filter(f=>f.date>=today&&f.date<=sixWeeksStr)
+      .filter(f=>f.date>=today&&f.date<=seasonEnd)
       .filter(f=>{
         if(effectiveTeam==="All") return true;
         // Map team name to divisions
         const divMap = {
           "Div 2":["Div 2"],
-          "Div 3":["Div 3","T20 S4","T20 Serie 4"],
-          "Div 4":["Div 4","T20 S5","T20 Serie 5"],
-          "Women's":["Women's"],"U13":["U13"],"U15":["U15"],
+          "Div 3":["Div 3","T20 Serie 4"],
+          "Div 4":["Div 4","T20 Serie 5"],
+          "Women's":["Women's"],
+          "OB":["OB"],
+          "U13":["U13"],"U15":["U15"],
           "U16":["U16"],"U18":["U18"],
         };
         const validDivs = divMap[effectiveTeam]||[];
@@ -6526,7 +6527,7 @@ export default function App() {
     return (
       <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
           currentUser={currentUser} onLogout={handleLogout}/>}>
-        <AppHeader title="Team Availability" sub="Training · Matches · Next 6 weeks"
+        <AppHeader title="Team Availability" sub="Full 2026 Season · Training &amp; Matches"
           onBack={()=>setView("schedule")}/>
         <div style={{padding:"14px 16px 100px"}}>
 
