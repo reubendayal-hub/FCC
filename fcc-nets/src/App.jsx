@@ -2940,14 +2940,15 @@ export default function App() {
     const pollOptions = bPollOpts.map(o=>({...o, votes:[]}));
     const restrictedTo = bRestrictTeam || null;
     const isLeader = ["superadmin","admin","captain","vicecaptain"].includes(userRole);
+    const isAdmin = ["superadmin","admin"].includes(userRole);
 
-    // Prime time enforcement for members
-    if(!isLeader) {
-      const prime = isPrimeTime(bFrom, bDate);
+    if(!isAdmin) {
+      const prime = (!isLeader) && isPrimeTime(bFrom, bDate);
       const maxMins = toMinsNet(bFrom) + (prime ? 60 : 120);
       if(toMinsNet(bTo) > maxMins) {
         const allowed = prime ? "1 hour" : "2 hours";
-        showToast(`⭐ Prime hours: max ${allowed} per booking at this time`);
+        const msg = prime ? `⭐ Prime hours: max ${allowed} per booking at this time` : `Maximum booking duration is ${allowed}`;
+        showToast(msg);
         return;
       }
     }
@@ -4872,9 +4873,10 @@ export default function App() {
                     {Array.from({length:24},(_,i)=>{
                       const h=String(i).padStart(2,"0");
                       const isLeader=["superadmin","admin","captain","vicecaptain"].includes(userRole);
+                      const isAdmin=["superadmin","admin"].includes(userRole);
                       const prime=(!isLeader)&&bFrom?isPrimeTime(bFrom, bDate):false;
                       const maxMins=toMinsNet(bFrom)+(prime?60:120);
-                      const disabled=(!isLeader)&&(i*60>maxMins||i*60<=toMinsNet(bFrom));
+                      const disabled=!isAdmin && (i*60>maxMins||i*60<=toMinsNet(bFrom));
                       return <option key={h} value={h} disabled={disabled}>{h}</option>;
                     })}
                   </select>
@@ -4884,9 +4886,15 @@ export default function App() {
                       const h=bTo.split(":")[0]||"20";
                       setBTo(`${h}:${e.target.value}`);
                     }}>
-                    {["00","15","30","45"].map(m=>(
-                      <option key={m} value={m}>:{m}</option>
-                    ))}
+                    {["00","15","30","45"].map(m=>{
+                      const isLeader=["superadmin","admin","captain","vicecaptain"].includes(userRole);
+                      const isAdmin=["superadmin","admin"].includes(userRole);
+                      const prime=(!isLeader)&&bFrom?isPrimeTime(bFrom, bDate):false;
+                      const maxMins=toMinsNet(bFrom)+(prime?60:120);
+                      const optionMins=Number(bTo.split(":")[0])*60+Number(m);
+                      const disabled=!isAdmin && (optionMins>maxMins || optionMins<=toMinsNet(bFrom));
+                      return <option key={m} value={m} disabled={disabled}>:{m}</option>;
+                    })}
                   </select>
                 </div>
               </FFld>
