@@ -121,7 +121,116 @@ const MATCH_FIXTURES = [
   { date:"2026-09-12", from:"10:00", to:"19:00", label:"U18 — FCC vs Glostrup U18" },
 ];
 
-// ─── Roles ────────────────────────────────────────────────────
+// ─── All 2026 FCC Fixtures (home + away, for availability view) ─
+// division key maps to app team name for filtering by captain's team
+const ALL_FIXTURES = [
+  // ── 2. Division (Div 2) ──────────────────────────────────────
+  {date:"2026-05-10",label:"Div 2 @ Hvidovre 1",division:"Div 2",home:false},
+  {date:"2026-05-17",label:"Div 2 vs Århus 1",division:"Div 2",home:true},
+  {date:"2026-05-24",label:"Div 2 vs Himalaya 1",division:"Div 2",home:true},
+  {date:"2026-05-31",label:"Div 2 @ Tåstrup 1",division:"Div 2",home:false},
+  {date:"2026-06-07",label:"Div 2 vs Copenhagen 1",division:"Div 2",home:true},
+  {date:"2026-06-14",label:"Div 2 @ Soraner 2",division:"Div 2",home:false},
+  {date:"2026-06-28",label:"Div 2 @ Nørrebro 1",division:"Div 2",home:false},
+  {date:"2026-07-26",label:"Div 2 vs Bella 1",division:"Div 2",home:true},
+  {date:"2026-08-15",label:"Div 2 vs Kolding 1",division:"Div 2",home:true},
+  {date:"2026-08-22",label:"Div 2 @ Ikast-Brande 1",division:"Div 2",home:false},
+  {date:"2026-08-23",label:"Div 2 @ Herning 1",division:"Div 2",home:false},
+  {date:"2026-08-30",label:"Div 2 vs Frem 1",division:"Div 2",home:true},
+  // ── 3. Division Øst - B (Div 3) ──────────────────────────────
+  {date:"2026-04-26",label:"Div 3 @ AB 2",division:"Div 3",home:false},
+  {date:"2026-05-02",label:"Div 3 vs APMM 1",division:"Div 3",home:true},
+  {date:"2026-05-10",label:"Div 3 @ Ishøj 3",division:"Div 3",home:false},
+  {date:"2026-05-31",label:"Div 3 vs Frem 2",division:"Div 3",home:true},
+  {date:"2026-06-13",label:"Div 3 vs Hvidovre 2",division:"Div 3",home:true},
+  {date:"2026-06-27",label:"Div 3 vs Ishøj 3",division:"Div 3",home:true},
+  {date:"2026-08-02",label:"Div 3 @ Hvidovre 2",division:"Div 3",home:false},
+  {date:"2026-08-08",label:"Div 3 @ Frem 2",division:"Div 3",home:false},
+  {date:"2026-08-22",label:"Div 3 vs APMM 1",division:"Div 3",home:true},
+  {date:"2026-09-05",label:"Div 3 vs AB 2",division:"Div 3",home:true},
+  // ── 4. Division Øst (Div 4) ──────────────────────────────────
+  {date:"2026-05-10",label:"Div 4 vs Tårnby 1",division:"Div 4",home:true},
+  {date:"2026-05-17",label:"Div 4 @ Glostrup 3",division:"Div 4",home:false},
+  {date:"2026-05-31",label:"Div 4 vs Albertslund 3",division:"Div 4",home:true},
+  {date:"2026-06-14",label:"Div 4 vs Tåstrup 2",division:"Div 4",home:true},
+  {date:"2026-06-20",label:"Div 4 @ Himalaya 2",division:"Div 4",home:false},
+  {date:"2026-07-04",label:"Div 4 @ Nørrebro 2",division:"Div 4",home:false},
+  {date:"2026-08-01",label:"Div 4 vs Hvidovre 3",division:"Div 4",home:true},
+  {date:"2026-08-09",label:"Div 4 vs Frem 3",division:"Div 4",home:true},
+  {date:"2026-08-22",label:"Div 4 @ Copenhagen 2",division:"Div 4",home:false},
+  // ── T20 Serie 4 ───────────────────────────────────────────────
+  {date:"2026-04-12",label:"T20 S4 @ Frem 1",division:"Div 3",home:false},
+  {date:"2026-04-19",label:"T20 S4 @ Hvidovre 2",division:"Div 3",home:false},
+  {date:"2026-05-03",label:"T20 S4 vs Nørrebro 2",division:"Div 3",home:true},
+  {date:"2026-07-05",label:"T20 S4 vs AB 2",division:"Div 3",home:true},
+  {date:"2026-08-02",label:"T20 S4 vs Tåstrup 1",division:"Div 3",home:true},
+  // ── T20 Serie 5 ───────────────────────────────────────────────
+  {date:"2026-04-12",label:"T20 S5 @ Bella 2",division:"Div 4",home:false},
+  {date:"2026-04-18",label:"T20 S5 @ Glostrup 3",division:"Div 4",home:false},
+  {date:"2026-05-16",label:"T20 S5 vs Himalaya 1",division:"Div 4",home:true},
+  {date:"2026-05-25",label:"T20 S5 @ Frem 2",division:"Div 4",home:false},
+  {date:"2026-07-05",label:"T20 S5 vs Tårnby 1",division:"Div 4",home:true},
+  {date:"2026-07-11",label:"T20 S5 vs Tåstrup 2",division:"Div 4",home:true},
+  // ── Oldboys (OB) ──────────────────────────────────────────────
+  {date:"2026-05-06",label:"OB vs Køge OB",division:"Div 3",home:true},
+  {date:"2026-05-22",label:"OB @ Tåstrup OB",division:"Div 3",home:false},
+  {date:"2026-05-27",label:"OB vs Hvidovre OB",division:"Div 3",home:true},
+  {date:"2026-06-01",label:"OB @ Svanholm OB",division:"Div 3",home:false},
+  {date:"2026-06-10",label:"OB @ Ishøj OB",division:"Div 3",home:false},
+  {date:"2026-06-18",label:"OB vs Forty Øst 1",division:"Div 3",home:true},
+  {date:"2026-06-24",label:"OB @ Hvidovre OB",division:"Div 3",home:false},
+  {date:"2026-07-02",label:"OB @ Køge OB",division:"Div 3",home:false},
+  {date:"2026-08-12",label:"OB vs Tåstrup OB",division:"Div 3",home:true},
+  {date:"2026-08-18",label:"OB vs Svanholm OB",division:"Div 3",home:true},
+  {date:"2026-08-25",label:"OB vs Ishøj OB",division:"Div 3",home:true},
+  {date:"2026-09-03",label:"OB vs Hvidovre OB",division:"Div 3",home:true},
+  // ── Women's (Kvinderækken) ────────────────────────────────────
+  {date:"2026-05-17",label:"Women's @ Horsens",division:"Women's",home:false},
+  {date:"2026-05-17",label:"Women's @ Aarhus",division:"Women's",home:false},
+  {date:"2026-05-24",label:"Women's @ Glostrup",division:"Women's",home:false},
+  {date:"2026-06-06",label:"Women's vs Esbjerg",division:"Women's",home:true},
+  {date:"2026-06-14",label:"Women's vs Svanholm",division:"Women's",home:true},
+  {date:"2026-08-02",label:"Women's vs KB",division:"Women's",home:true},
+  {date:"2026-08-15",label:"Women's @ Fredericia",division:"Women's",home:false},
+  // ── U13 ──────────────────────────────────────────────────────
+  {date:"2026-04-25",label:"U13 @ Svanholm U13",division:"U13",home:false},
+  {date:"2026-05-16",label:"U13 vs Glostrup U13",division:"U13",home:true},
+  {date:"2026-05-25",label:"U13 vs Soraner U13",division:"U13",home:true},
+  {date:"2026-06-05",label:"U13 @ Roskilde U13",division:"U13",home:false},
+  {date:"2026-06-13",label:"U13 vs Svanholm U13",division:"U13",home:true},
+  {date:"2026-06-20",label:"U13 vs Roskilde U13",division:"U13",home:true},
+  {date:"2026-08-09",label:"U13 vs KB U13",division:"U13",home:true},
+  {date:"2026-08-22",label:"U13 @ Soraner U13",division:"U13",home:false},
+  {date:"2026-08-30",label:"U13 @ Glostrup U13",division:"U13",home:false},
+  {date:"2026-09-06",label:"U13 @ KB U13",division:"U13",home:false},
+  // ── U15 ──────────────────────────────────────────────────────
+  {date:"2026-04-26",label:"U15 vs KB U15",division:"U15",home:true},
+  {date:"2026-05-23",label:"U15 vs Svanholm U15",division:"U15",home:true},
+  {date:"2026-06-27",label:"U15 @ Glostrup U15",division:"U15",home:false},
+  {date:"2026-07-19",label:"U15 @ Svanholm U15",division:"U15",home:false},
+  {date:"2026-08-16",label:"U15 vs KB U15",division:"U15",home:true},
+  {date:"2026-09-05",label:"U15 vs Glostrup U15",division:"U15",home:true},
+  // ── U16 ──────────────────────────────────────────────────────
+  {date:"2026-06-28",label:"U16 @ KB U16",division:"U16",home:false},
+  {date:"2026-08-03",label:"U16 vs Svanholm U16",division:"U16",home:true},
+  {date:"2026-08-05",label:"U16 @ Glostrup U16",division:"U16",home:false},
+  {date:"2026-08-07",label:"U16 @ Svanholm U16",division:"U16",home:false},
+  {date:"2026-08-29",label:"U16 vs Glostrup U16",division:"U16",home:true},
+  {date:"2026-09-06",label:"U16 @ KB U16",division:"U16",home:false},
+  // ── U18 ──────────────────────────────────────────────────────
+  {date:"2026-04-25",label:"U18 @ KB U18",division:"U18",home:false},
+  {date:"2026-05-16",label:"U18 @ Glostrup U18",division:"U18",home:false},
+  {date:"2026-06-21",label:"U18 vs Svanholm U18",division:"U18",home:true},
+  {date:"2026-07-25",label:"U18 vs KB U18",division:"U18",home:true},
+  {date:"2026-08-01",label:"U18 @ Svanholm U18",division:"U18",home:false},
+  {date:"2026-09-12",label:"U18 vs Glostrup U18",division:"U18",home:true},
+];
+
+// Division → app team name mapping for filtering
+const DIVISION_TO_TEAM = {
+  "Div 2":"Div 2","Div 3":"Div 3","Div 4":"Div 4",
+  "Women's":"Women's","U13":"U13","U15":"U15","U16":"U18","U18":"U18",
+};
 const ROLES = ["superadmin","admin","captain","vicecaptain","member"];
 const ROLE_META = {
   superadmin: { label:"Super Admin",  bg:"#431407", text:"#fdba74", icon:"👑" },
@@ -572,6 +681,11 @@ function getCoachTeams(name, teams) {
 // isCoachMember(name, teams) — true if they coach any team
 function isCoachMember(name, teams) {
   return (teams||[]).some(t=>(t.coaches||[]).includes(name));
+}
+
+// isAbsent(member, dateStr) — true if member has an absence covering this date
+function isAbsent(member, dateStr) {
+  return (member?.absences||[]).some(a=>a.from<=dateStr && a.to>=dateStr);
 }
 
 // ─── Profile completion ────────────────────────────────────────
@@ -2102,6 +2216,7 @@ function SidebarNav({view, setView, userRole, currentUser, onLogout}) {
         {navBtn("schedule","📅","Schedule")}
         {navBtn("add","＋","Book / Join")}
         {isAdmin && navBtn("admin","👥","Admin Panel")}
+        {(isAdmin || isCoachMember(currentUser?.name,[])) && navBtn("availability","📊","Team Availability")}
         {navBtn("profile","👤","My Profile")}
       </div>
       <div style={{marginTop:"auto",width:"100%",paddingTop:24,
@@ -2443,7 +2558,10 @@ export default function App() {
           // Auto-enroll members from the slot's teams
           const slotTeams = slot.teams?.length ? slot.teams : (slot.team ? [slot.team] : []);
           const autoPlayers = slotTeams.length
-            ? liveMembers.filter(m=>(m.teams||[]).some(t=>slotTeams.includes(t))).map(m=>m.name)
+            ? liveMembers.filter(m=>
+                (m.teams||[]).some(t=>slotTeams.includes(t)) &&
+                !isAbsent(m, dateStr) // skip members marked away
+              ).map(m=>m.name)
             : [];
           // Collect coaches from all slot teams
           const slotCoaches = [...new Set(slotTeams.flatMap(tn=>{
@@ -2951,6 +3069,13 @@ export default function App() {
   const [showAllBlocks,  setShowAllBlocks]  = useState(false);
   const [xlsParsed,      setXlsParsed]      = useState(null);  // {fixtures, allMatches} from uploaded DCF xlsx
   const [xlsError,       setXlsError]       = useState(null);
+  // Availability / absence state
+  const [absFrom,        setAbsFrom]        = useState("");
+  const [absTo,          setAbsTo]          = useState("");
+  const [absCat,         setAbsCat]         = useState("Holiday");
+  const [absNote,        setAbsNote]        = useState("");
+  const [absConflicts,   setAbsConflicts]   = useState(null);
+  const [availView,      setAvailView]      = useState("team");
   const [netsDate,       setNetsDate]       = useState(todayStr());
   const [wxData,         setWxData]         = useState(null); // weather data
   const [blockCals,     setBlockCals]     = useState([]);    // [{id,date,from,to,label}]
@@ -4251,6 +4376,16 @@ export default function App() {
               </button>
             );
           })}
+          {(can(userRole,"sendReminder")||isCoachMember(currentUser?.name,teams))&&(
+            <button onClick={()=>setView("availability")}
+              style={{padding:"7px 12px",borderRadius:20,cursor:"pointer",
+                fontFamily:"inherit",fontWeight:800,fontSize:13,
+                background:"rgba(255,255,255,.12)",color:"rgba(255,255,255,.8)",
+                border:"0.5px solid rgba(255,255,255,.2)",flexShrink:0}}
+              title="Team Availability">
+              📊
+            </button>
+          )}
         </div>
 
         {/* Reminder strips */}
@@ -5865,6 +6000,171 @@ export default function App() {
             </div>
           </div>
 
+          {/* ── My Availability ───────────────────────────────── */}
+          {(()=>{
+            const myAbsences = (me.absences||[]).sort((a,b)=>a.from.localeCompare(b.from));
+            const ABS_CATS = ["Holiday","Work","Injury","Other"];
+            const catColour = {Holiday:"#1e40af",Work:"#92400e",Injury:"#dc2626",Other:"#374151"};
+            const catBg     = {Holiday:"#eff6ff",Work:"#fffbeb",Injury:"#fef2f2",Other:"#f3f4f6"};
+            const catBord   = {Holiday:"#bfdbfe",Work:"#fde68a",Injury:"#fca5a5",Other:"#e5e7eb"};
+
+            function saveAbsences(newList) {
+              const updated = members.map(m=>m.id===me.id?{...m,absences:newList}:m);
+              saveMembers(updated);
+            }
+
+            function addAbsence() {
+              if(!absFrom||!absTo) { showToast("Please pick start and end dates"); return; }
+              if(absTo<absFrom) { showToast("End date must be on or after start date"); return; }
+              // Find conflicting sessions
+              const conflicts = sessions.filter(s=>
+                s.players.includes(me.name) &&
+                s.date>=absFrom && s.date<=absTo
+              );
+              if(conflicts.length>0) {
+                setAbsConflicts({from:absFrom,to:absTo,cat:absCat,note:absNote,sessions:conflicts});
+                return; // show nudge
+              }
+              commitAbsence(absFrom,absTo,absCat,absNote,[]);
+            }
+
+            function commitAbsence(from,to,cat,note,sessionsToRemove) {
+              const newAbs = {id:uid(),from,to,category:cat,note:note.trim()};
+              saveAbsences([...myAbsences,newAbs]);
+              if(sessionsToRemove.length>0) {
+                const updated=sessions.map(s=>sessionsToRemove.find(c=>c.id===s.id)
+                  ? {...s,players:s.players.filter(p=>p!==me.name)} : s);
+                saveSessions(updated);
+              }
+              setAbsFrom(""); setAbsTo(""); setAbsCat("Holiday"); setAbsNote("");
+              setAbsConflicts(null);
+              showToast(`Away period saved ✓${sessionsToRemove.length>0?" · removed from "+sessionsToRemove.length+" session"+( sessionsToRemove.length>1?"s":""):""}`);
+            }
+
+            return (
+              <div style={{background:G.white,border:`1.5px solid ${G.border}`,
+                borderRadius:12,padding:"14px 16px"}}>
+                <div style={{fontWeight:900,fontSize:14,color:G.text,marginBottom:12,
+                  display:"flex",alignItems:"center",gap:8}}>
+                  ✈️ My Availability
+                </div>
+
+                {/* Conflict nudge */}
+                {absConflicts&&(
+                  <div style={{background:"#fffbeb",border:"1.5px solid #fde68a",
+                    borderRadius:10,padding:"12px 14px",marginBottom:14}}>
+                    <div style={{fontWeight:800,fontSize:13,color:"#92400e",marginBottom:6}}>
+                      ⚠️ You're signed up for {absConflicts.sessions.length} session{absConflicts.sessions.length>1?"s":""} during this period
+                    </div>
+                    <div style={{fontSize:12,color:"#78350f",marginBottom:10,lineHeight:1.6}}>
+                      {absConflicts.sessions.map(s=>`${fmtShort(s.date)} ${s.from}–${s.to}${s.label?" · "+s.label:""}`).join("\n")}
+                    </div>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      <button onClick={()=>commitAbsence(absConflicts.from,absConflicts.to,absConflicts.cat,absConflicts.note,absConflicts.sessions)}
+                        style={{flex:1,background:"#92400e",color:"#fff",border:"none",
+                          borderRadius:9,padding:"9px 0",fontFamily:"inherit",fontWeight:800,
+                          fontSize:12,cursor:"pointer"}}>
+                        Save &amp; remove me from those sessions
+                      </button>
+                      <button onClick={()=>commitAbsence(absConflicts.from,absConflicts.to,absConflicts.cat,absConflicts.note,[])}
+                        style={{flex:1,background:G.cream,color:G.muted,border:`1px solid ${G.border}`,
+                          borderRadius:9,padding:"9px 0",fontFamily:"inherit",fontWeight:700,
+                          fontSize:12,cursor:"pointer"}}>
+                        Save &amp; keep me in sessions
+                      </button>
+                    </div>
+                    <button onClick={()=>setAbsConflicts(null)}
+                      style={{width:"100%",marginTop:8,background:"none",border:"none",
+                        fontSize:12,color:G.muted,cursor:"pointer",fontFamily:"inherit"}}>
+                      Cancel
+                    </button>
+                  </div>
+                )}
+
+                {/* Existing absences */}
+                {myAbsences.length>0&&(
+                  <div style={{marginBottom:14,display:"flex",flexDirection:"column",gap:6}}>
+                    {myAbsences.map(a=>(
+                      <div key={a.id} style={{display:"flex",alignItems:"center",gap:10,
+                        padding:"9px 12px",borderRadius:9,
+                        background:catBg[a.category]||"#f3f4f6",
+                        border:`1px solid ${catBord[a.category]||"#e5e7eb"}`}}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontWeight:700,fontSize:13,
+                            color:catColour[a.category]||G.text}}>
+                            {a.category}
+                            {a.from===a.to
+                              ? ` · ${fmtShort(a.from)}`
+                              : ` · ${fmtShort(a.from)} – ${fmtShort(a.to)}`}
+                          </div>
+                          {a.note&&<div style={{fontSize:11,color:G.muted,marginTop:2}}>
+                            {a.note}
+                            <span style={{fontStyle:"italic",opacity:.7}}> (note visible to admins only)</span>
+                          </div>}
+                        </div>
+                        <button onClick={()=>saveAbsences(myAbsences.filter(x=>x.id!==a.id))}
+                          style={{background:"none",border:"none",color:G.red,
+                            fontSize:18,cursor:"pointer",padding:"0 4px",lineHeight:1}}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add new absence */}
+                {!absConflicts&&(
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    <div style={{display:"flex",gap:8}}>
+                      <div style={{flex:1}}>
+                        <label style={{fontSize:10,fontWeight:700,color:G.muted,
+                          display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>
+                          From
+                        </label>
+                        <input type="date" value={absFrom}
+                          onChange={e=>{ setAbsFrom(e.target.value); if(!absTo||absTo<e.target.value) setAbsTo(e.target.value); }}
+                          min={todayStr()}
+                          style={iSt({fontSize:13,padding:"8px 10px",borderRadius:8})}/>
+                      </div>
+                      <div style={{flex:1}}>
+                        <label style={{fontSize:10,fontWeight:700,color:G.muted,
+                          display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>
+                          To
+                        </label>
+                        <input type="date" value={absTo}
+                          onChange={e=>setAbsTo(e.target.value)}
+                          min={absFrom||todayStr()}
+                          style={iSt({fontSize:13,padding:"8px 10px",borderRadius:8})}/>
+                      </div>
+                    </div>
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                      {ABS_CATS.map(c=>(
+                        <button key={c} onClick={()=>setAbsCat(c)}
+                          style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${absCat===c?catBord[c]||G.green:"rgba(0,0,0,.1)"}`,
+                            background:absCat===c?(catBg[c]||G.cream):"transparent",
+                            color:absCat===c?(catColour[c]||G.green):G.muted,
+                            fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                    {absCat==="Other"&&(
+                      <input value={absNote} onChange={e=>setAbsNote(e.target.value)}
+                        placeholder="Brief reason (visible to admins only)…"
+                        style={iSt({fontSize:13,padding:"8px 10px",borderRadius:8})}/>
+                    )}
+                    <button onClick={addAbsence}
+                      disabled={!absFrom||!absTo}
+                      style={{background:absFrom&&absTo?G.green:"rgba(0,0,0,.1)",
+                        color:absFrom&&absTo?G.lime:G.muted,border:"none",borderRadius:9,
+                        padding:"10px 0",fontFamily:"inherit",fontWeight:800,fontSize:13,
+                        cursor:absFrom&&absTo?"pointer":"default",width:"100%"}}>
+                      + Mark as away
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Help & Contact */}
           <button type="button" onClick={()=>setView("help")}
             style={{background:G.white,border:`1.5px solid ${G.border}`,
@@ -6151,6 +6451,304 @@ export default function App() {
 
         </div>
         <BotNav view="profile" setView={setView} userRole={userRole}
+          pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
+        {toast&&<Toast msg={toast}/>}
+      </Shell>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // RENDER: Team Availability
+  // ════════════════════════════════════════════════════════════
+  if(view==="availability") {
+    const userMem = members.find(m=>m.id===currentUser.id)||currentUser;
+    const isAdmin = can(userRole,"accessMembers");
+    const isCoach = isCoachMember(currentUser.name, teams);
+    const isCaptainOrVC = can(userRole,"sendReminder");
+
+    const myCoachTeams = teams.filter(t=>(t.coaches||[]).includes(currentUser.name)).map(t=>t.name);
+    const myPlayTeams  = userMem.teams||[];
+    const allVisible   = [...new Set([...myCoachTeams,...myPlayTeams])];
+    const canSeeAll    = isAdmin || myCoachTeams.length>1;
+    const teamOptions  = isAdmin ? teams.map(t=>t.name) : allVisible;
+
+    const [avTeam, setAvTeam] = React.useState(
+      myCoachTeams[0]||myPlayTeams[0]||(teams[0]?.name||"")
+    );
+    const [showMatches, setShowMatches] = React.useState(true);
+
+    const today      = todayStr();
+    const sixWeeks   = new Date(); sixWeeks.setDate(sixWeeks.getDate()+42);
+    const sixWeeksStr= sixWeeks.toISOString().slice(0,10);
+
+    const squadMembers = avTeam==="All"
+      ? members
+      : members.filter(m=>(m.teams||[]).includes(avTeam));
+
+    const catColour={Holiday:"#1e40af",Work:"#92400e",Injury:"#dc2626",Other:"#374151"};
+    const catBg    ={Holiday:"#eff6ff",Work:"#fffbeb",Injury:"#fef2f2",Other:"#f3f4f6"};
+
+    function awayOn(date){ return squadMembers.filter(m=>isAbsent(m,date)); }
+
+    // Training sessions relevant to this team
+    const relevantSessions = sessions
+      .filter(s=>s.date>=today&&s.date<=sixWeeksStr)
+      .filter(s=>avTeam==="All"?true:
+        (s.restrictedTo===avTeam||(s.sessionTeams||[]).includes(avTeam)||
+         (!s.restrictedTo&&s.players.some(p=>{
+           const m=members.find(x=>x.name===p);
+           return (m?.teams||[]).includes(avTeam);
+         }))))
+      .sort((a,b)=>a.date.localeCompare(b.date)||a.from.localeCompare(b.from));
+
+    // Matches relevant to this team — filter by division mapping
+    const relevantMatches = ALL_FIXTURES
+      .filter(f=>f.date>=today&&f.date<=sixWeeksStr)
+      .filter(f=>{
+        if(avTeam==="All") return true;
+        // Map team name to divisions
+        const divMap = {
+          "Div 2":["Div 2"],
+          "Div 3":["Div 3","T20 S4","T20 Serie 4"],
+          "Div 4":["Div 4","T20 S5","T20 Serie 5"],
+          "Women's":["Women's"],"U13":["U13"],"U15":["U15"],
+          "U16":["U16"],"U18":["U18"],
+        };
+        const validDivs = divMap[avTeam]||[];
+        return validDivs.some(d=>f.division.includes(d)||f.label.includes(d));
+      })
+      .sort((a,b)=>a.date.localeCompare(b.date));
+
+    // Build a combined timeline — all unique dates with sessions + matches
+    const allDates = [...new Set([
+      ...relevantSessions.map(s=>s.date),
+      ...(showMatches?relevantMatches.map(f=>f.date):[]),
+    ])].sort();
+
+    return (
+      <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
+          currentUser={currentUser} onLogout={handleLogout}/>}>
+        <AppHeader title="Team Availability" sub="Training · Matches · Next 6 weeks"
+          onBack={()=>setView("schedule")}/>
+        <div style={{padding:"14px 16px 100px"}}>
+
+          {/* Team selector */}
+          <div style={{marginBottom:12,display:"flex",gap:6,flexWrap:"wrap"}}>
+            {canSeeAll&&(
+              <button onClick={()=>setAvTeam("All")}
+                style={{padding:"6px 14px",borderRadius:20,
+                  border:`1px solid ${avTeam==="All"?G.green:G.border}`,
+                  background:avTeam==="All"?G.green:G.white,
+                  color:avTeam==="All"?G.lime:G.muted,
+                  fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                All teams
+              </button>
+            )}
+            {teamOptions.map(tn=>{
+              const tm=getTeamMeta(tn); const on=avTeam===tn;
+              return (
+                <button key={tn} onClick={()=>setAvTeam(tn)}
+                  style={{padding:"6px 14px",borderRadius:20,border:"none",
+                    background:on?tm.bg:"rgba(0,0,0,.06)",
+                    color:on?tm.text:G.muted,
+                    fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                  {tn}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Match overlay toggle */}
+          <div style={{display:"flex",alignItems:"center",gap:10,
+            marginBottom:16,padding:"8px 12px",background:G.cream,
+            borderRadius:10,border:`1px solid ${G.border}`}}>
+            <span style={{fontSize:12,fontWeight:700,color:G.text,flex:1}}>
+              🏏 Show match fixtures
+            </span>
+            <button onClick={()=>setShowMatches(v=>!v)}
+              style={{width:44,height:24,borderRadius:20,border:"none",cursor:"pointer",
+                background:showMatches?G.green:"#d1d5db",
+                transition:"background .2s",position:"relative",flexShrink:0}}>
+              <span style={{position:"absolute",top:2,
+                left:showMatches?22:2,width:20,height:20,
+                borderRadius:"50%",background:"#fff",
+                transition:"left .2s",display:"block"}}/>
+            </button>
+          </div>
+
+          {/* Currently away banner */}
+          {(()=>{
+            const awayNow=squadMembers.filter(m=>isAbsent(m,today));
+            if(!awayNow.length) return null;
+            return (
+              <div style={{background:"#fffbeb",border:"1.5px solid #fde68a",
+                borderRadius:12,padding:"12px 14px",marginBottom:14}}>
+                <div style={{fontWeight:800,fontSize:12,color:"#92400e",marginBottom:8}}>
+                  ✈️ Currently away ({awayNow.length})
+                </div>
+                {awayNow.map(m=>{
+                  const abs=(m.absences||[]).find(a=>a.from<=today&&a.to>=today);
+                  return (
+                    <div key={m.id} style={{display:"flex",alignItems:"center",
+                      gap:8,marginBottom:4,fontSize:12}}>
+                      <span style={{fontWeight:700,color:G.text}}>{m.name}</span>
+                      <span style={{fontSize:10,padding:"1px 8px",borderRadius:20,fontWeight:700,
+                        background:catBg[abs?.category]||"#f3f4f6",
+                        color:catColour[abs?.category]||G.muted}}>
+                        {abs?.category||"Away"}
+                      </span>
+                      {abs?.to!==today&&<span style={{fontSize:11,color:G.muted}}>
+                        until {fmtShort(abs.to)}
+                      </span>}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+          {/* Combined timeline */}
+          {allDates.length===0?(
+            <div style={{textAlign:"center",padding:"40px 0",color:G.muted,fontSize:14}}>
+              Nothing coming up in the next 6 weeks
+            </div>
+          ):allDates.map(date=>{
+            const daySessions = relevantSessions.filter(s=>s.date===date);
+            const dayMatches  = showMatches ? relevantMatches.filter(f=>f.date===date) : [];
+            const awayList    = awayOn(date);
+            const awayCount   = awayList.length;
+
+            return (
+              <div key={date} style={{marginBottom:16}}>
+                {/* Date row */}
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                  <div style={{fontWeight:900,fontSize:13,color:G.text,whiteSpace:"nowrap"}}>
+                    {fmtShort(date)}
+                  </div>
+                  {awayCount>0&&(
+                    <div style={{fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:700,
+                      background:"#fffbeb",color:"#92400e",border:"1px solid #fde68a",
+                      whiteSpace:"nowrap"}}>
+                      ✈️ {awayCount} away
+                    </div>
+                  )}
+                  <div style={{flex:1,height:1,background:G.border}}/>
+                </div>
+
+                {/* Match chips — shown prominently above training */}
+                {dayMatches.map((f,i)=>(
+                  <div key={i} style={{
+                    display:"flex",alignItems:"center",gap:10,
+                    padding:"10px 14px",marginBottom:6,borderRadius:10,
+                    background:f.home?"#f0fdf4":"#f8fafc",
+                    border:`1.5px solid ${f.home?"#86efac":"#e2e8f0"}`,
+                  }}>
+                    <span style={{fontSize:18,flexShrink:0}}>{f.home?"🏠":"✈️"}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:800,fontSize:13,color:G.text}}>{f.label}</div>
+                      <div style={{fontSize:10,color:G.muted,marginTop:1}}>
+                        {f.home?"Home · Karlebo":"Away"}
+                        {avTeam==="All"&&<span style={{marginLeft:6,fontWeight:700,
+                          color:G.green}}>{f.division}</span>}
+                      </div>
+                    </div>
+                    <span style={{fontSize:10,fontWeight:800,padding:"2px 8px",
+                      borderRadius:20,
+                      background:f.home?"#dcfce7":"#e2e8f0",
+                      color:f.home?"#166534":"#475569",
+                      flexShrink:0}}>
+                      MATCH
+                    </span>
+                  </div>
+                ))}
+
+                {/* Training session cards */}
+                {daySessions.map(s=>{
+                  const squad  = avTeam==="All"?squadMembers:squadMembers.filter(m=>(m.teams||[]).includes(avTeam));
+                  const total  = squad.length;
+                  const inSess = s.players.filter(p=>squad.some(m=>m.name===p)).length;
+                  const awayFromSess = awayList.filter(m=>!s.players.includes(m.name));
+                  const unaccounted = Math.max(0,total-inSess-awayFromSess.length);
+                  const pctIn = total>0?Math.round((inSess/total)*100):0;
+
+                  return (
+                    <div key={s.id} style={{background:G.white,
+                      border:`1.5px solid ${G.border}`,
+                      borderRadius:10,padding:"12px 14px",marginBottom:6}}>
+                      <div style={{display:"flex",alignItems:"flex-start",
+                        justifyContent:"space-between",marginBottom:8}}>
+                        <div>
+                          <div style={{fontWeight:800,fontSize:13,color:G.text}}>
+                            {s.label||"Training"}
+                            {s.restrictedTo&&<span style={{marginLeft:6,fontSize:10,
+                              fontWeight:700,padding:"1px 6px",borderRadius:20,
+                              background:"#fef9c3",color:"#92400e"}}>🔒 {s.restrictedTo}
+                            </span>}
+                          </div>
+                          <div style={{fontSize:11,color:G.muted,marginTop:1}}>
+                            {s.from}–{s.to}
+                          </div>
+                        </div>
+                        <div style={{textAlign:"right",flexShrink:0}}>
+                          <span style={{fontWeight:900,fontSize:15,color:G.green}}>{inSess}</span>
+                          <span style={{fontSize:11,color:G.muted}}> / {total}</span>
+                        </div>
+                      </div>
+
+                      {/* Bar */}
+                      {total>0&&(
+                        <div style={{height:6,borderRadius:20,background:"#f1f5f9",
+                          overflow:"hidden",display:"flex",marginBottom:6}}>
+                          <div style={{width:`${pctIn}%`,background:G.green,
+                            borderRadius:"20px 0 0 20px",transition:"width .3s"}}/>
+                          {awayFromSess.length>0&&<div style={{
+                            width:`${Math.round((awayFromSess.length/total)*100)}%`,
+                            background:"#fbbf24"}}/>}
+                        </div>
+                      )}
+
+                      <div style={{display:"flex",gap:10,flexWrap:"wrap",
+                        fontSize:11,color:G.muted}}>
+                        <span>🟢 {inSess} confirmed</span>
+                        {awayFromSess.length>0&&<span>🟡 {awayFromSess.length} away</span>}
+                        {unaccounted>0&&<span>⚪ {unaccounted} unaccounted</span>}
+                      </div>
+
+                      {awayFromSess.length>0&&(
+                        <div style={{marginTop:8,paddingTop:8,
+                          borderTop:`1px solid ${G.border}`,
+                          display:"flex",flexDirection:"column",gap:3}}>
+                          {awayFromSess.map(m=>{
+                            const abs=(m.absences||[]).find(a=>a.from<=date&&a.to>=date);
+                            return (
+                              <div key={m.id} style={{display:"flex",alignItems:"center",
+                                gap:6,fontSize:12}}>
+                                <span style={{color:"#fbbf24"}}>✈️</span>
+                                <span style={{fontWeight:700,color:G.text}}>{m.name}</span>
+                                <span style={{fontSize:10,padding:"1px 7px",borderRadius:20,
+                                  fontWeight:700,
+                                  background:catBg[abs?.category]||"#f3f4f6",
+                                  color:catColour[abs?.category]||G.muted}}>
+                                  {abs?.category||"Away"}
+                                </span>
+                                {(isAdmin||isCoach)&&abs?.note&&(
+                                  <span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>
+                                    "{abs.note}"
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+        <BotNav view="schedule" setView={setView} userRole={userRole}
           pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
         {toast&&<Toast msg={toast}/>}
       </Shell>
