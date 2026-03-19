@@ -508,57 +508,6 @@ const DIVISION_TEAMS = {
   "Pronit Lahiri":         "Div 4",
 };
 
-// ─── T20 Squads 2026 ─────────────────────────────────────────
-// Separate tournament — mixed squads not tied to division groups.
-const T20_SQUADS = {
-  "T20 Serie 4": {
-    captain: "Syed Hamza Kazmi",
-    vc:      "Ashwin Shankar",
-    nameMap: {
-      "Chuchendra Durgesh Mattaparthi": "Durgesh",
-      "Balaji Ramdas":                  "Balaji R",
-    },
-    // Genuinely new — not in EMAIL_SEED or existing member list
-    newMembers: [
-      {name:"Virendra Pawar",      teams:["T20 Serie 4"]},
-      {name:"Muhammad Aun Zaheer", teams:["T20 Serie 4"]},
-    ],
-    members: [
-      "Dhruv Shah","Ashwin Shankar","Rewanth Punna","Syed Hamza Kazmi",
-      "Garghi Seenevas","Adithya Manimaran","Anirudh Ram Sriram","Vinay Kumar",
-      "Stalin Natesan","Virendra Pawar","Vijay Deepak","Muhammad Aun Zaheer",
-      "Chuchendra Durgesh Mattaparthi","Nimesh Rajamohanan","Deepak Akar",
-      "Nitin Jain","Balaji Ramdas","Reuben Dayal",
-    ],
-  },
-  "T20 Serie 5": {
-    captain: "Aurangzeb Pirzada",
-    vc:      "Vivek Satyarthi",
-    nameMap: {
-      "Aurangzeb Pirzada":              "Zeb Pirzada",        // Zeb is his preferred name in app
-      "Arunkumar Krishnamurthy":        "Arun Krishnamurthy", // already in system
-      "Arun Shankar Ambadipudi":        "Arun Shankar",       // already in system
-      "Jayashwanth Jeganathan Subhashini": "Jayashwanth J S", // already in system
-    },
-    // Genuinely new — not in EMAIL_SEED or existing member list
-    newMembers: [
-      {name:"Aniket Rao",               teams:["T20 Serie 5"]}, // different from Aniket Sharma (U11 coach)
-      {name:"Muhammad Junaid",          teams:["T20 Serie 5"]},
-      {name:"Dantuluri Venkatakrishna", teams:["T20 Serie 5"]}, // different from Saatvik Dantuluri
-      {name:"Vivek Bhatnagar",          teams:["T20 Serie 5"]}, // different from Vivek Satyarthi
-      {name:"Sagar Sachdeva",           teams:["T20 Serie 5"]}, // different from Sagar Gupta
-    ],
-    members: [
-      "Aniket Rao","Muhammad Junaid","Ahmed Nawaz","Prithvi Sagar","Sahil Gagneja",
-      "Dantuluri Venkatakrishna","Arunkumar Krishnamurthy","Vivek Bhatnagar",
-      "Amit Yadav","Gagan Sachdeva","Shreyas Gujjar","Nirmal Mohanan",
-      "Monesh Shantharam","Shashank Rastogi","Aurangzeb Pirzada",
-      "Rajkumar Jeyaraman","Sagar Sachdeva","Vivek Satyarthi",
-      "Arun Shankar Ambadipudi","Jayashwanth Jeganathan Subhashini","Shardul Joshi",
-    ],
-  },
-};
-
 // ─── Email seed (from uniform order form) ────────────────────
 // Used to pre-populate member emails via admin "Seed Emails" button.
 // Also used for first-time login verification for members who have no email yet.
@@ -2535,9 +2484,16 @@ export default function App() {
         const initialSessions = sr.exists() ? JSON.parse(sr.data().value) : [];
         setSessions(initialSessions);
         sessionsRef.current = initialSessions;
-        const initialMembers = mr.exists() ? JSON.parse(mr.data().value).map(normMember) : SEED_MEMBERS.map(normMember);
+        let initialMembers = mr.exists() ? JSON.parse(mr.data().value).map(normMember) : SEED_MEMBERS.map(normMember);
+        // Clean out legacy T20 tags to avoid duplicates with manual groups
+        initialMembers = initialMembers.map(m => {
+          if (!m.teams) return m;
+          const filtered = m.teams.filter(t => !t.startsWith("T20 Serie 4") && !t.startsWith("T20 Serie 5"));
+          return filtered.length === m.teams.length ? m : { ...m, teams: filtered };
+        });
         setMembers(initialMembers);
         membersRef.current = initialMembers;
+        if (mr.exists()) setDoc(doc(db,"fccnets","members"), {value:JSON.stringify(initialMembers)}).catch(()=>{});
         setPins(        pr.exists() ? JSON.parse(pr.data().value) : {});
         // Merge coaches from DEFAULT_TEAMS into stored teams (adds coaches field if missing)
         const storedTeams = tr.exists() ? JSON.parse(tr.data().value) : DEFAULT_TEAMS;
@@ -2609,7 +2565,7 @@ export default function App() {
     const toAdd = [];
     recurring.forEach(slot=>{
       if(!slot.enabled) return;
-      for(let i=0; i<=21; i++){
+      for(let i=0; i<=28; i++){
         const d = new Date(today); d.setDate(today.getDate()+i);
         if(d.getDay() !== slot.day) continue;
         const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
@@ -2695,10 +2651,10 @@ export default function App() {
     const seedEmail = EMAIL_SEED[member.name];
     const storedEmail = member.email;
     const hasInviteCode = !!freshCodes[member.id];
-    if(seedEmail || storedEmail) {
-      setAuthView("verifyemail");
-    } else if(hasInviteCode) {
+    if(hasInviteCode) {
       setAuthView("verifycode");
+    } else if(seedEmail || storedEmail) {
+      setAuthView("verifyemail");
     } else {
       // No email, no invite code — account not set up yet, block access
       setAuthView("blocked");
@@ -6925,75 +6881,6 @@ export default function App() {
       showToast(`Division teams assigned ✓`);
     }
 
-    // ── T20 squad import ───────────────────────────────────────
-    function resolvedName(squadName, teamKey) {
-      const map = T20_SQUADS[teamKey]?.nameMap||{};
-      return map[squadName]||squadName;
-    }
-
-    function computeT20Updates() {
-      const results = {};
-      Object.entries(T20_SQUADS).forEach(([teamKey,squad])=>{
-        const toAddTeam=[];  // existing members missing this T20 team
-        const toCreate=[];   // genuinely new members
-        const roleUpdates=[]; // captain/VC role changes
-
-        squad.members.forEach(rawName=>{
-          const appName = resolvedName(rawName, teamKey);
-          const existing = members.find(m=>m.name===appName);
-          if(existing) {
-            if(!(existing.teams||[]).includes(teamKey))
-              toAddTeam.push(existing);
-            // captain/vc role
-            if(appName===squad.captain && existing.role==="member")
-              roleUpdates.push({member:existing, role:"captain"});
-            if(appName===squad.vc && existing.role==="member")
-              roleUpdates.push({member:existing, role:"vicecaptain"});
-          } else {
-            // only create if in newMembers list
-            const nm=(squad.newMembers||[]).find(n=>n.name===rawName||n.name===appName);
-            if(nm) toCreate.push(nm);
-          }
-        });
-        results[teamKey]={toAddTeam,toCreate,roleUpdates};
-      });
-      return results;
-    }
-
-    function applyT20Squads() {
-      const updates = computeT20Updates();
-      let updatedMembers = [...members];
-      let created=0, teamsAdded=0, rolesSet=0;
-
-      Object.entries(updates).forEach(([teamKey,{toAddTeam,toCreate,roleUpdates}])=>{
-        // Add T20 team to existing members
-        updatedMembers = updatedMembers.map(m=>{
-          if(toAddTeam.find(x=>x.id===m.id))
-            return normMember({...m, teams:[...(m.teams||[]),teamKey]});
-          return m;
-        });
-        teamsAdded += toAddTeam.length;
-
-        // Apply role updates
-        updatedMembers = updatedMembers.map(m=>{
-          const ru=roleUpdates.find(r=>r.member.id===m.id);
-          if(ru) { rolesSet++; return {...m, role:ru.role}; }
-          return m;
-        });
-
-        // Create new members
-        toCreate.forEach(nm=>{
-          updatedMembers.push(normMember({id:uid(),...nm}));
-          created++;
-        });
-      });
-
-      saveMembers(updatedMembers);
-      logAction("system",`T20 squad import: ${teamsAdded} team assignments, ${created} new members, ${rolesSet} roles set`);
-      showToast(`T20 squads imported ✓  · ${teamsAdded} updated · ${created} new`);
-    }
-
-    const t20Updates = userRole==="superadmin" ? computeT20Updates() : {};
     return (
     <Shell>
       <AppHeader title="Manage Members"
@@ -8171,53 +8058,6 @@ export default function App() {
           </div>
         )}
 
-        {/* T20 squad import banner */}
-        {userRole==="superadmin"&&(()=>{
-          const totalNew    = Object.values(t20Updates).reduce((n,v)=>n+v.toCreate.length,0);
-          const totalUpdate = Object.values(t20Updates).reduce((n,v)=>n+v.toAddTeam.length,0);
-          const totalRoles  = Object.values(t20Updates).reduce((n,v)=>n+v.roleUpdates.length,0);
-          if(totalNew+totalUpdate+totalRoles===0) return (
-            <div style={{background:"#f0fdf4",border:"1.5px solid #86efac",
-              borderRadius:12,padding:"12px 14px",marginBottom:16,
-              fontSize:12,color:"#166534",fontWeight:700}}>
-              ✅ T20 Serie 4 &amp; 5 squads fully synced
-            </div>
-          );
-          return (
-            <div style={{background:"#fffbeb",border:"1.5px solid #fde68a",
-              borderRadius:12,padding:"14px 16px",marginBottom:16}}>
-              <div style={{fontWeight:900,fontSize:13,color:"#92400e",marginBottom:6}}>
-                🏆 T20 Serie 4 &amp; 5 — Squad import ready
-              </div>
-              <div style={{fontSize:12,color:"#78350f",marginBottom:10,lineHeight:1.6}}>
-                {totalUpdate>0&&<div>➕ <b>{totalUpdate}</b> existing members will get T20 team added</div>}
-                {totalNew>0&&<div>🆕 <b>{totalNew}</b> new members will be created</div>}
-                {totalRoles>0&&<div>🏆 <b>{totalRoles}</b> captain/VC roles will be set</div>}
-              </div>
-              {Object.entries(t20Updates).map(([teamKey,{toAddTeam,toCreate,roleUpdates}])=>(
-                (toAddTeam.length+toCreate.length+roleUpdates.length)>0&&(
-                  <div key={teamKey} style={{fontSize:11,background:"#78350f",color:"#fde68a",
-                    borderRadius:7,padding:"7px 10px",marginBottom:8,lineHeight:1.8}}>
-                    <b>{teamKey}:</b>{" "}
-                    {[
-                      ...toAddTeam.map(m=>m.name+" → add team"),
-                      ...toCreate.map(m=>m.name+" (new)"),
-                      ...roleUpdates.map(r=>r.member.name+" → "+r.role),
-                    ].join(" · ")}
-                  </div>
-                )
-              ))}
-              <div style={{fontSize:11,color:"#92400e",marginBottom:10,lineHeight:1.5}}>
-                ⚠️ Aurangzeb Pirzada is new — check if they're in U15/U18 and assign youth team manually after import.
-                No existing data will be overwritten.
-              </div>
-              <Btn bg="#92400e" col="#fde68a" onClick={applyT20Squads}>
-                Import T20 Squads
-              </Btn>
-            </div>
-          );
-        })()}
-
         </>}
 
         {/* ── Audit Log (superadmin only) ───────────────────── */}
@@ -8548,8 +8388,8 @@ export default function App() {
                     {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&pins[m.id]&&(
                       <Btn onClick={()=>resetPin(m.id)} bg={G.amberBg} col={G.amber} sm>🔑 Reset PIN</Btn>
                     )}
-                    {/* Invite code — only for members with no email and no PIN yet, and no existing code */}
-                    {can(userRole,"resetOtherPin")&&!pins[m.id]&&!m.email&&!EMAIL_SEED[m.name]&&!inviteCodes[m.id]&&(
+                    {/* Invite code — for members with no PIN and no active code */}
+                    {can(userRole,"resetOtherPin")&&!pins[m.id]&&!inviteCodes[m.id]&&(
                       <Btn sm bg="#f0f9ff" col="#0369a1"
                         onClick={()=>{
                           const code = generateInviteCode(m.id);
