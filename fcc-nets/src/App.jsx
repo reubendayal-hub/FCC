@@ -6907,7 +6907,7 @@ export default function App() {
       </Shell>
     );
   }
-
+  view = "availability";   // ← TEMP FORCE FOR TESTING
   // ════════════════════════════════════════════════════════════
   // RENDER: Help & Contact
   // ════════════════════════════════════════════════════════════
