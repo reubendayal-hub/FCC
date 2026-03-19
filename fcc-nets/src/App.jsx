@@ -9430,7 +9430,7 @@ export default function App() {
                             display: "flex", gap: 4, background: G.cream, borderRadius: 20,
                             padding: 3, border: `1px solid ${G.border}`
                         }}>
-                            {[["flat", "All Members 👥"], ["teams", "≡ By Team"]].map(([mode, label]) => (
+                            {[["flat", "≡ All Members"], ["teams", "👥 By Team"]].map(([mode, label]) => (
                                 <button key={mode} onClick={() => setAdminListMode(mode)}
                                     style={{
                                         padding: "5px 12px", borderRadius: 17, border: "none", cursor: "pointer",
@@ -9444,7 +9444,7 @@ export default function App() {
                         </div>
                     </div>
 
-                    {/* Flat "All Members" view — DEFAULT + email/phone editing */}
+                    {/* ── Flat "All Members" view (default + modern design) ──────────────────────────── */}
                     {adminListMode === "flat" && (() => {
                         const flatList = members
                             .filter(m => {
@@ -9453,82 +9453,94 @@ export default function App() {
                                 return q && t;
                             })
                             .sort((a, b) => a.name.localeCompare(b.name));
+
                         return (
                             <div style={{
-                                display: "flex", flexDirection: "column", gap: 0,
-                                background: G.white, border: `1.5px solid ${G.border}`, borderRadius: 14,
-                                overflow: "hidden"
+                                display: "flex", flexDirection: "column", gap: 12,
+                                background: G.white, border: `1.5px solid ${G.border}`, borderRadius: 16,
+                                padding: "12px"
                             }}>
                                 {flatList.length === 0 && (
-                                    <div style={{ padding: "20px", textAlign: "center", color: G.muted, fontSize: 13 }}>
-                                        No members match
+                                    <div style={{ padding: "40px 20px", textAlign: "center", color: G.muted }}>
+                                        No members found
                                     </div>
                                 )}
-                                {flatList.map((m, i) => {
+
+                                {flatList.map(m => {
                                     const rm = ROLE_META[m.role || "member"];
-                                    const teamChips = (m.teams || []).slice(0, 3);
+                                    const teamChips = (m.teams || []).slice(0, 4);
+
                                     return (
                                         <div key={m.id} style={{
-                                            padding: "12px 14px", borderBottom: i < flatList.length - 1 ? `1px solid ${G.border}` : "none"
+                                            background: "#f8fafc", borderRadius: 14, padding: "16px",
+                                            border: `1px solid ${G.border}`, boxShadow: "0 2px 8px rgba(0,0,0,0.05)"
                                         }}>
-                                            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                                                <div style={{ flex: 1 }}>
-                                                    <div style={{ fontWeight: 700, fontSize: 15, color: G.text }}>{m.name}</div>
+                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                                                <div>
+                                                    <div style={{ fontSize: 17, fontWeight: 700, color: G.text }}>{m.name}</div>
+                                                    {rm && m.role !== "member" && <RolePill role={m.role} />}
                                                 </div>
-                                                {rm && m.role !== "member" && <RolePill role={m.role} />}
+                                                {can(userRole, "removeMember") && m.id !== currentUser.id && (
+                                                    <button onClick={() => setConfirmDelete(m)} style={{ color: G.red, fontSize: 20 }}>×</button>
+                                                )}
                                             </div>
 
                                             {/* Email Row */}
-                                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                                                <span style={{ fontSize: 12, color: G.muted, width: 55 }}>Email:</span>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
+                                                <span style={{ fontSize: 13, color: G.muted, width: 55 }}>Email</span>
                                                 {editingEmail?.id === m.id ? (
-                                                    <input autoFocus style={{ ...iSt({ flex: 1, padding: "5px 8px", fontSize: 13 }) }}
+                                                    <input autoFocus style={{ flex: 1, ...iSt({ padding: "6px 10px", fontSize: 13 }) }}
                                                         value={editingEmail.value}
                                                         onChange={e => setEditingEmail({ ...editingEmail, value: e.target.value })}
                                                         onBlur={() => {
                                                             if (editingEmail.value !== m.email) {
                                                                 const updated = members.map(x => x.id === m.id ? { ...x, email: editingEmail.value } : x);
                                                                 saveMembers(updated);
+                                                                showToast("✅ Email updated");
                                                             }
                                                             setEditingEmail(null);
-                                                        }}
-                                                        onKeyDown={e => e.key === "Enter" && e.target.blur()} />
+                                                        }} />
                                                 ) : (
-                                                    <div style={{ flex: 1, fontSize: 13, color: m.email ? G.text : G.muted }}>
+                                                    <div style={{ flex: 1, fontSize: 13, color: m.email ? G.text : "#94a3b8" }}>
                                                         {m.email || "—"}
-                                                        {can(userRole, "addMember") && <button onClick={() => setEditingEmail({ id: m.id, value: m.email || "" })} style={{ marginLeft: 8, fontSize: 11, color: G.mid }}>✏️</button>}
+                                                        {can(userRole, "addMember") && (
+                                                            <button onClick={() => setEditingEmail({ id: m.id, value: m.email || "" })} style={{ marginLeft: 8, fontSize: 12, color: G.mid }}>✏️</button>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
 
                                             {/* Phone Row */}
-                                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                                <span style={{ fontSize: 12, color: G.muted, width: 55 }}>Phone:</span>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8 }}>
+                                                <span style={{ fontSize: 13, color: G.muted, width: 55 }}>Phone</span>
                                                 {editingPhone?.id === m.id ? (
-                                                    <input autoFocus style={{ ...iSt({ flex: 1, padding: "5px 8px", fontSize: 13 }) }}
+                                                    <input autoFocus style={{ flex: 1, ...iSt({ padding: "6px 10px", fontSize: 13 }) }}
                                                         value={editingPhone.value}
                                                         onChange={e => setEditingPhone({ ...editingPhone, value: e.target.value })}
                                                         onBlur={() => {
                                                             if (editingPhone.value !== m.phone) {
                                                                 const updated = members.map(x => x.id === m.id ? { ...x, phone: editingPhone.value } : x);
                                                                 saveMembers(updated);
+                                                                showToast("✅ Phone updated");
                                                             }
                                                             setEditingPhone(null);
-                                                        }}
-                                                        onKeyDown={e => e.key === "Enter" && e.target.blur()} />
+                                                        }} />
                                                 ) : (
-                                                    <div style={{ flex: 1, fontSize: 13, color: m.phone ? G.text : G.muted }}>
+                                                    <div style={{ flex: 1, fontSize: 13, color: m.phone ? G.text : "#94a3b8" }}>
                                                         {m.phone || "—"}
-                                                        {can(userRole, "addMember") && <button onClick={() => setEditingPhone({ id: m.id, value: m.phone || "" })} style={{ marginLeft: 8, fontSize: 11, color: G.mid }}>✏️</button>}
+                                                        {can(userRole, "addMember") && (
+                                                            <button onClick={() => setEditingPhone({ id: m.id, value: m.phone || "" })} style={{ marginLeft: 8, fontSize: 12, color: G.mid }}>✏️</button>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
 
-                                            {/* Team chips */}
-                                            <div style={{ marginTop: 10 }}>
-                                                <div style={{ fontSize: 10, color: G.muted, marginBottom: 4 }}>Teams</div>
-                                                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                                            {/* Teams */}
+                                            <div style={{ marginTop: 14 }}>
+                                                <div style={{ fontSize: 12, color: G.muted, marginBottom: 6 }}>Teams</div>
+                                                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                                                     {teamChips.map(t => <TeamPill key={t} team={t} sm />)}
+                                                    {(m.teams || []).length > 4 && <span style={{ fontSize: 11, color: G.muted }}>+{(m.teams || []).length - 4}</span>}
                                                 </div>
                                             </div>
                                         </div>
@@ -9537,6 +9549,11 @@ export default function App() {
                             </div>
                         );
                     })()}
+
+                    {/* ── Team view (unchanged, just for completeness) ──────────────────────────── */}
+                    {adminListMode === "teams" && Object.entries(adminGrouped).map(([team, list]) => {
+                        // (your existing team view code stays exactly the same)
+                    })}
 
                     {/* Team view — unchanged except for the toggle label */}
                     {adminListMode === "teams" && Object.entries(adminGrouped).map(([team, list]) => {
