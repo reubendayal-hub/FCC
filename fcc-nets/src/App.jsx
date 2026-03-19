@@ -233,7 +233,18 @@ const ALL_FIXTURES = [
   { date: "2026-08-01", label: "U18 @ Svanholm U18", division: "U18", home: false },
   { date: "2026-09-12", label: "U18 vs Glostrup U18", division: "U18", home: true },
 ]
-
+// ─── Coach Map (from your Excel "Coach and Mentor" sheet) ─────
+const COACH_MAP = {
+  "2026-05-09": "Reuben",
+  "2026-05-31": "To be planned",
+  "2026-06-21": "Reuben",
+  "2026-08-16": "Reuben",
+  "2026-09-20": "Reuben",
+  // You can expand this later with all 80+ coaches from the Excel
+  // Example:
+  // "2026-04-26": "Zeb",
+  // "2026-05-02": "Arun",
+};
 // Division → app team name mapping for filtering
 const DIVISION_TO_TEAM = {
   "Div 2": "Div 2", "Div 3": "Div 3", "Div 4": "Div 4",
@@ -7543,7 +7554,53 @@ export default function App() {
       </Shell>
     );
   }
+  if (view === "availability" && ["captain", "vicecaptain", "t20captain", "t20vicecaptain", "admin", "superadmin"].includes(userRole)) {
+    const fullSchedule = ALL_FIXTURES
+      .map(f => ({ ...f, coach: COACH_MAP[f.date] || "—" }))
+      .sort((a, b) => a.date.localeCompare(b.date));
 
+    return (
+      <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
+        currentUser={currentUser} onLogout={handleLogout} />}>
+        <AppHeader
+          title="Team Availability"
+          sub="Full 2026 Schedule + Coaches (Captains & Admins only)"
+          onBack={() => setView("schedule")}
+        />
+
+        <div style={{ padding: "14px 16px 100px" }}>
+          {fullSchedule.map((m, i) => (
+            <div key={i} style={{
+              background: G.white,
+              border: `1.5px solid ${G.border}`,
+              borderRadius: 12,
+              padding: "14px",
+              marginBottom: 12,
+              boxShadow: "0 2px 8px rgba(0,0,0,.06)"
+            }}>
+              <div style={{ fontWeight: 900, fontSize: 16, color: G.text, marginBottom: 4 }}>
+                {fmtLong(m.date)}
+              </div>
+              <div style={{ fontSize: 14, color: G.muted, marginBottom: 8 }}>
+                {m.label} • {m.division}
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: G.green }}>
+                Coach: {m.coach}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <BotNav
+          view="availability"
+          setView={setView}
+          userRole={userRole}
+          pendingCount={joinRequests.filter(r => r.status === "pending").length}
+        />
+        {toast && <Toast msg={toast} />}
+      </Shell>
+    );
+  }
   if (view === "admin" && can(userRole, "accessMembers")) {
     const namesNeedFix = userRole === "superadmin"
       ? members.filter(m => !m.name.includes(" ") && NAME_MAP[m.name])
