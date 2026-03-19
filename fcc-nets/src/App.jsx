@@ -7556,27 +7556,22 @@ export default function App() {
   }
   if (view === "availability") {
     return (
-      <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
-        currentUser={currentUser} onLogout={handleLogout} />}>
-        <AppHeader
-          title="Team Availability"
-          sub="TEST MODE — If you see this green text, the page works!"
-          onBack={() => setView("schedule")}
-        />
-
-        <div style={{ padding: "100px 20px", textAlign: "center", fontSize: "24px", fontWeight: "900", color: "#166534" }}>
-          ✅ TEAM AVAILABILITY PAGE IS NOW WORKING!<br /><br />
-          (This proves the view loads. We'll add the real list in the next step.)
-        </div>
-
-        <BotNav
-          view="availability"
-          setView={setView}
-          userRole={userRole}
-          pendingCount={joinRequests.filter(r => r.status === "pending").length}
-        />
-        {toast && <Toast msg={toast} />}
-      </Shell>
+      <div style={{
+        padding: "120px 20px",
+        textAlign: "center",
+        fontSize: "28px",
+        fontWeight: "900",
+        color: "#166534",
+        background: "#f0fdf4",
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      }}>
+        ✅ TEST SUCCESS<br /><br />
+        TEAM AVAILABILITY PAGE IS WORKING<br /><br />
+        (If you see this green box, the view works. We just need to add the real list next.)
+      </div>
     );
   }
   if (view === "admin" && can(userRole, "accessMembers")) {
