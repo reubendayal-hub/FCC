@@ -9430,7 +9430,7 @@ export default function App() {
                             display: "flex", gap: 4, background: G.cream, borderRadius: 20,
                             padding: 3, border: `1px solid ${G.border}`
                         }}>
-                            {[["flat", "≡ All Members"], ["teams", "👥 By Team"]].map(([mode, label]) => (
+                            {[["flat", "All Members 👥"], ["teams", "≡ By Team"]].map(([mode, label]) => (
                                 <button key={mode} onClick={() => setAdminListMode(mode)}
                                     style={{
                                         padding: "5px 12px", borderRadius: 17, border: "none", cursor: "pointer",
