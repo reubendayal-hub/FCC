@@ -7555,43 +7555,18 @@ export default function App() {
     );
   }
   if (view === "availability") {
-    const fullSchedule = ALL_FIXTURES
-      .map(f => ({
-        ...f,
-        coach: COACH_MAP[f.date] || "—"
-      }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-
     return (
       <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
         currentUser={currentUser} onLogout={handleLogout} />}>
         <AppHeader
           title="Team Availability"
-          sub="Full 2026 Schedule + Coaches"
+          sub="TEST MODE — If you see this green text, the page works!"
           onBack={() => setView("schedule")}
         />
 
-        <div style={{ padding: "14px 16px 100px" }}>
-          {fullSchedule.map((m, i) => (
-            <div key={i} style={{
-              background: G.white,
-              border: `1.5px solid ${G.border}`,
-              borderRadius: 12,
-              padding: "14px",
-              marginBottom: 12,
-              boxShadow: "0 2px 8px rgba(0,0,0,.06)"
-            }}>
-              <div style={{ fontWeight: 900, fontSize: 16, color: G.text, marginBottom: 4 }}>
-                {fmtLong(m.date)}
-              </div>
-              <div style={{ fontSize: 14, color: G.muted, marginBottom: 8 }}>
-                {m.label} • {m.division}
-              </div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: G.green }}>
-                Coach: {m.coach}
-              </div>
-            </div>
-          ))}
+        <div style={{ padding: "100px 20px", textAlign: "center", fontSize: "24px", fontWeight: "900", color: "#166534" }}>
+          ✅ TEAM AVAILABILITY PAGE IS NOW WORKING!<br /><br />
+          (This proves the view loads. We'll add the real list in the next step.)
         </div>
 
         <BotNav
