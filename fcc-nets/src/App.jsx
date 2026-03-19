@@ -7554,41 +7554,19 @@ export default function App() {
       </Shell>
     );
   }
-  if (view === "availability" && ["captain", "vicecaptain", "t20captain", "t20vicecaptain", "admin", "superadmin"].includes(userRole)) {
-    const fullSchedule = ALL_FIXTURES
-      .map(f => ({ ...f, coach: COACH_MAP[f.date] || "—" }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-
+  if (view === "availability") {
     return (
       <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
         currentUser={currentUser} onLogout={handleLogout} />}>
         <AppHeader
           title="Team Availability"
-          sub="Full 2026 Schedule + Coaches (Captains & Admins only)"
+          sub="TEST MODE - If you see this, it works!"
           onBack={() => setView("schedule")}
         />
 
-        <div style={{ padding: "14px 16px 100px" }}>
-          {fullSchedule.map((m, i) => (
-            <div key={i} style={{
-              background: G.white,
-              border: `1.5px solid ${G.border}`,
-              borderRadius: 12,
-              padding: "14px",
-              marginBottom: 12,
-              boxShadow: "0 2px 8px rgba(0,0,0,.06)"
-            }}>
-              <div style={{ fontWeight: 900, fontSize: 16, color: G.text, marginBottom: 4 }}>
-                {fmtLong(m.date)}
-              </div>
-              <div style={{ fontSize: 14, color: G.muted, marginBottom: 8 }}>
-                {m.label} • {m.division}
-              </div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: G.green }}>
-                Coach: {m.coach}
-              </div>
-            </div>
-          ))}
+        <div style={{ padding: "80px 20px", textAlign: "center", fontSize: "22px", color: "#166534", fontWeight: "900" }}>
+          ✅ TEAM AVAILABILITY PAGE IS NOW LOADING!<br /><br />
+          (This proves the view works. We'll add the real list next.)
         </div>
 
         <BotNav
