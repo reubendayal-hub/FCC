@@ -112,7 +112,7 @@ export default async function handler(req, res) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "FCC Training <notifications@fredensborgcricket.dk>",
+        from: "FCC Training <onboarding@resend.dev>",
         to: ["reuben.dayal@gmail.com"],
         subject,
         html,
