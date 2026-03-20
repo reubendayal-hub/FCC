@@ -750,6 +750,15 @@ function isCoachMember(name, teams) {
   return (teams||[]).some(t=>(t.coaches||[]).includes(name));
 }
 
+// maskEmail: show first 2 + last 2 chars of local part for recognition
+function maskEmail(email) {
+  if(!email) return '';
+  const [local, domain] = email.split('@');
+  if(!domain) return email;
+  if(local.length <= 4) return email; // too short to mask meaningfully
+  return local.slice(0,2) + '•'.repeat(Math.max(local.length-4,2)) + local.slice(-2) + '@' + domain;
+}
+
 // isAbsent(member, dateStr) — true if member has an absence covering this date
 function isAbsent(member, dateStr) {
   return (member?.absences||[]).some(a=>a.from<=dateStr && a.to>=dateStr);
@@ -2429,8 +2438,9 @@ export default function App() {
   const [newPhone, setNewPhone] = useState("");
   const [aSearch,  setASearch]  = useState("");
   const [aFilter,  setAFilter]  = useState("All");
-  const [adminListMode, setAdminListMode] = useState("teams"); // "teams" | "flat"
-  const [expandedSessions, setExpandedSessions] = useState({}); // {sessionId: bool}
+  const [adminListMode, setAdminListMode] = useState("flat"); // "teams" | "flat" — flat by default
+  const [selMember, setSelMember] = useState(null); // member selected in flat view
+  const [expandedSessions, setExpandedSessions] = useState({});
   const [editingRole, setEditingRole] = useState(null);
 
   // Team management state
@@ -4126,7 +4136,7 @@ export default function App() {
       const e = EMAIL_SEED[pendingMember?.name||""] || (pendingMember?.email||"");
       if(!e) return null;
       const [local, domain] = e.split("@");
-      const shown = local.slice(0,2) + "•".repeat(Math.max(local.length-2,2));
+      const shown = maskEmail(email);
       return shown + "@" + domain;
     })();
     return (
@@ -8548,44 +8558,158 @@ export default function App() {
               {flatList.map((m,i)=>{
                 const rm=ROLE_META[m.role||"member"];
                 const teamChips=(m.teams||[]).slice(0,3);
+                const isExpanded = selMember?.id===m.id;
                 return (
-                  <div key={m.id} onClick={()=>setSelMember(m)}
-                    style={{display:"flex",alignItems:"center",gap:10,
-                      padding:"10px 14px",cursor:"pointer",
-                      borderBottom:i<flatList.length-1?`1px solid ${G.border}`:"none",
-                      background:"transparent",transition:"background .1s"}}
-                    onMouseEnter={e=>e.currentTarget.style.background=G.cream}
-                    onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                    <div style={{width:32,height:32,borderRadius:"50%",
-                      background:`${rm?.bg||G.green}22`,
-                      display:"flex",alignItems:"center",justifyContent:"center",
-                      fontSize:10,fontWeight:900,color:rm?.bg||G.green,flexShrink:0}}>
-                      {m.name.split(" ").map(w=>w[0]).join("").slice(0,2)}
-                    </div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                        <span style={{fontWeight:700,fontSize:13,color:G.text}}>{m.name}</span>
-                        {rm&&m.role!=="member"&&<span style={{fontSize:9,padding:"1px 6px",
-                          borderRadius:20,background:rm.bg,color:rm.text,fontWeight:700}}>
-                          {rm.icon} {rm.label}
-                        </span>}
+                  <div key={m.id}>
+                    {/* Member row */}
+                    <div onClick={()=>setSelMember(isExpanded?null:m)}
+                      style={{display:"flex",alignItems:"center",gap:10,
+                        padding:"10px 14px",cursor:"pointer",
+                        borderBottom:(!isExpanded&&i<flatList.length-1)?`1px solid ${G.border}`:"none",
+                        background:isExpanded?`${G.green}08`:"transparent",
+                        transition:"background .1s"}}
+                      onMouseEnter={e=>{if(!isExpanded)e.currentTarget.style.background=G.cream}}
+                      onMouseLeave={e=>{if(!isExpanded)e.currentTarget.style.background="transparent"}}>
+                      <div style={{width:32,height:32,borderRadius:"50%",
+                        background:`${rm?.bg||G.green}22`,
+                        display:"flex",alignItems:"center",justifyContent:"center",
+                        fontSize:10,fontWeight:900,color:rm?.bg||G.green,flexShrink:0}}>
+                        {m.name.split(" ").map(w=>w[0]).join("").slice(0,2)}
                       </div>
-                      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:2}}>
-                        {teamChips.map(t=>{
-                          const tm=getTeamMeta(t);
-                          return <span key={t} style={{fontSize:9,padding:"1px 6px",
-                            borderRadius:20,background:tm.bg,color:tm.text,fontWeight:700}}>
-                            {t}
-                          </span>;
-                        })}
-                        {(m.teams||[]).length>3&&<span style={{fontSize:9,color:G.muted}}>
-                          +{(m.teams||[]).length-3}
-                        </span>}
-                        {(m.teams||[]).length===0&&<span style={{fontSize:9,color:G.muted,
-                          fontStyle:"italic"}}>Unassigned</span>}
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                          <span style={{fontWeight:700,fontSize:13,color:G.text}}>{m.name}</span>
+                          {rm&&m.role!=="member"&&<span style={{fontSize:9,padding:"1px 6px",
+                            borderRadius:20,background:rm.bg,color:rm.text,fontWeight:700}}>
+                            {rm.icon} {rm.label}
+                          </span>}
+                        </div>
+                        <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:2}}>
+                          {teamChips.map(t=>{
+                            const tm=getTeamMeta(t);
+                            return <span key={t} style={{fontSize:9,padding:"1px 6px",
+                              borderRadius:20,background:tm.bg,color:tm.text,fontWeight:700}}>
+                              {t}
+                            </span>;
+                          })}
+                          {(m.teams||[]).length>3&&<span style={{fontSize:9,color:G.muted}}>
+                            +{(m.teams||[]).length-3}
+                          </span>}
+                          {(m.teams||[]).length===0&&<span style={{fontSize:9,color:G.muted,
+                            fontStyle:"italic"}}>Unassigned</span>}
+                        </div>
                       </div>
+                      <span style={{color:G.muted,fontSize:14,transition:"transform .15s",
+                        transform:isExpanded?"rotate(90deg)":"rotate(0deg)"}}>›</span>
                     </div>
-                    <span style={{color:G.muted,fontSize:14}}>›</span>
+
+                    {/* Expanded detail */}
+                    {isExpanded&&(
+                      <div style={{background:G.cream,borderBottom:`1px solid ${G.border}`,
+                        padding:"12px 14px",display:"flex",flexDirection:"column",gap:8}}>
+
+                        {/* Contact */}
+                        {editingName?.id===m.id+"_contact_flat" ? (
+                          <div style={{background:G.white,borderRadius:8,padding:"10px 12px",
+                            border:`1px solid ${G.border}`}}>
+                            <div style={{fontSize:10,fontWeight:800,color:G.muted,letterSpacing:1.2,
+                              textTransform:"uppercase",marginBottom:8}}>Edit Contact</div>
+                            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                              <input type="email" placeholder="Email"
+                                value={editingName.email||""}
+                                onChange={e=>setEditingName({...editingName,email:e.target.value})}
+                                style={iSt({fontSize:12,padding:"6px 10px",borderRadius:7})}/>
+                              <input type="tel" placeholder="Phone"
+                                value={editingName.phone||""}
+                                onChange={e=>setEditingName({...editingName,phone:e.target.value})}
+                                style={iSt({fontSize:12,padding:"6px 10px",borderRadius:7})}/>
+                              <div style={{fontSize:11,color:"#92400e",background:"#fffbeb",
+                                borderRadius:6,padding:"6px 8px",border:"1px solid #fde68a"}}>
+                                ⚠️ This will update {m.name.split(" ")[0]}'s contact details. Check before saving.
+                              </div>
+                              <div style={{display:"flex",gap:6}}>
+                                <button type="button" onClick={()=>{
+                                    const newEmail=(editingName.email||"").trim()||null;
+                                    const newPhone=(editingName.phone||"").trim()||null;
+                                    saveMembers(members.map(x=>x.id===m.id?{...x,email:newEmail,phone:newPhone}:x));
+                                    logAction("member",`Updated contact: ${m.name}`);
+                                    showToast(`✓ Saved for ${m.name.split(" ")[0]}`);
+                                    setSelMember({...m,email:newEmail,phone:newPhone});
+                                    setEditingName(null);
+                                  }}
+                                  style={{flex:1,background:G.green,color:G.lime,border:"none",
+                                    borderRadius:7,padding:"7px",fontSize:12,fontWeight:800,
+                                    cursor:"pointer",fontFamily:"inherit"}}>✓ Save</button>
+                                <button type="button" onClick={()=>setEditingName(null)}
+                                  style={{background:G.white,color:G.muted,border:`1px solid ${G.border}`,
+                                    borderRadius:7,padding:"7px 12px",fontSize:12,cursor:"pointer",
+                                    fontFamily:"inherit"}}>Cancel</button>
+                              </div>
+                            </div>
+                          </div>
+                        ):(
+                          <div style={{display:"flex",alignItems:"center",gap:8,
+                            padding:"8px 10px",background:G.white,borderRadius:8,
+                            border:`1px solid ${G.border}`}}>
+                            <div style={{flex:1,fontSize:12,display:"flex",flexDirection:"column",gap:3}}>
+                              <span style={{color:G.muted}}>
+                                📧 {m.email?<b style={{color:G.text}}>{maskEmail(m.email)}</b>:<em style={{color:"#d1d5db"}}>no email</em>}
+                              </span>
+                              <span style={{color:G.muted}}>
+                                📱 {m.phone?<b style={{color:G.text}}>{m.phone}</b>:<em style={{color:"#d1d5db"}}>no phone</em>}
+                              </span>
+                            </div>
+                            {can(userRole,"addMember")&&(
+                              <button type="button"
+                                onClick={()=>setEditingName({id:m.id+"_contact_flat",value:"",
+                                  email:m.email||"",phone:m.phone||""})}
+                                style={{background:"none",border:"none",cursor:"pointer",
+                                  color:G.muted,fontSize:13,padding:"2px 4px"}}>✏️</button>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Actions */}
+                        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                          {can(userRole,"assignRoles")&&(m.id!==currentUser.id||userRole==="superadmin")&&(
+                            <select value={m.role||"member"}
+                              onChange={e=>updateRole(m.id,e.target.value)}
+                              style={{border:`1px solid ${G.border}`,borderRadius:6,
+                                padding:"5px 8px",fontSize:11,fontFamily:"inherit",
+                                color:G.text,background:G.white,cursor:"pointer"}}>
+                              {userRole==="superadmin"&&<option value="superadmin">👑 Super Admin</option>}
+                              <option value="admin">👨🏻‍💻 Admin</option>
+                              {(m.teams||[]).some(t=>seniorTeamNames.includes(t)&&!t.startsWith("T20"))&&<>
+                                <option value="captain">👨‍✈️ Captain</option>
+                                <option value="vicecaptain">👷🏻‍♂️ Vice Captain</option>
+                              </>}
+                              {(m.teams||[]).some(t=>t.startsWith("T20"))&&<>
+                                <option value="t20captain">🦸‍♂️ T20 Captain</option>
+                                <option value="t20vicecaptain">🥷🏻 T20 Vice Captain</option>
+                              </>}
+                              <option value="member">🏏 Member</option>
+                            </select>
+                          )}
+                          {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&pins[m.id]&&(
+                            <Btn onClick={()=>resetPin(m.id)} bg={G.amberBg} col={G.amber} sm>🔑 Reset PIN</Btn>
+                          )}
+                          {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&!pins[m.id]&&m.email&&(
+                            <Btn onClick={()=>{generateInviteCode(m.id);showToast(`✓ New access code for ${m.name.split(" ")[0]}`);}}
+                              bg={G.amberBg} col={G.amber} sm>🔑 Reset Access</Btn>
+                          )}
+                          {can(userRole,"resetOtherPin")&&!pins[m.id]&&!m.email&&!inviteCodes[m.id]&&(
+                            <Btn sm bg="#f0f9ff" col="#0369a1" onClick={()=>{
+                                const code=generateInviteCode(m.id);
+                                setToast(`📋 ${m.name.split(" ")[0]}: ${code}`);
+                                setTimeout(()=>setToast(null),6000);
+                              }}>🎟️ Gen Code</Btn>
+                          )}
+                          {can(userRole,"removeMember")&&m.id!==currentUser.id&&(
+                            <Btn onClick={()=>setConfirmDelete(m)} bg={G.redBg} col={G.red} sm>× Remove</Btn>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -8693,6 +8817,76 @@ export default function App() {
 
                 {/* Bottom row: role pill + team chips + role dropdown + reset PIN */}
                 <div style={{display:"flex",flexDirection:"column",gap:8}}>
+
+                  {/* Contact details row */}
+                  {editingName?.id===m.id+"_contact" ? (
+                    <div style={{background:G.cream,borderRadius:8,padding:"10px 12px",
+                      border:`1px solid ${G.border}`}}>
+                      <div style={{fontSize:10,fontWeight:800,color:G.muted,letterSpacing:1.2,
+                        textTransform:"uppercase",marginBottom:8}}>Edit Contact Details</div>
+                      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                        <input type="email" placeholder="Email address"
+                          value={editingName.email||""}
+                          onChange={e=>setEditingName({...editingName,email:e.target.value})}
+                          style={iSt({fontSize:12,padding:"6px 10px",borderRadius:7})}/>
+                        <input type="tel" placeholder="Phone (+45 XX XX XX XX)"
+                          value={editingName.phone||""}
+                          onChange={e=>setEditingName({...editingName,phone:e.target.value})}
+                          style={iSt({fontSize:12,padding:"6px 10px",borderRadius:7})}/>
+                        <div style={{fontSize:11,color:"#92400e",background:"#fffbeb",
+                          borderRadius:6,padding:"6px 8px",border:"1px solid #fde68a"}}>
+                          ⚠️ Saving will update {m.name}'s contact details in the system.
+                          Make sure the information is correct before saving.
+                        </div>
+                        <div style={{display:"flex",gap:6}}>
+                          <button type="button"
+                            onClick={()=>{
+                              const newEmail=(editingName.email||"").trim()||null;
+                              const newPhone=(editingName.phone||"").trim()||null;
+                              const updated=members.map(x=>x.id===m.id?{...x,email:newEmail,phone:newPhone}:x);
+                              saveMembers(updated);
+                              logAction("member",`Updated contact: ${m.name} — email: ${newEmail||"none"}, phone: ${newPhone||"none"}`);
+                              showToast(`✓ Contact details saved for ${m.name.split(" ")[0]}`);
+                              setEditingName(null);
+                            }}
+                            style={{flex:1,background:G.green,color:G.lime,border:"none",
+                              borderRadius:7,padding:"7px",fontSize:12,fontWeight:800,
+                              cursor:"pointer",fontFamily:"inherit"}}>
+                            ✓ Save changes
+                          </button>
+                          <button type="button" onClick={()=>setEditingName(null)}
+                            style={{background:G.cream,color:G.muted,border:`1px solid ${G.border}`,
+                              borderRadius:7,padding:"7px 12px",fontSize:12,cursor:"pointer",
+                              fontFamily:"inherit"}}>Cancel</button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{display:"flex",alignItems:"center",gap:6,
+                      padding:"6px 8px",background:G.cream,borderRadius:7,
+                      border:`1px solid ${G.border}`}}>
+                      <div style={{flex:1,minWidth:0,display:"flex",gap:10,flexWrap:"wrap"}}>
+                        <span style={{fontSize:11,color:G.muted}}>
+                          📧 {m.email
+                            ? <b style={{color:G.text}}>{maskEmail(m.email)}</b>
+                            : <em style={{color:"#d1d5db"}}>no email</em>}
+                        </span>
+                        <span style={{fontSize:11,color:G.muted}}>
+                          📱 {m.phone
+                            ? <b style={{color:G.text}}>{m.phone}</b>
+                            : <em style={{color:"#d1d5db"}}>no phone</em>}
+                        </span>
+                      </div>
+                      {can(userRole,"addMember")&&(
+                        <button type="button"
+                          onClick={()=>setEditingName({id:m.id+"_contact",value:"",
+                            email:m.email||"",phone:m.phone||""})}
+                          style={{background:"none",border:"none",cursor:"pointer",
+                            color:G.muted,fontSize:12,padding:"2px 4px",flexShrink:0}}
+                          title="Edit email & phone">✏️</button>
+                      )}
+                    </div>
+                  )}
                   {/* Team chips */}
                   <div>
                     <div style={{fontSize:10,fontWeight:800,color:G.muted,
@@ -8726,23 +8920,34 @@ export default function App() {
                           padding:"4px 6px",fontSize:11,fontFamily:"inherit",
                           color:G.text,background:G.cream,cursor:"pointer"}}>
                         {userRole==="superadmin"&&<option value="superadmin">👑 Super Admin</option>}
-                        <option value="admin">🔧 Admin</option>
-                        {(m.teams||[]).some(t=>seniorTeamNames.includes(t))&&<>
-                          <option value="captain">🏆 Captain</option>
-                          <option value="vicecaptain">🥈 Vice Captain</option>
+                        <option value="admin">👨🏻‍💻 Admin</option>
+                        {(m.teams||[]).some(t=>seniorTeamNames.includes(t)&&!t.startsWith("T20"))&&<>
+                          <option value="captain">👨‍✈️ Captain</option>
+                          <option value="vicecaptain">👷🏻‍♂️ Vice Captain</option>
+                        </>}
+                        {(m.teams||[]).some(t=>t.startsWith("T20"))&&<>
+                          <option value="t20captain">🦸‍♂️ T20 Captain</option>
+                          <option value="t20vicecaptain">🥷🏻 T20 Vice Captain</option>
                         </>}
                         <option value="member">🏏 Member</option>
                       </select>
                     )}
+                    {/* Reset PIN — show for anyone with a PIN set */}
                     {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&pins[m.id]&&(
                       <Btn onClick={()=>resetPin(m.id)} bg={G.amberBg} col={G.amber} sm>🔑 Reset PIN</Btn>
                     )}
-                    {/* Invite code — only for members with no email and no PIN yet, and no existing code */}
+                    {/* Reset access for members with email but no PIN yet */}
+                    {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&!pins[m.id]&&m.email&&(
+                      <Btn onClick={()=>{
+                          generateInviteCode(m.id);
+                          showToast(`✓ New access code generated for ${m.name.split(" ")[0]}`);
+                        }} bg={G.amberBg} col={G.amber} sm>🔑 Reset Access</Btn>
+                    )}
+                    {/* Invite code — only for members with no email and no PIN yet */}
                     {can(userRole,"resetOtherPin")&&!pins[m.id]&&!m.email&&!EMAIL_SEED[m.name]&&!inviteCodes[m.id]&&(
                       <Btn sm bg="#f0f9ff" col="#0369a1"
                         onClick={()=>{
                           const code = generateInviteCode(m.id);
-                          // Show in a non-blocking overlay using the toast — slightly longer
                           setToast(`📋 Code for ${m.name.split(" ")[0]}: ${code} — share via WhatsApp`);
                           setTimeout(()=>setToast(null), 6000);
                         }}>
