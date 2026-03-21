@@ -3616,7 +3616,7 @@ export default function App() {
                 <div style={{fontSize:12,color:G.muted,marginBottom:10}}>
                   First time? Setting up your account?
                 </div>
-                <button onClick={()=>{setVfStep("search");setVfSearch("");setVfMatch(null);setVfEmail("");setVfPhone("");setVfCode("");setVfError("");setVfConsent(false);setVfIsParent(false);setAuthView("verify");}}
+                <button onClick={()=>{setVfStep("search");setVfSearch("");setVfMatch(null);setVfEmail("");setVfPhone("");setVfCode("");setVfError("");setVfConsent(false);setVfIsParent(false);setVfParentMode(false);setVfParentName("");setVfParentConsent(false);setAuthView("verify");}}
                   style={{background:G.white,color:G.green,border:`1.5px solid ${G.green}`,
                     borderRadius:20,padding:"9px 22px",fontSize:13,fontWeight:800,
                     cursor:"pointer",fontFamily:"inherit"}}>
@@ -4392,10 +4392,9 @@ export default function App() {
     const maskedEmail = (()=>{
       const e = EMAIL_SEED[pendingMember?.name||""] || (pendingMember?.email||"");
       if(!e) return null;
-      const [local, domain] = e.split("@");
-      const shown = maskEmail(email);
-      return shown + "@" + domain;
+      return maskEmail(e);
     })();
+    const isYouthPending = isYouthMember(pendingMember);
     return (
       <Shell>
         <div style={{display:"flex",flexDirection:"column",minHeight:"100vh"}}>
@@ -4408,10 +4407,40 @@ export default function App() {
             </div>
           </div>
           <div style={{flex:1,padding:"28px 24px"}}>
+
+            {/* Youth member → show parent route prominently */}
+            {isYouthPending && (
+              <div style={{background:"#fdf4ff",border:"1.5px solid #e9d5ff",borderRadius:12,
+                padding:"14px 16px",marginBottom:20,display:"flex",alignItems:"flex-start",gap:10}}>
+                <span style={{fontSize:20,flexShrink:0}}>👶</span>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:800,fontSize:13,color:"#6b21a8",marginBottom:4}}>
+                    {pendingMember?.name} is a youth member
+                  </div>
+                  <div style={{fontSize:12,color:"#7e22ce",lineHeight:1.6,marginBottom:10}}>
+                    Are you a parent setting this up? Use the parent access flow instead —
+                    it's designed for you.
+                  </div>
+                  <button onClick={()=>{
+                      setVfMatch(pendingMember);
+                      setVfEmail(""); setVfPhone(""); setVfError("");
+                      setVfParentMode(true); setVfParentName(""); setVfParentConsent(false);
+                      setVfStep("found");
+                      setPendingMember(null); setEmailInput(""); setEmailError("");
+                      setAuthView("verify");
+                    }}
+                    style={{background:"#7c3aed",color:"#fff",border:"none",borderRadius:20,
+                      padding:"8px 18px",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+                    👨‍👧 I'm a parent — use parent setup instead
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div style={{background:"#f0fdf4",border:"1.5px solid rgba(20,83,45,.15)",
               borderRadius:14,padding:"16px 18px",marginBottom:20}}>
               <div style={{fontSize:13,color:G.muted,lineHeight:1.6}}>
-                We have an email address on record for you ending in{" "}
+                We have an email address on record ending in{" "}
                 <span style={{fontWeight:800,color:G.text}}>{maskedEmail}</span>.
                 <br/>Enter your full email address below to verify your identity.
               </div>
@@ -4434,6 +4463,13 @@ export default function App() {
               {emailError&&(
                 <div style={{marginTop:6,fontSize:12,color:"#dc2626",fontWeight:700}}>
                   ⚠️ {emailError}
+                  {isYouthPending && (
+                    <div style={{marginTop:6,fontWeight:600,color:"#78350f",
+                      background:"#fffbeb",borderRadius:7,padding:"6px 10px",
+                      border:"1px solid #fde68a",lineHeight:1.5}}>
+                      💡 If you're a parent, use the purple button above to set up parent access instead.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -4551,6 +4587,7 @@ export default function App() {
                 setVfEmail(pendingMember?.email||"");
                 setVfPhone(pendingMember?.phone||"");
                 setVfCode(""); setVfError(""); setVfConsent(false);
+                setVfParentMode(false); setVfParentName(""); setVfParentConsent(false);
                 if(pendingMember) setVfStep("found");
                 setAuthView("verify");
               }}
