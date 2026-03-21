@@ -253,18 +253,18 @@ const ROLE_META = {
 // Senior teams can have captains/vice captains; youth cannot
 // ─── Default teams (loaded from storage, editable by admins) ──
 const DEFAULT_TEAMS = [
-  {id:"div2",   name:"Div 2",        senior:true,  coaches:[]},
-  {id:"div3",   name:"Div 3",        senior:true,  coaches:[]},
-  {id:"div4",   name:"Div 4",        senior:true,  coaches:[]},
-  {id:"t20s4",  name:"T20 Serie 4",  senior:true,  coaches:[]},
-  {id:"t20s5",  name:"T20 Serie 5",  senior:true,  coaches:[]},
-  {id:"womens", name:"Women's",      senior:true,  coaches:["Arun Krishnamurthy"]},
-  {id:"ob",     name:"OB",           senior:true,  coaches:[]},
-  {id:"u18",    name:"U18",          senior:false, coaches:[]},
-  {id:"u15",    name:"U15",          senior:false, coaches:["Zeb Pirzada"]},
-  {id:"u15g",   name:"U15 Girls",    senior:false, coaches:["Zeb Pirzada","Rajesh Muthukumar","Kuda"]},
-  {id:"u13",    name:"U13",          senior:false, coaches:["Zeb Pirzada"]},
-  {id:"u11",    name:"U11",          senior:false, coaches:["Reuben Dayal","Aniket Sharma","Nitin Gupta"]},
+  {id:"div2",   name:"Div 2",        senior:true,  coaches:[], captain:null, vicecaptain:null},
+  {id:"div3",   name:"Div 3",        senior:true,  coaches:[], captain:null, vicecaptain:null},
+  {id:"div4",   name:"Div 4",        senior:true,  coaches:[], captain:null, vicecaptain:null},
+  {id:"t20s4",  name:"T20 Serie 4",  senior:true,  coaches:[], captain:null, vicecaptain:null},
+  {id:"t20s5",  name:"T20 Serie 5",  senior:true,  coaches:[], captain:null, vicecaptain:null},
+  {id:"womens", name:"Women's",      senior:true,  coaches:["Arun Krishnamurthy"], captain:null, vicecaptain:null},
+  {id:"ob",     name:"OB",           senior:true,  coaches:[], captain:null, vicecaptain:null},
+  {id:"u18",    name:"U18",          senior:false, coaches:[], captain:null, vicecaptain:null},
+  {id:"u15",    name:"U15",          senior:false, coaches:["Zeb Pirzada"], captain:null, vicecaptain:null},
+  {id:"u15g",   name:"U15 Girls",    senior:false, coaches:["Zeb Pirzada","Rajesh Muthukumar","Kuda"], captain:null, vicecaptain:null},
+  {id:"u13",    name:"U13",          senior:false, coaches:["Zeb Pirzada"], captain:null, vicecaptain:null},
+  {id:"u11",    name:"U11",          senior:false, coaches:["Reuben Dayal","Aniket Sharma","Nitin Gupta"], captain:null, vicecaptain:null},
 ];
 
 const TEAM_META = {
@@ -359,12 +359,12 @@ const CAN = {
   resetOtherPin:  ["superadmin"],
 };
 const can = (role, action) => (CAN[action]||[]).includes(role);
-// canOrCoach: coaches (derived from team.coaches[]) get captain-level abilities
-// Note: teams param optional — falls back to role check only if not provided
+// canOrCoach: coaches AND team captains/VCs get captain-level abilities
 function canOrCoach(role, action, member, teams) {
   if(can(role, action)) return true;
   if(member && teams && ["removePlayer","addOtherPlayer","deleteSession","sendReminder"].includes(action)) {
-    return isCoachMember(member.name, teams);
+    if(isCoachMember(member.name, teams)) return true;
+    if(getTeamRole(member.name, teams)) return true; // team captain or VC
   }
   return false;
 }
@@ -748,6 +748,24 @@ function getCoachTeams(name, teams) {
 // isCoachMember(name, teams) — true if they coach any team
 function isCoachMember(name, teams) {
   return (teams||[]).some(t=>(t.coaches||[]).includes(name));
+}
+
+// getTeamRole(name, teams) — returns "captain"|"vicecaptain"|null based on team records
+function getTeamRole(name, teams) {
+  if(!name||!teams) return null;
+  for(const t of teams) {
+    if(t.captain===name) return "captain";
+    if(t.vicecaptain===name) return "vicecaptain";
+  }
+  return null;
+}
+
+// isTeamCaptain / isTeamVC helpers
+function isTeamCaptainFor(name, teamName, teams) {
+  return (teams||[]).find(t=>t.name===teamName)?.captain === name;
+}
+function isTeamVCFor(name, teamName, teams) {
+  return (teams||[]).find(t=>t.name===teamName)?.vicecaptain === name;
 }
 
 // maskEmail: show first 2 + last 2 chars of local part for recognition
@@ -4488,7 +4506,7 @@ export default function App() {
               </button>
             );
           })}
-          {(can(userRole,"sendReminder")||isCoachMember(currentUser?.name,teams))&&(
+          {(can(userRole,"sendReminder")||isCoachMember(currentUser?.name,teams)||!!getTeamRole(currentUser?.name,teams))&&(
             <button onClick={()=>setView("availability")}
               style={{padding:"7px 12px",borderRadius:20,cursor:"pointer",
                 fontFamily:"inherit",fontWeight:800,fontSize:13,
@@ -6286,7 +6304,7 @@ export default function App() {
                 <div style={{fontSize:11,color:G.muted,marginTop:2,lineHeight:1.5}}>
                   Receive an email each time you join or book a session.
                   {me.email
-                    ? ` Sent to ${me.email.replace(/(.{2})(.*)(@.*)/,(_,a,b,c)=>a+"•".repeat(b.length)+c)}.`
+                    ? ` Sent to ${maskEmail(me.email)}.`
                     : " No email on file — add one in your profile."}
                 </div>
               </div>
@@ -7621,6 +7639,73 @@ export default function App() {
                       </div>
                     )}
                   </div>
+
+                  {/* Captain & Vice Captain — senior teams only */}
+                  {t.senior&&(
+                    <div style={{marginTop:10,paddingTop:10,borderTop:`1px dashed ${G.border}`}}>
+                      <div style={{fontSize:10,fontWeight:900,color:G.muted,letterSpacing:1.2,
+                        textTransform:"uppercase",marginBottom:6}}>
+                        Captain &amp; Vice Captain
+                      </div>
+                      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                        {/* Captain picker */}
+                        <div style={{flex:1,minWidth:120}}>
+                          <div style={{fontSize:10,color:G.muted,fontWeight:700,marginBottom:3}}>
+                            👨‍✈️ Captain
+                          </div>
+                          <select
+                            value={t.captain||""}
+                            onChange={e=>{
+                              saveTeams(teams.map(x=>x.id===t.id?{...x,captain:e.target.value||null}:x));
+                              logAction("role",`Set ${t.name} captain: ${e.target.value||"none"}`);
+                            }}
+                            style={iSt({fontSize:12,padding:"5px 8px",borderRadius:7,
+                              background:G.white})}>
+                            <option value="">— None —</option>
+                            {members
+                              .filter(m=>(m.teams||[]).includes(t.name))
+                              .sort((a,b)=>a.name.localeCompare(b.name))
+                              .map(m=>(
+                                <option key={m.id} value={m.name}>{m.name}</option>
+                              ))}
+                          </select>
+                        </div>
+                        {/* VC picker */}
+                        <div style={{flex:1,minWidth:120}}>
+                          <div style={{fontSize:10,color:G.muted,fontWeight:700,marginBottom:3}}>
+                            👷🏻‍♂️ Vice Captain
+                          </div>
+                          <select
+                            value={t.vicecaptain||""}
+                            onChange={e=>{
+                              saveTeams(teams.map(x=>x.id===t.id?{...x,vicecaptain:e.target.value||null}:x));
+                              logAction("role",`Set ${t.name} VC: ${e.target.value||"none"}`);
+                            }}
+                            style={iSt({fontSize:12,padding:"5px 8px",borderRadius:7,
+                              background:G.white})}>
+                            <option value="">— None —</option>
+                            {members
+                              .filter(m=>(m.teams||[]).includes(t.name))
+                              .sort((a,b)=>a.name.localeCompare(b.name))
+                              .map(m=>(
+                                <option key={m.id} value={m.name}>{m.name}</option>
+                              ))}
+                          </select>
+                        </div>
+                      </div>
+                      {/* Show current assignments */}
+                      {(t.captain||t.vicecaptain)&&(
+                        <div style={{marginTop:6,display:"flex",gap:6,flexWrap:"wrap"}}>
+                          {t.captain&&<span style={{fontSize:10,padding:"2px 8px",borderRadius:20,
+                            background:"#f0fdf4",color:"#166534",border:"1px solid #86efac",
+                            fontWeight:700}}>👨‍✈️ {t.captain.split(" ")[0]}</span>}
+                          {t.vicecaptain&&<span style={{fontSize:10,padding:"2px 8px",borderRadius:20,
+                            background:G.cream,color:G.muted,border:`1px solid ${G.border}`,
+                            fontWeight:700}}>👷🏻‍♂️ {t.vicecaptain.split(" ")[0]}</span>}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -8607,6 +8692,42 @@ export default function App() {
                     {isExpanded&&(
                       <div style={{background:G.cream,borderBottom:`1px solid ${G.border}`,
                         padding:"12px 14px",display:"flex",flexDirection:"column",gap:8}}>
+
+                        {/* Name editing */}
+                        {editingName?.id===m.id+"_name_flat" ? (
+                          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                            <input autoFocus
+                              style={{...iSt({padding:"6px 10px",fontSize:13}),flex:1}}
+                              value={editingName.value}
+                              onChange={e=>setEditingName({...editingName,value:e.target.value})}
+                              onKeyDown={e=>{
+                                if(e.key==="Enter"){e.preventDefault();renameMember(m.id,editingName.value);setSelMember({...m,name:editingName.value});}
+                                if(e.key==="Escape") setEditingName(null);
+                              }}/>
+                            <button type="button"
+                              onClick={()=>{renameMember(m.id,editingName.value);setSelMember({...m,name:editingName.value});}}
+                              style={{background:G.green,color:G.lime,border:"none",borderRadius:7,
+                                padding:"6px 12px",fontSize:12,fontWeight:800,cursor:"pointer",
+                                fontFamily:"inherit"}}>✓</button>
+                            <button type="button" onClick={()=>setEditingName(null)}
+                              style={{background:G.white,color:G.muted,border:`1px solid ${G.border}`,
+                                borderRadius:7,padding:"6px 10px",fontSize:12,cursor:"pointer",
+                                fontFamily:"inherit"}}>✕</button>
+                          </div>
+                        ) : (
+                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                            <span style={{fontWeight:800,fontSize:14,color:G.text,flex:1}}>
+                              {m.name}
+                            </span>
+                            {can(userRole,"addMember")&&(
+                              <button type="button"
+                                onClick={e=>{e.stopPropagation();setEditingName({id:m.id+"_name_flat",value:m.name});}}
+                                style={{background:"none",border:"none",cursor:"pointer",
+                                  color:G.muted,fontSize:13,padding:"2px 4px"}}
+                                title="Edit name">✏️ Edit name</button>
+                            )}
+                          </div>
+                        )}
 
                         {/* Contact */}
                         {editingName?.id===m.id+"_contact_flat" ? (
