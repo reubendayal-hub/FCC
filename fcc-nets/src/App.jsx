@@ -1681,7 +1681,7 @@ function BothNetsIcon({color="currentColor",size=18}) {
 }
 
 // ─── PlayerGroup — collapsible team section in session detail ──
-function PlayerGroup({team,players,members,lifts,selSess,isSelf,cutoff,canRemove,onRemove,onCarpoolEdit,onCarpoolSet,single}) {
+function PlayerGroup({team,players,members,teams,lifts,selSess,isSelf,cutoff,canRemove,onRemove,onCarpoolEdit,onCarpoolSet,single}) {
   const [open,setOpen]=React.useState(true); // default open
   const tm=getTeamMeta(team);
   const dispStop=d=>{const o=getLiftObj(d);if(!o.stop)return"";return o.stop==="Other"?(o.stopOther||"Other"):o.stop;};
@@ -1724,11 +1724,11 @@ function PlayerGroup({team,players,members,lifts,selSess,isSelf,cutoff,canRemove
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontWeight:800,color:G.text,fontSize:15}}>
                   {p}{self&&<span style={{color:G.muted,fontSize:12,fontWeight:500,marginLeft:6}}>(you)</span>}
-                  {mem?.isCoach&&<span style={{fontSize:12,marginLeft:5}} title="Coach">🧢</span>}
+                  {isCoachMember(p, teams)&&<span style={{fontSize:12,marginLeft:5}} title="Coach">🧢</span>}
                 </div>
                 <div style={{display:"flex",gap:4,marginTop:2,flexWrap:"wrap"}}>
                   {(mem?.teams||[]).map(t=><TeamPill key={t} team={t} sm/>)}
-                  {mem?.role&&mem.role!=="member"&&<RolePill role={mem.role}/>}
+                  <MemberRolePills member={mem} teams={teams} sm/>
                 </div>
                 {/* Lift inline badge */}
                 {liftPref&&(
@@ -5621,6 +5621,7 @@ export default function App() {
 
             return dedupedGroups.map(({team,players})=>(
               <PlayerGroup key={team} team={team} players={players} members={members}
+                teams={teams}
                 lifts={lifts} selSess={selSess} isSelf={p=>currentUser?.name===p}
                 cutoff={cutoff} canRemove={canOrCoach(userRole,"removePlayer",userMem,teams)}
                 onRemove={p=>handleLeave(selSess.id,p)}
