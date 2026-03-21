@@ -878,6 +878,54 @@ const RolePill = ({role}) => {
     fontSize:11,fontWeight:800}}>{m.icon} {m.label}</span>;
 };
 
+// Returns array of {label, bg, text, icon} chips for a member's full role display
+// Includes global role (if not plain member) + all team captain/VC assignments
+function getMemberRoleChips(member, teams) {
+  const chips = [];
+  const role = member?.role||"member";
+  // Global role — only show if not plain member
+  if(role!=="member" && ROLE_META[role]) {
+    chips.push({...ROLE_META[role], key:"global"});
+  }
+  // Team-based captain/VC roles
+  (teams||[]).forEach(t=>{
+    if(t.captain===member?.name) {
+      const tm = getTeamMeta(t.name);
+      chips.push({
+        label:`${t.name} Captain`, icon:"👨‍✈️",
+        bg:tm.bg, text:tm.text, key:`cap-${t.id}`
+      });
+    }
+    if(t.vicecaptain===member?.name) {
+      const tm = getTeamMeta(t.name);
+      chips.push({
+        label:`${t.name} VC`, icon:"👷🏻‍♂️",
+        bg:tm.bg, text:tm.text, key:`vc-${t.id}`
+      });
+    }
+  });
+  return chips;
+}
+
+// MemberRolePills — renders all role chips for a member
+const MemberRolePills = ({member, teams, sm}) => {
+  const chips = getMemberRoleChips(member, teams);
+  if(!chips.length) return null;
+  return (<>
+    {chips.map(c=>(
+      <span key={c.key} style={{
+        background:c.bg, color:c.text, borderRadius:20,
+        padding:sm?"1px 6px":"2px 9px",
+        fontSize:sm?9:11, fontWeight:800,
+        display:"inline-flex", alignItems:"center", gap:3,
+        whiteSpace:"nowrap",
+      }}>
+        {c.icon} {c.label}
+      </span>
+    ))}
+  </>);
+};
+
 const TeamPill = ({team,sm}) => {
   const m=getTeamMeta(team||"Unassigned");
   return <span style={{background:m.bg,color:m.text,borderRadius:20,
@@ -2573,11 +2621,17 @@ export default function App() {
         setMembers(initialMembers);
         membersRef.current = initialMembers;
         setPins(        pr.exists() ? JSON.parse(pr.data().value) : {});
-        // Merge coaches from DEFAULT_TEAMS into stored teams (adds coaches field if missing)
+        // Merge DEFAULT_TEAMS fields into stored teams (fixes missing senior/captain/vc/coaches)
         const storedTeams = tr.exists() ? JSON.parse(tr.data().value) : DEFAULT_TEAMS;
         const mergedTeams = storedTeams.map(t => {
           const def = DEFAULT_TEAMS.find(d=>d.name===t.name);
-          return {...t, coaches: t.coaches ?? def?.coaches ?? []};
+          return {
+            ...t,
+            coaches:    t.coaches    ?? def?.coaches    ?? [],
+            senior:     def?.senior  ?? t.senior        ?? false, // always trust DEFAULT_TEAMS for senior
+            captain:    t.captain    ?? def?.captain    ?? null,
+            vicecaptain:t.vicecaptain?? def?.vicecaptain?? null,
+          };
         });
         setTeams(mergedTeams);
         teamsRef.current = mergedTeams;
@@ -3499,9 +3553,12 @@ export default function App() {
                       {m.name.split(" ").map(w=>w[0]).join("").slice(0,2)}
                     </span>
                     {m.name}
-                    {m.role && m.role !== "member" && (
-                      <span style={{fontSize:12}}>{ROLE_META[m.role]?.icon}</span>
-                    )}
+                    {(()=>{
+                      const chips=getMemberRoleChips(m,teams);
+                      return chips.length>0
+                        ? <span style={{fontSize:12}}>{chips[0].icon}</span>
+                        : null;
+                    })()}
                   </button>
                 );
               })}
@@ -5893,7 +5950,8 @@ export default function App() {
                   <div style={{fontFamily:"'Playfair Display',serif",fontWeight:900,
                     fontSize:20,color:"#fff"}}>{me.name}</div>
                   <div style={{marginTop:4,display:"flex",gap:6,flexWrap:"wrap"}}>
-                    <RolePill role={me.role||"member"}/>
+                    <MemberRolePills member={me} teams={teams}/>
+                    {getMemberRoleChips(me,teams).length===0&&<RolePill role={me.role||"member"}/>}
                     {myTeams.map(t=><TeamPill key={t} team={t} sm/>)}
                     {myTeams.length===0&&<TeamPill team="Unassigned" sm/>}
                   </div>
@@ -8740,10 +8798,7 @@ export default function App() {
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                           <span style={{fontWeight:700,fontSize:13,color:G.text}}>{m.name}</span>
-                          {rm&&m.role!=="member"&&<span style={{fontSize:9,padding:"1px 6px",
-                            borderRadius:20,background:rm.bg,color:rm.text,fontWeight:700}}>
-                            {rm.icon} {rm.label}
-                          </span>}
+                          <MemberRolePills member={m} teams={teams} sm/>
                         </div>
                         <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:2}}>
                           {teamChips.map(t=>{
@@ -9101,7 +9156,8 @@ export default function App() {
                   </div>
                   {/* Role + actions row */}
                   <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                    <RolePill role={m.role||"member"}/>
+                    <MemberRolePills member={m} teams={teams} sm/>
+                    {getMemberRoleChips(m,teams).length===0&&<RolePill role={m.role||"member"}/>}
                     {can(userRole,"assignRoles")&&(m.id!==currentUser.id||userRole==="superadmin")&&(
                       <select value={["superadmin","admin","member"].includes(m.role||"member")?(m.role||"member"):"member"}
                         onChange={e=>updateRole(m.id,e.target.value)}
