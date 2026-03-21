@@ -239,7 +239,7 @@ const DIVISION_TO_TEAM = {
   "Div 2":"Div 2","Div 3":"Div 3","Div 4":"Div 4",
   "Women's":"Women's","U13":"U13","U15":"U15","U16":"U18","U18":"U18",
 };
-const ROLES = ["superadmin","admin","captain","vicecaptain","t20captain","t20vicecaptain","member"];
+const ROLES = ["superadmin","admin","member"]; // Captain/VC managed per-team in Coaches & Captains section
 const ROLE_META = {
   superadmin:    { label:"Super Admin",       bg:"#431407", text:"#fdba74", icon:"👑" },
   admin:         { label:"Admin",             bg:"#1e3a5f", text:"#93c5fd", icon:"👨🏻‍💻" },
@@ -7222,7 +7222,7 @@ export default function App() {
             {label:"👥 Members",    id:"sec-members",    key:"members"},
             {label:"➕ Add Member", id:"sec-add-member", key:"addmember"},
             {label:"🏏 Groups",     id:"sec-groups",     key:"groups"},
-            {label:"🧢 Coaches",    id:"sec-coaches",    key:"coaches"},
+            {label:"🧢 Coaches & Captains", id:"sec-coaches", key:"coaches"},
             {label:"🚫 Block Nets", id:"sec-blocknets",  key:"blocknets"},
             {label:"🔁 Recurring",  id:"sec-recurring",  key:"recurring"},
             {label:"👑 Audit Log",  id:"sec-auditlog",   key:"auditlog"},
@@ -7292,6 +7292,48 @@ export default function App() {
                   </Btn>
                 </div>
               ))}
+            </div>
+          );
+        })()}
+
+        {/* ── One-time role migration (captain/VC → member) ──── */}
+        {userRole==="superadmin"&&(()=>{
+          const legacy = members.filter(m=>
+            ["captain","vicecaptain","t20captain","t20vicecaptain"].includes(m.role||"")
+          );
+          if(!legacy.length) return null;
+          return (
+            <div style={{background:"#fffbeb",border:"1.5px solid #fde68a",
+              borderRadius:12,padding:"14px 16px",marginBottom:14}}>
+              <div style={{fontWeight:800,fontSize:13,color:"#92400e",marginBottom:6}}>
+                ⚠️ {legacy.length} member{legacy.length>1?"s":""} still have legacy captain/VC roles
+              </div>
+              <div style={{fontSize:12,color:"#78350f",marginBottom:10,lineHeight:1.6}}>
+                These were set before team-based captain/VC assignment. Click below to reset them
+                all to Member — then assign their leadership roles via Coaches &amp; Captains.
+              </div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:10}}>
+                {legacy.map(m=>(
+                  <span key={m.id} style={{fontSize:11,padding:"2px 8px",borderRadius:20,
+                    background:"#fef9c3",color:"#92400e",fontWeight:700}}>
+                    {m.name} ({m.role})
+                  </span>
+                ))}
+              </div>
+              <button onClick={()=>{
+                  const updated = members.map(m=>
+                    ["captain","vicecaptain","t20captain","t20vicecaptain"].includes(m.role||"")
+                      ? {...m, role:"member"} : m
+                  );
+                  saveMembers(updated);
+                  logAction("role",`Migrated ${legacy.length} legacy captain/VC roles to member`);
+                  showToast(`✓ ${legacy.length} roles reset to Member`);
+                }}
+                style={{background:"#92400e",color:"#fff",border:"none",borderRadius:8,
+                  padding:"8px 16px",fontSize:12,fontWeight:800,cursor:"pointer",
+                  fontFamily:"inherit"}}>
+                Reset all to Member
+              </button>
             </div>
           );
         })()}
@@ -7553,7 +7595,7 @@ export default function App() {
           style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
             background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",
             padding:"8px 0",marginBottom:adminSec.coaches?8:14}}>
-          <span style={{fontWeight:900,fontSize:13,color:G.text}}>🧢 Team Coaches</span>
+          <span style={{fontWeight:900,fontSize:13,color:G.text}}>🧢 Coaches &amp; Captains</span>
           <span style={{fontSize:12,color:G.muted,fontWeight:700}}>
             {adminSec.coaches?"▲ collapse":"▼ show"}
           </span>
@@ -7562,150 +7604,184 @@ export default function App() {
           <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
             padding:14,marginBottom:16}}>
             <div style={{fontSize:12,color:G.muted,marginBottom:12,lineHeight:1.5}}>
-              Assign coaches to teams. Coaches appear on session cards and details.
-              This data will sync with the Trainer shift coordination system.
+              Assign coaches, captains and vice captains per team. Each person's role is team-specific — someone can be captain in Div 3 and VC in T20 Serie 4 at the same time.
             </div>
             {teams.map(t=>{
               const tCoaches = t.coaches||[];
               const search = coachSearch[t.id]||"";
+              const teamMembers = members
+                .filter(m=>(m.teams||[]).includes(t.name))
+                .sort((a,b)=>a.name.localeCompare(b.name));
               const suggestions = search.trim().length>1
                 ? members
                     .filter(m=>m.name.toLowerCase().includes(search.toLowerCase())&&!tCoaches.includes(m.name))
                     .sort((a,b)=>a.name.localeCompare(b.name))
                     .slice(0,6)
                 : [];
+              const tm = getTeamMeta(t.name);
               return (
-                <div key={t.id} style={{marginBottom:14,paddingBottom:14,
-                  borderBottom:`1px solid ${G.border}`}}>
-                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
-                    <span style={{fontWeight:800,fontSize:13,color:G.text}}>{t.name}</span>
-                    <span style={{fontSize:10,color:G.muted,background:G.cream,
-                      padding:"1px 7px",borderRadius:20,border:`1px solid ${G.border}`}}>
-                      {t.senior?"Senior":"Youth"}
+                <div key={t.id} style={{
+                  marginBottom:14,
+                  borderRadius:12,
+                  border:`1.5px solid ${G.border}`,
+                  borderLeft:`4px solid ${tm.bg}`,
+                  background:G.white,
+                  overflow:"hidden",
+                }}>
+                  {/* Team header */}
+                  <div style={{
+                    background:`${tm.bg}18`,
+                    borderBottom:`1px solid ${G.border}`,
+                    padding:"10px 14px",
+                    display:"flex",alignItems:"center",gap:8,
+                  }}>
+                    <span style={{fontWeight:900,fontSize:14,color:tm.bg}}>{t.name}</span>
+                    {t.senior
+                      ? <span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:20,
+                          background:tm.bg,color:tm.text}}>Senior</span>
+                      : <span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:20,
+                          background:"#e5e7eb",color:"#374151"}}>Youth</span>
+                    }
+                    <span style={{fontSize:11,color:G.muted,marginLeft:"auto"}}>
+                      {teamMembers.length} member{teamMembers.length!==1?"s":""}
                     </span>
                   </div>
-                  {/* Current coaches */}
-                  <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:6}}>
-                    {tCoaches.length===0&&(
-                      <span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>No coaches assigned</span>
-                    )}
-                    {tCoaches.map(name=>(
-                      <span key={name} style={{display:"inline-flex",alignItems:"center",gap:4,
-                        fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:20,
-                        background:"#fef9c3",color:"#92400e",border:"0.5px solid #fde68a"}}>
-                        🧢 {name}
-                        <button onClick={()=>{
-                          saveTeams(teams.map(x=>x.id===t.id
-                            ?{...x,coaches:tCoaches.filter(n=>n!==name)}:x));
-                          logAction("member",`Removed coach ${name} from ${t.name}`);
-                        }} style={{background:"none",border:"none",cursor:"pointer",
-                          color:"#92400e",padding:0,fontSize:13,lineHeight:1,fontWeight:900}}>
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                  {/* Search to add */}
-                  <div style={{position:"relative"}}>
-                    <input
-                      placeholder="Search to add a coach…"
-                      value={search}
-                      onChange={e=>setCoachSearch(s=>({...s,[t.id]:e.target.value}))}
-                      style={iSt({padding:"7px 10px",fontSize:12,width:"100%",boxSizing:"border-box"})}/>
-                    {suggestions.length>0&&(
-                      <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:20,
-                        background:G.white,border:`1.5px solid ${G.border}`,
-                        borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,.1)",marginTop:2}}>
-                        {suggestions.map(m=>(
-                          <button key={m.id} type="button"
-                            onClick={()=>{
-                              saveTeams(teams.map(x=>x.id===t.id
-                                ?{...x,coaches:[...tCoaches,m.name]}:x));
-                              setCoachSearch(s=>({...s,[t.id]:""}));
-                              logAction("member",`Added coach ${m.name} to ${t.name}`);
-                            }}
-                            style={{width:"100%",textAlign:"left",padding:"8px 12px",
-                              background:"none",border:"none",borderBottom:`1px solid ${G.border}`,
-                              cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,
-                              color:G.text}}>
-                            {m.name}
-                            {getCoachTeams(m.name,teams).length>0&&(
-                              <span style={{fontSize:10,color:G.muted,marginLeft:6}}>
-                                (also coaches: {getCoachTeams(m.name,teams).join(", ")})
-                              </span>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Captain & Vice Captain — senior teams only */}
-                  {t.senior&&(
-                    <div style={{marginTop:10,paddingTop:10,borderTop:`1px dashed ${G.border}`}}>
+                  <div style={{padding:"12px 14px",display:"flex",flexDirection:"column",gap:12}}>
+
+                    {/* Coaches */}
+                    <div>
                       <div style={{fontSize:10,fontWeight:900,color:G.muted,letterSpacing:1.2,
                         textTransform:"uppercase",marginBottom:6}}>
-                        Captain &amp; Vice Captain
+                        {t.name} Coach{tCoaches.length!==1?"es":""}
                       </div>
-                      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                        {/* Captain picker */}
-                        <div style={{flex:1,minWidth:120}}>
-                          <div style={{fontSize:10,color:G.muted,fontWeight:700,marginBottom:3}}>
-                            👨‍✈️ Captain
-                          </div>
-                          <select
-                            value={t.captain||""}
-                            onChange={e=>{
-                              saveTeams(teams.map(x=>x.id===t.id?{...x,captain:e.target.value||null}:x));
-                              logAction("role",`Set ${t.name} captain: ${e.target.value||"none"}`);
-                            }}
-                            style={iSt({fontSize:12,padding:"5px 8px",borderRadius:7,
-                              background:G.white})}>
-                            <option value="">— None —</option>
-                            {members
-                              .filter(m=>(m.teams||[]).includes(t.name))
-                              .sort((a,b)=>a.name.localeCompare(b.name))
-                              .map(m=>(
-                                <option key={m.id} value={m.name}>{m.name}</option>
-                              ))}
-                          </select>
-                        </div>
-                        {/* VC picker */}
-                        <div style={{flex:1,minWidth:120}}>
-                          <div style={{fontSize:10,color:G.muted,fontWeight:700,marginBottom:3}}>
-                            👷🏻‍♂️ Vice Captain
-                          </div>
-                          <select
-                            value={t.vicecaptain||""}
-                            onChange={e=>{
-                              saveTeams(teams.map(x=>x.id===t.id?{...x,vicecaptain:e.target.value||null}:x));
-                              logAction("role",`Set ${t.name} VC: ${e.target.value||"none"}`);
-                            }}
-                            style={iSt({fontSize:12,padding:"5px 8px",borderRadius:7,
-                              background:G.white})}>
-                            <option value="">— None —</option>
-                            {members
-                              .filter(m=>(m.teams||[]).includes(t.name))
-                              .sort((a,b)=>a.name.localeCompare(b.name))
-                              .map(m=>(
-                                <option key={m.id} value={m.name}>{m.name}</option>
-                              ))}
-                          </select>
-                        </div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:6}}>
+                        {tCoaches.length===0&&(
+                          <span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>No coaches assigned</span>
+                        )}
+                        {tCoaches.map(name=>(
+                          <span key={name} style={{display:"inline-flex",alignItems:"center",gap:4,
+                            fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:20,
+                            background:"#fef9c3",color:"#92400e",border:"0.5px solid #fde68a"}}>
+                            🧢 {name}
+                            <button onClick={()=>{
+                              saveTeams(teams.map(x=>x.id===t.id
+                                ?{...x,coaches:tCoaches.filter(n=>n!==name)}:x));
+                              logAction("member",`Removed coach ${name} from ${t.name}`);
+                            }} style={{background:"none",border:"none",cursor:"pointer",
+                              color:"#92400e",padding:0,fontSize:13,lineHeight:1,fontWeight:900}}>×</button>
+                          </span>
+                        ))}
                       </div>
-                      {/* Show current assignments */}
-                      {(t.captain||t.vicecaptain)&&(
-                        <div style={{marginTop:6,display:"flex",gap:6,flexWrap:"wrap"}}>
-                          {t.captain&&<span style={{fontSize:10,padding:"2px 8px",borderRadius:20,
-                            background:"#f0fdf4",color:"#166534",border:"1px solid #86efac",
-                            fontWeight:700}}>👨‍✈️ {t.captain.split(" ")[0]}</span>}
-                          {t.vicecaptain&&<span style={{fontSize:10,padding:"2px 8px",borderRadius:20,
-                            background:G.cream,color:G.muted,border:`1px solid ${G.border}`,
-                            fontWeight:700}}>👷🏻‍♂️ {t.vicecaptain.split(" ")[0]}</span>}
-                        </div>
-                      )}
+                      <div style={{position:"relative"}}>
+                        <input
+                          placeholder={`Search to add ${t.name} coach…`}
+                          value={search}
+                          onChange={e=>setCoachSearch(s=>({...s,[t.id]:e.target.value}))}
+                          style={iSt({padding:"7px 10px",fontSize:12,width:"100%",boxSizing:"border-box"})}/>
+                        {suggestions.length>0&&(
+                          <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:20,
+                            background:G.white,border:`1.5px solid ${G.border}`,
+                            borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,.1)",marginTop:2}}>
+                            {suggestions.map(m=>(
+                              <button key={m.id} type="button"
+                                onClick={()=>{
+                                  saveTeams(teams.map(x=>x.id===t.id
+                                    ?{...x,coaches:[...tCoaches,m.name]}:x));
+                                  setCoachSearch(s=>({...s,[t.id]:""}));
+                                  logAction("member",`Added coach ${m.name} to ${t.name}`);
+                                }}
+                                style={{width:"100%",textAlign:"left",padding:"8px 12px",
+                                  background:"none",border:"none",borderBottom:`1px solid ${G.border}`,
+                                  cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,
+                                  color:G.text}}>
+                                {m.name}
+                                {getCoachTeams(m.name,teams).length>0&&(
+                                  <span style={{fontSize:10,color:G.muted,marginLeft:6}}>
+                                    (also coaches: {getCoachTeams(m.name,teams).join(", ")})
+                                  </span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
+
+                    {/* Captain & VC — senior teams only */}
+                    {t.senior&&(
+                      <div style={{borderTop:`1px solid ${G.border}`,paddingTop:12}}>
+                        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                          {/* Captain */}
+                          <div style={{flex:1,minWidth:130}}>
+                            <div style={{fontSize:10,fontWeight:900,color:G.muted,
+                              letterSpacing:1.2,textTransform:"uppercase",marginBottom:5}}>
+                              {t.name} Captain
+                            </div>
+                            {t.captain&&(
+                              <div style={{display:"flex",alignItems:"center",gap:6,
+                                marginBottom:6,padding:"4px 8px",borderRadius:20,
+                                background:"#f0fdf4",border:"1px solid #86efac",
+                                width:"fit-content"}}>
+                                <span style={{fontSize:11,fontWeight:700,color:"#166534"}}>
+                                  👨‍✈️ {t.captain}
+                                </span>
+                                <button onClick={()=>{
+                                    saveTeams(teams.map(x=>x.id===t.id?{...x,captain:null}:x));
+                                    logAction("role",`Removed ${t.name} captain`);
+                                  }} style={{background:"none",border:"none",cursor:"pointer",
+                                    color:"#166534",padding:0,fontSize:13,lineHeight:1}}>×</button>
+                              </div>
+                            )}
+                            <select value={t.captain||""}
+                              onChange={e=>{
+                                saveTeams(teams.map(x=>x.id===t.id?{...x,captain:e.target.value||null}:x));
+                                if(e.target.value) logAction("role",`Set ${t.name} captain: ${e.target.value}`);
+                              }}
+                              style={iSt({fontSize:12,padding:"5px 8px",borderRadius:7,background:G.white})}>
+                              <option value="">{t.captain?"Change captain…":"— Assign captain —"}</option>
+                              {teamMembers.map(m=>(
+                                <option key={m.id} value={m.name}>{m.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          {/* VC */}
+                          <div style={{flex:1,minWidth:130}}>
+                            <div style={{fontSize:10,fontWeight:900,color:G.muted,
+                              letterSpacing:1.2,textTransform:"uppercase",marginBottom:5}}>
+                              {t.name} Vice Captain
+                            </div>
+                            {t.vicecaptain&&(
+                              <div style={{display:"flex",alignItems:"center",gap:6,
+                                marginBottom:6,padding:"4px 8px",borderRadius:20,
+                                background:G.cream,border:`1px solid ${G.border}`,
+                                width:"fit-content"}}>
+                                <span style={{fontSize:11,fontWeight:700,color:G.muted}}>
+                                  👷🏻‍♂️ {t.vicecaptain}
+                                </span>
+                                <button onClick={()=>{
+                                    saveTeams(teams.map(x=>x.id===t.id?{...x,vicecaptain:null}:x));
+                                    logAction("role",`Removed ${t.name} VC`);
+                                  }} style={{background:"none",border:"none",cursor:"pointer",
+                                    color:G.muted,padding:0,fontSize:13,lineHeight:1}}>×</button>
+                              </div>
+                            )}
+                            <select value={t.vicecaptain||""}
+                              onChange={e=>{
+                                saveTeams(teams.map(x=>x.id===t.id?{...x,vicecaptain:e.target.value||null}:x));
+                                if(e.target.value) logAction("role",`Set ${t.name} VC: ${e.target.value}`);
+                              }}
+                              style={iSt({fontSize:12,padding:"5px 8px",borderRadius:7,background:G.white})}>
+                              <option value="">{t.vicecaptain?"Change VC…":"— Assign VC —"}</option>
+                              {teamMembers.map(m=>(
+                                <option key={m.id} value={m.name}>{m.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -8793,21 +8869,13 @@ export default function App() {
                         {/* Actions */}
                         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                           {can(userRole,"assignRoles")&&(m.id!==currentUser.id||userRole==="superadmin")&&(
-                            <select value={m.role||"member"}
+                            <select value={["superadmin","admin","member"].includes(m.role||"member")?(m.role||"member"):"member"}
                               onChange={e=>updateRole(m.id,e.target.value)}
                               style={{border:`1px solid ${G.border}`,borderRadius:6,
                                 padding:"5px 8px",fontSize:11,fontFamily:"inherit",
                                 color:G.text,background:G.white,cursor:"pointer"}}>
                               {userRole==="superadmin"&&<option value="superadmin">👑 Super Admin</option>}
                               <option value="admin">👨🏻‍💻 Admin</option>
-                              {(m.teams||[]).some(t=>seniorTeamNames.includes(t)&&!t.startsWith("T20"))&&<>
-                                <option value="captain">👨‍✈️ Captain</option>
-                                <option value="vicecaptain">👷🏻‍♂️ Vice Captain</option>
-                              </>}
-                              {(m.teams||[]).some(t=>t.startsWith("T20"))&&<>
-                                <option value="t20captain">🦸‍♂️ T20 Captain</option>
-                                <option value="t20vicecaptain">🥷🏻 T20 Vice Captain</option>
-                              </>}
                               <option value="member">🏏 Member</option>
                             </select>
                           )}
@@ -9035,21 +9103,13 @@ export default function App() {
                   <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                     <RolePill role={m.role||"member"}/>
                     {can(userRole,"assignRoles")&&(m.id!==currentUser.id||userRole==="superadmin")&&(
-                      <select value={m.role||"member"}
+                      <select value={["superadmin","admin","member"].includes(m.role||"member")?(m.role||"member"):"member"}
                         onChange={e=>updateRole(m.id,e.target.value)}
                         style={{border:`1px solid ${G.border}`,borderRadius:6,
                           padding:"4px 6px",fontSize:11,fontFamily:"inherit",
                           color:G.text,background:G.cream,cursor:"pointer"}}>
                         {userRole==="superadmin"&&<option value="superadmin">👑 Super Admin</option>}
                         <option value="admin">👨🏻‍💻 Admin</option>
-                        {(m.teams||[]).some(t=>seniorTeamNames.includes(t)&&!t.startsWith("T20"))&&<>
-                          <option value="captain">👨‍✈️ Captain</option>
-                          <option value="vicecaptain">👷🏻‍♂️ Vice Captain</option>
-                        </>}
-                        {(m.teams||[]).some(t=>t.startsWith("T20"))&&<>
-                          <option value="t20captain">🦸‍♂️ T20 Captain</option>
-                          <option value="t20vicecaptain">🥷🏻 T20 Vice Captain</option>
-                        </>}
                         <option value="member">🏏 Member</option>
                       </select>
                     )}
