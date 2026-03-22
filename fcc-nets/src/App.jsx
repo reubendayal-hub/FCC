@@ -2894,6 +2894,19 @@ export default function App() {
     }
   },[view]);
 
+  // ── Clear admin editing state when member selection changes ───
+  // Prevents editingName getting stuck when rows collapse or members re-render
+  useEffect(()=>{ setEditingName(null); },[selMember?.id]);
+
+  // ── Escape key clears any open edit form in admin panel ───────
+  useEffect(()=>{
+    function onKey(e) {
+      if(e.key==="Escape" && editingName) setEditingName(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return ()=>window.removeEventListener("keydown", onKey);
+  },[editingName]);
+
   // ── Weather fetch (Open-Meteo ECMWF — free, CORS-enabled) ────
   useEffect(()=>{
     function fetchWx() {
@@ -6973,11 +6986,7 @@ export default function App() {
     const relevantSessions = sessions
       .filter(s=>s.date>=today&&s.date<=seasonEnd)
       .filter(s=>effectiveTeam==="All"?true:
-        (s.restrictedTo===effectiveTeam||(s.sessionTeams||[]).includes(effectiveTeam)||
-         (!s.restrictedTo&&s.players.some(p=>{
-           const mx=members.find(x=>x.name===p);
-           return (mx?.teams||[]).includes(effectiveTeam);
-         }))))
+        (s.restrictedTo===effectiveTeam||(s.sessionTeams||[]).includes(effectiveTeam)))
       .sort((a,b)=>a.date.localeCompare(b.date)||a.from.localeCompare(b.from));
 
     const relevantMatches = ALL_FIXTURES
@@ -9235,11 +9244,12 @@ export default function App() {
                                 <button type="button" onClick={()=>{
                                     const newEmail=(editingName.email||"").trim()||null;
                                     const newPhone=(editingName.phone||"").trim()||null;
-                                    saveMembers(members.map(x=>x.id===m.id?{...x,email:newEmail,phone:newPhone}:x));
+                                    // Clear editing state FIRST to unblock the UI immediately
+                                    setEditingName(null);
+                                    // Use membersRef to avoid stale closure
+                                    saveMembers(membersRef.current.map(x=>x.id===m.id?{...x,email:newEmail,phone:newPhone}:x));
                                     logAction("member",`Updated contact: ${m.name}`);
                                     showToast(`✓ Saved for ${m.name.split(" ")[0]}`);
-                                    setSelMember({...m,email:newEmail,phone:newPhone});
-                                    setEditingName(null);
                                   }}
                                   style={{flex:1,background:G.green,color:G.lime,border:"none",
                                     borderRadius:7,padding:"7px",fontSize:12,fontWeight:800,
@@ -9495,11 +9505,11 @@ export default function App() {
                             onClick={()=>{
                               const newEmail=(editingName.email||"").trim()||null;
                               const newPhone=(editingName.phone||"").trim()||null;
-                              const updated=members.map(x=>x.id===m.id?{...x,email:newEmail,phone:newPhone}:x);
-                              saveMembers(updated);
+                              // Clear editing state FIRST so the UI unblocks immediately
+                              setEditingName(null);
+                              saveMembers(membersRef.current.map(x=>x.id===m.id?{...x,email:newEmail,phone:newPhone}:x));
                               logAction("member",`Updated contact: ${m.name} — email: ${newEmail||"none"}, phone: ${newPhone||"none"}`);
                               showToast(`✓ Contact details saved for ${m.name.split(" ")[0]}`);
-                              setEditingName(null);
                             }}
                             style={{flex:1,background:G.green,color:G.lime,border:"none",
                               borderRadius:7,padding:"7px",fontSize:12,fontWeight:800,
