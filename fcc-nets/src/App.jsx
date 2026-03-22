@@ -2771,7 +2771,10 @@ export default function App() {
     const updated = {...inviteCodes, [memberId]: hashCode(plain)};
     saveInviteCodes(updated);
     if(m) logAction("pin", `Generated invite code for: ${m.name}`);
-    showToast(`Code for member: ${plain}`);
+    // Copy to clipboard silently
+    try { navigator.clipboard.writeText(plain); } catch(e) {}
+    // Show persistent modal instead of a brief toast
+    setCodeModal({name: m?.name || "Member", code: plain});
     return plain;
   }
 
@@ -3272,6 +3275,7 @@ export default function App() {
   }
 
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [codeModal,     setCodeModal]     = useState(null); // {name, code}
   const [schedFilter,   setSchedFilter]   = useState("all"); // "all" | "mine"
   const [blocksExpanded, setBlocksExpanded] = useState(false);
   const [showPastAll,       setShowPastAll]       = useState(false);
@@ -4101,10 +4105,35 @@ export default function App() {
       }
 
       // ── Standard path (adult member, or youth with no parent mode chosen) ──
+      const alreadyHasPin = !!pins[vfMatch.id];
       return (
         <Shell>
           {hdr(`Hi, ${vfMatch.name.split(" ")[0]}!`,"FCC Training — account setup")}
           <div style={{padding:"20px 20px 40px"}}>
+
+            {/* Already has a PIN — redirect to normal login */}
+            {alreadyHasPin && (
+              <div style={{background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:12,
+                padding:"16px 16px",marginBottom:16}}>
+                <div style={{fontWeight:800,fontSize:14,color:"#166534",marginBottom:6}}>
+                  ✅ Your account is already set up!
+                </div>
+                <div style={{fontSize:13,color:"#166534",lineHeight:1.6,marginBottom:14}}>
+                  You already have a PIN. You don't need to go through this flow —
+                  just log in normally from the home screen.
+                </div>
+                <button onClick={()=>{
+                    setAuthView("pick");
+                    setVfStep("search"); setVfMatch(null); setVfSearch("");
+                  }}
+                  style={{width:"100%",background:"#16a34a",color:"#fff",border:"none",
+                    borderRadius:10,padding:"12px",fontSize:14,fontWeight:800,
+                    cursor:"pointer",fontFamily:"inherit"}}>
+                  ← Go back and log in
+                </button>
+              </div>
+            )}
+
             <div style={{background:G.cream,border:`1px solid ${G.border}`,borderRadius:10,
               padding:"12px 14px",marginBottom:16,fontSize:11,color:G.muted,lineHeight:1.6}}>
               <b style={{color:G.text}}>🔐 Privacy notice</b><br/>{PRIVACY_TEXT}
@@ -4336,7 +4365,9 @@ export default function App() {
                     <div style={{fontWeight:800,fontSize:14,color:G.text}}>{m.name}</div>
                     <div style={{fontSize:11,color:G.muted}}>
                       {(m.teams||[]).join(", ")||"No team assigned"}
-                      {m.email?" · ✉️ email on file":" · no email yet"}
+                      {pins[m.id]
+                        ? <span style={{color:"#16a34a",fontWeight:700}}> · ✅ already set up — log in normally</span>
+                        : m.email?" · ✉️ email on file":" · no email yet"}
                     </div>
                   </div>
                   <span style={{marginLeft:"auto",fontSize:16,color:G.green}}>›</span>
@@ -7570,11 +7601,7 @@ export default function App() {
                     <div style={{fontSize:11,color:G.muted}}>📧 {m.email}</div>
                   </div>
                   <Btn sm bg={G.green} col={G.lime}
-                    onClick={()=>{
-                      const code=generateInviteCode(m.id);
-                      setToast(`📋 Code for ${m.name.split(" ")[0]}: ${code}`);
-                      setTimeout(()=>setToast(null),6000);
-                    }}>
+                    onClick={()=>generateInviteCode(m.id)}>
                     🎟️ Give Access
                   </Btn>
                 </div>
@@ -7765,9 +7792,8 @@ export default function App() {
               const code = genCode();
               const updated = {...inviteCodes, [parentMember.id]: hashCode(code)};
               saveInviteCodes(updated);
-              // Notify admin via toast (in production, you'd email the parent too)
-              setToast(`✓ ${req.parentName} approved! Access code: ${code} — share this via WhatsApp or email`);
-              setTimeout(()=>setToast(null), 10000);
+              try { navigator.clipboard.writeText(code); } catch(e) {}
+              setCodeModal({name: req.parentName, code, forChild: child.name});
             }, 400);
             // Mark request as approved
             saveParentReqs(parentReqs.map(r=>r.id===req.id?{...r,status:"approved",approvedAt:new Date().toISOString()}:r));
@@ -9300,15 +9326,12 @@ export default function App() {
                             <Btn onClick={()=>resetPin(m.id)} bg={G.amberBg} col={G.amber} sm>🔑 Reset PIN</Btn>
                           )}
                           {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&!pins[m.id]&&m.email&&(
-                            <Btn onClick={()=>{generateInviteCode(m.id);showToast(`✓ New access code for ${m.name.split(" ")[0]}`);}}
+                            <Btn onClick={()=>generateInviteCode(m.id)}
                               bg={G.amberBg} col={G.amber} sm>🔑 Reset Access</Btn>
                           )}
                           {can(userRole,"resetOtherPin")&&!pins[m.id]&&!m.email&&!inviteCodes[m.id]&&(
-                            <Btn sm bg="#f0f9ff" col="#0369a1" onClick={()=>{
-                                const code=generateInviteCode(m.id);
-                                setToast(`📋 ${m.name.split(" ")[0]}: ${code}`);
-                                setTimeout(()=>setToast(null),6000);
-                              }}>🎟️ Gen Code</Btn>
+                            <Btn sm bg="#f0f9ff" col="#0369a1"
+                              onClick={()=>generateInviteCode(m.id)}>🎟️ Gen Code</Btn>
                           )}
                           {can(userRole,"removeMember")&&m.id!==currentUser.id&&(
                             <Btn onClick={()=>setConfirmDelete(m)} bg={G.redBg} col={G.red} sm>× Remove</Btn>
@@ -9593,19 +9616,13 @@ export default function App() {
                     )}
                     {/* Reset access for members with email but no PIN yet */}
                     {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&!pins[m.id]&&m.email&&(
-                      <Btn onClick={()=>{
-                          generateInviteCode(m.id);
-                          showToast(`✓ New access code generated for ${m.name.split(" ")[0]}`);
-                        }} bg={G.amberBg} col={G.amber} sm>🔑 Reset Access</Btn>
+                      <Btn onClick={()=>generateInviteCode(m.id)}
+                        bg={G.amberBg} col={G.amber} sm>🔑 Reset Access</Btn>
                     )}
                     {/* Invite code — only for members with no email and no PIN yet */}
                     {can(userRole,"resetOtherPin")&&!pins[m.id]&&!m.email&&!EMAIL_SEED[m.name]&&!inviteCodes[m.id]&&(
                       <Btn sm bg="#f0f9ff" col="#0369a1"
-                        onClick={()=>{
-                          const code = generateInviteCode(m.id);
-                          setToast(`📋 Code for ${m.name.split(" ")[0]}: ${code} — share via WhatsApp`);
-                          setTimeout(()=>setToast(null), 6000);
-                        }}>
+                        onClick={()=>generateInviteCode(m.id)}>
                         🎟️ Gen Code
                       </Btn>
                     )}
@@ -9617,11 +9634,7 @@ export default function App() {
                           🎟️ Code active
                         </span>
                         <Btn sm bg="#f0f9ff" col="#0369a1"
-                          onClick={()=>{
-                            const code = generateInviteCode(m.id);
-                            setToast(`📋 New code for ${m.name.split(" ")[0]}: ${code} — share via WhatsApp`);
-                            setTimeout(()=>setToast(null), 6000);
-                          }}>
+                          onClick={()=>generateInviteCode(m.id)}>
                           ↻ New
                         </Btn>
                       </div>
@@ -9638,6 +9651,72 @@ export default function App() {
       </div>
       <BotNav view="admin" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length + parentReqs.filter(r=>r.status==="pending").length}/>
       {toast&&<Toast msg={toast}/>}
+
+      {/* ── Code modal ── */}
+      {codeModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",
+          zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+          <div style={{background:G.white,borderRadius:18,padding:"28px 24px",
+            maxWidth:340,width:"100%",boxShadow:"0 12px 48px rgba(0,0,0,0.25)",
+            textAlign:"center"}}>
+            <div style={{fontSize:36,marginBottom:10}}>🎟️</div>
+            <div style={{fontWeight:900,fontSize:17,color:G.text,marginBottom:4}}>
+              Access Code Generated
+            </div>
+            <div style={{fontSize:13,color:G.muted,marginBottom:20,lineHeight:1.6}}>
+              {codeModal.forChild
+                ? <>For <b style={{color:G.text}}>{codeModal.name}</b> (parent of <b style={{color:G.text}}>{codeModal.forChild}</b>)</>
+                : <>For <b style={{color:G.text}}>{codeModal.name}</b></>
+              }
+            </div>
+            {/* Big code display */}
+            <div style={{background:"#f0f9ff",border:"2px dashed #0369a1",borderRadius:14,
+              padding:"18px 16px",marginBottom:16}}>
+              <div style={{fontSize:11,fontWeight:700,color:"#0369a1",
+                textTransform:"uppercase",letterSpacing:1.5,marginBottom:8}}>
+                One-time access code
+              </div>
+              <div style={{fontSize:32,fontWeight:900,color:"#0c4a6e",
+                letterSpacing:6,fontFamily:"'DM Sans',monospace"}}>
+                {codeModal.code}
+              </div>
+            </div>
+            {/* Copy button */}
+            <button onClick={()=>{
+                try { navigator.clipboard.writeText(codeModal.code); } catch(e) {}
+                showToast("Code copied ✓");
+              }}
+              style={{width:"100%",background:"#0369a1",color:"#fff",border:"none",
+                borderRadius:10,padding:"12px",fontSize:14,fontWeight:800,
+                cursor:"pointer",fontFamily:"inherit",marginBottom:10,
+                display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              📋 Copy to Clipboard
+            </button>
+            {/* WhatsApp share */}
+            <button onClick={()=>{
+                const msg = codeModal.forChild
+                  ? `Hi ${codeModal.name}, your FCC Training access code for ${codeModal.forChild}'s account is: *${codeModal.code}*\n\n1. Open https://fcc-training.vercel.app\n2. Tap "Set up my account"\n3. Search for ${codeModal.forChild}'s name\n4. Enter this code when prompted`
+                  : `Hi ${codeModal.name.split(" ")[0]}, your FCC Training access code is: *${codeModal.code}*\n\n1. Open https://fcc-training.vercel.app\n2. Tap "Set up my account"\n3. Search for your name\n4. Enter this code when prompted`;
+                window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`,"_blank");
+              }}
+              style={{width:"100%",background:"#25D366",color:"#fff",border:"none",
+                borderRadius:10,padding:"12px",fontSize:14,fontWeight:800,
+                cursor:"pointer",fontFamily:"inherit",marginBottom:14,
+                display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              💬 Share via WhatsApp
+            </button>
+            <div style={{fontSize:11,color:G.muted,marginBottom:14,lineHeight:1.5}}>
+              This code is single-use and expires after the member logs in for the first time.
+            </div>
+            <button onClick={()=>setCodeModal(null)}
+              style={{background:"none",border:`1.5px solid ${G.border}`,borderRadius:10,
+                padding:"10px 24px",fontSize:13,fontWeight:700,color:G.muted,
+                cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
+              Done
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Delete confirmation modal ── */}
       {confirmDelete&&(
