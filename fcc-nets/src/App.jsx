@@ -7581,7 +7581,13 @@ export default function App() {
         {adminSec.members&&<>
         {/* ── Self-verified members (email confirmed, no action needed) ── */}
         {can(userRole,"addMember")&&(()=>{
-          const verified = members.filter(m=>m.emailVerified&&!m.pin&&!Object.keys(inviteCodes).find(id=>id===m.id));
+          const verified = members.filter(m=>
+            m.emailVerified &&
+            !m.pin &&
+            !Object.keys(inviteCodes).find(id=>id===m.id) &&
+            !m.managedBy &&      // exclude parent-managed children — they don't log in directly
+            !m.isParentOf        // exclude parent accounts — handled via parent req approval
+          );
           if(!verified.length) return null;
           return (
             <div style={{background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:12,
@@ -7787,13 +7793,30 @@ export default function App() {
             };
             const withParent = [...updatedMembers, parentMember];
             saveMembers(withParent);
-            // Give parent immediate access via invite code
+            // Give parent immediate access — generate code and email it directly to parent
             setTimeout(()=>{
               const code = genCode();
               const updated = {...inviteCodes, [parentMember.id]: hashCode(code)};
               saveInviteCodes(updated);
+              // Auto-email the code to the parent — they don't need admin to forward it
+              fetch("/api/send-verify", {
+                method:"POST",
+                headers:{"Content-Type":"application/json"},
+                body: JSON.stringify({
+                  email: req.parentEmail,
+                  name: req.parentName,
+                  code,
+                  customMessage: `Your request to manage ${child.name}'s FCC Training account has been approved. Use the code below to set up your access.`,
+                })
+              }).catch(()=>{});
+              // Also copy to clipboard and show modal as backup (in case email fails)
               try { navigator.clipboard.writeText(code); } catch(e) {}
-              setCodeModal({name: req.parentName, code, forChild: child.name});
+              setCodeModal({
+                name: req.parentName,
+                code,
+                forChild: child.name,
+                autoEmailed: true,  // tells modal to say "also sent by email"
+              });
             }, 400);
             // Mark request as approved
             saveParentReqs(parentReqs.map(r=>r.id===req.id?{...r,status:"approved",approvedAt:new Date().toISOString()}:r));
@@ -8937,20 +8960,52 @@ export default function App() {
         {divisionUpdates.length > 0 && (
           <div style={{background:"#eff6ff",border:"1.5px solid #93c5fd",
             borderRadius:12,padding:"14px 16px",marginBottom:16}}>
-            <div style={{fontWeight:900,fontSize:13,color:"#1e3a5f",marginBottom:6}}>
-              🏏 Division team assignments ready
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+              <div style={{fontWeight:900,fontSize:13,color:"#1e3a5f"}}>
+                🏏 Division team assignments ready
+              </div>
+              <button onClick={()=>{
+                  // Dismiss all by pretending they're already assigned
+                  const toSkip = divisionUpdates.map(m=>m.name);
+                  const fakeFix = members.map(m=>
+                    toSkip.includes(m.name) ? {...m, teams:[...(m.teams||[]), DIVISION_TEAMS[m.name]]} : m
+                  );
+                  saveMembers(fakeFix);
+                  showToast("Division assignments applied ✓");
+                }}
+                style={{fontSize:11,fontWeight:700,color:"#1e3a5f",background:"none",
+                  border:"1px solid #93c5fd",borderRadius:20,padding:"3px 10px",
+                  cursor:"pointer",fontFamily:"inherit"}}>
+                Apply all & dismiss
+              </button>
             </div>
             <div style={{fontSize:12,color:"#1e40af",marginBottom:10,lineHeight:1.5}}>
               <b>{divisionUpdates.length}</b> member{divisionUpdates.length>1?"s":""} have a division squad assignment not yet reflected in the app.
               This will add their division group without removing any existing groups.
             </div>
-            <div style={{fontSize:11,background:"#1e3a5f",color:"#93c5fd",
-              borderRadius:7,padding:"7px 10px",marginBottom:10,lineHeight:1.8}}>
-              {divisionUpdates.map(m=>`${m.name} → ${DIVISION_TEAMS[m.name]}`).join(" · ")}
+            <div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:10}}>
+              {divisionUpdates.map(m=>(
+                <div key={m.id} style={{display:"flex",alignItems:"center",gap:8,
+                  background:"#1e3a5f",borderRadius:7,padding:"6px 10px"}}>
+                  <span style={{fontSize:11,color:"#93c5fd",flex:1,lineHeight:1.8}}>
+                    {m.name} → {DIVISION_TEAMS[m.name]}
+                  </span>
+                  <button onClick={()=>{
+                      // Dismiss just this one
+                      saveMembers(members.map(x=>x.id===m.id
+                        ? {...x, teams:[...(x.teams||[]), DIVISION_TEAMS[m.name]]}
+                        : x
+                      ));
+                      showToast(`${m.name.split(" ")[0]} → ${DIVISION_TEAMS[m.name]} ✓`);
+                    }}
+                    style={{fontSize:10,fontWeight:700,color:"#bfdbfe",background:"rgba(255,255,255,.1)",
+                      border:"none",borderRadius:20,padding:"2px 8px",cursor:"pointer",
+                      fontFamily:"inherit",flexShrink:0}}>
+                    Assign ✓
+                  </button>
+                </div>
+              ))}
             </div>
-            <Btn bg="#1e3a5f" col="#93c5fd" onClick={applyDivisionTeams}>
-              Assign Division Teams to {divisionUpdates.length} Member{divisionUpdates.length>1?"s":""}
-            </Btn>
           </div>
         )}
 
@@ -9663,12 +9718,23 @@ export default function App() {
             <div style={{fontWeight:900,fontSize:17,color:G.text,marginBottom:4}}>
               Access Code Generated
             </div>
-            <div style={{fontSize:13,color:G.muted,marginBottom:20,lineHeight:1.6}}>
+            <div style={{fontSize:13,color:G.muted,marginBottom:codeModal.autoEmailed?10:20,lineHeight:1.6}}>
               {codeModal.forChild
                 ? <>For <b style={{color:G.text}}>{codeModal.name}</b> (parent of <b style={{color:G.text}}>{codeModal.forChild}</b>)</>
                 : <>For <b style={{color:G.text}}>{codeModal.name}</b></>
               }
             </div>
+            {/* Auto-emailed confirmation */}
+            {codeModal.autoEmailed && (
+              <div style={{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:10,
+                padding:"9px 12px",marginBottom:16,display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:16}}>📧</span>
+                <div style={{fontSize:12,color:"#166534",fontWeight:700,textAlign:"left",lineHeight:1.5}}>
+                  Code sent automatically to <b>{codeModal.name}</b>'s email.
+                  No need to forward it — they can log in as soon as they check their inbox.
+                </div>
+              </div>
+            )}
             {/* Big code display */}
             <div style={{background:"#f0f9ff",border:"2px dashed #0369a1",borderRadius:14,
               padding:"18px 16px",marginBottom:16}}>
@@ -9680,6 +9746,11 @@ export default function App() {
                 letterSpacing:6,fontFamily:"'DM Sans',monospace"}}>
                 {codeModal.code}
               </div>
+              {codeModal.autoEmailed && (
+                <div style={{fontSize:11,color:"#0369a1",marginTop:6}}>
+                  (backup — already in your clipboard)
+                </div>
+              )}
             </div>
             {/* Copy button */}
             <button onClick={()=>{
