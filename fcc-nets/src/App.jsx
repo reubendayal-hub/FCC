@@ -7433,25 +7433,6 @@ export default function App() {
       logAction("system", `Imported ${toAdd.length} missing member${toAdd.length>1?"s":""}: ${toAdd.map(m=>m.name).join(", ")}`);
       showToast(`${toAdd.length} member${toAdd.length>1?"s":""} added ✓`);
     }
-    // Members who have a division assignment in DIVISION_TEAMS but not yet that team in Firebase
-    const divisionUpdates = userRole==="superadmin"
-      ? members.filter(m=>{
-          const div = DIVISION_TEAMS[m.name];
-          return div && !(m.teams||[]).includes(div);
-        })
-      : [];
-    function applyDivisionTeams() {
-      const updated = members.map(m=>{
-        const div = DIVISION_TEAMS[m.name];
-        if(!div) return m;
-        const existing = m.teams||[];
-        if(existing.includes(div)) return m;
-        return normMember({...m, teams:[...existing, div]});
-      });
-      saveMembers(updated);
-      logAction("system", `Assigned division teams to ${divisionUpdates.length} member${divisionUpdates.length>1?"s":""}: ${divisionUpdates.map(m=>m.name+" → "+DIVISION_TEAMS[m.name]).join(", ")}`);
-      showToast(`Division teams assigned ✓`);
-    }
 
     // ── T20 squad import ───────────────────────────────────────
     function resolvedName(squadName, teamKey) {
@@ -8957,58 +8938,6 @@ export default function App() {
         )}
 
         {/* ── Division Team Assignments ──────────────────────── */}
-        {divisionUpdates.length > 0 && (
-          <div style={{background:"#eff6ff",border:"1.5px solid #93c5fd",
-            borderRadius:12,padding:"14px 16px",marginBottom:16}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
-              <div style={{fontWeight:900,fontSize:13,color:"#1e3a5f"}}>
-                🏏 Division team assignments ready
-              </div>
-              <button onClick={()=>{
-                  // Dismiss all by pretending they're already assigned
-                  const toSkip = divisionUpdates.map(m=>m.name);
-                  const fakeFix = members.map(m=>
-                    toSkip.includes(m.name) ? {...m, teams:[...(m.teams||[]), DIVISION_TEAMS[m.name]]} : m
-                  );
-                  saveMembers(fakeFix);
-                  showToast("Division assignments applied ✓");
-                }}
-                style={{fontSize:11,fontWeight:700,color:"#1e3a5f",background:"none",
-                  border:"1px solid #93c5fd",borderRadius:20,padding:"3px 10px",
-                  cursor:"pointer",fontFamily:"inherit"}}>
-                Apply all & dismiss
-              </button>
-            </div>
-            <div style={{fontSize:12,color:"#1e40af",marginBottom:10,lineHeight:1.5}}>
-              <b>{divisionUpdates.length}</b> member{divisionUpdates.length>1?"s":""} have a division squad assignment not yet reflected in the app.
-              This will add their division group without removing any existing groups.
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:10}}>
-              {divisionUpdates.map(m=>(
-                <div key={m.id} style={{display:"flex",alignItems:"center",gap:8,
-                  background:"#1e3a5f",borderRadius:7,padding:"6px 10px"}}>
-                  <span style={{fontSize:11,color:"#93c5fd",flex:1,lineHeight:1.8}}>
-                    {m.name} → {DIVISION_TEAMS[m.name]}
-                  </span>
-                  <button onClick={()=>{
-                      // Dismiss just this one
-                      saveMembers(members.map(x=>x.id===m.id
-                        ? {...x, teams:[...(x.teams||[]), DIVISION_TEAMS[m.name]]}
-                        : x
-                      ));
-                      showToast(`${m.name.split(" ")[0]} → ${DIVISION_TEAMS[m.name]} ✓`);
-                    }}
-                    style={{fontSize:10,fontWeight:700,color:"#bfdbfe",background:"rgba(255,255,255,.1)",
-                      border:"none",borderRadius:20,padding:"2px 8px",cursor:"pointer",
-                      fontFamily:"inherit",flexShrink:0}}>
-                    Assign ✓
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         </>}
 
         {/* ── Audit Log (superadmin only) ───────────────────── */}
