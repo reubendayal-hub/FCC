@@ -3822,12 +3822,28 @@ export default function App() {
           headers:{"Content-Type":"application/json"},
           body: JSON.stringify({email, name, code})
         });
-        if(!r.ok) throw new Error("Send failed");
+        if(!r.ok) {
+          // Try to get actual error from API
+          let apiMsg = "";
+          try { const j = await r.json(); apiMsg = j.error||j.message||""; } catch(e) {}
+          throw new Error(apiMsg || `Server error (${r.status})`);
+        }
         setVfSentCode(code);
         setVfCodeExpiry(Date.now()+15*60*1000);
         setVfStep("code");
       } catch(e) {
-        setVfError("Could not send email. Please check the address and try again.");
+        // For parent requests: email verification is a nicety — admin approves anyway.
+        // Offer a bypass so the parent isn't permanently blocked by an email API issue.
+        if(vfParentMode) {
+          setVfError(
+            `__EMAIL_FAILED__${e.message||"Could not reach email server"}`
+          );
+        } else {
+          setVfError(
+            `Email could not be sent — this is likely a temporary server issue, not a problem with your address. ` +
+            `Please try again in a moment. If it keeps failing, contact the admin directly.`
+          );
+        }
       }
       setVfSending(false);
     }
@@ -4087,8 +4103,61 @@ export default function App() {
                   as described in the privacy notice above. I confirm I have parental authority to provide this consent.
                 </span>
               </label>
-              {vfError&&<div style={{background:G.redBg,color:G.red,borderRadius:8,
-                padding:"8px 12px",fontSize:13,marginBottom:12}}>{vfError}</div>}
+              {vfError && !vfError.startsWith("__EMAIL_FAILED__") && (
+                <div style={{background:G.redBg,color:G.red,borderRadius:8,
+                  padding:"8px 12px",fontSize:13,marginBottom:12}}>{vfError}</div>
+              )}
+              {vfError && vfError.startsWith("__EMAIL_FAILED__") && (
+                <div style={{background:"#fffbeb",border:"1.5px solid #fde68a",
+                  borderRadius:10,padding:"14px 16px",marginBottom:12}}>
+                  <div style={{fontWeight:800,fontSize:13,color:"#92400e",marginBottom:6}}>
+                    ⚠️ Could not send verification email
+                  </div>
+                  <div style={{fontSize:12,color:"#78350f",lineHeight:1.6,marginBottom:12}}>
+                    This is a temporary server issue — your email address is fine.
+                    Since the admin reviews all parent requests anyway, you can submit
+                    your request without email verification and the admin will confirm
+                    your identity manually.
+                  </div>
+                  <button onClick={()=>{
+                      // Submit parent request without email verification
+                      const req = {
+                        id: uid(),
+                        submittedAt: new Date().toISOString(),
+                        memberId: vfMatch.id,
+                        memberName: vfMatch.name,
+                        parentName: vfParentName.trim(),
+                        parentEmail: vfEmail.trim(),
+                        parentPhone: vfPhone.trim()||null,
+                        emailVerified: false,  // not verified — admin must confirm manually
+                        consentGiven: vfParentConsent,
+                        consentDate: new Date().toISOString().slice(0,10),
+                        isOverride: !!(vfMatch.managedBy),
+                        status: "pending",
+                        note: "Email verification failed — please confirm parent identity before approving.",
+                      };
+                      saveParentReqs([...parentReqs, req]);
+                      fetch("/api/notify",{method:"POST",headers:{"Content-Type":"application/json"},
+                        body:JSON.stringify({type:"joinrequest",data:{
+                          name:`Parent request for ${vfMatch.name}`,
+                          playerTeam:(vfMatch.teams||[]).join(", ")||"Youth",
+                          message:`⚠️ Email unverified — confirm manually. Parent: ${vfParentName} · ${vfEmail}${req.isOverride?" (OVERRIDE)":""}`
+                        }})}).catch(()=>{});
+                      setVfStep("parentdone");
+                    }}
+                    style={{width:"100%",background:"#92400e",color:"#fff",border:"none",
+                      borderRadius:10,padding:"11px",fontSize:13,fontWeight:800,
+                      cursor:"pointer",fontFamily:"inherit",marginBottom:8}}>
+                    Submit request without email verification →
+                  </button>
+                  <button onClick={()=>sendCode(vfEmail, vfParentName||"Parent")}
+                    style={{width:"100%",background:"none",border:`1px solid #fde68a`,
+                      borderRadius:10,padding:"9px",fontSize:12,fontWeight:700,color:"#92400e",
+                      cursor:"pointer",fontFamily:"inherit"}}>
+                    🔄 Try sending email again
+                  </button>
+                </div>
+              )}
               <Btn bg={G.green} col={G.lime} full
                 disabled={!vfParentConsent||!vfEmail.includes("@")||!vfParentName.trim()||vfSending}
                 onClick={()=>sendCode(vfEmail, vfParentName||"Parent")}>
@@ -7835,6 +7904,9 @@ export default function App() {
                           {req.emailVerified&&<span style={{fontSize:10,fontWeight:700,
                             padding:"1px 7px",borderRadius:20,background:"#dcfce7",
                             color:"#166534",border:"0.5px solid #86efac"}}>✅ email verified</span>}
+                          {!req.emailVerified&&<span style={{fontSize:10,fontWeight:700,
+                            padding:"1px 7px",borderRadius:20,background:"#fee2e2",
+                            color:"#dc2626",border:"0.5px solid #fca5a5"}}>⚠️ email NOT verified</span>}
                           {req.isOverride&&<span style={{fontSize:10,fontWeight:700,
                             padding:"1px 7px",borderRadius:20,background:"#fef3c7",
                             color:"#92400e",border:"0.5px solid #fde68a"}}>⚠️ override request</span>}
@@ -7857,6 +7929,14 @@ export default function App() {
                             ⚠️ Currently managed by: <b>{child.managedBy.name}</b>
                             {child.managedBy.email&&<span> ({maskEmail(child.managedBy.email)})</span>}
                             . Approving will replace this.
+                          </div>
+                        )}
+                        {!req.emailVerified&&(
+                          <div style={{marginTop:6,background:"#fef2f2",border:"1px solid #fca5a5",
+                            borderRadius:7,padding:"8px 10px",fontSize:11,color:"#dc2626",lineHeight:1.5}}>
+                            ⚠️ <b>Email not verified</b> — the verification email failed when this request was submitted.
+                            Please confirm this parent's identity before approving
+                            (e.g. call <b>{req.parentPhone||"them"}</b> or check at training).
                           </div>
                         )}
                       </div>
