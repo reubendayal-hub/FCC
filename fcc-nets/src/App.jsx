@@ -4241,11 +4241,22 @@ export default function App() {
                 </div>
               </div>
               <div style={{fontSize:13,color:G.muted,marginBottom:16,lineHeight:1.6}}>
-                Is this the correct email? We'll send a verification code to confirm.
+                Is this your email? Tap below to confirm and activate your account.
               </div>
               <Btn bg={G.green} col={G.lime} full disabled={vfSending}
-                onClick={()=>{ setVfEmail(vfMatch.email); sendCode(vfMatch.email, vfMatch.name); }}>
-                {vfSending?"Sending…":"📧 Send verification code"}
+                onClick={()=>{
+                  // Activate directly — no email code needed
+                  const updated = members.map(m=>m.id===vfMatch.id ? {
+                    ...m, email: vfMatch.email,
+                    emailVerified: true, consentGiven: true,
+                    consentDate: new Date().toISOString().slice(0,10),
+                  } : m);
+                  saveMembers(updated);
+                  generateInviteCode(vfMatch.id);
+                  logAction("member",`Self-activated: ${vfMatch.name} — ${vfMatch.email}`);
+                  setVfStep("done");
+                }}>
+                ✅ Yes, activate my account
               </Btn>
               <button onClick={()=>{setVfStep("search");}}
                 style={{width:"100%",marginTop:10,background:"none",border:`1px solid ${G.border}`,
@@ -4275,8 +4286,20 @@ export default function App() {
               {vfError&&<div style={{background:G.redBg,color:G.red,borderRadius:8,
                 padding:"8px 12px",fontSize:13,marginBottom:12}}>{vfError}</div>}
               <Btn bg={G.green} col={G.lime} full disabled={!vfEmail.includes("@")||vfSending}
-                onClick={()=>sendCode(vfEmail,vfMatch.name)}>
-                {vfSending?"Sending…":"📧 Send verification code"}
+                onClick={()=>{
+                  // Save email and activate — no code verification needed
+                  const updated = members.map(m=>m.id===vfMatch.id ? {
+                    ...m, email: vfEmail.trim(),
+                    phone: vfPhone.trim()||m.phone,
+                    emailVerified: true, consentGiven: true,
+                    consentDate: new Date().toISOString().slice(0,10),
+                  } : m);
+                  saveMembers(updated);
+                  generateInviteCode(vfMatch.id);
+                  logAction("member",`Self-activated (new email): ${vfMatch.name} — ${vfEmail}`);
+                  setVfStep("done");
+                }}>
+                ✅ Save &amp; activate my account
               </Btn>
             </>)}
             <button onClick={()=>setVfStep("search")}
@@ -4382,8 +4405,33 @@ export default function App() {
 
           <Btn bg={G.green} col={G.lime} full
             disabled={!vfConsent||!vfEmail.includes("@")||(vfIsParent?!vfChildName.trim():!vfNewName.trim())||vfSending}
-            onClick={()=>sendCode(vfEmail, vfNewName||"Member")}>
-            {vfSending?"Sending code…":"📧 Verify email & submit"}
+            onClick={()=>{
+              // Submit join request directly — no email verification needed
+              // since admin reviews and approves all new registrations anyway
+              const req = {
+                id: uid(),
+                submittedAt: new Date().toISOString(),
+                forChild: vfIsParent,
+                playerName: vfIsParent ? vfChildName.trim() : vfNewName.trim(),
+                playerTeam: vfNewTeam||null,
+                parentName: vfIsParent ? vfNewName.trim() : null,
+                contact: vfPhone.trim()||null,
+                email: vfEmail.trim(),
+                emailVerified: false,
+                consentGiven: vfConsent,
+                consentDate: new Date().toISOString().slice(0,10),
+                status:"pending",
+              };
+              saveJoinRequests([...joinRequests, req]);
+              fetch("/api/notify",{method:"POST",headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({type:"joinrequest",data:{
+                  name:req.playerName,
+                  playerTeam:req.playerTeam||"Not specified",
+                  message:`${req.email||""}${req.parentName?" · Parent: "+req.parentName:""}${req.contact?" · "+req.contact:""}`
+                }})}).catch(()=>{});
+              setVfStep("done");
+            }}>
+            {vfSending?"Submitting…":"✋ Submit registration request"}
           </Btn>
           <button onClick={()=>setVfStep("search")}
             style={{width:"100%",marginTop:8,background:"none",border:"none",
