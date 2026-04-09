@@ -1755,7 +1755,7 @@ function PlayerGroup({team,players,members,teams,lifts,selSess,isSelf,cutoff,can
                     {isO&&liftObj.seats>0&&<span style={{fontSize:11,color:G.muted}}>💺 {liftObj.seats} seat{liftObj.seats>1?"s":""}</span>}
                     {dispStop(liftObj)&&<span style={{fontSize:11,color:G.muted}}>📍 {dispStop(liftObj)}</span>}
                     {liftObj.note&&<span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>"{liftObj.note}"</span>}
-                    {self&&!cutoff&&(
+                    {self&&(
                       <button onClick={()=>onCarpoolEdit(p)}
                         style={{fontSize:11,background:"none",border:"none",color:G.muted,
                           textDecoration:"underline",cursor:"pointer",fontFamily:"inherit",padding:0}}>
@@ -1764,7 +1764,7 @@ function PlayerGroup({team,players,members,teams,lifts,selSess,isSelf,cutoff,can
                     )}
                   </div>
                 )}
-                {!liftPref&&self&&!cutoff&&(
+                {!liftPref&&self&&(
                   <button onClick={onCarpoolSet}
                     style={{marginTop:5,fontSize:11,fontWeight:700,padding:"3px 10px",
                       borderRadius:20,border:`1px solid ${G.border}`,background:G.cream,
@@ -2052,6 +2052,15 @@ function CarpoolSheet({sess,sessions,myName,liftDraft,setLiftDraft,liftEditing,s
                         background:isO?G.green:"#1e3a5f",color:isO?G.lime:"#bfdbfe"}}>
                       Done ✓
                     </button>
+                    {myData.pref&&(
+                      <button onClick={()=>saveLift(null)}
+                        style={{width:"100%",marginTop:8,padding:"8px 0",borderRadius:10,
+                          border:`1px solid ${G.border}`,background:"transparent",
+                          fontFamily:"inherit",fontSize:12,fontWeight:600,cursor:"pointer",
+                          color:G.muted}}>
+                        🗑 Remove my preference
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -5608,18 +5617,18 @@ export default function App() {
                     {isO&&myLiftObj.seats>0&&<span style={{fontSize:11,color:G.muted}}>💺{myLiftObj.seats}</span>}
                     {dispS(myLiftObj)&&<span style={{fontSize:11,color:G.muted}}>📍{dispS(myLiftObj)}</span>}
                     {myLiftObj.note&&<span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>"{myLiftObj.note}"</span>}
-                    {!cutoff&&<button onClick={()=>{setLiftDraft({...myLiftObj});setCarpoolSheetSess(selSess);}}
+                    <button onClick={()=>{setLiftDraft({...myLiftObj});setCarpoolSheetSess(selSess);}}
                       style={{fontSize:11,background:"none",border:"none",color:G.muted,
-                        textDecoration:"underline",cursor:"pointer",fontFamily:"inherit",padding:0}}>Edit</button>}
+                        textDecoration:"underline",cursor:"pointer",fontFamily:"inherit",padding:0}}>Edit</button>
                   </div>
-                ) : !cutoff ? (
+                ) : (
                   <button onClick={()=>{setLiftDraft(null);setCarpoolSheetSess(selSess);}}
                     style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,
                       border:`1px solid #c6f0d0`,background:G.white,color:G.green,
                       cursor:"pointer",fontFamily:"inherit"}}>
                     🚘 Set your preference
                   </button>
-                ) : null}
+                )}
               </div>
             );
           })()}
