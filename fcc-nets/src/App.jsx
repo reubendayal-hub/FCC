@@ -11,9 +11,8 @@ const MEMBERS_KEY    = "fcc-nets-members-v4";
 const PINS_KEY       = "fcc-nets-pins-v4";
 const RECURRING_KEY  = "recurring";
 const TEAMS_KEY      = "fcc-nets-teams-v4";
-const JOINREQS_KEY    = "joinrequests";
-const AUDITLOG_KEY    = "auditlog";
-const PARENT_REQS_KEY = "parentrequests";
+const JOINREQS_KEY   = "joinrequests";
+const AUDITLOG_KEY   = "auditlog";
 
 // ─── 2026 Home Match Fixtures (Fredensborg ground only) ───────
 // ─── Privacy notice (GDPR) ────────────────────────────────────
@@ -776,12 +775,6 @@ function maskEmail(email) {
   if(!domain) return email;
   if(local.length <= 4) return email; // too short to mask meaningfully
   return local.slice(0,2) + '•'.repeat(Math.max(local.length-4,2)) + local.slice(-2) + '@' + domain;
-}
-
-// isYouthMember: true if any of the member's teams are youth groups
-const YOUTH_TEAMS = ["U11","U13","U15","U15 Girls","U16","U18"];
-function isYouthMember(member) {
-  return (member?.teams||[]).some(t => YOUTH_TEAMS.includes(t));
 }
 
 // isAbsent(member, dateStr) — true if member has an absence covering this date
@@ -1729,9 +1722,22 @@ function PlayerGroup({team,players,members,teams,lifts,selSess,isSelf,cutoff,can
                 {p.split(" ").map(w=>w[0]).join("").slice(0,2)}
               </div>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontWeight:800,color:G.text,fontSize:15}}>
-                  {p}{self&&<span style={{color:G.muted,fontSize:12,fontWeight:500,marginLeft:6}}>(you)</span>}
-                  {isCoachMember(p, teams)&&<span style={{fontSize:12,marginLeft:5}} title="Coach">🧢</span>}
+                <div style={{fontWeight:800,color:G.text,fontSize:15,
+                  display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                  {p}{self&&<span style={{color:G.muted,fontSize:12,fontWeight:500}}>(you)</span>}
+                  {isCoachMember(p, teams)&&<span style={{fontSize:12}} title="Coach">🧢</span>}
+                  {(()=>{
+                    if(!mem||!selSess?.date) return null;
+                    if(!isAbsent(mem, selSess.date)) return null;
+                    const abs=(mem.absences||[]).find(a=>a.from<=selSess.date&&a.to>=selSess.date);
+                    return (
+                      <span style={{fontSize:10,fontWeight:700,padding:"1px 7px",
+                        borderRadius:20,background:"#fffbeb",color:"#92400e",
+                        border:"1px solid #fde68a"}}>
+                        ✈️ Away{abs?.category&&` · ${abs.category}`}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <div style={{display:"flex",gap:4,marginTop:2,flexWrap:"wrap"}}>
                   {(mem?.teams||[]).map(t=><TeamPill key={t} team={t} sm/>)}
@@ -2460,8 +2466,6 @@ export default function App() {
   const [inviteCodes,   setInviteCodes]   = useState({});
   // Join requests from non-members
   const [joinRequests,  setJoinRequests]  = useState([]);
-  // Parent management requests (youth account parent setup)
-  const [parentReqs,    setParentReqs]    = useState([]);
   // Superadmin-only audit log
   const [auditLog,      setAuditLog]      = useState([]);
 
@@ -2564,7 +2568,7 @@ export default function App() {
   const [jrChildTeam,setJrChildTeam]=useState("");
 
   // ── Self-service verify/onboarding flow ────────────────────
-  const [vfStep,      setVfStep]      = useState("search");   // search|found|notfound|code|parent|done|parentrequest|parentdone
+  const [vfStep,      setVfStep]      = useState("search");   // search|found|notfound|code|parent|done
   const [vfSearch,    setVfSearch]    = useState("");
   const [vfMatch,     setVfMatch]     = useState(null);        // matched member object
   const [vfEmail,     setVfEmail]     = useState("");
@@ -2579,10 +2583,6 @@ export default function App() {
   const [vfChildName, setVfChildName] = useState("");
   const [vfNewName,   setVfNewName]   = useState("");
   const [vfNewTeam,   setVfNewTeam]   = useState("");
-  // Parent-setup-for-child mode within the "found" flow
-  const [vfParentMode,     setVfParentMode]     = useState(false); // true = parent registering for child
-  const [vfParentName,     setVfParentName]     = useState("");
-  const [vfParentConsent,  setVfParentConsent]  = useState(false);
 
   const userRole = currentUser?.role || "member";
   const showToast = m => { setToast(m); setTimeout(()=>setToast(null),2700); };
@@ -2611,11 +2611,10 @@ export default function App() {
       invitecodes: doc(db,"fccnets","invitecodes"),
       joinrequests:doc(db,"fccnets",JOINREQS_KEY),
       auditlog:    doc(db,"fccnets",AUDITLOG_KEY),
-      parentreqs:  doc(db,"fccnets",PARENT_REQS_KEY),
     };
     (async()=>{
       try {
-        const [sr,mr,pr,tr,rr,br,ir,jr,ar,par] = await Promise.all([
+        const [sr,mr,pr,tr,rr,br,ir,jr,ar] = await Promise.all([
           getDoc(refs.sessions),
           getDoc(refs.members),
           getDoc(refs.pins),
@@ -2625,7 +2624,6 @@ export default function App() {
           getDoc(refs.invitecodes),
           getDoc(refs.joinrequests),
           getDoc(refs.auditlog),
-          getDoc(refs.parentreqs),
         ]);
         // Sessions MUST be loaded before setLoading(false) so sessionsRef is
         // populated before the recurring useEffect runs — prevents lifts being wiped
@@ -2655,9 +2653,8 @@ export default function App() {
         setInviteCodes( ir.exists() ? JSON.parse(ir.data().value) : {});
         setJoinRequests(jr.exists() ? JSON.parse(jr.data().value) : []);
         setAuditLog(    ar.exists() ? JSON.parse(ar.data().value) : []);
-        setParentReqs(  par.exists()? JSON.parse(par.data().value): []);
       } catch(e) {
-        setMembers(SEED_MEMBERS.map(normMember)); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]); setBlockCals([]); setInviteCodes({}); setJoinRequests([]); setAuditLog([]); setParentReqs([]);
+        setMembers(SEED_MEMBERS.map(normMember)); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]); setBlockCals([]); setInviteCodes({}); setJoinRequests([]); setAuditLog([]);
       }
       setLoading(false);
     })();
@@ -2678,7 +2675,6 @@ export default function App() {
   const saveBlockCals   = async u => { setBlockCals(u);   await setDoc(doc(db,"fccnets","blockcals"),   {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveInviteCodes = async u => { setInviteCodes(u);  await setDoc(doc(db,"fccnets","invitecodes"), {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveJoinRequests= async u => { setJoinRequests(u); await setDoc(doc(db,"fccnets",JOINREQS_KEY),  {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveParentReqs  = async u => { setParentReqs(u);   await setDoc(doc(db,"fccnets",PARENT_REQS_KEY),{value:JSON.stringify(u)}).catch(()=>{}); };
 
   // ── Audit log ─────────────────────────────────────────────────
   // Cap at 500 entries; newest first. Only superadmin can read.
@@ -2771,10 +2767,7 @@ export default function App() {
     const updated = {...inviteCodes, [memberId]: hashCode(plain)};
     saveInviteCodes(updated);
     if(m) logAction("pin", `Generated invite code for: ${m.name}`);
-    // Copy to clipboard silently
-    try { navigator.clipboard.writeText(plain); } catch(e) {}
-    // Show persistent modal instead of a brief toast
-    setCodeModal({name: m?.name || "Member", code: plain});
+    showToast(`Code for member: ${plain}`);
     return plain;
   }
 
@@ -2896,19 +2889,6 @@ export default function App() {
       setPSearch(""); setPFilter("All"); setOtherGroupsOpen(false);
     }
   },[view]);
-
-  // ── Clear admin editing state when member selection changes ───
-  // Prevents editingName getting stuck when rows collapse or members re-render
-  useEffect(()=>{ setEditingName(null); },[selMember?.id]);
-
-  // ── Escape key clears any open edit form in admin panel ───────
-  useEffect(()=>{
-    function onKey(e) {
-      if(e.key==="Escape" && editingName) setEditingName(null);
-    }
-    window.addEventListener("keydown", onKey);
-    return ()=>window.removeEventListener("keydown", onKey);
-  },[editingName]);
 
   // ── Weather fetch (Open-Meteo ECMWF — free, CORS-enabled) ────
   useEffect(()=>{
@@ -3060,7 +3040,17 @@ export default function App() {
     if(!bDate||selP.length===0){showToast("Pick a date & at least one player");return;}
     const pollOptions = bPollOpts.map(o=>({...o, votes:[]}));
     const restrictedTo = bRestrictTeam || null;
-    const isLeader = ["superadmin","admin","captain","vicecaptain"].includes(userRole);
+    const isLeader = ["superadmin","admin","captain","vicecaptain","t20captain","t20vicecaptain"].includes(userRole)||!!getTeamRole(currentUser?.name,teams);
+
+    // Absence check — warn if self is marked away on booking date
+    if(bDate && currentUser && selP.includes(currentUser.name)) {
+      const me = members.find(m=>m.id===currentUser.id);
+      if(me && isAbsent(me, bDate)) {
+        const abs = (me.absences||[]).find(a=>a.from<=bDate&&a.to>=bDate);
+        const msg = `You've marked yourself away during this period (${abs?.category||"Away"}: ${fmtShort(abs?.from)} – ${fmtShort(abs?.to)}). Book anyway?`;
+        if(!window.confirm(msg)) return;
+      }
+    }
 
     // Prime time enforcement for members
     if(!isLeader) {
@@ -3126,6 +3116,7 @@ export default function App() {
       const newSess = {id:uid(),date:bDate,from:bFrom,to:bTo,
         players:[...autoPlayers],note:bNote.trim(),label:bLabel.trim(),
         net:bNet,
+        createdBy: currentUser?.name||null,
         lifts: bLift && currentUser?.name ? {[currentUser.name]: {pref:bLift,seats:1,stop:"",stopOther:"",note:"",saved:true}} : {},
         restrictedTo,poll:pollOptions,comments:[]};
       saveSessions([...sessions, newSess]
@@ -3230,12 +3221,21 @@ export default function App() {
   function handleJoinDetail(name) {
     if(!selSess) return;
     if(selSess.players.includes(name)){showToast("Already in this session");return;}
+    // Absence soft warn
+    const mem = members.find(m=>m.name===name);
+    if(mem && isAbsent(mem, selSess.date)) {
+      const abs = (mem.absences||[]).find(a=>a.from<=selSess.date&&a.to>=selSess.date);
+      const isSelf = name===currentUser?.name;
+      const msg = isSelf
+        ? `You've marked yourself away during this period (${abs?.category||"Away"}: ${fmtShort(abs?.from)} – ${fmtShort(abs?.to)}). Add yourself anyway?`
+        : `${name.split(" ")[0]} is marked away on this date (${abs?.category||"Away"}: ${fmtShort(abs?.from)} – ${fmtShort(abs?.to)}). Add them anyway?`;
+      if(!window.confirm(msg)) return;
+    }
     const updatedPlayers = [...selSess.players, name];
     const upd=sessions.map(s=>s.id===selSess.id?{...s,players:updatedPlayers}:s);
     saveSessions(upd);
     setSelSess(upd.find(s=>s.id===selSess.id));
     showToast(`${name.split(" ")[0]} added ✓`);
-    // Confirmation email only when the member adds themselves
     if(name===currentUser?.name)
       sendBookingConfirm(members.find(m=>m.name===name), selSess, updatedPlayers);
   }
@@ -3275,7 +3275,6 @@ export default function App() {
   }
 
   const [confirmDelete, setConfirmDelete] = useState(null);
-  const [codeModal,     setCodeModal]     = useState(null); // {name, code}
   const [schedFilter,   setSchedFilter]   = useState("all"); // "all" | "mine"
   const [blocksExpanded, setBlocksExpanded] = useState(false);
   const [showPastAll,       setShowPastAll]       = useState(false);
@@ -3633,7 +3632,7 @@ export default function App() {
                 <div style={{fontSize:12,color:G.muted,marginBottom:10}}>
                   First time? Setting up your account?
                 </div>
-                <button onClick={()=>{setVfStep("search");setVfSearch("");setVfMatch(null);setVfEmail("");setVfPhone("");setVfCode("");setVfError("");setVfConsent(false);setVfIsParent(false);setVfParentMode(false);setVfParentName("");setVfParentConsent(false);setAuthView("verify");}}
+                <button onClick={()=>{setVfStep("search");setVfSearch("");setVfMatch(null);setVfEmail("");setVfPhone("");setVfCode("");setVfError("");setVfConsent(false);setVfIsParent(false);setAuthView("verify");}}
                   style={{background:G.white,color:G.green,border:`1.5px solid ${G.green}`,
                     borderRadius:20,padding:"9px 22px",fontSize:13,fontWeight:800,
                     cursor:"pointer",fontFamily:"inherit"}}>
@@ -3822,28 +3821,12 @@ export default function App() {
           headers:{"Content-Type":"application/json"},
           body: JSON.stringify({email, name, code})
         });
-        if(!r.ok) {
-          // Try to get actual error from API
-          let apiMsg = "";
-          try { const j = await r.json(); apiMsg = j.error||j.message||""; } catch(e) {}
-          throw new Error(apiMsg || `Server error (${r.status})`);
-        }
+        if(!r.ok) throw new Error("Send failed");
         setVfSentCode(code);
         setVfCodeExpiry(Date.now()+15*60*1000);
         setVfStep("code");
       } catch(e) {
-        // For parent requests: email verification is a nicety — admin approves anyway.
-        // Offer a bypass so the parent isn't permanently blocked by an email API issue.
-        if(vfParentMode) {
-          setVfError(
-            `__EMAIL_FAILED__${e.message||"Could not reach email server"}`
-          );
-        } else {
-          setVfError(
-            `Email could not be sent — this is likely a temporary server issue, not a problem with your address. ` +
-            `Please try again in a moment. If it keeps failing, contact the admin directly.`
-          );
-        }
+        setVfError("Could not send email. Please check the address and try again.");
       }
       setVfSending(false);
     }
@@ -3852,35 +3835,7 @@ export default function App() {
       if(!vfSentCode) { setVfError("No code sent yet"); return; }
       if(Date.now()>vfCodeExpiry) { setVfError("Code expired — please request a new one"); return; }
       if(vfCode.trim()!==vfSentCode) { setVfError("Incorrect code — please try again"); return; }
-
-      // ── Parent mode: create a parent request for admin approval ──
-      if(vfMatch && vfParentMode) {
-        const req = {
-          id: uid(),
-          submittedAt: new Date().toISOString(),
-          memberId: vfMatch.id,
-          memberName: vfMatch.name,
-          parentName: vfParentName.trim(),
-          parentEmail: vfEmail.trim(),
-          parentPhone: vfPhone.trim()||null,
-          emailVerified: true,
-          consentGiven: vfParentConsent,
-          consentDate: new Date().toISOString().slice(0,10),
-          isOverride: !!(vfMatch.managedBy), // true = requesting to replace existing parent
-          status: "pending",
-        };
-        saveParentReqs([...parentReqs, req]);
-        fetch("/api/notify",{method:"POST",headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({type:"joinrequest",data:{
-            name:`Parent request for ${vfMatch.name}`,
-            playerTeam:(vfMatch.teams||[]).join(", ")||"Youth",
-            message:`Parent: ${vfParentName} · ${vfEmail}${req.isOverride?" (OVERRIDE — existing parent)":""}`
-          }})}).catch(()=>{});
-        setVfStep("parentdone");
-        return;
-      }
-
-      // Code correct — activate account (standard flow)
+      // Code correct — activate account
       if(vfMatch) {
         // Update existing member with email/phone + consent
         const updated = members.map(m=>m.id===vfMatch.id ? {
@@ -3961,43 +3916,6 @@ export default function App() {
       </Shell>
     );
 
-    // ── Step: parentdone ──────────────────────────────────────
-    if(vfStep==="parentdone") return (
-      <Shell>
-        {hdr("Request sent! 👨‍👧","FCC Training")}
-        <div style={{padding:"32px 24px",textAlign:"center"}}>
-          <div style={{fontSize:56,marginBottom:16}}>📬</div>
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:900,
-            color:G.green,marginBottom:10}}>Parent request submitted!</div>
-          <div style={{fontSize:14,color:G.muted,lineHeight:1.6,marginBottom:20}}>
-            Your email has been verified and your request to manage{" "}
-            <b style={{color:G.text}}>{vfMatch?.name}</b>'s account has been sent to the admin.
-          </div>
-          <div style={{background:G.cream,border:`1.5px solid ${G.border}`,borderRadius:12,
-            padding:"14px 16px",marginBottom:24,textAlign:"left"}}>
-            <div style={{fontWeight:800,fontSize:13,color:G.text,marginBottom:8}}>What happens next?</div>
-            {[
-              ["👤","The admin reviews your request, usually within 1–2 days"],
-              ["✅","Once approved, you'll receive an access code via email"],
-              ["🔑","Use that code on the login screen → \"Set up my account\" to create your PIN"],
-              ["🏏","You'll then be able to log in and manage "+( vfMatch?.name.split(" ")[0]||"their")+"'s bookings"],
-            ].map(([icon,text],i)=>(
-              <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:8}}>
-                <span style={{fontSize:16,flexShrink:0}}>{icon}</span>
-                <span style={{fontSize:12,color:G.muted,lineHeight:1.5}}>{text}</span>
-              </div>
-            ))}
-          </div>
-          <button onClick={()=>{setAuthView("pick");setVfStep("search");setVfParentMode(false);}}
-            style={{background:G.green,color:G.lime,border:"none",borderRadius:12,
-              padding:"12px 28px",fontSize:14,fontWeight:800,cursor:"pointer",
-              fontFamily:"inherit"}}>
-            ← Back to login
-          </button>
-        </div>
-      </Shell>
-    );
-
     // ── Step: code verification ───────────────────────────────
     if(vfStep==="code") return (
       <Shell>
@@ -4040,195 +3958,15 @@ export default function App() {
     // ── Step: found — existing member ─────────────────────────
     if(vfStep==="found" && vfMatch) {
       const hasEmail = !!(vfMatch.email||"").trim();
-      const isYouth  = isYouthMember(vfMatch);
-      const alreadyHasParent = !!(vfMatch.managedBy);
-
-      // ── Parent-setup path (youth member, parent mode toggled on) ──
-      if(isYouth && vfParentMode) {
-        return (
-          <Shell>
-            {hdr(`Hi, ${vfMatch.name.split(" ")[0]}'s parent!`,"FCC Training — parent account setup")}
-            <div style={{padding:"20px 20px 40px"}}>
-              <div style={{background:G.cream,border:`1px solid ${G.border}`,borderRadius:10,
-                padding:"12px 14px",marginBottom:16,fontSize:11,color:G.muted,lineHeight:1.6}}>
-                <b style={{color:G.text}}>🔐 Privacy notice</b><br/>{PRIVACY_TEXT}
-              </div>
-              <div style={{background:"#eff6ff",border:"1.5px solid #bfdbfe",borderRadius:12,
-                padding:"14px 16px",marginBottom:16}}>
-                <div style={{fontWeight:800,fontSize:13,color:"#1e40af",marginBottom:6}}>
-                  👶 Setting up parent access for {vfMatch.name}
-                </div>
-                <div style={{fontSize:12,color:"#1e40af",lineHeight:1.6}}>
-                  {alreadyHasParent
-                    ? `This account is currently managed by ${vfMatch.managedBy.name}. You can request to take over — an admin will review and approve.`
-                    : `We'll verify your email, then send your request to the club admin. Once approved you'll receive an access code to log in and manage ${vfMatch.name.split(" ")[0]}'s account.`}
-                </div>
-              </div>
-              {alreadyHasParent && (
-                <div style={{background:"#fff7ed",border:"1.5px solid #fed7aa",borderRadius:10,
-                  padding:"12px 14px",marginBottom:16,fontSize:12,color:"#92400e",lineHeight:1.6}}>
-                  ⚠️ This account is already managed by <b>{vfMatch.managedBy.name}</b>
-                  {vfMatch.managedBy.email ? ` (${maskEmail(vfMatch.managedBy.email)})` : ""}.
-                  If you believe this is an error or you need to take over, submit below and the admin will contact you.
-                </div>
-              )}
-              <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:16}}>
-                <div>
-                  <label style={{fontSize:12,fontWeight:700,color:G.muted,display:"block",marginBottom:5}}>YOUR NAME (Parent / Guardian)</label>
-                  <input value={vfParentName} onChange={e=>setVfParentName(e.target.value)}
-                    placeholder="Your full name"
-                    style={iSt({fontSize:15,padding:"12px 14px",borderRadius:10})}/>
-                </div>
-                <div>
-                  <label style={{fontSize:12,fontWeight:700,color:G.muted,display:"block",marginBottom:5}}>YOUR EMAIL ADDRESS</label>
-                  <input type="email" value={vfEmail} onChange={e=>setVfEmail(e.target.value)}
-                    placeholder="your@email.com"
-                    style={iSt({fontSize:15,padding:"12px 14px",borderRadius:10})}/>
-                </div>
-                <div>
-                  <label style={{fontSize:12,fontWeight:700,color:G.muted,display:"block",marginBottom:5}}>YOUR PHONE <span style={{fontWeight:400}}>(optional)</span></label>
-                  <input type="tel" value={vfPhone} onChange={e=>setVfPhone(e.target.value)}
-                    placeholder="+45 XX XX XX XX"
-                    style={iSt({fontSize:15,padding:"12px 14px",borderRadius:10})}/>
-                </div>
-              </div>
-              <label style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:16,
-                cursor:"pointer",padding:"12px 14px",background:"#fffbeb",borderRadius:10,
-                border:"1px solid #fde68a"}}>
-                <input type="checkbox" checked={vfParentConsent}
-                  onChange={e=>setVfParentConsent(e.target.checked)}
-                  style={{width:16,height:16,cursor:"pointer",flexShrink:0,marginTop:2}}/>
-                <span style={{fontSize:12,color:"#78350f",lineHeight:1.6}}>
-                  I consent to Fredensborg CC storing my contact details to manage {vfMatch.name}'s membership,
-                  as described in the privacy notice above. I confirm I have parental authority to provide this consent.
-                </span>
-              </label>
-              {vfError && !vfError.startsWith("__EMAIL_FAILED__") && (
-                <div style={{background:G.redBg,color:G.red,borderRadius:8,
-                  padding:"8px 12px",fontSize:13,marginBottom:12}}>{vfError}</div>
-              )}
-              {vfError && vfError.startsWith("__EMAIL_FAILED__") && (
-                <div style={{background:"#fffbeb",border:"1.5px solid #fde68a",
-                  borderRadius:10,padding:"14px 16px",marginBottom:12}}>
-                  <div style={{fontWeight:800,fontSize:13,color:"#92400e",marginBottom:6}}>
-                    ⚠️ Could not send verification email
-                  </div>
-                  <div style={{fontSize:12,color:"#78350f",lineHeight:1.6,marginBottom:12}}>
-                    This is a temporary server issue — your email address is fine.
-                    Since the admin reviews all parent requests anyway, you can submit
-                    your request without email verification and the admin will confirm
-                    your identity manually.
-                  </div>
-                  <button onClick={()=>{
-                      // Submit parent request without email verification
-                      const req = {
-                        id: uid(),
-                        submittedAt: new Date().toISOString(),
-                        memberId: vfMatch.id,
-                        memberName: vfMatch.name,
-                        parentName: vfParentName.trim(),
-                        parentEmail: vfEmail.trim(),
-                        parentPhone: vfPhone.trim()||null,
-                        emailVerified: false,  // not verified — admin must confirm manually
-                        consentGiven: vfParentConsent,
-                        consentDate: new Date().toISOString().slice(0,10),
-                        isOverride: !!(vfMatch.managedBy),
-                        status: "pending",
-                        note: "Email verification failed — please confirm parent identity before approving.",
-                      };
-                      saveParentReqs([...parentReqs, req]);
-                      fetch("/api/notify",{method:"POST",headers:{"Content-Type":"application/json"},
-                        body:JSON.stringify({type:"joinrequest",data:{
-                          name:`Parent request for ${vfMatch.name}`,
-                          playerTeam:(vfMatch.teams||[]).join(", ")||"Youth",
-                          message:`⚠️ Email unverified — confirm manually. Parent: ${vfParentName} · ${vfEmail}${req.isOverride?" (OVERRIDE)":""}`
-                        }})}).catch(()=>{});
-                      setVfStep("parentdone");
-                    }}
-                    style={{width:"100%",background:"#92400e",color:"#fff",border:"none",
-                      borderRadius:10,padding:"11px",fontSize:13,fontWeight:800,
-                      cursor:"pointer",fontFamily:"inherit",marginBottom:8}}>
-                    Submit request without email verification →
-                  </button>
-                  <button onClick={()=>sendCode(vfEmail, vfParentName||"Parent")}
-                    style={{width:"100%",background:"none",border:`1px solid #fde68a`,
-                      borderRadius:10,padding:"9px",fontSize:12,fontWeight:700,color:"#92400e",
-                      cursor:"pointer",fontFamily:"inherit"}}>
-                    🔄 Try sending email again
-                  </button>
-                </div>
-              )}
-              <Btn bg={G.green} col={G.lime} full
-                disabled={!vfParentConsent||!vfEmail.includes("@")||!vfParentName.trim()||vfSending}
-                onClick={()=>sendCode(vfEmail, vfParentName||"Parent")}>
-                {vfSending?"Sending code…":"📧 Verify my email & send request to admin"}
-              </Btn>
-              <button onClick={()=>{setVfParentMode(false);setVfError("");}}
-                style={{width:"100%",marginTop:8,background:"none",border:"none",
-                  fontSize:12,color:G.muted,cursor:"pointer",fontFamily:"inherit"}}>
-                ← Back
-              </button>
-            </div>
-          </Shell>
-        );
-      }
-
-      // ── Standard path (adult member, or youth with no parent mode chosen) ──
-      const alreadyHasPin = !!pins[vfMatch.id];
       return (
         <Shell>
           {hdr(`Hi, ${vfMatch.name.split(" ")[0]}!`,"FCC Training — account setup")}
           <div style={{padding:"20px 20px 40px"}}>
-
-            {/* Already has a PIN — redirect to normal login */}
-            {alreadyHasPin && (
-              <div style={{background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:12,
-                padding:"16px 16px",marginBottom:16}}>
-                <div style={{fontWeight:800,fontSize:14,color:"#166534",marginBottom:6}}>
-                  ✅ Your account is already set up!
-                </div>
-                <div style={{fontSize:13,color:"#166534",lineHeight:1.6,marginBottom:14}}>
-                  You already have a PIN. You don't need to go through this flow —
-                  just log in normally from the home screen.
-                </div>
-                <button onClick={()=>{
-                    setAuthView("pick");
-                    setVfStep("search"); setVfMatch(null); setVfSearch("");
-                  }}
-                  style={{width:"100%",background:"#16a34a",color:"#fff",border:"none",
-                    borderRadius:10,padding:"12px",fontSize:14,fontWeight:800,
-                    cursor:"pointer",fontFamily:"inherit"}}>
-                  ← Go back and log in
-                </button>
-              </div>
-            )}
-
+            {/* Privacy notice */}
             <div style={{background:G.cream,border:`1px solid ${G.border}`,borderRadius:10,
               padding:"12px 14px",marginBottom:16,fontSize:11,color:G.muted,lineHeight:1.6}}>
               <b style={{color:G.text}}>🔐 Privacy notice</b><br/>{PRIVACY_TEXT}
             </div>
-
-            {/* Youth member banner */}
-            {isYouth && (
-              <div style={{background:"#fdf4ff",border:"1.5px solid #e9d5ff",borderRadius:12,
-                padding:"14px 16px",marginBottom:16,display:"flex",alignItems:"flex-start",gap:12}}>
-                <span style={{fontSize:22,flexShrink:0}}>👶</span>
-                <div style={{flex:1}}>
-                  <div style={{fontWeight:800,fontSize:13,color:"#6b21a8",marginBottom:4}}>
-                    {vfMatch.name} is a youth member
-                  </div>
-                  <div style={{fontSize:12,color:"#7e22ce",lineHeight:1.6,marginBottom:10}}>
-                    Are you a parent or guardian setting up this account?
-                    Use the parent setup flow — it sends your request to the admin for approval.
-                  </div>
-                  <button onClick={()=>{setVfParentMode(true);setVfParentName("");setVfParentConsent(false);setVfError("");}}
-                    style={{background:"#7c3aed",color:"#fff",border:"none",borderRadius:20,
-                      padding:"8px 18px",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
-                    👨‍👧 I'm a parent — set up parent access
-                  </button>
-                </div>
-              </div>
-            )}
 
             {hasEmail ? (<>
               <div style={{background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:10,
@@ -4241,22 +3979,11 @@ export default function App() {
                 </div>
               </div>
               <div style={{fontSize:13,color:G.muted,marginBottom:16,lineHeight:1.6}}>
-                Is this your email? Tap below to confirm and activate your account.
+                Is this the correct email? We'll send a verification code to confirm.
               </div>
               <Btn bg={G.green} col={G.lime} full disabled={vfSending}
-                onClick={()=>{
-                  // Activate directly — no email code needed
-                  const updated = members.map(m=>m.id===vfMatch.id ? {
-                    ...m, email: vfMatch.email,
-                    emailVerified: true, consentGiven: true,
-                    consentDate: new Date().toISOString().slice(0,10),
-                  } : m);
-                  saveMembers(updated);
-                  generateInviteCode(vfMatch.id);
-                  logAction("member",`Self-activated: ${vfMatch.name} — ${vfMatch.email}`);
-                  setVfStep("done");
-                }}>
-                ✅ Yes, activate my account
+                onClick={()=>{ setVfEmail(vfMatch.email); sendCode(vfMatch.email, vfMatch.name); }}>
+                {vfSending?"Sending…":"📧 Send verification code"}
               </Btn>
               <button onClick={()=>{setVfStep("search");}}
                 style={{width:"100%",marginTop:10,background:"none",border:`1px solid ${G.border}`,
@@ -4265,20 +3992,22 @@ export default function App() {
                 Not me / use a different email
               </button>
             </>) : (<>
-              <div style={{fontWeight:700,fontSize:14,color:G.text,marginBottom:4}}>
+              <div style={{fontSize:14,color:G.text,fontWeight:700,marginBottom:16}}>
                 We found your profile but don't have your email yet.
-              </div>
-              <div style={{fontSize:13,color:G.muted,marginBottom:16,lineHeight:1.6}}>
                 Add it below to activate your account.
               </div>
               <div style={{marginBottom:12}}>
-                <label style={{fontSize:12,fontWeight:700,color:G.muted,display:"block",marginBottom:5}}>YOUR EMAIL ADDRESS</label>
+                <label style={{fontSize:12,fontWeight:700,color:G.muted,display:"block",marginBottom:5}}>
+                  YOUR EMAIL ADDRESS
+                </label>
                 <input type="email" value={vfEmail} onChange={e=>setVfEmail(e.target.value)}
                   placeholder="your@email.com"
                   style={iSt({fontSize:15,padding:"12px 14px",borderRadius:10})}/>
               </div>
               <div style={{marginBottom:16}}>
-                <label style={{fontSize:12,fontWeight:700,color:G.muted,display:"block",marginBottom:5}}>PHONE NUMBER <span style={{fontWeight:400}}>(optional)</span></label>
+                <label style={{fontSize:12,fontWeight:700,color:G.muted,display:"block",marginBottom:5}}>
+                  PHONE NUMBER <span style={{fontWeight:400}}>(optional)</span>
+                </label>
                 <input type="tel" value={vfPhone} onChange={e=>setVfPhone(e.target.value)}
                   placeholder="+45 XX XX XX XX"
                   style={iSt({fontSize:15,padding:"12px 14px",borderRadius:10})}/>
@@ -4286,20 +4015,8 @@ export default function App() {
               {vfError&&<div style={{background:G.redBg,color:G.red,borderRadius:8,
                 padding:"8px 12px",fontSize:13,marginBottom:12}}>{vfError}</div>}
               <Btn bg={G.green} col={G.lime} full disabled={!vfEmail.includes("@")||vfSending}
-                onClick={()=>{
-                  // Save email and activate — no code verification needed
-                  const updated = members.map(m=>m.id===vfMatch.id ? {
-                    ...m, email: vfEmail.trim(),
-                    phone: vfPhone.trim()||m.phone,
-                    emailVerified: true, consentGiven: true,
-                    consentDate: new Date().toISOString().slice(0,10),
-                  } : m);
-                  saveMembers(updated);
-                  generateInviteCode(vfMatch.id);
-                  logAction("member",`Self-activated (new email): ${vfMatch.name} — ${vfEmail}`);
-                  setVfStep("done");
-                }}>
-                ✅ Save &amp; activate my account
+                onClick={()=>sendCode(vfEmail,vfMatch.name)}>
+                {vfSending?"Sending…":"📧 Send verification code"}
               </Btn>
             </>)}
             <button onClick={()=>setVfStep("search")}
@@ -4405,33 +4122,8 @@ export default function App() {
 
           <Btn bg={G.green} col={G.lime} full
             disabled={!vfConsent||!vfEmail.includes("@")||(vfIsParent?!vfChildName.trim():!vfNewName.trim())||vfSending}
-            onClick={()=>{
-              // Submit join request directly — no email verification needed
-              // since admin reviews and approves all new registrations anyway
-              const req = {
-                id: uid(),
-                submittedAt: new Date().toISOString(),
-                forChild: vfIsParent,
-                playerName: vfIsParent ? vfChildName.trim() : vfNewName.trim(),
-                playerTeam: vfNewTeam||null,
-                parentName: vfIsParent ? vfNewName.trim() : null,
-                contact: vfPhone.trim()||null,
-                email: vfEmail.trim(),
-                emailVerified: false,
-                consentGiven: vfConsent,
-                consentDate: new Date().toISOString().slice(0,10),
-                status:"pending",
-              };
-              saveJoinRequests([...joinRequests, req]);
-              fetch("/api/notify",{method:"POST",headers:{"Content-Type":"application/json"},
-                body:JSON.stringify({type:"joinrequest",data:{
-                  name:req.playerName,
-                  playerTeam:req.playerTeam||"Not specified",
-                  message:`${req.email||""}${req.parentName?" · Parent: "+req.parentName:""}${req.contact?" · "+req.contact:""}`
-                }})}).catch(()=>{});
-              setVfStep("done");
-            }}>
-            {vfSending?"Submitting…":"✋ Submit registration request"}
+            onClick={()=>sendCode(vfEmail, vfNewName||"Member")}>
+            {vfSending?"Sending code…":"📧 Verify email & submit"}
           </Btn>
           <button onClick={()=>setVfStep("search")}
             style={{width:"100%",marginTop:8,background:"none",border:"none",
@@ -4482,9 +4174,7 @@ export default function App() {
                     <div style={{fontWeight:800,fontSize:14,color:G.text}}>{m.name}</div>
                     <div style={{fontSize:11,color:G.muted}}>
                       {(m.teams||[]).join(", ")||"No team assigned"}
-                      {pins[m.id]
-                        ? <span style={{color:"#16a34a",fontWeight:700}}> · ✅ already set up — log in normally</span>
-                        : m.email?" · ✉️ email on file":" · no email yet"}
+                      {m.email?" · ✉️ email on file":" · no email yet"}
                     </div>
                   </div>
                   <span style={{marginLeft:"auto",fontSize:16,color:G.green}}>›</span>
@@ -4553,9 +4243,10 @@ export default function App() {
     const maskedEmail = (()=>{
       const e = EMAIL_SEED[pendingMember?.name||""] || (pendingMember?.email||"");
       if(!e) return null;
-      return maskEmail(e);
+      const [local, domain] = e.split("@");
+      const shown = maskEmail(email);
+      return shown + "@" + domain;
     })();
-    const isYouthPending = isYouthMember(pendingMember);
     return (
       <Shell>
         <div style={{display:"flex",flexDirection:"column",minHeight:"100vh"}}>
@@ -4568,40 +4259,10 @@ export default function App() {
             </div>
           </div>
           <div style={{flex:1,padding:"28px 24px"}}>
-
-            {/* Youth member → show parent route prominently */}
-            {isYouthPending && (
-              <div style={{background:"#fdf4ff",border:"1.5px solid #e9d5ff",borderRadius:12,
-                padding:"14px 16px",marginBottom:20,display:"flex",alignItems:"flex-start",gap:10}}>
-                <span style={{fontSize:20,flexShrink:0}}>👶</span>
-                <div style={{flex:1}}>
-                  <div style={{fontWeight:800,fontSize:13,color:"#6b21a8",marginBottom:4}}>
-                    {pendingMember?.name} is a youth member
-                  </div>
-                  <div style={{fontSize:12,color:"#7e22ce",lineHeight:1.6,marginBottom:10}}>
-                    Are you a parent setting this up? Use the parent access flow instead —
-                    it's designed for you.
-                  </div>
-                  <button onClick={()=>{
-                      setVfMatch(pendingMember);
-                      setVfEmail(""); setVfPhone(""); setVfError("");
-                      setVfParentMode(true); setVfParentName(""); setVfParentConsent(false);
-                      setVfStep("found");
-                      setPendingMember(null); setEmailInput(""); setEmailError("");
-                      setAuthView("verify");
-                    }}
-                    style={{background:"#7c3aed",color:"#fff",border:"none",borderRadius:20,
-                      padding:"8px 18px",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
-                    👨‍👧 I'm a parent — use parent setup instead
-                  </button>
-                </div>
-              </div>
-            )}
-
             <div style={{background:"#f0fdf4",border:"1.5px solid rgba(20,83,45,.15)",
               borderRadius:14,padding:"16px 18px",marginBottom:20}}>
               <div style={{fontSize:13,color:G.muted,lineHeight:1.6}}>
-                We have an email address on record ending in{" "}
+                We have an email address on record for you ending in{" "}
                 <span style={{fontWeight:800,color:G.text}}>{maskedEmail}</span>.
                 <br/>Enter your full email address below to verify your identity.
               </div>
@@ -4624,13 +4285,6 @@ export default function App() {
               {emailError&&(
                 <div style={{marginTop:6,fontSize:12,color:"#dc2626",fontWeight:700}}>
                   ⚠️ {emailError}
-                  {isYouthPending && (
-                    <div style={{marginTop:6,fontWeight:600,color:"#78350f",
-                      background:"#fffbeb",borderRadius:7,padding:"6px 10px",
-                      border:"1px solid #fde68a",lineHeight:1.5}}>
-                      💡 If you're a parent, use the purple button above to set up parent access instead.
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -4748,7 +4402,6 @@ export default function App() {
                 setVfEmail(pendingMember?.email||"");
                 setVfPhone(pendingMember?.phone||"");
                 setVfCode(""); setVfError(""); setVfConsent(false);
-                setVfParentMode(false); setVfParentName(""); setVfParentConsent(false);
                 if(pendingMember) setVfStep("found");
                 setAuthView("verify");
               }}
@@ -4972,7 +4625,7 @@ export default function App() {
             borderRadius:10,padding:"8px 12px",
             display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <div style={{color:"rgba(255,255,255,.8)",fontSize:11,fontWeight:700}}>🟢 Training TODAY</div>
-            <Btn onClick={()=>openWA(todayStr())} bg="rgba(255,255,255,.18)" col={G.white} sm>📲 Share Today</Btn>
+            <Btn onClick={()=>openWA(todayStr())} bg="rgba(255,255,255,.18)" col={G.white} sm>📲 Share on WhatsApp</Btn>
           </div>
         )}
       </div>
@@ -5238,7 +4891,7 @@ export default function App() {
         )}
 
       </div>
-      <BotNav view="schedule" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length + parentReqs.filter(r=>r.status==="pending").length}/>
+      <BotNav view="schedule" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
       {toast&&<Toast msg={toast}/>}
 
       {carpoolSheetSess&&<CarpoolSheet
@@ -5576,14 +5229,19 @@ export default function App() {
                   <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                     {list.map(m=>{
                       const sel=selP.includes(m.name);
+                      const away = bDate && isAbsent(m, bDate);
+                      const abs = away ? (m.absences||[]).find(a=>a.from<=bDate&&a.to>=bDate) : null;
                       return (
                         <button key={m.id} type="button"
                           onClick={()=>setSelP(ps=>sel?ps.filter(x=>x!==m.name):[...ps,m.name])}
-                          style={{background:sel?G.green:G.white,color:sel?G.lime:G.text,
-                            border:sel?`2px solid ${G.green}`:`1.5px solid ${G.border}`,
+                          style={{background:sel?G.green:away?"#fffbeb":G.white,
+                            color:sel?G.lime:away?"#92400e":G.text,
+                            border:sel?`2px solid ${G.green}`:away?"1.5px solid #fde68a":`1.5px solid ${G.border}`,
                             borderRadius:24,padding:"7px 14px",fontSize:13,fontWeight:700,
-                            cursor:"pointer",fontFamily:"inherit",transition:"all .1s"}}>
-                          {sel&&"✓ "}{m.name}
+                            cursor:"pointer",fontFamily:"inherit",transition:"all .1s"}}
+                          title={away?`Away: ${abs?.category||""} ${fmtShort(abs?.from)}–${fmtShort(abs?.to)}`:""}
+                        >
+                          {sel&&"✓ "}{m.name}{away&&" ✈️"}
                         </button>
                       );
                     })}
@@ -5744,7 +5402,7 @@ export default function App() {
             Existing session at same date & time? Players are auto-added.
           </p>
         </form>
-        <BotNav view="add" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length + parentReqs.filter(r=>r.status==="pending").length}/>
+        <BotNav view="add" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
         {toast&&<Toast msg={toast}/>}
       </Shell>
     );
@@ -5880,7 +5538,7 @@ export default function App() {
 
           <SLbl mt={4}>Players ({selSess.players.length})</SLbl>
           {/* ── Persistent carpool section ─────────────────── */}
-          {userInTeam&&!cutoff&&(()=>{
+          {(userInTeam || selSess.players.includes(currentUser?.name))&&(()=>{
             const lifts=selSess.lifts||{};
             const myName=currentUser?.name;
             const myLiftObj=getLiftObj(lifts[myName]);
@@ -5950,18 +5608,18 @@ export default function App() {
                     {isO&&myLiftObj.seats>0&&<span style={{fontSize:11,color:G.muted}}>💺{myLiftObj.seats}</span>}
                     {dispS(myLiftObj)&&<span style={{fontSize:11,color:G.muted}}>📍{dispS(myLiftObj)}</span>}
                     {myLiftObj.note&&<span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>"{myLiftObj.note}"</span>}
-                    <button onClick={()=>{setLiftDraft({...myLiftObj});setCarpoolSheetSess(selSess);}}
+                    {!cutoff&&<button onClick={()=>{setLiftDraft({...myLiftObj});setCarpoolSheetSess(selSess);}}
                       style={{fontSize:11,background:"none",border:"none",color:G.muted,
-                        textDecoration:"underline",cursor:"pointer",fontFamily:"inherit",padding:0}}>Edit</button>
+                        textDecoration:"underline",cursor:"pointer",fontFamily:"inherit",padding:0}}>Edit</button>}
                   </div>
-                ) : (
+                ) : !cutoff ? (
                   <button onClick={()=>{setLiftDraft(null);setCarpoolSheetSess(selSess);}}
                     style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,
                       border:`1px solid #c6f0d0`,background:G.white,color:G.green,
                       cursor:"pointer",fontFamily:"inherit"}}>
                     🚘 Set your preference
                   </button>
-                )}
+                ) : null}
               </div>
             );
           })()}
@@ -6132,16 +5790,20 @@ export default function App() {
                           {grouped[t].map(m=>{
                             const self = isSelf(m.name);
                             const canAdd = canAddOthers || self;
+                            const away = selSess?.date && isAbsent(m, selSess.date);
+                            const abs = away ? (m.absences||[]).find(a=>a.from<=selSess.date&&a.to>=selSess.date) : null;
                             return (
                               <button key={m.id}
                                 onClick={canAdd ? ()=>handleJoinDetail(m.name) : undefined}
-                                style={{background:canAdd?G.white:"#f1f5f9",
-                                  color:canAdd?G.text:G.muted,
-                                  border:`1.5px solid ${canAdd?G.border:"#e2e8f0"}`,
+                                style={{background:canAdd?(away?"#fffbeb":G.white):"#f1f5f9",
+                                  color:canAdd?(away?"#92400e":G.text):G.muted,
+                                  border:`1.5px solid ${canAdd?(away?"#fde68a":G.border):"#e2e8f0"}`,
                                   borderRadius:24,padding:"7px 14px",fontSize:13,fontWeight:700,
                                   cursor:canAdd?"pointer":"default",fontFamily:"inherit",
-                                  opacity:canAdd?1:0.65}}>
-                                {canAdd ? `+ ${m.name}` : m.name}
+                                  opacity:canAdd?1:0.65}}
+                                title={away?`Away: ${abs?.category||""} ${fmtShort(abs?.from)}–${fmtShort(abs?.to)}`:""}
+                              >
+                                {canAdd ? `+ ${m.name}` : m.name}{away&&" ✈️"}
                               </button>
                             );
                           })}
@@ -6239,8 +5901,14 @@ export default function App() {
             );
           })()}
 
-          {can(userRole,"deleteSession")&&(()=>{
+          {(()=>{
             const isRecurring = !!selSess.recurringId;
+            const isMySession = selSess.createdBy===currentUser?.name;
+            const isCaptainLevel = canOrCoach(userRole,"deleteSession",userMem,teams);
+            // Members can only delete their own non-recurring sessions
+            // Captains/admins/coaches can delete any session (recurring too)
+            const canDelete = isCaptainLevel || (!isRecurring && isMySession);
+            if(!canDelete) return null;
             const slot = isRecurring ? recurring.find(r=>r.id===selSess.recurringId) : null;
             return (
               <div style={{marginTop:22}}>
@@ -6258,6 +5926,13 @@ export default function App() {
                     </label>
                   </div>
                 )}
+                {!isRecurring&&isMySession&&!isCaptainLevel&&(
+                  <div style={{background:"#f0fdf4",border:"1px solid #86efac",
+                    borderRadius:10,padding:"9px 13px",marginBottom:10,fontSize:12,
+                    color:"#166534",lineHeight:1.5}}>
+                    ℹ️ You created this session. You can delete it to cancel your booking.
+                  </div>
+                )}
                 <button onClick={()=>{
                     if(isRecurring&&slot&&document.getElementById("stopRecurring")?.checked){
                       deleteRecurringSlotSilent(slot.id);
@@ -6268,13 +5943,13 @@ export default function App() {
                     background:"transparent",border:`1.5px solid ${G.red}`,color:G.red,
                     borderRadius:10,padding:"11px",fontSize:14,fontWeight:800,
                     cursor:"pointer",fontFamily:"inherit"}}>
-                  🗑 Delete Session
+                  🗑 {isRecurring?"Delete Session":"Cancel & Delete Booking"}
                 </button>
               </div>
             );
           })()}
         </div>
-        <BotNav view="session" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length + parentReqs.filter(r=>r.status==="pending").length}/>
+        <BotNav view="session" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
         {toast&&<Toast msg={toast}/>}
         {carpoolSheetSess&&<CarpoolSheet
           sess={carpoolSheetSess}
@@ -6844,7 +6519,7 @@ export default function App() {
           </button>
 
         </div>
-        <BotNav view="profile" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length + parentReqs.filter(r=>r.status==="pending").length}/>
+        <BotNav view="profile" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
         {toast&&<Toast msg={toast}/>}
       </Shell>
     );
@@ -7001,7 +6676,7 @@ export default function App() {
           </Btn>
 
         </div>
-        <BotNav view="profile" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length + parentReqs.filter(r=>r.status==="pending").length}/>
+        <BotNav view="profile" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
         {toast&&<Toast msg={toast}/>}
       </Shell>
     );
@@ -7098,7 +6773,7 @@ export default function App() {
 
         </div>
         <BotNav view="profile" setView={setView} userRole={userRole}
-          pendingCount={joinRequests.filter(r=>r.status==="pending").length + parentReqs.filter(r=>r.status==="pending").length}/>
+          pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
         {toast&&<Toast msg={toast}/>}
       </Shell>
     );
@@ -7134,7 +6809,11 @@ export default function App() {
     const relevantSessions = sessions
       .filter(s=>s.date>=today&&s.date<=seasonEnd)
       .filter(s=>effectiveTeam==="All"?true:
-        (s.restrictedTo===effectiveTeam||(s.sessionTeams||[]).includes(effectiveTeam)))
+        (s.restrictedTo===effectiveTeam||(s.sessionTeams||[]).includes(effectiveTeam)||
+         (!s.restrictedTo&&s.players.some(p=>{
+           const mx=members.find(x=>x.name===p);
+           return (mx?.teams||[]).includes(effectiveTeam);
+         }))))
       .sort((a,b)=>a.date.localeCompare(b.date)||a.from.localeCompare(b.from));
 
     const relevantMatches = ALL_FIXTURES
@@ -7483,7 +7162,7 @@ export default function App() {
           })}
         </div>
         <BotNav view="schedule" setView={setView} userRole={userRole}
-          pendingCount={joinRequests.filter(r=>r.status==="pending").length + parentReqs.filter(r=>r.status==="pending").length}/>
+          pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
         {toast&&<Toast msg={toast}/>}
       </Shell>
     );
@@ -7496,7 +7175,7 @@ export default function App() {
           onBack={()=>setView("schedule")}/>
         <WeatherPage wx={wxData} setView={setView}/>
         <BotNav view="schedule" setView={setView} userRole={userRole}
-          pendingCount={joinRequests.filter(r=>r.status==="pending").length + parentReqs.filter(r=>r.status==="pending").length}/>
+          pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
         {toast&&<Toast msg={toast}/>}
       </Shell>
     );
@@ -7549,6 +7228,25 @@ export default function App() {
       saveMembers([...members, ...toAdd]);
       logAction("system", `Imported ${toAdd.length} missing member${toAdd.length>1?"s":""}: ${toAdd.map(m=>m.name).join(", ")}`);
       showToast(`${toAdd.length} member${toAdd.length>1?"s":""} added ✓`);
+    }
+    // Members who have a division assignment in DIVISION_TEAMS but not yet that team in Firebase
+    const divisionUpdates = userRole==="superadmin"
+      ? members.filter(m=>{
+          const div = DIVISION_TEAMS[m.name];
+          return div && !(m.teams||[]).includes(div);
+        })
+      : [];
+    function applyDivisionTeams() {
+      const updated = members.map(m=>{
+        const div = DIVISION_TEAMS[m.name];
+        if(!div) return m;
+        const existing = m.teams||[];
+        if(existing.includes(div)) return m;
+        return normMember({...m, teams:[...existing, div]});
+      });
+      saveMembers(updated);
+      logAction("system", `Assigned division teams to ${divisionUpdates.length} member${divisionUpdates.length>1?"s":""}: ${divisionUpdates.map(m=>m.name+" → "+DIVISION_TEAMS[m.name]).join(", ")}`);
+      showToast(`Division teams assigned ✓`);
     }
 
     // ── T20 squad import ───────────────────────────────────────
@@ -7679,13 +7377,7 @@ export default function App() {
         {adminSec.members&&<>
         {/* ── Self-verified members (email confirmed, no action needed) ── */}
         {can(userRole,"addMember")&&(()=>{
-          const verified = members.filter(m=>
-            m.emailVerified &&
-            !m.pin &&
-            !Object.keys(inviteCodes).find(id=>id===m.id) &&
-            !m.managedBy &&      // exclude parent-managed children — they don't log in directly
-            !m.isParentOf        // exclude parent accounts — handled via parent req approval
-          );
+          const verified = members.filter(m=>m.emailVerified&&!m.pin&&!Object.keys(inviteCodes).find(id=>id===m.id));
           if(!verified.length) return null;
           return (
             <div style={{background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:12,
@@ -7705,7 +7397,11 @@ export default function App() {
                     <div style={{fontSize:11,color:G.muted}}>📧 {m.email}</div>
                   </div>
                   <Btn sm bg={G.green} col={G.lime}
-                    onClick={()=>generateInviteCode(m.id)}>
+                    onClick={()=>{
+                      const code=generateInviteCode(m.id);
+                      setToast(`📋 Code for ${m.name.split(" ")[0]}: ${code}`);
+                      setTimeout(()=>setToast(null),6000);
+                    }}>
                     🎟️ Give Access
                   </Btn>
                 </div>
@@ -7850,165 +7546,6 @@ export default function App() {
           );
         })()}
         </>}
-
-        {/* ── Parent Management Requests ───────────────────────── */}
-        {can(userRole,"addMember")&&parentReqs.filter(r=>r.status==="pending").length>0&&(()=>{
-          const pending = parentReqs.filter(r=>r.status==="pending");
-
-          function approveParentReq(req) {
-            // Find the child member
-            const child = members.find(m=>m.id===req.memberId);
-            if(!child) { showToast("Member not found — may have been removed"); return; }
-            // Store parent info on the member record
-            const parentInfo = {
-              name: req.parentName,
-              email: req.parentEmail,
-              phone: req.parentPhone||null,
-              consentGiven: req.consentGiven,
-              consentDate: req.consentDate,
-              approvedAt: new Date().toISOString(),
-            };
-            const updatedMembers = members.map(m=>m.id===req.memberId
-              ? {...m, managedBy: parentInfo, accountType:"parent"}
-              : m
-            );
-            saveMembers(updatedMembers);
-            // Generate invite code for the parent using the child's member ID (they share the same profile)
-            // We create a separate parent member record so they can log in independently
-            const parentMember = {
-              id: uid(),
-              name: req.parentName,
-              teams: child.teams||[],
-              role: "member",
-              email: req.parentEmail,
-              phone: req.parentPhone||null,
-              emailVerified: true,
-              consentGiven: req.consentGiven,
-              consentDate: req.consentDate,
-              isParentOf: req.memberId,
-              isParentOfName: child.name,
-              accountType: "parent",
-            };
-            const withParent = [...updatedMembers, parentMember];
-            saveMembers(withParent);
-            // Give parent immediate access — generate code and email it directly to parent
-            setTimeout(()=>{
-              const code = genCode();
-              const updated = {...inviteCodes, [parentMember.id]: hashCode(code)};
-              saveInviteCodes(updated);
-              // Auto-email the code to the parent — they don't need admin to forward it
-              fetch("/api/send-verify", {
-                method:"POST",
-                headers:{"Content-Type":"application/json"},
-                body: JSON.stringify({
-                  email: req.parentEmail,
-                  name: req.parentName,
-                  code,
-                  customMessage: `Your request to manage ${child.name}'s FCC Training account has been approved. Use the code below to set up your access.`,
-                })
-              }).catch(()=>{});
-              // Also copy to clipboard and show modal as backup (in case email fails)
-              try { navigator.clipboard.writeText(code); } catch(e) {}
-              setCodeModal({
-                name: req.parentName,
-                code,
-                forChild: child.name,
-                autoEmailed: true,  // tells modal to say "also sent by email"
-              });
-            }, 400);
-            // Mark request as approved
-            saveParentReqs(parentReqs.map(r=>r.id===req.id?{...r,status:"approved",approvedAt:new Date().toISOString()}:r));
-            logAction("member",`Approved parent request: ${req.parentName} → manages ${child.name}`);
-          }
-
-          function declineParentReq(req) {
-            saveParentReqs(parentReqs.map(r=>r.id===req.id?{...r,status:"declined"}:r));
-            logAction("member",`Declined parent request: ${req.parentName} for ${req.memberName}`);
-            showToast("Request declined");
-          }
-
-          return (
-            <>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,marginTop:4}}>
-                <div style={{flex:1,height:1,background:G.border}}/>
-                <div style={{fontSize:10,fontWeight:900,letterSpacing:1.5,color:"#7c3aed",
-                  textTransform:"uppercase",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5}}>
-                  <span style={{background:"#7c3aed",color:"#fff",borderRadius:99,fontSize:9,
-                    fontWeight:900,padding:"1px 6px"}}>{pending.length}</span>
-                  Parent Access Requests
-                </div>
-                <div style={{flex:1,height:1,background:G.border}}/>
-              </div>
-              {pending.map(req=>{
-                const child = members.find(m=>m.id===req.memberId);
-                return (
-                  <div key={req.id} style={{background:"#fdf4ff",border:"1.5px solid #e9d5ff",
-                    borderRadius:12,padding:"12px 14px",marginBottom:10}}>
-                    <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:10}}>
-                      <span style={{fontSize:22,flexShrink:0}}>👨‍👧</span>
-                      <div style={{flex:1}}>
-                        <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:4}}>
-                          <span style={{fontWeight:800,fontSize:14,color:G.text}}>{req.parentName}</span>
-                          {req.emailVerified&&<span style={{fontSize:10,fontWeight:700,
-                            padding:"1px 7px",borderRadius:20,background:"#dcfce7",
-                            color:"#166534",border:"0.5px solid #86efac"}}>✅ email verified</span>}
-                          {!req.emailVerified&&<span style={{fontSize:10,fontWeight:700,
-                            padding:"1px 7px",borderRadius:20,background:"#fee2e2",
-                            color:"#dc2626",border:"0.5px solid #fca5a5"}}>⚠️ email NOT verified</span>}
-                          {req.isOverride&&<span style={{fontSize:10,fontWeight:700,
-                            padding:"1px 7px",borderRadius:20,background:"#fef3c7",
-                            color:"#92400e",border:"0.5px solid #fde68a"}}>⚠️ override request</span>}
-                        </div>
-                        <div style={{fontSize:12,color:G.muted,lineHeight:1.7}}>
-                          <span style={{fontWeight:700,color:"#7c3aed"}}>Requesting parent access for:</span>{" "}
-                          <b style={{color:G.text}}>{req.memberName}</b>
-                          {child&&<span style={{fontSize:11,color:G.muted}}>{" · "}{(child.teams||[]).join(", ")||"No team"}</span>}
-                          <br/>
-                          📧 {req.parentEmail}
-                          {req.parentPhone&&<>{" · "}📱 {req.parentPhone}</>}
-                          <br/>
-                          <span style={{color:"#9ca3af",fontSize:10}}>
-                            {new Date(req.submittedAt).toLocaleDateString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}
-                          </span>
-                        </div>
-                        {req.isOverride&&child?.managedBy&&(
-                          <div style={{marginTop:6,background:"#fffbeb",border:"1px solid #fde68a",
-                            borderRadius:7,padding:"6px 10px",fontSize:11,color:"#92400e"}}>
-                            ⚠️ Currently managed by: <b>{child.managedBy.name}</b>
-                            {child.managedBy.email&&<span> ({maskEmail(child.managedBy.email)})</span>}
-                            . Approving will replace this.
-                          </div>
-                        )}
-                        {!req.emailVerified&&(
-                          <div style={{marginTop:6,background:"#fef2f2",border:"1px solid #fca5a5",
-                            borderRadius:7,padding:"8px 10px",fontSize:11,color:"#dc2626",lineHeight:1.5}}>
-                            ⚠️ <b>Email not verified</b> — the verification email failed when this request was submitted.
-                            Please confirm this parent's identity before approving
-                            (e.g. call <b>{req.parentPhone||"them"}</b> or check at training).
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div style={{display:"flex",gap:8}}>
-                      <button onClick={()=>approveParentReq(req)}
-                        style={{flex:1,background:"#7c3aed",color:"#fff",border:"none",
-                          borderRadius:9,padding:"9px 0",fontFamily:"inherit",
-                          fontWeight:800,fontSize:12,cursor:"pointer"}}>
-                        ✓ Approve — give parent access
-                      </button>
-                      <button onClick={()=>declineParentReq(req)}
-                        style={{background:"#fee2e2",color:"#dc2626",border:"none",
-                          borderRadius:9,padding:"9px 14px",fontFamily:"inherit",
-                          fontWeight:800,fontSize:12,cursor:"pointer"}}>
-                        ✗ Decline
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </>
-          );
-        })()}
 
         {/* ── Add Member section ──────────────────────────────── */}
         {can(userRole,"addMember")&&<>
@@ -9066,6 +8603,26 @@ export default function App() {
         )}
 
         {/* ── Division Team Assignments ──────────────────────── */}
+        {divisionUpdates.length > 0 && (
+          <div style={{background:"#eff6ff",border:"1.5px solid #93c5fd",
+            borderRadius:12,padding:"14px 16px",marginBottom:16}}>
+            <div style={{fontWeight:900,fontSize:13,color:"#1e3a5f",marginBottom:6}}>
+              🏏 Division team assignments ready
+            </div>
+            <div style={{fontSize:12,color:"#1e40af",marginBottom:10,lineHeight:1.5}}>
+              <b>{divisionUpdates.length}</b> member{divisionUpdates.length>1?"s":""} have a division squad assignment not yet reflected in the app.
+              This will add their division group without removing any existing groups.
+            </div>
+            <div style={{fontSize:11,background:"#1e3a5f",color:"#93c5fd",
+              borderRadius:7,padding:"7px 10px",marginBottom:10,lineHeight:1.8}}>
+              {divisionUpdates.map(m=>`${m.name} → ${DIVISION_TEAMS[m.name]}`).join(" · ")}
+            </div>
+            <Btn bg="#1e3a5f" col="#93c5fd" onClick={applyDivisionTeams}>
+              Assign Division Teams to {divisionUpdates.length} Member{divisionUpdates.length>1?"s":""}
+            </Btn>
+          </div>
+        )}
+
         </>}
 
         {/* ── Audit Log (superadmin only) ───────────────────── */}
@@ -9382,12 +8939,11 @@ export default function App() {
                                 <button type="button" onClick={()=>{
                                     const newEmail=(editingName.email||"").trim()||null;
                                     const newPhone=(editingName.phone||"").trim()||null;
-                                    // Clear editing state FIRST to unblock the UI immediately
-                                    setEditingName(null);
-                                    // Use membersRef to avoid stale closure
-                                    saveMembers(membersRef.current.map(x=>x.id===m.id?{...x,email:newEmail,phone:newPhone}:x));
+                                    saveMembers(members.map(x=>x.id===m.id?{...x,email:newEmail,phone:newPhone}:x));
                                     logAction("member",`Updated contact: ${m.name}`);
                                     showToast(`✓ Saved for ${m.name.split(" ")[0]}`);
+                                    setSelMember({...m,email:newEmail,phone:newPhone});
+                                    setEditingName(null);
                                   }}
                                   style={{flex:1,background:G.green,color:G.lime,border:"none",
                                     borderRadius:7,padding:"7px",fontSize:12,fontWeight:800,
@@ -9438,73 +8994,20 @@ export default function App() {
                             <Btn onClick={()=>resetPin(m.id)} bg={G.amberBg} col={G.amber} sm>🔑 Reset PIN</Btn>
                           )}
                           {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&!pins[m.id]&&m.email&&(
-                            <Btn onClick={()=>generateInviteCode(m.id)}
+                            <Btn onClick={()=>{generateInviteCode(m.id);showToast(`✓ New access code for ${m.name.split(" ")[0]}`);}}
                               bg={G.amberBg} col={G.amber} sm>🔑 Reset Access</Btn>
                           )}
                           {can(userRole,"resetOtherPin")&&!pins[m.id]&&!m.email&&!inviteCodes[m.id]&&(
-                            <Btn sm bg="#f0f9ff" col="#0369a1"
-                              onClick={()=>generateInviteCode(m.id)}>🎟️ Gen Code</Btn>
+                            <Btn sm bg="#f0f9ff" col="#0369a1" onClick={()=>{
+                                const code=generateInviteCode(m.id);
+                                setToast(`📋 ${m.name.split(" ")[0]}: ${code}`);
+                                setTimeout(()=>setToast(null),6000);
+                              }}>🎟️ Gen Code</Btn>
                           )}
                           {can(userRole,"removeMember")&&m.id!==currentUser.id&&(
                             <Btn onClick={()=>setConfirmDelete(m)} bg={G.redBg} col={G.red} sm>× Remove</Btn>
                           )}
                         </div>
-
-                        {/* ── Parent / account type info (youth members) ── */}
-                        {isYouthMember(m)&&can(userRole,"addMember")&&(
-                          <div style={{marginTop:8,background:"#fdf4ff",border:"1px solid #e9d5ff",
-                            borderRadius:9,padding:"9px 12px"}}>
-                            <div style={{fontSize:10,fontWeight:900,color:"#6b21a8",
-                              letterSpacing:1.2,textTransform:"uppercase",marginBottom:6}}>
-                              👶 Account type
-                            </div>
-                            {m.managedBy ? (<>
-                              <div style={{fontSize:12,color:G.text,marginBottom:6,lineHeight:1.6}}>
-                                <b>Parent-managed</b> by{" "}
-                                <span style={{color:"#7c3aed"}}>{m.managedBy.name}</span>
-                                {m.managedBy.email&&<span style={{color:G.muted}}> ({maskEmail(m.managedBy.email)})</span>}
-                              </div>
-                              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                                <button onClick={()=>{
-                                    if(!window.confirm(`Switch ${m.name} to self-managed? The parent account will remain but ${m.name.split(" ")[0]} can also log in independently.`)) return;
-                                    saveMembers(members.map(x=>x.id===m.id?{...x,accountType:"hybrid"}:x));
-                                    logAction("member",`Account type switched to hybrid (self+parent): ${m.name}`);
-                                    showToast(`${m.name.split(" ")[0]} can now manage their own account ✓`);
-                                  }}
-                                  style={{fontSize:11,fontWeight:700,padding:"4px 12px",borderRadius:20,
-                                    border:"1px solid #c4b5fd",background:"#ede9fe",color:"#5b21b6",
-                                    cursor:"pointer",fontFamily:"inherit"}}>
-                                  🔄 Switch to hybrid (self + parent)
-                                </button>
-                                <button onClick={()=>{
-                                    if(!window.confirm(`Remove parent management from ${m.name}? They will need to set up their own access.`)) return;
-                                    const {managedBy:_,...rest} = m;
-                                    saveMembers(members.map(x=>x.id===m.id?{...rest,accountType:"self"}:x));
-                                    logAction("member",`Removed parent management from: ${m.name}`);
-                                    showToast("Parent management removed");
-                                  }}
-                                  style={{fontSize:11,fontWeight:700,padding:"4px 12px",borderRadius:20,
-                                    border:`1px solid ${G.border}`,background:G.white,color:G.muted,
-                                    cursor:"pointer",fontFamily:"inherit"}}>
-                                  Remove parent link
-                                </button>
-                              </div>
-                            </>) : (
-                              <div style={{fontSize:12,color:G.muted,fontStyle:"italic"}}>
-                                No parent linked yet.{" "}
-                                <span style={{fontStyle:"normal"}}>
-                                  Parent can link via "Set up my account" on the login screen.
-                                </span>
-                              </div>
-                            )}
-                            {m.accountType==="hybrid"&&(
-                              <div style={{marginTop:6,fontSize:11,background:"#dcfce7",color:"#166534",
-                                borderRadius:6,padding:"4px 8px",fontWeight:700}}>
-                                ✓ Hybrid — both player and parent can log in
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>
@@ -9640,11 +9143,11 @@ export default function App() {
                             onClick={()=>{
                               const newEmail=(editingName.email||"").trim()||null;
                               const newPhone=(editingName.phone||"").trim()||null;
-                              // Clear editing state FIRST so the UI unblocks immediately
-                              setEditingName(null);
-                              saveMembers(membersRef.current.map(x=>x.id===m.id?{...x,email:newEmail,phone:newPhone}:x));
+                              const updated=members.map(x=>x.id===m.id?{...x,email:newEmail,phone:newPhone}:x);
+                              saveMembers(updated);
                               logAction("member",`Updated contact: ${m.name} — email: ${newEmail||"none"}, phone: ${newPhone||"none"}`);
                               showToast(`✓ Contact details saved for ${m.name.split(" ")[0]}`);
+                              setEditingName(null);
                             }}
                             style={{flex:1,background:G.green,color:G.lime,border:"none",
                               borderRadius:7,padding:"7px",fontSize:12,fontWeight:800,
@@ -9728,13 +9231,19 @@ export default function App() {
                     )}
                     {/* Reset access for members with email but no PIN yet */}
                     {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&!pins[m.id]&&m.email&&(
-                      <Btn onClick={()=>generateInviteCode(m.id)}
-                        bg={G.amberBg} col={G.amber} sm>🔑 Reset Access</Btn>
+                      <Btn onClick={()=>{
+                          generateInviteCode(m.id);
+                          showToast(`✓ New access code generated for ${m.name.split(" ")[0]}`);
+                        }} bg={G.amberBg} col={G.amber} sm>🔑 Reset Access</Btn>
                     )}
                     {/* Invite code — only for members with no email and no PIN yet */}
                     {can(userRole,"resetOtherPin")&&!pins[m.id]&&!m.email&&!EMAIL_SEED[m.name]&&!inviteCodes[m.id]&&(
                       <Btn sm bg="#f0f9ff" col="#0369a1"
-                        onClick={()=>generateInviteCode(m.id)}>
+                        onClick={()=>{
+                          const code = generateInviteCode(m.id);
+                          setToast(`📋 Code for ${m.name.split(" ")[0]}: ${code} — share via WhatsApp`);
+                          setTimeout(()=>setToast(null), 6000);
+                        }}>
                         🎟️ Gen Code
                       </Btn>
                     )}
@@ -9746,7 +9255,11 @@ export default function App() {
                           🎟️ Code active
                         </span>
                         <Btn sm bg="#f0f9ff" col="#0369a1"
-                          onClick={()=>generateInviteCode(m.id)}>
+                          onClick={()=>{
+                            const code = generateInviteCode(m.id);
+                            setToast(`📋 New code for ${m.name.split(" ")[0]}: ${code} — share via WhatsApp`);
+                            setTimeout(()=>setToast(null), 6000);
+                          }}>
                           ↻ New
                         </Btn>
                       </div>
@@ -9761,90 +9274,8 @@ export default function App() {
           );
         })}
       </div>
-      <BotNav view="admin" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length + parentReqs.filter(r=>r.status==="pending").length}/>
+      <BotNav view="admin" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
       {toast&&<Toast msg={toast}/>}
-
-      {/* ── Code modal ── */}
-      {codeModal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",
-          zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
-          <div style={{background:G.white,borderRadius:18,padding:"28px 24px",
-            maxWidth:340,width:"100%",boxShadow:"0 12px 48px rgba(0,0,0,0.25)",
-            textAlign:"center"}}>
-            <div style={{fontSize:36,marginBottom:10}}>🎟️</div>
-            <div style={{fontWeight:900,fontSize:17,color:G.text,marginBottom:4}}>
-              Access Code Generated
-            </div>
-            <div style={{fontSize:13,color:G.muted,marginBottom:codeModal.autoEmailed?10:20,lineHeight:1.6}}>
-              {codeModal.forChild
-                ? <>For <b style={{color:G.text}}>{codeModal.name}</b> (parent of <b style={{color:G.text}}>{codeModal.forChild}</b>)</>
-                : <>For <b style={{color:G.text}}>{codeModal.name}</b></>
-              }
-            </div>
-            {/* Auto-emailed confirmation */}
-            {codeModal.autoEmailed && (
-              <div style={{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:10,
-                padding:"9px 12px",marginBottom:16,display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:16}}>📧</span>
-                <div style={{fontSize:12,color:"#166534",fontWeight:700,textAlign:"left",lineHeight:1.5}}>
-                  Code sent automatically to <b>{codeModal.name}</b>'s email.
-                  No need to forward it — they can log in as soon as they check their inbox.
-                </div>
-              </div>
-            )}
-            {/* Big code display */}
-            <div style={{background:"#f0f9ff",border:"2px dashed #0369a1",borderRadius:14,
-              padding:"18px 16px",marginBottom:16}}>
-              <div style={{fontSize:11,fontWeight:700,color:"#0369a1",
-                textTransform:"uppercase",letterSpacing:1.5,marginBottom:8}}>
-                One-time access code
-              </div>
-              <div style={{fontSize:32,fontWeight:900,color:"#0c4a6e",
-                letterSpacing:6,fontFamily:"'DM Sans',monospace"}}>
-                {codeModal.code}
-              </div>
-              {codeModal.autoEmailed && (
-                <div style={{fontSize:11,color:"#0369a1",marginTop:6}}>
-                  (backup — already in your clipboard)
-                </div>
-              )}
-            </div>
-            {/* Copy button */}
-            <button onClick={()=>{
-                try { navigator.clipboard.writeText(codeModal.code); } catch(e) {}
-                showToast("Code copied ✓");
-              }}
-              style={{width:"100%",background:"#0369a1",color:"#fff",border:"none",
-                borderRadius:10,padding:"12px",fontSize:14,fontWeight:800,
-                cursor:"pointer",fontFamily:"inherit",marginBottom:10,
-                display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-              📋 Copy to Clipboard
-            </button>
-            {/* WhatsApp share */}
-            <button onClick={()=>{
-                const msg = codeModal.forChild
-                  ? `Hi ${codeModal.name}, your FCC Training access code for ${codeModal.forChild}'s account is: *${codeModal.code}*\n\n1. Open https://fcc-training.vercel.app\n2. Tap "Set up my account"\n3. Search for ${codeModal.forChild}'s name\n4. Enter this code when prompted`
-                  : `Hi ${codeModal.name.split(" ")[0]}, your FCC Training access code is: *${codeModal.code}*\n\n1. Open https://fcc-training.vercel.app\n2. Tap "Set up my account"\n3. Search for your name\n4. Enter this code when prompted`;
-                window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`,"_blank");
-              }}
-              style={{width:"100%",background:"#25D366",color:"#fff",border:"none",
-                borderRadius:10,padding:"12px",fontSize:14,fontWeight:800,
-                cursor:"pointer",fontFamily:"inherit",marginBottom:14,
-                display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-              💬 Share via WhatsApp
-            </button>
-            <div style={{fontSize:11,color:G.muted,marginBottom:14,lineHeight:1.5}}>
-              This code is single-use and expires after the member logs in for the first time.
-            </div>
-            <button onClick={()=>setCodeModal(null)}
-              style={{background:"none",border:`1.5px solid ${G.border}`,borderRadius:10,
-                padding:"10px 24px",fontSize:13,fontWeight:700,color:G.muted,
-                cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
-              Done
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* ── Delete confirmation modal ── */}
       {confirmDelete&&(
