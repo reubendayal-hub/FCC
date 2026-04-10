@@ -969,7 +969,7 @@ const Btn = ({onClick,bg,col,children,full,sm,disabled,type="button"}) => (
       borderRadius:9,padding:sm?"6px 13px":"10px 18px",
       fontFamily:"'DM Sans',sans-serif",fontWeight:800,fontSize:sm?12:14,
       cursor:disabled?"not-allowed":"pointer",width:full?"100%":"auto",
-      opacity:disabled?.7:1,transition:"opacity .15s"}}>
+      opacity:disabled ? 0.7 : 1,transition:"opacity .15s"}}>
     {children}
   </button>
 );
@@ -2084,7 +2084,7 @@ function SessCard({s,members,teams,faded,onClick,onCarpoolClick}) {
     <div onClick={onClick} style={{background:isToday(s.date)?"#f7ffe8":G.white,
       borderRadius:14,padding:"13px 15px",marginBottom:9,
       border:isToday(s.date)?`2px solid ${G.lime}`:`1.5px solid ${G.border}`,
-      opacity:faded?.48:1,cursor:"pointer",
+      opacity:faded ? 0.48 : 1,cursor:"pointer",
       display:"flex",alignItems:"center",justifyContent:"space-between"}}>
       <div style={{flex:1,minWidth:0}}>
         {/* ── Date + time header — bordered ── */}
@@ -2776,8 +2776,7 @@ export default function App() {
     const updated = {...inviteCodes, [memberId]: hashCode(plain)};
     saveInviteCodes(updated);
     if(m) logAction("pin", `Generated invite code for: ${m.name}`);
-    showToast(`Code for member: ${plain}`);
-    return plain;
+    return plain; // caller is responsible for displaying the code
   }
 
   // ── Auth flow ─────────────────────────────────────────────────
@@ -2805,12 +2804,15 @@ export default function App() {
     const seedEmail = EMAIL_SEED[member.name];
     const storedEmail = member.email;
     const hasInviteCode = !!freshCodes[member.id];
-    if(seedEmail || storedEmail) {
-      setAuthView("verifyemail");
-    } else if(hasInviteCode) {
+
+    if(hasInviteCode) {
+      // Invite code takes priority — works for first-time AND reset scenarios
       setAuthView("verifycode");
+    } else if(seedEmail || storedEmail) {
+      // No invite code but has email — verify by email
+      setAuthView("verifyemail");
     } else {
-      // No email, no invite code — account not set up yet, block access
+      // No email, no invite code — account not set up yet
       setAuthView("blocked");
     }
   }
@@ -9003,14 +9005,17 @@ export default function App() {
                             <Btn onClick={()=>resetPin(m.id)} bg={G.amberBg} col={G.amber} sm>🔑 Reset PIN</Btn>
                           )}
                           {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&!pins[m.id]&&m.email&&(
-                            <Btn onClick={()=>{generateInviteCode(m.id);showToast(`✓ New access code for ${m.name.split(" ")[0]}`);}}
-                              bg={G.amberBg} col={G.amber} sm>🔑 Reset Access</Btn>
+                            <Btn onClick={()=>{
+                                const code=generateInviteCode(m.id);
+                                setToast(`📋 ${m.name.split(" ")[0]}'s code: ${code} — share this with them`);
+                                setTimeout(()=>setToast(null),8000);
+                              }} bg={G.amberBg} col={G.amber} sm>🔑 Reset Access</Btn>
                           )}
                           {can(userRole,"resetOtherPin")&&!pins[m.id]&&!m.email&&!inviteCodes[m.id]&&(
                             <Btn sm bg="#f0f9ff" col="#0369a1" onClick={()=>{
                                 const code=generateInviteCode(m.id);
-                                setToast(`📋 ${m.name.split(" ")[0]}: ${code}`);
-                                setTimeout(()=>setToast(null),6000);
+                                setToast(`📋 ${m.name.split(" ")[0]}: ${code} — share via WhatsApp`);
+                                setTimeout(()=>setToast(null),8000);
                               }}>🎟️ Gen Code</Btn>
                           )}
                           {can(userRole,"removeMember")&&m.id!==currentUser.id&&(
@@ -9241,17 +9246,18 @@ export default function App() {
                     {/* Reset access for members with email but no PIN yet */}
                     {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&!pins[m.id]&&m.email&&(
                       <Btn onClick={()=>{
-                          generateInviteCode(m.id);
-                          showToast(`✓ New access code generated for ${m.name.split(" ")[0]}`);
+                          const code=generateInviteCode(m.id);
+                          setToast(`📋 ${m.name.split(" ")[0]}'s code: ${code} — share this with them`);
+                          setTimeout(()=>setToast(null),8000);
                         }} bg={G.amberBg} col={G.amber} sm>🔑 Reset Access</Btn>
                     )}
                     {/* Invite code — only for members with no email and no PIN yet */}
-                    {can(userRole,"resetOtherPin")&&!pins[m.id]&&!m.email&&!EMAIL_SEED[m.name]&&!inviteCodes[m.id]&&(
+                    {can(userRole,"resetOtherPin")&&!pins[m.id]&&!m.email&&!inviteCodes[m.id]&&(
                       <Btn sm bg="#f0f9ff" col="#0369a1"
                         onClick={()=>{
                           const code = generateInviteCode(m.id);
-                          setToast(`📋 Code for ${m.name.split(" ")[0]}: ${code} — share via WhatsApp`);
-                          setTimeout(()=>setToast(null), 6000);
+                          setToast(`📋 ${m.name.split(" ")[0]}'s code: ${code} — share via WhatsApp`);
+                          setTimeout(()=>setToast(null), 8000);
                         }}>
                         🎟️ Gen Code
                       </Btn>
