@@ -356,7 +356,7 @@ const CAN = {
   assignRoles:    ["superadmin","admin"],
   addMember:      ["superadmin","admin"],
   removeMember:   ["superadmin","admin"],
-  resetOtherPin:  ["superadmin"],
+  resetOtherPin:  ["superadmin","admin"],
 };
 const can = (role, action) => (CAN[action]||[]).includes(role);
 // canOrCoach: coaches AND team captains/VCs get captain-level abilities
@@ -3307,6 +3307,7 @@ export default function App() {
   }
 
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [codeModal, setCodeModal] = useState(null); // {name, code} — invite code display modal
   const [schedFilter,   setSchedFilter]   = useState("all"); // "all" | "mine"
   const [blocksExpanded, setBlocksExpanded] = useState(false);
   const [showPastAll,       setShowPastAll]       = useState(false);
@@ -9100,22 +9101,36 @@ export default function App() {
                               <option value="member">🏏 Member</option>
                             </select>
                           )}
+                          {/* Reset PIN — member has a PIN */}
                           {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&pins[m.id]&&(
                             <Btn onClick={()=>resetPin(m.id)} bg={G.amberBg} col={G.amber} sm>🔑 Reset PIN</Btn>
                           )}
-                          {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&!pins[m.id]&&m.email&&(
+                          {/* Reset Access — has email, no PIN */}
+                          {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&!pins[m.id]&&m.email&&!inviteCodes[m.id]&&(
                             <Btn onClick={()=>{
                                 const code=generateInviteCode(m.id);
-                                setToast(`📋 ${m.name.split(" ")[0]}'s code: ${code} — share this with them`);
-                                setTimeout(()=>setToast(null),8000);
+                                setCodeModal({name:m.name,code});
                               }} bg={G.amberBg} col={G.amber} sm>🔑 Reset Access</Btn>
                           )}
+                          {/* Gen Code — no email, no PIN, no code */}
                           {can(userRole,"resetOtherPin")&&!pins[m.id]&&!m.email&&!inviteCodes[m.id]&&(
                             <Btn sm bg="#f0f9ff" col="#0369a1" onClick={()=>{
                                 const code=generateInviteCode(m.id);
-                                setToast(`📋 ${m.name.split(" ")[0]}: ${code} — share via WhatsApp`);
-                                setTimeout(()=>setToast(null),8000);
+                                setCodeModal({name:m.name,code});
                               }}>🎟️ Gen Code</Btn>
+                          )}
+                          {/* Code active — show it + allow regenerate */}
+                          {can(userRole,"resetOtherPin")&&!pins[m.id]&&inviteCodes[m.id]&&(
+                            <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
+                              <span style={{fontSize:10,color:"#0369a1",fontWeight:700,
+                                background:"#e0f2fe",borderRadius:6,padding:"3px 7px"}}>
+                                🎟️ Code pending
+                              </span>
+                              <Btn sm bg="#f0f9ff" col="#0369a1" onClick={()=>{
+                                  const code=generateInviteCode(m.id);
+                                  setCodeModal({name:m.name,code});
+                                }}>↻ New code</Btn>
+                            </div>
                           )}
                           {can(userRole,"removeMember")&&m.id!==currentUser.id&&(
                             <Btn onClick={()=>setConfirmDelete(m)} bg={G.redBg} col={G.red} sm>× Remove</Btn>
@@ -9342,21 +9357,19 @@ export default function App() {
                     {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&pins[m.id]&&(
                       <Btn onClick={()=>resetPin(m.id)} bg={G.amberBg} col={G.amber} sm>🔑 Reset PIN</Btn>
                     )}
-                    {/* Reset access for members with email but no PIN yet */}
-                    {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&!pins[m.id]&&m.email&&(
+                    {/* Reset access — has email, no PIN, no pending code */}
+                    {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&!pins[m.id]&&m.email&&!inviteCodes[m.id]&&(
                       <Btn onClick={()=>{
                           const code=generateInviteCode(m.id);
-                          setToast(`📋 ${m.name.split(" ")[0]}'s code: ${code} — share this with them`);
-                          setTimeout(()=>setToast(null),8000);
+                          setCodeModal({name:m.name,code});
                         }} bg={G.amberBg} col={G.amber} sm>🔑 Reset Access</Btn>
                     )}
-                    {/* Invite code — only for members with no email and no PIN yet */}
+                    {/* Gen Code — no email, no PIN, no pending code */}
                     {can(userRole,"resetOtherPin")&&!pins[m.id]&&!m.email&&!inviteCodes[m.id]&&(
                       <Btn sm bg="#f0f9ff" col="#0369a1"
                         onClick={()=>{
                           const code = generateInviteCode(m.id);
-                          setToast(`📋 ${m.name.split(" ")[0]}'s code: ${code} — share via WhatsApp`);
-                          setTimeout(()=>setToast(null), 8000);
+                          setCodeModal({name:m.name,code});
                         }}>
                         🎟️ Gen Code
                       </Btn>
@@ -9371,8 +9384,7 @@ export default function App() {
                         <Btn sm bg="#f0f9ff" col="#0369a1"
                           onClick={()=>{
                             const code = generateInviteCode(m.id);
-                            setToast(`📋 New code for ${m.name.split(" ")[0]}: ${code} — share via WhatsApp`);
-                            setTimeout(()=>setToast(null), 6000);
+                            setCodeModal({name:m.name,code});
                           }}>
                           ↻ New
                         </Btn>
@@ -9390,6 +9402,53 @@ export default function App() {
       </div>
       <BotNav view="admin" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length}/>
       {toast&&<Toast msg={toast}/>}
+
+      {/* ── Invite code modal ────────────────────────────── */}
+      {codeModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",
+          zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+          <div style={{background:G.white,borderRadius:16,padding:28,maxWidth:340,
+            width:"100%",boxShadow:"0 8px 40px rgba(0,0,0,0.22)"}}>
+            <div style={{fontSize:26,marginBottom:8,textAlign:"center"}}>🎟️</div>
+            <div style={{fontWeight:900,fontSize:17,color:G.text,marginBottom:4,textAlign:"center"}}>
+              Access code for {codeModal.name.split(" ")[0]}
+            </div>
+            <div style={{color:G.muted,fontSize:12,marginBottom:20,textAlign:"center",lineHeight:1.5}}>
+              Share this code with {codeModal.name.split(" ")[0]} so they can log in and set their PIN.
+              It can only be used once.
+            </div>
+            {/* Big code display */}
+            <div style={{background:G.cream,border:`2px dashed ${G.green}`,borderRadius:12,
+              padding:"18px 20px",marginBottom:16,textAlign:"center"}}>
+              <div style={{fontSize:11,fontWeight:800,color:G.muted,letterSpacing:1.5,
+                textTransform:"uppercase",marginBottom:6}}>Invite Code</div>
+              <div style={{fontSize:28,fontWeight:900,color:G.green,letterSpacing:6,
+                fontFamily:"monospace"}}>
+                {codeModal.code}
+              </div>
+            </div>
+            {/* Copy button */}
+            <button onClick={()=>{
+                navigator.clipboard.writeText(codeModal.code).then(()=>{
+                  showToast("✓ Code copied to clipboard");
+                }).catch(()=>{
+                  showToast("Select the code above and copy manually");
+                });
+              }}
+              style={{width:"100%",background:G.green,color:G.lime,border:"none",
+                borderRadius:10,padding:"12px",fontSize:14,fontWeight:800,
+                cursor:"pointer",fontFamily:"inherit",marginBottom:10}}>
+              📋 Copy code
+            </button>
+            <button onClick={()=>setCodeModal(null)}
+              style={{width:"100%",background:"transparent",color:G.muted,
+                border:`1.5px solid ${G.border}`,borderRadius:10,padding:"11px",
+                fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+              Done
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Delete confirmation modal ── */}
       {confirmDelete&&(
