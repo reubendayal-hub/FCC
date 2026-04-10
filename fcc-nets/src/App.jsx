@@ -2586,6 +2586,14 @@ export default function App() {
   const [vfSentCode,  setVfSentCode]  = useState("");          // generated code (client-side ephemeral)
   const [vfCodeExpiry,setVfCodeExpiry]= useState(null);
   const [vfSending,   setVfSending]   = useState(false);
+
+  // Login email code flow — send code to stored email instead of asking them to type it
+  const [loginCodeSent,    setLoginCodeSent]    = useState(false);
+  const [loginSentCode,    setLoginSentCode]    = useState("");
+  const [loginCodeExpiry,  setLoginCodeExpiry]  = useState(null);
+  const [loginCodeInput,   setLoginCodeInput]   = useState("");
+  const [loginCodeSending, setLoginCodeSending] = useState(false);
+  const [loginCodeError,   setLoginCodeError]   = useState("");
   const [vfError,     setVfError]     = useState("");
   const [vfConsent,   setVfConsent]   = useState(false);
   const [vfIsParent,  setVfIsParent]  = useState(false);
@@ -2862,6 +2870,19 @@ export default function App() {
   }
 
   function handleEnterPin(pin) {
+    // 0000 default PIN for U11/U13 youth members who haven't set a PIN yet
+    const isYouth = ["U11","U13"].some(t=>(pendingMember?.teams||[]).includes(t));
+    const hasNoPin = !pins[pendingMember?.id];
+    if(isYouth && hasNoPin && pin==="0000") {
+      // Let them in and take them straight to set a real PIN
+      setCurrentUser(pendingMember);
+      localStorage.setItem("fcc-current-user", JSON.stringify(pendingMember));
+      setPendingMember(null);
+      setPinError("");
+      setAuthView("pick");
+      showToast(`Welcome, ${pendingMember.name.split(" ")[0]}! 👋`);
+      return;
+    }
     if(hashPin(pin) === pins[pendingMember.id]) {
       setCurrentUser(pendingMember);
       localStorage.setItem("fcc-current-user", JSON.stringify(pendingMember));
@@ -4251,68 +4272,137 @@ export default function App() {
   // RENDER: Auth — verify email (first-time, adults only)
   // ════════════════════════════════════════════════════════════
   if(!currentUser && authView==="verifyemail") {
-    const maskedEmail = (()=>{
-      const e = EMAIL_SEED[pendingMember?.name||""] || (pendingMember?.email||"");
-      if(!e) return null;
-      const [local, domain] = e.split("@");
-      const shown = maskEmail(email);
-      return shown + "@" + domain;
-    })();
+    const storedEmail = EMAIL_SEED[pendingMember?.name||""] || (pendingMember?.email||"");
+    const masked = maskEmail(storedEmail);
+
+    async function sendLoginCode() {
+      setLoginCodeSending(true); setLoginCodeError("");
+      const code = String(Math.floor(100000+Math.random()*900000));
+      try {
+        const r = await fetch("/api/send-verify",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({email:storedEmail, name:pendingMember?.name||"", code})
+        });
+        if(!r.ok) throw new Error("Send failed");
+        setLoginSentCode(code);
+        setLoginCodeExpiry(Date.now()+15*60*1000);
+        setLoginCodeSent(true);
+      } catch(e) {
+        setLoginCodeError("Could not send email. Ask your admin to reset your access.");
+      }
+      setLoginCodeSending(false);
+    }
+
+    function verifyLoginCode() {
+      if(!loginSentCode) { setLoginCodeError("No code sent yet"); return; }
+      if(Date.now()>loginCodeExpiry) { setLoginCodeError("Code expired — request a new one"); return; }
+      if(loginCodeInput.trim()!==loginSentCode) { setLoginCodeError("Incorrect code — please try again"); return; }
+      // Correct — proceed to set PIN
+      setLoginCodeError("");
+      setLoginCodeSent(false);
+      setLoginSentCode("");
+      setLoginCodeInput("");
+      setAuthView("newpin");
+    }
+
+    function resetLoginCode() {
+      setLoginCodeSent(false);
+      setLoginSentCode("");
+      setLoginCodeInput("");
+      setLoginCodeError("");
+    }
+
     return (
       <Shell>
         <div style={{display:"flex",flexDirection:"column",minHeight:"100vh"}}>
           <div style={{background:G.green,padding:"22px 20px 18px",textAlign:"center"}}>
-            <div style={{fontSize:28,marginBottom:6}}>🔐</div>
+            <div style={{fontSize:28,marginBottom:6}}>📧</div>
             <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
               fontSize:19,fontWeight:900}}>Hi, {pendingMember?.name.split(" ")[0]}!</div>
             <div style={{color:"rgba(255,255,255,0.65)",fontSize:12,marginTop:4}}>
-              Verify your email to set up your account
+              Verify your identity to set your PIN
             </div>
           </div>
           <div style={{flex:1,padding:"28px 24px"}}>
-            <div style={{background:"#f0fdf4",border:"1.5px solid rgba(20,83,45,.15)",
-              borderRadius:14,padding:"16px 18px",marginBottom:20}}>
-              <div style={{fontSize:13,color:G.muted,lineHeight:1.6}}>
-                We have an email address on record for you ending in{" "}
-                <span style={{fontWeight:800,color:G.text}}>{maskedEmail}</span>.
-                <br/>Enter your full email address below to verify your identity.
-              </div>
-            </div>
-            <div style={{marginBottom:14}}>
-              <label style={{display:"block",fontSize:11,fontWeight:800,
-                color:G.muted,letterSpacing:1.2,textTransform:"uppercase",marginBottom:6}}>
-                Your Email Address
-              </label>
-              <input
-                type="email" autoFocus autoCapitalize="none"
-                placeholder="your@email.com"
-                value={emailInput}
-                onChange={e=>{setEmailInput(e.target.value);setEmailError("");}}
-                onKeyDown={e=>e.key==="Enter"&&handleVerifyEmail()}
-                style={{width:"100%",borderRadius:10,border:`1.5px solid ${emailError?"#ef4444":G.border}`,
-                  padding:"13px 14px",fontSize:15,fontFamily:"'DM Sans',sans-serif",
-                  fontWeight:500,background:"#fff",color:G.text,outline:"none",
-                  boxSizing:"border-box"}}/>
-              {emailError&&(
-                <div style={{marginTop:6,fontSize:12,color:"#dc2626",fontWeight:700}}>
-                  ⚠️ {emailError}
+            {!loginCodeSent ? (<>
+              <div style={{background:"#f0fdf4",border:"1.5px solid #86efac",
+                borderRadius:14,padding:"16px 18px",marginBottom:20}}>
+                <div style={{fontWeight:800,fontSize:13,color:"#166534",marginBottom:6}}>
+                  ✉️ We'll send a verification code to:
                 </div>
-              )}
-            </div>
-            <button onClick={handleVerifyEmail}
-              style={{width:"100%",background:G.green,color:G.lime,border:"none",
-                borderRadius:12,padding:"15px",fontSize:15,fontWeight:800,
-                cursor:"pointer",fontFamily:"inherit",marginBottom:10}}>
-              Verify &amp; Continue →
-            </button>
-            <button onClick={()=>{setPendingMember(null);setAuthView("pick");setEmailInput("");setEmailError("");}}
+                <div style={{fontSize:16,fontWeight:900,color:G.text,letterSpacing:1}}>
+                  {masked}
+                </div>
+                <div style={{fontSize:11,color:G.muted,marginTop:6,lineHeight:1.5}}>
+                  This is the email address we have on record.
+                  Check your inbox (and spam folder) after sending.
+                </div>
+              </div>
+              {loginCodeError&&<div style={{background:G.redBg,color:G.red,borderRadius:8,
+                padding:"8px 12px",fontSize:13,marginBottom:12,fontWeight:700}}>
+                ⚠️ {loginCodeError}
+              </div>}
+              <button onClick={sendLoginCode} disabled={loginCodeSending}
+                style={{width:"100%",background:loginCodeSending?"#e5e7eb":G.green,
+                  color:loginCodeSending?G.muted:G.lime,border:"none",borderRadius:12,
+                  padding:"15px",fontSize:15,fontWeight:800,cursor:loginCodeSending?"default":"pointer",
+                  fontFamily:"inherit",marginBottom:10}}>
+                {loginCodeSending?"Sending…":"📧 Send verification code"}
+              </button>
+            </>) : (<>
+              <div style={{background:"#f0fdf4",border:"1.5px solid #86efac",
+                borderRadius:14,padding:"14px 16px",marginBottom:20}}>
+                <div style={{fontWeight:800,fontSize:13,color:"#166534",marginBottom:4}}>
+                  Code sent! ✅
+                </div>
+                <div style={{fontSize:12,color:G.muted,lineHeight:1.5}}>
+                  Check the inbox for <b style={{color:G.text}}>{masked}</b> and enter the 6-digit code below.
+                  It expires in 15 minutes.
+                </div>
+              </div>
+              <div style={{marginBottom:14}}>
+                <label style={{display:"block",fontSize:11,fontWeight:800,
+                  color:G.muted,letterSpacing:1.2,textTransform:"uppercase",marginBottom:6}}>
+                  Verification Code
+                </label>
+                <input autoFocus type="text" inputMode="numeric" maxLength={6}
+                  placeholder="000000"
+                  value={loginCodeInput}
+                  onChange={e=>{setLoginCodeInput(e.target.value.replace(/\D/g,""));setLoginCodeError("");}}
+                  onKeyDown={e=>e.key==="Enter"&&verifyLoginCode()}
+                  style={{width:"100%",borderRadius:10,
+                    border:`1.5px solid ${loginCodeError?"#ef4444":G.border}`,
+                    padding:"13px 14px",fontSize:24,fontFamily:"'DM Sans',sans-serif",
+                    fontWeight:700,background:"#fff",color:G.text,outline:"none",
+                    boxSizing:"border-box",letterSpacing:6,textAlign:"center"}}/>
+                {loginCodeError&&<div style={{marginTop:6,fontSize:12,color:"#dc2626",fontWeight:700}}>
+                  ⚠️ {loginCodeError}
+                </div>}
+              </div>
+              <button onClick={verifyLoginCode}
+                style={{width:"100%",background:G.green,color:G.lime,border:"none",
+                  borderRadius:12,padding:"15px",fontSize:15,fontWeight:800,
+                  cursor:"pointer",fontFamily:"inherit",marginBottom:10}}>
+                Verify &amp; Continue →
+              </button>
+              <button onClick={resetLoginCode}
+                style={{width:"100%",background:"transparent",color:G.muted,border:"none",
+                  fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",padding:"8px"}}>
+                ← Didn't receive it? Send again
+              </button>
+            </>)}
+            <button onClick={()=>{
+                setPendingMember(null);setAuthView("pick");
+                resetLoginCode();
+              }}
               style={{width:"100%",background:"transparent",color:G.muted,border:"none",
                 fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",padding:"8px"}}>
               ← Back
             </button>
-            <div style={{marginTop:20,padding:"12px 14px",background:"#fffbeb",
+            <div style={{marginTop:16,padding:"12px 14px",background:"#fffbeb",
               border:"1px solid #fde68a",borderRadius:10,fontSize:12,color:"#78350f",lineHeight:1.6}}>
-              <b>Can't remember?</b> Contact your admin to reset your account.
+              <b>Wrong email?</b> Ask your admin to update your email address or reset your access.
             </div>
           </div>
         </div>
@@ -4465,16 +4555,24 @@ export default function App() {
   // ════════════════════════════════════════════════════════════
   // RENDER: Auth — enter PIN
   // ════════════════════════════════════════════════════════════
-  if(!currentUser && authView==="enterpin") return (
+  if(!currentUser && authView==="enterpin") {
+    const isYouthNoPinMember = ["U11","U13"].some(t=>(pendingMember?.teams||[]).includes(t))
+      && !pins[pendingMember?.id];
+    return (
     <Shell>
       <div style={{display:"flex",flexDirection:"column",minHeight:"100vh"}}>
-        {/* Compact header at top */}
         <div style={{background:G.green,padding:"18px 20px 16px",textAlign:"center"}}>
           <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
             fontSize:19,fontWeight:900}}>Welcome back, {pendingMember?.name.split(" ")[0]}!</div>
           <div style={{color:"rgba(255,255,255,0.6)",fontSize:12,marginTop:3}}>Enter your PIN</div>
         </div>
-        {/* Keypad pushed to lower portion of screen */}
+        {isYouthNoPinMember&&(
+          <div style={{background:"#fffbeb",border:"1px solid #fde68a",
+            margin:"16px 20px 0",borderRadius:10,padding:"10px 14px",
+            fontSize:12,color:"#92400e",lineHeight:1.6,textAlign:"center"}}>
+            👋 First time? Try <b>0000</b> to log in, then set your own PIN.
+          </div>
+        )}
         <div style={{flex:1,display:"flex",alignItems:"flex-end",paddingBottom:60}}>
           <div style={{width:"100%"}}>
             <PinPad
@@ -4487,7 +4585,8 @@ export default function App() {
         </div>
       </div>
     </Shell>
-  );
+    );
+  }
 
   // ════════════════════════════════════════════════════════════
   // RENDER: App (authenticated)
