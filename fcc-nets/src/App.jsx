@@ -1068,7 +1068,7 @@ function GroupIcon({color,size=18}) {
 }
 
 // ─── Nets Timeline Strip ──────────────────────────────────────
-function NetsTimeline({sessions,netsDate,setNetsDate,setView,setBDate,setBFrom,setBTo,setBNet}) {
+function NetsTimeline({sessions,netsDate,setNetsDate,setView,setBDate,setBFrom,setBTo,setBNet,blockCals=[]}) {
   // Build 14-day window starting today
   const today = new Date(); today.setHours(0,0,0,0);
   const dates = Array.from({length:14},(_,i)=>{
@@ -1133,9 +1133,10 @@ function NetsTimeline({sessions,netsDate,setNetsDate,setView,setBDate,setBFrom,s
           const gauge=netAvailGauge(sessions,d);
           const dow=new Date(d+"T12:00:00").getDay(); // 0=Sun,6=Sat
           const isWeekend=dow===0||dow===6;
+          const hasBlock=blockCals.some(b=>b.date===d);
           return (
             <button key={d} onClick={()=>setNetsDate(d)}
-              style={{flexShrink:0,
+              style={{flexShrink:0,position:"relative",
                 background:active?G.green:isWeekend?"#e8f5e9":"#f9fafb",
                 border:active?`2px solid ${G.green}`:isWeekend?`1.5px solid #c8e6c9`:`1.5px solid ${G.border}`,
                 borderRadius:10,padding:"6px 8px 5px",cursor:"pointer",fontFamily:"inherit",
@@ -1144,6 +1145,8 @@ function NetsTimeline({sessions,netsDate,setNetsDate,setView,setBDate,setBFrom,s
                   ?"0 3px 0 rgba(20,83,45,.4), inset 0 1px 0 rgba(255,255,255,.2)"
                   :"none",
                 transform:active?"translateY(-1px)":"none"}}>
+              {hasBlock&&<span style={{position:"absolute",top:2,right:2,fontSize:8,
+                opacity:active?0.9:0.6}}>🔒</span>}
               <div style={{fontSize:8,fontWeight:700,
                 color:active?G.lime:isWeekend?G.green:G.muted,
                 textTransform:"uppercase"}}>{f.day}</div>
@@ -1165,6 +1168,10 @@ function NetsTimeline({sessions,netsDate,setNetsDate,setView,setBDate,setBFrom,s
             <span style={{fontSize:9,color:G.muted,fontWeight:600,whiteSpace:"nowrap"}}>{l}</span>
           </div>
         ))}
+        <div style={{display:"flex",alignItems:"center",gap:3}}>
+          <span style={{fontSize:8}}>🔒</span>
+          <span style={{fontSize:9,color:G.muted,fontWeight:600,whiteSpace:"nowrap"}}>Blocked</span>
+        </div>
       </div>
 
       {/* Hour labels */}
@@ -1244,6 +1251,34 @@ function NetsTimeline({sessions,netsDate,setNetsDate,setView,setBDate,setBFrom,s
                       whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
                       {s.label||"Session"}{s.net==="both"?" ×2":""}
                     </span>
+                  </div>
+                );
+              })}
+              {/* Blocked date overlay — lock icon + striped pattern */}
+              {blockCals.filter(b=>b.date===netsDate).map(b=>{
+                const bFrom=toMinsNet(b.from), bTo=toMinsNet(b.to);
+                const left=netPct(Math.max(bFrom,NET_DAY_START));
+                const right=netPct(Math.min(bTo,NET_DAY_END));
+                const w=right-left;
+                if(w<=0) return null;
+                return (
+                  <div key={b.id} style={{position:"absolute",
+                    left:`${left}%`,width:`${w}%`,
+                    top:0,bottom:0,
+                    background:"repeating-linear-gradient(135deg,rgba(100,116,139,.12),rgba(100,116,139,.12) 4px,transparent 4px,transparent 8px)",
+                    borderLeft:"2px solid rgba(100,116,139,.4)",
+                    borderRight:"2px solid rgba(100,116,139,.4)",
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                    pointerEvents:"none",zIndex:5}}>
+                    <div style={{background:"rgba(100,116,139,.85)",borderRadius:4,
+                      padding:"2px 6px",display:"flex",alignItems:"center",gap:3}}>
+                      <span style={{fontSize:10}}>🔒</span>
+                      <span style={{fontSize:8,color:"#fff",fontWeight:700,
+                        whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",
+                        maxWidth:w>15?80:40}}>
+                        {b.label||"Blocked"}
+                      </span>
+                    </div>
                   </div>
                 );
               })}
@@ -4883,6 +4918,7 @@ export default function App() {
           setBFrom={setBFrom}
           setBTo={setBTo}
           setBNet={setBNet}
+          blockCals={blockCals}
         />
 
         {filteredUpcoming.length===0&&filteredPast.length===0?(
@@ -8323,7 +8359,7 @@ export default function App() {
                           value={bCalTo} onChange={e=>setBCalTo(e.target.value)}/>
                       </FFld>
                     </div>
-                    {/* Clash detection */}
+                    {/* Clash detection — existing blocks */}
                     {bCalDate&&(()=>{
                       const clash = blockCals.find(b=>b.date===bCalDate&&
                         timesOverlap(bCalFrom,bCalTo,b.from,b.to));
@@ -8334,6 +8370,63 @@ export default function App() {
                           ({clash.from}–{clash.to}). Check before saving.
                         </div>
                       ) : null;
+                    })()}
+                    {/* Clash detection — existing bookings */}
+                    {bCalDate&&(()=>{
+                      const clashingSessions = sessions.filter(s=>
+                        s.date===bCalDate && timesOverlap(bCalFrom,bCalTo,s.from,s.to));
+                      if(clashingSessions.length===0) return null;
+                      return (
+                        <div style={{background:"#fef3c7",border:"1.5px solid #f59e0b",
+                          borderRadius:10,padding:"12px 14px"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                            <span style={{fontSize:16}}>⚠️</span>
+                            <span style={{fontWeight:700,fontSize:13,color:"#78350f"}}>
+                              Timing clashing with nets booking
+                            </span>
+                          </div>
+                          <div style={{fontSize:12,color:"#92400e",marginBottom:10,lineHeight:1.5}}>
+                            Detected {clashingSessions.length} nets booking{clashingSessions.length>1?"s":""} for the selected time.
+                            Review before blocking.
+                          </div>
+                          <div style={{background:"#fffbeb",border:"1px solid #fcd34d",
+                            borderRadius:8,padding:"10px 12px"}}>
+                            <div style={{fontSize:9,textTransform:"uppercase",letterSpacing:"0.5px",
+                              color:"#a16207",fontWeight:600,marginBottom:8}}>
+                              Clashing booking{clashingSessions.length>1?"s":""}
+                            </div>
+                            {clashingSessions.slice(0,3).map(s=>{
+                              const tm=getTeamMeta(s.restrictedTo||"Unassigned");
+                              return (
+                                <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,
+                                  padding:"8px 10px",background:"#fff",border:"1px solid #e5e7eb",
+                                  borderRadius:8,marginBottom:6}}>
+                                  <div style={{width:10,height:10,borderRadius:"50%",
+                                    background:tm.bg,flexShrink:0}}/>
+                                  <div style={{flex:1}}>
+                                    <div style={{fontSize:12,fontWeight:600,color:"#1f2937"}}>
+                                      {s.label||"Session"}
+                                    </div>
+                                    <div style={{fontSize:10,color:"#6b7280"}}>
+                                      {s.from}–{s.to} · Net {s.net==="both"?"1+2":s.net} · {s.players?.length||0} players
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {clashingSessions.length>3&&(
+                              <div style={{fontSize:11,color:"#92400e",fontStyle:"italic",marginTop:4}}>
+                                +{clashingSessions.length-3} more booking{clashingSessions.length-3>1?"s":""}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{fontSize:11,color:"#92400e",marginTop:10,
+                            background:"#fef9c3",borderRadius:6,padding:"8px 10px",
+                            border:"0.5px solid #fde68a"}}>
+                            💡 If you proceed, consider notifying affected members about the change.
+                          </div>
+                        </div>
+                      );
                     })()}
                     <div style={{display:"flex",gap:8}}>
                       <Btn bg={G.green} col={G.lime} full onClick={()=>{
