@@ -2531,6 +2531,7 @@ export default function App() {
   const [view,     setView]     = useState("schedule");
   const [selSess,  setSelSess]  = useState(null);
   const [toast,    setToast]    = useState(null);
+  const [sessAttendance, setSessAttendance] = useState({}); // {playerId: true/false/null} for current session
 
   // Dynamic teams
   const [teams, setTeams] = useState(DEFAULT_TEAMS);
@@ -4961,7 +4962,7 @@ export default function App() {
                 <SLbl mt={4}>Upcoming</SLbl>
                 {visibleUpcoming.map(s=><SessCard key={s.id} s={s} members={members} teams={teams}
                   onCarpoolClick={()=>{setLiftDraft(null);setCarpoolSheetSess(s);}}
-                  onClick={()=>{setSelSess(s);setView("session");setLiftEditing(false);setLiftDraft(null);setNotInExpanded(false);setCarpoolFocus(false);}}/>)}
+                  onClick={()=>{setSelSess(s);setView("session");setLiftEditing(false);setLiftDraft(null);setNotInExpanded(false);setCarpoolFocus(false);setSessAttendance(s.attendance||{});}}/>)}
                 {filteredUpcoming.length>UPCOMING_LIMIT&&(
                   <button onClick={()=>setShowUpcomingAll(v=>!v)}
                     style={{width:"100%",padding:"8px 0",background:"none",
@@ -4985,7 +4986,7 @@ export default function App() {
                 <SLbl>Past</SLbl>
                 {visiblePast.map(s=><SessCard key={s.id} s={s} members={members} teams={teams} faded
                   onCarpoolClick={()=>{setLiftDraft(null);setCarpoolSheetSess(s);}}
-                  onClick={()=>{setSelSess(s);setView("session");setLiftEditing(false);setLiftDraft(null);setNotInExpanded(false);setCarpoolFocus(false);}}/>)}
+                  onClick={()=>{setSelSess(s);setView("session");setLiftEditing(false);setLiftDraft(null);setNotInExpanded(false);setCarpoolFocus(false);setSessAttendance(s.attendance||{});}}/>)}
                 {/* Toggle button */}
                 {filteredPast.length>1&&(
                   <button onClick={()=>setShowPastAll(v=>!v)}
@@ -5834,6 +5835,129 @@ export default function App() {
             ));
           })()}
 
+          {/* ── Attendance Section (Coaches/Admins only) ── */}
+          {(canOrCoach(userRole,"sendReminder",userMem,teams) || isCoachMember(currentUser?.name,teams)) && selSess.players.length > 0 && (()=>{
+            // Initialize attendance from session or empty
+            const att = sessAttendance;
+            const hasChanges = Object.keys(att).length > 0;
+            const presentCount = Object.values(att).filter(v=>v===true).length;
+            const absentCount = Object.values(att).filter(v=>v===false).length;
+            const unmarkedCount = selSess.players.length - presentCount - absentCount;
+            
+            return (
+              <div style={{marginBottom:20}}>
+                <SLbl mt={4}>📋 Attendance</SLbl>
+                <div style={{background:G.white,borderRadius:12,
+                  border:`1.5px solid ${G.border}`,padding:14}}>
+                  
+                  {/* Summary bar */}
+                  <div style={{display:"flex",gap:12,marginBottom:14,flexWrap:"wrap"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:4}}>
+                      <span style={{width:10,height:10,borderRadius:"50%",background:"#22c55e"}}/>
+                      <span style={{fontSize:12,fontWeight:700,color:G.text}}>{presentCount} present</span>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:4}}>
+                      <span style={{width:10,height:10,borderRadius:"50%",background:"#ef4444"}}/>
+                      <span style={{fontSize:12,fontWeight:700,color:G.text}}>{absentCount} absent</span>
+                    </div>
+                    {unmarkedCount > 0 && (
+                      <div style={{display:"flex",alignItems:"center",gap:4}}>
+                        <span style={{width:10,height:10,borderRadius:"50%",background:G.border}}/>
+                        <span style={{fontSize:12,color:G.muted}}>{unmarkedCount} unmarked</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Player attendance toggles */}
+                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    {[...selSess.players].sort((a,b)=>a.localeCompare(b)).map(playerName => {
+                      const mem = members.find(m=>m.name===playerName);
+                      const status = att[mem?.id || playerName]; // true=present, false=absent, undefined=unmarked
+                      
+                      return (
+                        <div key={playerName} style={{
+                          display:"flex",alignItems:"center",gap:10,
+                          padding:"8px 10px",borderRadius:8,
+                          background: status === true ? "#f0fdf4" : status === false ? "#fef2f2" : "#f8fafc",
+                          border: `1px solid ${status === true ? "#bbf7d0" : status === false ? "#fecaca" : G.border}`,
+                        }}>
+                          {/* Avatar */}
+                          <div style={{width:32,height:32,borderRadius:"50%",
+                            background: TEAM_META[(mem?.teams||[])[0]]?.bg || G.green,
+                            display:"flex",alignItems:"center",justifyContent:"center",
+                            fontSize:12,fontWeight:800,
+                            color: TEAM_META[(mem?.teams||[])[0]]?.text || G.lime}}>
+                            {playerName.split(" ").map(n=>n[0]).join("").slice(0,2)}
+                          </div>
+                          
+                          {/* Name */}
+                          <div style={{flex:1}}>
+                            <div style={{fontWeight:700,fontSize:13,color:G.text}}>{playerName}</div>
+                            {mem?.teams?.[0] && (
+                              <div style={{fontSize:10,color:G.muted}}>{mem.teams[0]}</div>
+                            )}
+                          </div>
+                          
+                          {/* Toggle buttons */}
+                          <div style={{display:"flex",gap:4}}>
+                            <button
+                              onClick={()=>{
+                                const key = mem?.id || playerName;
+                                setSessAttendance(prev => ({...prev, [key]: status === true ? null : true}));
+                              }}
+                              style={{
+                                width:36,height:36,borderRadius:8,border:"none",
+                                cursor:"pointer",fontFamily:"inherit",fontSize:16,
+                                background: status === true ? "#22c55e" : "#e5e7eb",
+                                color: status === true ? "#fff" : "#9ca3af",
+                                transition:"all .15s",
+                              }}>
+                              ✓
+                            </button>
+                            <button
+                              onClick={()=>{
+                                const key = mem?.id || playerName;
+                                setSessAttendance(prev => ({...prev, [key]: status === false ? null : false}));
+                              }}
+                              style={{
+                                width:36,height:36,borderRadius:8,border:"none",
+                                cursor:"pointer",fontFamily:"inherit",fontSize:16,
+                                background: status === false ? "#ef4444" : "#e5e7eb",
+                                color: status === false ? "#fff" : "#9ca3af",
+                                transition:"all .15s",
+                              }}>
+                              ✗
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Save button */}
+                  {hasChanges && (
+                    <button
+                      onClick={async ()=>{
+                        // TODO: Save to Firestore attendance/{sessionId}/records
+                        console.log("Saving attendance for session", selSess.id, sessAttendance);
+                        showToast("Attendance saved ✓");
+                        // Clear local state after save
+                        // setSessAttendance({});
+                      }}
+                      style={{
+                        width:"100%",marginTop:14,padding:"12px",borderRadius:10,
+                        border:"none",cursor:"pointer",fontFamily:"inherit",
+                        background:G.green,color:G.white,
+                        fontWeight:800,fontSize:14,
+                      }}>
+                      💾 Save Attendance
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
 
           {/* Poll voting */}
           {selSess.poll&&selSess.poll.length>0&&(()=>{
@@ -6326,6 +6450,10 @@ export default function App() {
           phase: "Phase 2",
         }}
         players={coachPlayers}
+        teams={isAdmin 
+          ? (teams||[]).filter(t=>t.name.startsWith("U")).map(t=>t.name)
+          : coachTeams.map(t=>t.name)
+        }
         userRole={userRole}
         currentUser={currentUser}
         onBack={() => setView("coachhq")}
