@@ -2538,6 +2538,9 @@ export default function App() {
   const seniorTeamNames = teams.filter(t=>t.senior).map(t=>t.name);
   const ALL_TEAMS = [...teams.map(t=>t.name), "Unassigned"];
 
+  // Season plans for Progress Tracker (per team)
+  const [seasonPlans, setSeasonPlans] = useState({});
+
   // Recurring slots
   const [recurring, setRecurring] = useState([]);
 
@@ -2678,10 +2681,11 @@ export default function App() {
       invitecodes: doc(db,"fccnets","invitecodes"),
       joinrequests:doc(db,"fccnets",JOINREQS_KEY),
       auditlog:    doc(db,"fccnets",AUDITLOG_KEY),
+      seasonplans: doc(db,"fccnets","seasonplans"),
     };
     (async()=>{
       try {
-        const [sr,mr,pr,tr,rr,br,ir,jr,ar] = await Promise.all([
+        const [sr,mr,pr,tr,rr,br,ir,jr,ar,spr] = await Promise.all([
           getDoc(refs.sessions),
           getDoc(refs.members),
           getDoc(refs.pins),
@@ -2691,6 +2695,7 @@ export default function App() {
           getDoc(refs.invitecodes),
           getDoc(refs.joinrequests),
           getDoc(refs.auditlog),
+          getDoc(refs.seasonplans),
         ]);
         // Sessions MUST be loaded before setLoading(false) so sessionsRef is
         // populated before the recurring useEffect runs — prevents lifts being wiped
@@ -2720,6 +2725,7 @@ export default function App() {
         setInviteCodes( ir.exists() ? JSON.parse(ir.data().value) : {});
         setJoinRequests(jr.exists() ? JSON.parse(jr.data().value) : []);
         setAuditLog(    ar.exists() ? JSON.parse(ar.data().value) : []);
+        setSeasonPlans( spr.exists() ? JSON.parse(spr.data().value) : {});
       } catch(e) {
         setMembers(SEED_MEMBERS.map(normMember)); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]); setBlockCals([]); setInviteCodes({}); setJoinRequests([]); setAuditLog([]);
       }
@@ -2742,6 +2748,7 @@ export default function App() {
   const saveBlockCals   = async u => { setBlockCals(u);   await setDoc(doc(db,"fccnets","blockcals"),   {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveInviteCodes = async u => { setInviteCodes(u);  await setDoc(doc(db,"fccnets","invitecodes"), {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveJoinRequests= async u => { setJoinRequests(u); await setDoc(doc(db,"fccnets",JOINREQS_KEY),  {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveSeasonPlans = async u => { setSeasonPlans(u); await setDoc(doc(db,"fccnets","seasonplans"), {value:JSON.stringify(u)}).catch(()=>{}); };
 
   // ── Audit log ─────────────────────────────────────────────────
   // Cap at 500 entries; newest first. Only superadmin can read.
@@ -4769,18 +4776,7 @@ export default function App() {
           )}
         </div>
 
-        {/* Reminder strips */}
-        {can(userRole,"sendReminder")&&tomorrowSess.length>0&&(
-          <div style={{margin:"0 14px 10px",background:"rgba(251,191,36,.12)",
-            border:"0.5px solid rgba(251,191,36,.25)",
-            borderRadius:10,padding:"8px 12px",
-            display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <div style={{color:"rgba(255,255,255,.75)",fontSize:11,fontWeight:700}}>
-              📅 {tomorrowSess.reduce((n,s)=>n+s.players.length,0)} players booked tomorrow
-            </div>
-            <Btn onClick={()=>openWA(tomorrowStr())} bg="#fbbf24" col="#1e3a5f" sm>📲 Send Reminder</Btn>
-          </div>
-        )}
+        {/* Today's training strip */}
         {can(userRole,"sendReminder")&&todaySess.length>0&&(
           <div style={{margin:"0 14px 10px",background:"rgba(255,255,255,.08)",
             borderRadius:10,padding:"8px 12px",
@@ -6437,6 +6433,11 @@ export default function App() {
     });
     const nextSession = coachSessions.find(s => isFuture(s.date));
     
+    // Get available teams for this coach (youth teams only)
+    const availableTeams = isAdmin 
+      ? (teams||[]).filter(t=>t.name.startsWith("U") || t.name === "Kvinder").map(t=>t.name)
+      : coachTeams.map(t=>t.name);
+    
     return (
       <ProgressTracker
         session={nextSession ? {
@@ -6450,10 +6451,8 @@ export default function App() {
           phase: "Phase 2",
         }}
         players={coachPlayers}
-        teams={isAdmin 
-          ? (teams||[]).filter(t=>t.name.startsWith("U")).map(t=>t.name)
-          : coachTeams.map(t=>t.name)
-        }
+        teams={availableTeams}
+        seasonPlans={seasonPlans}
         userRole={userRole}
         currentUser={currentUser}
         onBack={() => setView("coachhq")}
@@ -6466,6 +6465,11 @@ export default function App() {
           // TODO: Save to progressNotes/{playerId}/notes
           console.log("Saving note:", note);
           showToast("Note saved ✓");
+        }}
+        onSaveSeasonPlan={(teamName, plan) => {
+          const updated = { ...seasonPlans, [teamName]: plan };
+          saveSeasonPlans(updated);
+          showToast(`${teamName} plan saved ✓`);
         }}
       />
     );
@@ -8243,7 +8247,7 @@ export default function App() {
                   border:`1.5px solid ${G.border}`,
                   borderLeft:`4px solid ${tm.bg}`,
                   background:G.white,
-                  overflow:"hidden",
+                  position:"relative", // Allow dropdown to escape
                 }}>
                   {/* Team header */}
                   <div style={{
