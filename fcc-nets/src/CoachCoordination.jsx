@@ -6,8 +6,8 @@ import React, { useState, useMemo } from "react";
 // Uses real data from App.jsx (teams, fixtures, coaches)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Design tokens (dark theme matching original)
-const CC = {
+// Design tokens - DARK theme
+const DARK_THEME = {
   bg: "#0f1117",
   surface: "#181c27",
   surface2: "#1e2436",
@@ -24,7 +24,43 @@ const CC = {
   warn: "#f59e0b",
   warnBg: "rgba(245,158,11,0.1)",
   ok: "#10b981",
+  okBg: "rgba(16,185,129,0.1)",
+  groundBlocked: "#8b5cf6",
+  groundBlockedBg: "rgba(139,92,246,0.12)",
 };
+
+// Design tokens - LIGHT theme
+const LIGHT_THEME = {
+  bg: "#f8f9fb",
+  surface: "#ffffff",
+  surface2: "#f1f3f5",
+  border: "rgba(0,0,0,0.08)",
+  border2: "rgba(0,0,0,0.12)",
+  text: "#1a1d24",
+  muted: "rgba(26,29,36,0.55)",
+  dim: "rgba(26,29,36,0.15)",
+  gold: "#b8942e",
+  goldDim: "rgba(184,148,46,0.12)",
+  goldBorder: "rgba(184,148,46,0.35)",
+  conflict: "#dc2626",
+  conflictBg: "rgba(220,38,38,0.08)",
+  warn: "#d97706",
+  warnBg: "rgba(217,119,6,0.08)",
+  ok: "#059669",
+  okBg: "rgba(5,150,105,0.08)",
+  groundBlocked: "#7c3aed",
+  groundBlockedBg: "rgba(124,58,237,0.08)",
+};
+
+// Ground blocked dates (when Karlebo or other venues are unavailable)
+// TODO: Move to Firestore for dynamic management
+const GROUND_BLOCKED_DATES = [
+  { date: "2026-04-25", venue: "Karlebo", reason: "Ground maintenance" },
+  { date: "2026-05-01", venue: "Karlebo", reason: "Public holiday - ground closed" },
+  { date: "2026-05-09", venue: "Karlebo", reason: "School event" },
+  { date: "2026-06-20", venue: "Karlebo", reason: "Midsummer - ground closed" },
+  { date: "2026-06-21", venue: "Karlebo", reason: "Midsummer - ground closed" },
+];
 
 // Generate a consistent color from a name (for coaches not in predefined list)
 const stringToColor = (str) => {
@@ -172,7 +208,9 @@ function toDateStr(d) {
 export default function CoachCoordination({
   teams = [],
   allFixtures = [],
+  blockedDates = [], // Ground blocked dates from Admin Panel
   onBack,
+  onReassign, // Callback to save reassignment: (sessionId, date, newCoach) => void
 }) {
   const [currentWeekStart, setCurrentWeekStart] = useState(() => getWeekStart(new Date()));
   const [currentMode, setCurrentMode] = useState("outdoor");
@@ -180,6 +218,56 @@ export default function CoachCoordination({
   const [focusCoach, setFocusCoach] = useState(null);
   const [selectedSession, setSelectedSession] = useState(null);
   const [reassignModal, setReassignModal] = useState(null); // {session, date, conflicts}
+  const [darkMode, setDarkMode] = useState(true); // Light/dark mode toggle
+  const [notifyModal, setNotifyModal] = useState(null); // {newCoach, session, date} for WhatsApp notification
+  const [selectedReassignCoach, setSelectedReassignCoach] = useState(null); // Track selected coach in modal
+  
+  // Theme based on dark mode
+  const theme = darkMode ? {
+    bg: "#0f1117",
+    surface: "#181c27",
+    surface2: "#1e2436",
+    border: "rgba(255,255,255,0.07)",
+    border2: "rgba(255,255,255,0.13)",
+    text: "#e8eaf0",
+    muted: "rgba(232,234,240,0.45)",
+    dim: "rgba(232,234,240,0.2)",
+    gold: "#c9a84c",
+    goldDim: "rgba(201,168,76,0.18)",
+    goldBorder: "rgba(201,168,76,0.45)",
+    conflict: "#ef4444",
+    conflictBg: "rgba(239,68,68,0.12)",
+    warn: "#f59e0b",
+    warnBg: "rgba(245,158,11,0.1)",
+    ok: "#10b981",
+    blocked: "#6366f1",
+    blockedBg: "rgba(99,102,241,0.12)",
+  } : {
+    bg: "#f8fafc",
+    surface: "#ffffff",
+    surface2: "#f1f5f9",
+    border: "rgba(0,0,0,0.08)",
+    border2: "rgba(0,0,0,0.12)",
+    text: "#1e293b",
+    muted: "rgba(30,41,59,0.5)",
+    dim: "rgba(30,41,59,0.25)",
+    gold: "#b8860b",
+    goldDim: "rgba(184,134,11,0.12)",
+    goldBorder: "rgba(184,134,11,0.35)",
+    conflict: "#dc2626",
+    conflictBg: "rgba(220,38,38,0.08)",
+    warn: "#d97706",
+    warnBg: "rgba(217,119,6,0.08)",
+    ok: "#059669",
+    blocked: "#4f46e5",
+    blockedBg: "rgba(79,70,229,0.08)",
+  };
+  
+  // Get blocked dates for a specific day
+  const getBlockedOnDay = (date) => {
+    const ds = toDateStr(date);
+    return blockedDates.filter(b => b.date === ds);
+  };
   
   // Build coaches list from teams data - filter out empty/null names
   const coachesWithTeams = useMemo(() => {
@@ -289,16 +377,16 @@ export default function CoachCoordination({
   // ─────────────────────────────────────────────────────────────────────────────
   return (
     <div style={{
-      background: CC.bg,
+      background: theme.bg,
       minHeight: "100vh",
       fontFamily: "'IBM Plex Sans', -apple-system, sans-serif",
-      color: CC.text,
+      color: theme.text,
       fontSize: 13,
     }}>
       {/* Header */}
       <header style={{
-        background: CC.surface,
-        borderBottom: `1px solid ${CC.goldBorder}`,
+        background: theme.surface,
+        borderBottom: `1px solid ${theme.goldBorder}`,
         padding: "0 16px",
         display: "flex",
         alignItems: "center",
@@ -313,7 +401,7 @@ export default function CoachCoordination({
           style={{
             background: "none",
             border: "none",
-            color: CC.muted,
+            color: theme.muted,
             fontSize: 20,
             cursor: "pointer",
             padding: "4px 8px",
@@ -326,14 +414,14 @@ export default function CoachCoordination({
           fontSize: 13,
           fontWeight: 600,
           letterSpacing: "0.04em",
-          color: CC.text,
+          color: theme.text,
           display: "flex",
           alignItems: "center",
           gap: 10,
         }}>
           FCC
           <span style={{
-            background: CC.gold,
+            background: theme.gold,
             color: "#0f1117",
             fontSize: 9,
             fontWeight: 600,
@@ -353,9 +441,9 @@ export default function CoachCoordination({
               padding: "6px 12px",
               fontSize: 11,
               fontWeight: 600,
-              background: currentMode === "outdoor" ? CC.goldDim : "transparent",
-              border: `1px solid ${currentMode === "outdoor" ? CC.goldBorder : CC.border}`,
-              color: currentMode === "outdoor" ? CC.gold : CC.muted,
+              background: currentMode === "outdoor" ? theme.goldDim : "transparent",
+              border: `1px solid ${currentMode === "outdoor" ? theme.goldBorder : theme.border}`,
+              color: currentMode === "outdoor" ? theme.gold : theme.muted,
               borderRadius: 6,
               cursor: "pointer",
               fontFamily: "'IBM Plex Mono', monospace",
@@ -369,15 +457,32 @@ export default function CoachCoordination({
               padding: "6px 12px",
               fontSize: 11,
               fontWeight: 600,
-              background: currentMode === "indoor" ? CC.goldDim : "transparent",
-              border: `1px solid ${currentMode === "indoor" ? CC.goldBorder : CC.border}`,
-              color: currentMode === "indoor" ? CC.gold : CC.muted,
+              background: currentMode === "indoor" ? theme.goldDim : "transparent",
+              border: `1px solid ${currentMode === "indoor" ? theme.goldBorder : theme.border}`,
+              color: currentMode === "indoor" ? theme.gold : theme.muted,
               borderRadius: 6,
               cursor: "pointer",
               fontFamily: "'IBM Plex Mono', monospace",
             }}
           >
             🏠 Indoor
+          </button>
+          
+          {/* Dark/Light mode toggle */}
+          <button
+            onClick={() => setDarkMode(!darkMode)}
+            style={{
+              padding: "6px 10px",
+              fontSize: 14,
+              background: "transparent",
+              border: `1px solid ${theme.border}`,
+              borderRadius: 6,
+              cursor: "pointer",
+              marginLeft: 8,
+            }}
+            title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {darkMode ? "☀️" : "🌙"}
           </button>
         </div>
       </header>
@@ -386,8 +491,8 @@ export default function CoachCoordination({
       <div style={{
         display: "flex",
         gap: 0,
-        background: CC.surface,
-        borderBottom: `1px solid ${CC.border}`,
+        background: theme.surface,
+        borderBottom: `1px solid ${theme.border}`,
         padding: "0 16px",
         overflowX: "auto",
       }}>
@@ -406,8 +511,8 @@ export default function CoachCoordination({
               fontWeight: 600,
               background: "transparent",
               border: "none",
-              borderBottom: currentView === tab.id ? `2px solid ${CC.gold}` : "2px solid transparent",
-              color: currentView === tab.id ? CC.gold : CC.muted,
+              borderBottom: currentView === tab.id ? `2px solid ${theme.gold}` : "2px solid transparent",
+              color: currentView === tab.id ? theme.gold : theme.muted,
               cursor: "pointer",
               fontFamily: "inherit",
               display: "flex",
@@ -420,7 +525,7 @@ export default function CoachCoordination({
             {tab.label}
             {tab.count > 0 && (
               <span style={{
-                background: CC.conflict,
+                background: theme.conflict,
                 color: "#fff",
                 fontSize: 10,
                 fontWeight: 700,
@@ -438,15 +543,15 @@ export default function CoachCoordination({
       {/* Conflict banner */}
       {weekConflicts.length > 0 && currentView === "schedule" && (
         <div style={{
-          background: CC.conflictBg,
-          borderBottom: `1px solid ${CC.conflict}40`,
+          background: theme.conflictBg,
+          borderBottom: `1px solid ${theme.conflict}40`,
           padding: "10px 16px",
           display: "flex",
           alignItems: "center",
           gap: 10,
         }}>
           <span style={{ fontSize: 16 }}>⚠️</span>
-          <span style={{ fontSize: 12, color: CC.conflict, fontWeight: 600 }}>
+          <span style={{ fontSize: 12, color: theme.conflict, fontWeight: 600 }}>
             {weekConflicts.length} conflict{weekConflicts.length > 1 ? "s" : ""} this week — coach on match duty
           </span>
           <button
@@ -457,8 +562,8 @@ export default function CoachCoordination({
               fontSize: 11,
               fontWeight: 600,
               background: "transparent",
-              border: `1px solid ${CC.conflict}60`,
-              color: CC.conflict,
+              border: `1px solid ${theme.conflict}60`,
+              color: theme.conflict,
               borderRadius: 4,
               cursor: "pointer",
               fontFamily: "inherit",
@@ -477,28 +582,28 @@ export default function CoachCoordination({
             alignItems: "center",
             justifyContent: "space-between",
             padding: "12px 16px",
-            background: CC.surface,
-            borderBottom: `1px solid ${CC.border}`,
+            background: theme.surface,
+            borderBottom: `1px solid ${theme.border}`,
           }}>
             <button onClick={prevWeek} style={{
               padding: "6px 12px",
               fontSize: 12,
               background: "transparent",
-              border: `1px solid ${CC.border}`,
-              color: CC.text,
+              border: `1px solid ${theme.border}`,
+              color: theme.text,
               borderRadius: 6,
               cursor: "pointer",
             }}>
               ← Prev
             </button>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: CC.text }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: theme.text }}>
                 {fmtDate(weekDays[0])} – {fmtDate(weekDays[6])}
               </div>
               <button onClick={goToToday} style={{
                 background: "none",
                 border: "none",
-                color: CC.gold,
+                color: theme.gold,
                 fontSize: 11,
                 cursor: "pointer",
                 textDecoration: "underline",
@@ -510,8 +615,8 @@ export default function CoachCoordination({
               padding: "6px 12px",
               fontSize: 12,
               background: "transparent",
-              border: `1px solid ${CC.border}`,
-              color: CC.text,
+              border: `1px solid ${theme.border}`,
+              color: theme.text,
               borderRadius: 6,
               cursor: "pointer",
             }}>
@@ -525,15 +630,15 @@ export default function CoachCoordination({
             gap: 8,
             padding: "12px 16px",
             overflowX: "auto",
-            background: CC.surface2,
-            borderBottom: `1px solid ${CC.border}`,
+            background: theme.surface2,
+            borderBottom: `1px solid ${theme.border}`,
           }}>
-            <span style={{ fontSize: 11, color: CC.muted, alignSelf: "center", marginRight: 4 }}>
+            <span style={{ fontSize: 11, color: theme.muted, alignSelf: "center", marginRight: 4 }}>
               Filter:
             </span>
             {coaches.map(coach => {
               const isActive = focusCoach === null || focusCoach === coach;
-              const color = getCoachColor(coach) || CC.muted;
+              const color = getCoachColor(coach) || theme.muted;
               return (
                 <button
                   key={coach}
@@ -543,8 +648,8 @@ export default function CoachCoordination({
                     fontSize: 11,
                     fontWeight: 600,
                     background: isActive ? `${color}20` : "transparent",
-                    border: `1.5px solid ${isActive ? color : CC.border}`,
-                    color: isActive ? color : CC.dim,
+                    border: `1.5px solid ${isActive ? color : theme.border}`,
+                    color: isActive ? color : theme.dim,
                     borderRadius: 20,
                     cursor: "pointer",
                     fontFamily: "inherit",
@@ -568,7 +673,9 @@ export default function CoachCoordination({
             {weekDays.map((date, dayIdx) => {
               const daySessions = sessions.filter(s => s.day === dayIdx);
               const dayMatches = getMatchesOnDay(date);
+              const dayBlocked = getBlockedOnDay(date);
               const isToday = toDateStr(date) === toDateStr(new Date());
+              const isBlocked = dayBlocked.length > 0;
               
               // Filter sessions by focused coach
               const visibleSessions = focusCoach
@@ -579,20 +686,20 @@ export default function CoachCoordination({
                   )
                 : daySessions;
               
-              if (visibleSessions.length === 0 && dayMatches.length === 0) return null;
+              if (visibleSessions.length === 0 && dayMatches.length === 0 && !isBlocked) return null;
               
               return (
                 <div key={dayIdx} style={{
-                  background: CC.surface,
-                  border: `1px solid ${isToday ? CC.gold : CC.border}`,
+                  background: theme.surface,
+                  border: `1px solid ${isBlocked ? theme.blocked : isToday ? theme.gold : theme.border}`,
                   borderRadius: 12,
                   overflow: "hidden",
                 }}>
                   {/* Day header */}
                   <div style={{
                     padding: "10px 14px",
-                    background: isToday ? CC.goldDim : CC.surface2,
-                    borderBottom: `1px solid ${CC.border}`,
+                    background: isBlocked ? theme.blockedBg : isToday ? theme.goldDim : theme.surface2,
+                    borderBottom: `1px solid ${theme.border}`,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
@@ -601,39 +708,73 @@ export default function CoachCoordination({
                       <span style={{
                         fontSize: 13,
                         fontWeight: 700,
-                        color: isToday ? CC.gold : CC.text,
+                        color: isBlocked ? theme.blocked : isToday ? theme.gold : theme.text,
                       }}>
                         {DAY_NAMES[dayIdx]}
                       </span>
                       <span style={{
                         fontSize: 12,
-                        color: CC.muted,
+                        color: theme.muted,
                         marginLeft: 8,
                       }}>
                         {fmtDate(date)}
                       </span>
                     </div>
-                    {isToday && (
-                      <span style={{
-                        fontSize: 10,
-                        fontWeight: 600,
-                        color: CC.gold,
-                        background: CC.goldDim,
-                        padding: "2px 8px",
-                        borderRadius: 10,
-                      }}>
-                        TODAY
-                      </span>
-                    )}
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      {isBlocked && (
+                        <span style={{
+                          fontSize: 10,
+                          fontWeight: 600,
+                          color: theme.blocked,
+                          background: theme.blockedBg,
+                          padding: "2px 8px",
+                          borderRadius: 10,
+                          border: `1px solid ${theme.blocked}40`,
+                        }}>
+                          🚫 GROUND BLOCKED
+                        </span>
+                      )}
+                      {isToday && !isBlocked && (
+                        <span style={{
+                          fontSize: 10,
+                          fontWeight: 600,
+                          color: theme.gold,
+                          background: theme.goldDim,
+                          padding: "2px 8px",
+                          borderRadius: 10,
+                        }}>
+                          TODAY
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  
+                  {/* Blocked date details */}
+                  {isBlocked && (
+                    <div style={{
+                      padding: "10px 14px",
+                      background: theme.blockedBg,
+                      borderBottom: `1px solid ${theme.border}`,
+                    }}>
+                      {dayBlocked.map((b, i) => (
+                        <div key={i} style={{
+                          fontSize: 11,
+                          color: theme.blocked,
+                          marginBottom: i < dayBlocked.length - 1 ? 4 : 0,
+                        }}>
+                          {b.reason || "Ground unavailable"}{b.time ? ` (${b.time})` : ""}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   
                   {/* Sessions */}
                   <div style={{ padding: "10px 14px" }}>
                     {visibleSessions.map(session => {
                       const conflicts = getConflictsForSession(session, date);
                       const hasConflict = conflicts.length > 0;
-                      const teamColor = TEAM_COLORS[session.team] || CC.muted;
-                      const coachColor = getCoachColor(session.coach) || CC.muted;
+                      const teamColor = TEAM_COLORS[session.team] || theme.muted;
+                      const coachColor = getCoachColor(session.coach) || theme.muted;
                       
                       return (
                         <div
@@ -642,8 +783,8 @@ export default function CoachCoordination({
                           style={{
                             padding: "10px 12px",
                             marginBottom: 8,
-                            background: hasConflict ? CC.conflictBg : CC.surface2,
-                            border: `1px solid ${hasConflict ? CC.conflict + "40" : CC.border}`,
+                            background: hasConflict ? theme.conflictBg : theme.surface2,
+                            border: `1px solid ${hasConflict ? theme.conflict + "40" : theme.border}`,
                             borderRadius: 8,
                             cursor: "pointer",
                           }}
@@ -667,10 +808,10 @@ export default function CoachCoordination({
                             </div>
                             
                             <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: CC.text }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>
                                 {session.team} Training
                               </div>
-                              <div style={{ fontSize: 11, color: CC.muted }}>
+                              <div style={{ fontSize: 11, color: theme.muted }}>
                                 {session.time} · {session.venue}
                               </div>
                             </div>
@@ -688,7 +829,7 @@ export default function CoachCoordination({
                                 fontSize: 10,
                                 fontWeight: 700,
                                 color: "#fff",
-                                border: `2px solid ${CC.surface}`,
+                                border: `2px solid ${theme.surface}`,
                               }}>
                                 {getShortName(session.coach).slice(0, 2).toUpperCase()}
                               </div>
@@ -697,14 +838,14 @@ export default function CoachCoordination({
                                   width: 28,
                                   height: 28,
                                   borderRadius: "50%",
-                                  background: getCoachColor(session.coCoach) || CC.muted,
+                                  background: getCoachColor(session.coCoach) || theme.muted,
                                   display: "flex",
                                   alignItems: "center",
                                   justifyContent: "center",
                                   fontSize: 10,
                                   fontWeight: 700,
                                   color: "#fff",
-                                  border: `2px solid ${CC.surface}`,
+                                  border: `2px solid ${theme.surface}`,
                                   marginLeft: -8,
                                 }}>
                                   {getShortName(session.coCoach).slice(0, 2).toUpperCase()}
@@ -723,27 +864,52 @@ export default function CoachCoordination({
                             )}
                           </div>
                           
-                          {/* Conflict details */}
+                          {/* Conflict details with Reassign button */}
                           {hasConflict && selectedSession === session.id && (
                             <div style={{
                               marginTop: 10,
                               padding: "10px",
-                              background: CC.conflictBg,
+                              background: theme.conflictBg,
                               borderRadius: 6,
-                              border: `1px solid ${CC.conflict}30`,
+                              border: `1px solid ${theme.conflict}30`,
                             }}>
                               <div style={{
-                                fontSize: 11,
-                                fontWeight: 700,
-                                color: CC.conflict,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
                                 marginBottom: 6,
                               }}>
-                                ⚠️ Match Conflict
+                                <div style={{
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  color: theme.conflict,
+                                }}>
+                                  ⚠️ Match Conflict
+                                </div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setReassignModal({ session, date, conflicts });
+                                  }}
+                                  style={{
+                                    padding: "4px 10px",
+                                    fontSize: 10,
+                                    fontWeight: 600,
+                                    background: theme.gold + "20",
+                                    border: `1px solid ${theme.goldBorder}`,
+                                    color: theme.gold,
+                                    borderRadius: 4,
+                                    cursor: "pointer",
+                                    fontFamily: "inherit",
+                                  }}
+                                >
+                                  Reassign →
+                                </button>
                               </div>
                               {conflicts.map((match, i) => (
                                 <div key={i} style={{
                                   fontSize: 11,
-                                  color: CC.text,
+                                  color: theme.text,
                                   marginBottom: 4,
                                 }}>
                                   • <strong style={{ color: getCoachColor(match.conflictCoach) }}>
@@ -762,14 +928,14 @@ export default function CoachCoordination({
                       <div style={{
                         marginTop: visibleSessions.length > 0 ? 8 : 0,
                         padding: "8px 10px",
-                        background: `${CC.gold}10`,
+                        background: `${theme.gold}10`,
                         borderRadius: 6,
-                        border: `1px dashed ${CC.goldBorder}`,
+                        border: `1px dashed ${theme.goldBorder}`,
                       }}>
                         <div style={{
                           fontSize: 10,
                           fontWeight: 700,
-                          color: CC.gold,
+                          color: theme.gold,
                           marginBottom: 6,
                           textTransform: "uppercase",
                           letterSpacing: "0.5px",
@@ -779,11 +945,11 @@ export default function CoachCoordination({
                         {dayMatches.slice(0, 3).map((match, i) => (
                           <div key={i} style={{
                             fontSize: 11,
-                            color: CC.muted,
+                            color: theme.muted,
                             marginBottom: 2,
                           }}>
                             <span style={{
-                              color: DIVISION_COLORS[match.division] || CC.muted,
+                              color: DIVISION_COLORS[match.division] || theme.muted,
                               fontWeight: 600,
                             }}>
                               {match.division}
@@ -792,7 +958,7 @@ export default function CoachCoordination({
                           </div>
                         ))}
                         {dayMatches.length > 3 && (
-                          <div style={{ fontSize: 10, color: CC.muted, marginTop: 4 }}>
+                          <div style={{ fontSize: 10, color: theme.muted, marginTop: 4 }}>
                             +{dayMatches.length - 3} more
                           </div>
                         )}
@@ -810,7 +976,7 @@ export default function CoachCoordination({
           <div>
             <div style={{
               fontSize: 12,
-              color: CC.muted,
+              color: theme.muted,
               marginBottom: 16,
             }}>
               All {allFixtures.length} Fredensborg matches for 2026 season
@@ -830,7 +996,7 @@ export default function CoachCoordination({
                   <div style={{
                     fontSize: 14,
                     fontWeight: 700,
-                    color: CC.gold,
+                    color: theme.gold,
                     marginBottom: 10,
                     fontFamily: "'IBM Plex Mono', monospace",
                   }}>
@@ -838,12 +1004,12 @@ export default function CoachCoordination({
                   </div>
                   
                   {matches.map((match, i) => {
-                    const divColor = DIVISION_COLORS[match.division] || CC.muted;
+                    const divColor = DIVISION_COLORS[match.division] || theme.muted;
                     return (
                       <div key={i} style={{
                         padding: "10px 12px",
-                        background: match.home ? CC.surface : CC.surface2,
-                        border: `1px solid ${match.home ? CC.goldBorder : CC.border}`,
+                        background: match.home ? theme.surface : theme.surface2,
+                        border: `1px solid ${match.home ? theme.goldBorder : theme.border}`,
                         borderRadius: 8,
                         marginBottom: 6,
                         display: "flex",
@@ -854,7 +1020,7 @@ export default function CoachCoordination({
                           width: 50,
                           fontSize: 11,
                           fontWeight: 600,
-                          color: CC.muted,
+                          color: theme.muted,
                         }}>
                           {new Date(match.date).toLocaleDateString("en-US", { day: "numeric", month: "short" })}
                         </div>
@@ -872,7 +1038,7 @@ export default function CoachCoordination({
                           {match.division}
                         </div>
                         
-                        <div style={{ flex: 1, fontSize: 12, color: CC.text }}>
+                        <div style={{ flex: 1, fontSize: 12, color: theme.text }}>
                           {match.label.replace(match.division + " ", "")}
                         </div>
                         
@@ -880,8 +1046,8 @@ export default function CoachCoordination({
                           <span style={{
                             fontSize: 9,
                             fontWeight: 700,
-                            color: CC.gold,
-                            background: CC.goldDim,
+                            color: theme.gold,
+                            background: theme.goldDim,
                             padding: "2px 6px",
                             borderRadius: 4,
                           }}>
@@ -904,10 +1070,10 @@ export default function CoachCoordination({
               <div style={{
                 textAlign: "center",
                 padding: "40px 20px",
-                color: CC.muted,
+                color: theme.muted,
               }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: CC.ok }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: theme.ok }}>
                   No conflicts this week
                 </div>
                 <div style={{ fontSize: 12, marginTop: 8 }}>
@@ -918,7 +1084,7 @@ export default function CoachCoordination({
               <>
                 <div style={{
                   fontSize: 12,
-                  color: CC.muted,
+                  color: theme.muted,
                   marginBottom: 16,
                 }}>
                   {weekConflicts.length} training session{weekConflicts.length > 1 ? "s" : ""} affected this week
@@ -927,8 +1093,8 @@ export default function CoachCoordination({
                 {weekConflicts.map((conflict, i) => (
                   <div key={i} style={{
                     padding: "14px",
-                    background: CC.conflictBg,
-                    border: `1px solid ${CC.conflict}40`,
+                    background: theme.conflictBg,
+                    border: `1px solid ${theme.conflict}40`,
                     borderRadius: 10,
                     marginBottom: 12,
                   }}>
@@ -954,24 +1120,24 @@ export default function CoachCoordination({
                         {conflict.session.team}
                       </div>
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: CC.text }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>
                           {conflict.session.team} Training
                         </div>
-                        <div style={{ fontSize: 11, color: CC.muted }}>
+                        <div style={{ fontSize: 11, color: theme.muted }}>
                           {fmtDateFull(conflict.date)} · {conflict.session.time}
                         </div>
                       </div>
                     </div>
                     
                     <div style={{
-                      background: CC.surface,
+                      background: theme.surface,
                       borderRadius: 6,
                       padding: "10px",
                     }}>
                       <div style={{
                         fontSize: 10,
                         fontWeight: 700,
-                        color: CC.conflict,
+                        color: theme.conflict,
                         marginBottom: 8,
                         textTransform: "uppercase",
                         letterSpacing: "0.5px",
@@ -989,7 +1155,7 @@ export default function CoachCoordination({
                             width: 24,
                             height: 24,
                             borderRadius: "50%",
-                            background: getCoachColor(match.conflictCoach) || CC.muted,
+                            background: getCoachColor(match.conflictCoach) || theme.muted,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -999,7 +1165,7 @@ export default function CoachCoordination({
                           }}>
                             {getShortName(match.conflictCoach)?.slice(0, 2).toUpperCase()}
                           </div>
-                          <div style={{ fontSize: 11, color: CC.text }}>
+                          <div style={{ fontSize: 11, color: theme.text }}>
                             <strong style={{ color: getCoachColor(match.conflictCoach) }}>
                               {getShortName(match.conflictCoach)}
                             </strong>
@@ -1025,7 +1191,7 @@ export default function CoachCoordination({
             <div style={{
               fontSize: 11,
               fontWeight: 700,
-              color: CC.muted,
+              color: theme.muted,
               textTransform: "uppercase",
               letterSpacing: "0.5px",
               marginBottom: 16,
@@ -1061,8 +1227,8 @@ export default function CoachCoordination({
               
               return (
                 <div key={coachName} style={{
-                  background: CC.surface,
-                  border: `1px solid ${CC.border}`,
+                  background: theme.surface,
+                  border: `1px solid ${theme.border}`,
                   borderRadius: 12,
                   padding: "14px 16px",
                   marginBottom: 12,
@@ -1083,10 +1249,10 @@ export default function CoachCoordination({
                       {getInitials(coachName)}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: CC.text }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>
                         {getShortName(coachName)}
                       </div>
-                      <div style={{ fontSize: 11, color: CC.muted }}>
+                      <div style={{ fontSize: 11, color: theme.muted }}>
                         {coachData.teams.join(" · ")}
                       </div>
                     </div>
@@ -1097,9 +1263,9 @@ export default function CoachCoordination({
                           padding: "6px 12px",
                           fontSize: 11,
                           fontWeight: 600,
-                          background: CC.conflictBg,
-                          border: `1px solid ${CC.conflict}40`,
-                          color: CC.conflict,
+                          background: theme.conflictBg,
+                          border: `1px solid ${theme.conflict}40`,
+                          color: theme.conflict,
                           borderRadius: 6,
                           cursor: "pointer",
                           fontFamily: "inherit",
@@ -1117,7 +1283,7 @@ export default function CoachCoordination({
                         <div style={{
                           fontSize: 9,
                           fontWeight: 600,
-                          color: CC.muted,
+                          color: theme.muted,
                           marginBottom: 4,
                         }}>
                           {DAY_NAMES[day]}
@@ -1125,9 +1291,9 @@ export default function CoachCoordination({
                         <div style={{
                           height: 6,
                           borderRadius: 3,
-                          background: hasConflict ? CC.conflict :
+                          background: hasConflict ? theme.conflict :
                                      daySessions.length > 0 ? coachColor :
-                                     CC.surface2,
+                                     theme.surface2,
                         }} />
                       </div>
                     ))}
@@ -1141,14 +1307,14 @@ export default function CoachCoordination({
               <div style={{
                 marginTop: 20,
                 padding: "14px 16px",
-                background: CC.conflictBg,
-                border: `1px solid ${CC.conflict}40`,
+                background: theme.conflictBg,
+                border: `1px solid ${theme.conflict}40`,
                 borderRadius: 12,
               }}>
                 <div style={{
                   fontSize: 11,
                   fontWeight: 700,
-                  color: CC.conflict,
+                  color: theme.conflict,
                   textTransform: "uppercase",
                   letterSpacing: "0.5px",
                   marginBottom: 10,
@@ -1161,7 +1327,7 @@ export default function CoachCoordination({
                     alignItems: "center",
                     gap: 10,
                     padding: "8px 0",
-                    borderBottom: i < weekConflicts.length - 1 ? `1px solid ${CC.border}` : "none",
+                    borderBottom: i < weekConflicts.length - 1 ? `1px solid ${theme.border}` : "none",
                   }}>
                     <div style={{
                       width: 28,
@@ -1179,10 +1345,10 @@ export default function CoachCoordination({
                       {conflict.session.team}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: CC.text }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: theme.text }}>
                         {conflict.session.label}
                       </div>
-                      <div style={{ fontSize: 10, color: CC.muted }}>
+                      <div style={{ fontSize: 10, color: theme.muted }}>
                         {fmtDate(conflict.date)} · {conflict.matches.map(m => getShortName(m.conflictCoach)).join(", ")} on match duty
                       </div>
                     </div>
@@ -1197,8 +1363,8 @@ export default function CoachCoordination({
                         fontSize: 10,
                         fontWeight: 600,
                         background: "transparent",
-                        border: `1px solid ${CC.gold}60`,
-                        color: CC.gold,
+                        border: `1px solid ${theme.gold}60`,
+                        color: theme.gold,
                         borderRadius: 4,
                         cursor: "pointer",
                         fontFamily: "inherit",
@@ -1232,38 +1398,38 @@ export default function CoachCoordination({
           <div 
             onClick={e => e.stopPropagation()}
             style={{
-              background: CC.surface,
+              background: theme.surface,
               borderRadius: 16,
               padding: "24px",
               maxWidth: 400,
               width: "100%",
               maxHeight: "80vh",
               overflow: "auto",
-              border: `1px solid ${CC.goldBorder}`,
+              border: `1px solid ${theme.goldBorder}`,
             }}
           >
             <div style={{
               fontSize: 16,
               fontWeight: 700,
-              color: CC.text,
+              color: theme.text,
               marginBottom: 4,
             }}>
               Reassign — {reassignModal.session.label}
             </div>
             <div style={{
               fontSize: 12,
-              color: CC.muted,
+              color: theme.muted,
               marginBottom: 16,
             }}>
               {fmtDateFull(reassignModal.date)} · {reassignModal.session.time} · {reassignModal.session.venue}
-              <span style={{ color: CC.conflict, marginLeft: 8 }}>⚠ Match conflict!</span>
+              <span style={{ color: theme.conflict, marginLeft: 8 }}>⚠ Match conflict!</span>
             </div>
             
             {/* Current coach */}
             <div style={{
               fontSize: 10,
               fontWeight: 700,
-              color: CC.muted,
+              color: theme.muted,
               textTransform: "uppercase",
               letterSpacing: "0.5px",
               marginBottom: 8,
@@ -1275,7 +1441,7 @@ export default function CoachCoordination({
               alignItems: "center",
               gap: 10,
               padding: "10px 12px",
-              background: CC.surface2,
+              background: theme.surface2,
               borderRadius: 8,
               marginBottom: 16,
             }}>
@@ -1294,18 +1460,18 @@ export default function CoachCoordination({
                 {getInitials(reassignModal.session.coach)}
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: CC.text }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>
                   {getShortName(reassignModal.session.coach)}
                 </div>
-                <div style={{ fontSize: 11, color: CC.muted }}>
+                <div style={{ fontSize: 11, color: theme.muted }}>
                   {reassignModal.session.team}
                 </div>
               </div>
               <span style={{
                 fontSize: 10,
                 fontWeight: 600,
-                color: CC.conflict,
-                background: CC.conflictBg,
+                color: theme.conflict,
+                background: theme.conflictBg,
                 padding: "4px 8px",
                 borderRadius: 4,
               }}>
@@ -1317,7 +1483,7 @@ export default function CoachCoordination({
             <div style={{
               fontSize: 10,
               fontWeight: 700,
-              color: CC.muted,
+              color: theme.muted,
               textTransform: "uppercase",
               letterSpacing: "0.5px",
               marginBottom: 8,
@@ -1335,18 +1501,20 @@ export default function CoachCoordination({
                   (COACH_PLAYS_IN[c.name] || []).includes(m.division)
                 );
                 const isCurrentCoach = c.name === reassignModal.session.coach;
+                const isSelected = selectedReassignCoach === c.name;
                 
                 return (
                   <button
                     key={c.name}
                     disabled={isCurrentCoach}
+                    onClick={() => !isCurrentCoach && setSelectedReassignCoach(c.name)}
                     style={{
                       display: "flex",
                       alignItems: "center",
                       gap: 8,
                       padding: "10px 12px",
-                      background: isCurrentCoach ? CC.surface2 : CC.surface2,
-                      border: `1.5px solid ${isCurrentCoach ? CC.border : CC.border}`,
+                      background: isSelected ? `${theme.ok}15` : theme.surface2,
+                      border: `1.5px solid ${isSelected ? theme.ok : isCurrentCoach ? theme.border : theme.border}`,
                       borderRadius: 8,
                       cursor: isCurrentCoach ? "not-allowed" : "pointer",
                       opacity: isCurrentCoach ? 0.5 : 1,
@@ -1369,10 +1537,10 @@ export default function CoachCoordination({
                       {getInitials(c.name)}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: CC.text }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: theme.text }}>
                         {getShortName(c.name)}
                       </div>
-                      <div style={{ fontSize: 10, color: CC.muted }}>
+                      <div style={{ fontSize: 10, color: theme.muted }}>
                         {c.teams.slice(0, 2).join(", ")}
                       </div>
                     </div>
@@ -1380,8 +1548,8 @@ export default function CoachCoordination({
                       <span style={{
                         fontSize: 8,
                         fontWeight: 600,
-                        color: CC.warn,
-                        background: CC.warnBg,
+                        color: theme.warn,
+                        background: theme.warnBg,
                         padding: "2px 6px",
                         borderRadius: 4,
                       }}>
@@ -1397,7 +1565,7 @@ export default function CoachCoordination({
             <div style={{
               fontSize: 10,
               fontWeight: 700,
-              color: CC.muted,
+              color: theme.muted,
               textTransform: "uppercase",
               letterSpacing: "0.5px",
               marginBottom: 8,
@@ -1405,7 +1573,7 @@ export default function CoachCoordination({
               Match Conflicts On This Day
             </div>
             <div style={{
-              background: CC.surface2,
+              background: theme.surface2,
               borderRadius: 8,
               padding: "10px 12px",
               marginBottom: 16,
@@ -1413,7 +1581,7 @@ export default function CoachCoordination({
               {reassignModal.conflicts.map((match, i) => (
                 <div key={i} style={{
                   fontSize: 11,
-                  color: CC.text,
+                  color: theme.text,
                   marginBottom: i < reassignModal.conflicts.length - 1 ? 6 : 0,
                 }}>
                   <span style={{ color: DIVISION_COLORS[match.division] }}>
@@ -1425,7 +1593,7 @@ export default function CoachCoordination({
             
             <div style={{
               fontSize: 11,
-              color: CC.muted,
+              color: theme.muted,
               fontStyle: "italic",
               marginBottom: 16,
             }}>
@@ -1435,14 +1603,17 @@ export default function CoachCoordination({
             {/* Actions */}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button
-                onClick={() => setReassignModal(null)}
+                onClick={() => {
+                  setReassignModal(null);
+                  setSelectedReassignCoach(null);
+                }}
                 style={{
                   padding: "10px 16px",
                   fontSize: 12,
                   fontWeight: 600,
                   background: "transparent",
-                  border: `1px solid ${CC.border}`,
-                  color: CC.muted,
+                  border: `1px solid ${theme.border}`,
+                  color: theme.muted,
                   borderRadius: 8,
                   cursor: "pointer",
                   fontFamily: "inherit",
@@ -1451,24 +1622,153 @@ export default function CoachCoordination({
                 Cancel
               </button>
               <button
+                disabled={!selectedReassignCoach}
                 onClick={() => {
-                  // TODO: Save reassignment to Firestore
+                  if (!selectedReassignCoach) return;
+                  // Save reassignment
+                  if (onReassign) {
+                    onReassign(reassignModal.session.id, toDateStr(reassignModal.date), selectedReassignCoach);
+                  }
+                  // Show WhatsApp notification prompt
+                  setNotifyModal({
+                    newCoach: selectedReassignCoach,
+                    oldCoach: reassignModal.session.coach,
+                    session: reassignModal.session,
+                    date: reassignModal.date,
+                  });
                   setReassignModal(null);
-                  // Show toast
+                  setSelectedReassignCoach(null);
                 }}
                 style={{
                   padding: "10px 20px",
                   fontSize: 12,
                   fontWeight: 700,
-                  background: `${CC.ok}20`,
-                  border: `1.5px solid ${CC.ok}`,
-                  color: CC.ok,
+                  background: selectedReassignCoach ? `${theme.ok}20` : theme.surface2,
+                  border: `1.5px solid ${selectedReassignCoach ? theme.ok : theme.border}`,
+                  color: selectedReassignCoach ? theme.ok : theme.muted,
+                  borderRadius: 8,
+                  cursor: selectedReassignCoach ? "pointer" : "not-allowed",
+                  fontFamily: "inherit",
+                  opacity: selectedReassignCoach ? 1 : 0.5,
+                }}
+              >
+                Confirm reassign
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* WhatsApp Notification Modal */}
+      {notifyModal && (
+        <div 
+          onClick={() => setNotifyModal(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1001,
+            padding: 20,
+          }}
+        >
+          <div 
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: theme.surface,
+              borderRadius: 16,
+              padding: "24px",
+              maxWidth: 380,
+              width: "100%",
+              border: `1px solid ${theme.ok}40`,
+            }}
+          >
+            <div style={{
+              fontSize: 40,
+              textAlign: "center",
+              marginBottom: 16,
+            }}>
+              ✅
+            </div>
+            <div style={{
+              fontSize: 16,
+              fontWeight: 700,
+              color: theme.text,
+              textAlign: "center",
+              marginBottom: 8,
+            }}>
+              Reassignment Saved
+            </div>
+            <div style={{
+              fontSize: 12,
+              color: theme.muted,
+              textAlign: "center",
+              marginBottom: 20,
+            }}>
+              <strong style={{ color: theme.text }}>{getShortName(notifyModal.newCoach)}</strong> will now cover{" "}
+              <strong style={{ color: theme.text }}>{notifyModal.session.team}</strong> training on{" "}
+              {fmtDate(notifyModal.date)}.
+            </div>
+            
+            <div style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: theme.text,
+              textAlign: "center",
+              marginBottom: 12,
+            }}>
+              Notify {getShortName(notifyModal.newCoach)} via WhatsApp?
+            </div>
+            
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => setNotifyModal(null)}
+                style={{
+                  flex: 1,
+                  padding: "12px 16px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  background: "transparent",
+                  border: `1px solid ${theme.border}`,
+                  color: theme.muted,
                   borderRadius: 8,
                   cursor: "pointer",
                   fontFamily: "inherit",
                 }}
               >
-                Confirm reassign
+                Skip
+              </button>
+              <button
+                onClick={() => {
+                  // Generate WhatsApp message
+                  const message = `Hi ${getShortName(notifyModal.newCoach)}! 👋\n\nCould you please cover ${notifyModal.session.team} training on ${fmtDateFull(notifyModal.date)} (${notifyModal.session.time}) at ${notifyModal.session.venue}?\n\n${getShortName(notifyModal.oldCoach)} has a match conflict that day.\n\nThanks! 🙏`;
+                  
+                  // Open WhatsApp with pre-filled message
+                  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+                  window.open(whatsappUrl, '_blank');
+                  
+                  setNotifyModal(null);
+                }}
+                style={{
+                  flex: 1,
+                  padding: "12px 16px",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  background: "#25D366",
+                  border: "none",
+                  color: "#fff",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                }}
+              >
+                <span>📱</span> Send WhatsApp
               </button>
             </div>
           </div>
