@@ -6478,7 +6478,17 @@ export default function App() {
       <CoachCoordination
         teams={teams}
         allFixtures={ALL_FIXTURES}
+        blockedDates={blockCals.map(b => ({
+          date: b.date,
+          reason: b.label,
+          time: `${b.from}–${b.to}`,
+        }))}
         onBack={() => setView("coachhq")}
+        onReassign={(sessionId, date, newCoach) => {
+          // TODO: Save to Firestore coachOverrides collection
+          console.log("Reassign:", sessionId, date, newCoach);
+          showToast(`Reassigned to ${newCoach.split(" ")[0]} ✓`);
+        }}
       />
     );
   }
