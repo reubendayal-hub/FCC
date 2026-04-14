@@ -570,8 +570,13 @@ function MarkAttendance({
   onToggleAttendance,
   onSaveAttendance,
   onSelectPlayer,
+  isEditingAttendance = false, // New prop to control edit mode
+  onStartEditAttendance, // Callback to enter edit mode
+  onCancelEditAttendance, // Callback to exit edit mode
 }) {
   const presentCount = Object.values(attendance).filter(v => v === true).length;
+  const absentCount = Object.values(attendance).filter(v => v === false).length;
+  const unmarkedCount = players.length - presentCount - absentCount;
   const totalCount = players.length;
   
   return (
@@ -601,6 +606,120 @@ function MarkAttendance({
         </div>
       )}
       
+      {/* Attendance summary bar - only show if any attendance marked */}
+      {(presentCount > 0 || absentCount > 0) && (
+        <div style={{
+          display: "flex",
+          gap: 10,
+          marginBottom: 12,
+        }}>
+          {presentCount > 0 && (
+            <div style={{
+              flex: 1,
+              background: "#f0fdf4",
+              border: "1px solid #bbf7d0",
+              borderRadius: 10,
+              padding: "10px 12px",
+              textAlign: "center",
+            }}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#166534" }}>{presentCount}</div>
+              <div style={{ fontSize: 10, color: "#15803d", fontWeight: 600 }}>Present</div>
+            </div>
+          )}
+          {absentCount > 0 && (
+            <div style={{
+              flex: 1,
+              background: "#fef2f2",
+              border: "1px solid #fecaca",
+              borderRadius: 10,
+              padding: "10px 12px",
+              textAlign: "center",
+            }}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#dc2626" }}>{absentCount}</div>
+              <div style={{ fontSize: 10, color: "#b91c1c", fontWeight: 600 }}>Absent</div>
+            </div>
+          )}
+          {unmarkedCount > 0 && (
+            <div style={{
+              flex: 1,
+              background: PT.bg,
+              border: `1px solid ${PT.border}`,
+              borderRadius: 10,
+              padding: "10px 12px",
+              textAlign: "center",
+            }}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: PT.muted }}>{unmarkedCount}</div>
+              <div style={{ fontSize: 10, color: PT.muted, fontWeight: 600 }}>Unmarked</div>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Edit attendance button - only show when NOT in edit mode */}
+      {!isEditingAttendance && (
+        <button
+          onClick={onStartEditAttendance}
+          style={{
+            width: "100%",
+            padding: "12px",
+            background: PT.bg,
+            border: `1.5px dashed ${PT.border}`,
+            borderRadius: 10,
+            fontSize: 13,
+            fontWeight: 600,
+            color: PT.muted,
+            cursor: "pointer",
+            fontFamily: "inherit",
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+          }}
+        >
+          ✏️ Mark Attendance for Today's Session
+        </button>
+      )}
+      
+      {/* Editing mode header */}
+      {isEditingAttendance && (
+        <div style={{
+          background: "#fef3c7",
+          border: "1.5px solid #fde68a",
+          borderRadius: 10,
+          padding: "10px 14px",
+          marginBottom: 16,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#92400e" }}>
+              ✏️ Marking Attendance
+            </div>
+            <div style={{ fontSize: 11, color: "#a16207" }}>
+              Tap circles to mark present/absent
+            </div>
+          </div>
+          <button
+            onClick={onCancelEditAttendance}
+            style={{
+              padding: "6px 12px",
+              fontSize: 11,
+              fontWeight: 600,
+              background: PT.white,
+              color: PT.muted,
+              border: `1px solid ${PT.border}`,
+              borderRadius: 6,
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+      
       {/* Player list */}
       <div style={{
         background: PT.card,
@@ -625,11 +744,11 @@ function MarkAttendance({
             Players · tap name for progress
           </span>
           <span style={{
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: 600,
-            color: PT.success,
+            color: PT.muted,
           }}>
-            {presentCount}/{totalCount} present
+            {totalCount} player{totalCount !== 1 ? "s" : ""}
           </span>
         </div>
         
@@ -645,22 +764,24 @@ function MarkAttendance({
                 gap: 12,
                 padding: "12px 0",
                 borderBottom: idx < players.length - 1 ? `1px solid ${PT.border}` : "none",
-                opacity: isPresent === false ? 0.6 : 1,
               }}
             >
-              <AttendanceToggle
-                isPresent={isPresent}
-                onToggle={() => {
-                  // Cycle: null -> true -> false -> null
-                  const next = isPresent === null ? true : isPresent === true ? false : null;
-                  onToggleAttendance(player.id, next);
-                }}
-              />
+              {/* Only show toggle in edit mode */}
+              {isEditingAttendance && (
+                <AttendanceToggle
+                  isPresent={isPresent}
+                  onToggle={() => {
+                    // Cycle: null -> true -> false -> null
+                    const next = isPresent === null ? true : isPresent === true ? false : null;
+                    onToggleAttendance(player.id, next);
+                  }}
+                />
+              )}
               
               <PlayerAvatar 
                 name={player.name} 
                 size={38} 
-                color={isPresent === false ? "#888" : player.avatarColor}
+                color={player.avatarColor}
               />
               
               <div 
@@ -677,39 +798,49 @@ function MarkAttendance({
                 )}
               </div>
               
-              <span style={{
-                fontSize: 11,
-                padding: "4px 10px",
-                borderRadius: 12,
-                background: isPresent === true ? PT.successBg : isPresent === false ? PT.errorBg : PT.bg,
-                color: isPresent === true ? PT.successText : isPresent === false ? PT.errorText : PT.muted,
-                fontWeight: 500,
-              }}>
-                {isPresent === true ? "Present" : isPresent === false ? "Absent" : "—"}
-              </span>
+              {/* Show attendance status badge (if marked) */}
+              {(isPresent === true || isPresent === false) && (
+                <span style={{
+                  fontSize: 10,
+                  padding: "3px 8px",
+                  borderRadius: 10,
+                  background: isPresent === true ? "#dcfce7" : "#fef2f2",
+                  color: isPresent === true ? "#166534" : "#dc2626",
+                  fontWeight: 600,
+                }}>
+                  {isPresent === true ? "✓" : "✗"}
+                </span>
+              )}
+              
+              {/* Show dash for unmarked when not editing */}
+              {!isEditingAttendance && isPresent === null && (
+                <span style={{ fontSize: 14, color: PT.muted }}>—</span>
+              )}
             </div>
           );
         })}
       </div>
       
-      {/* Save button */}
-      <button
-        onClick={() => onSaveAttendance?.(attendance)}
-        style={{
-          width: "100%",
-          padding: "14px",
-          background: PT.navy,
-          color: PT.white,
-          border: "none",
-          borderRadius: 12,
-          fontSize: 15,
-          fontWeight: 700,
-          cursor: "pointer",
-          fontFamily: "inherit",
-        }}
-      >
-        Save attendance
-      </button>
+      {/* Save button - only show in edit mode */}
+      {isEditingAttendance && (
+        <button
+          onClick={() => onSaveAttendance?.(attendance)}
+          style={{
+            width: "100%",
+            padding: "14px",
+            background: PT.navy,
+            color: PT.white,
+            border: "none",
+            borderRadius: 12,
+            fontSize: 15,
+            fontWeight: 700,
+            cursor: "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          💾 Save Attendance
+        </button>
+      )}
     </div>
   );
 }
@@ -1595,7 +1726,7 @@ export default function ProgressTracker({
   trainingSessions,
   currentUser,
   userRole,
-  initialScreen = "attendance", // Can be "attendance", "phases", "plan", etc.
+  initialScreen = "players", // Can be "players", "phases", "plan", etc.
   onBack,
   onSaveNote,
   onSaveAttendance,
@@ -1605,11 +1736,12 @@ export default function ProgressTracker({
   onEditSession,
   onSaveSeasonPlan, // Callback to save plan: (teamName, plan) => void
 }) {
-  const [activeScreen, setActiveScreen] = useState(initialScreen); // attendance | plan | phases | note | progress | report
+  const [activeScreen, setActiveScreen] = useState(initialScreen); // players | plan | phases | note | progress | report
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [attendance, setAttendance] = useState({});
   const [selectedTeam, setSelectedTeam] = useState(teams[0] || "all"); // Team filter
   const [expandedPhases, setExpandedPhases] = useState({}); // {phaseId: true/false} for collapsible phases
+  const [isEditingAttendance, setIsEditingAttendance] = useState(false); // Attendance edit mode
   
   // Editing state
   const [editingSession, setEditingSession] = useState(null); // Session being edited
@@ -1624,12 +1756,12 @@ export default function ProgressTracker({
     return players.filter(p => p.team === selectedTeam || (p.teams || []).includes(selectedTeam));
   }, [players, selectedTeam]);
   
-  // Initialize attendance from session data
+  // Initialize attendance from session data - start with all null (unmarked)
   useEffect(() => {
     if (session?.attendance) {
       setAttendance(session.attendance);
     } else if (filteredPlayers) {
-      // Default all to null (not marked)
+      // Default all to null (not marked) - NO fake attendance data
       const initial = {};
       filteredPlayers.forEach(p => { initial[p.id] = null; });
       setAttendance(initial);
@@ -1708,13 +1840,13 @@ export default function ProgressTracker({
   
   const handleSaveNote = (note) => {
     onSaveNote?.(note);
-    setActiveScreen("attendance");
+    setActiveScreen("players");
     setSelectedPlayer(null);
   };
   
   // Screen titles
   const screenTitles = {
-    attendance: { title: session?.name || "U11 Session", sub: "Mark Attendance" },
+    players: { title: "Training Session", sub: isEditingAttendance ? "Marking Attendance" : "Player List" },
     plan: { title: "Training Plan", sub: "Season 2026" },
     phases: { title: "Season Overview", sub: "Phase Progress" },
     note: { title: "Quick Note", sub: selectedPlayer?.name },
@@ -2195,10 +2327,10 @@ export default function ProgressTracker({
         }}>
           <button
             onClick={() => {
-              if (activeScreen === "attendance" || activeScreen === "plan") {
+              if (activeScreen === "players" || activeScreen === "plan") {
                 onBack?.();
               } else {
-                setActiveScreen("attendance");
+                setActiveScreen("players");
                 setSelectedPlayer(null);
               }
             }}
@@ -2305,14 +2437,20 @@ export default function ProgressTracker({
       
       {/* Content */}
       <div style={{ paddingBottom: 100 }}>
-        {activeScreen === "attendance" && (
+        {activeScreen === "players" && (
           <MarkAttendance
             session={session}
             players={filteredPlayers}
             attendance={attendance}
             onToggleAttendance={handleToggleAttendance}
-            onSaveAttendance={handleSaveAttendance}
+            onSaveAttendance={(att) => {
+              handleSaveAttendance(att);
+              setIsEditingAttendance(false); // Exit edit mode after save
+            }}
             onSelectPlayer={handleSelectPlayer}
+            isEditingAttendance={isEditingAttendance}
+            onStartEditAttendance={() => setIsEditingAttendance(true)}
+            onCancelEditAttendance={() => setIsEditingAttendance(false)}
           />
         )}
         
@@ -2951,7 +3089,7 @@ export default function ProgressTracker({
             lastNote={selectedPlayer.notes?.[0]}
             onSave={handleSaveNote}
             onBack={() => {
-              setActiveScreen("attendance");
+              setActiveScreen("players");
               setSelectedPlayer(null);
             }}
           />
@@ -2989,7 +3127,7 @@ export default function ProgressTracker({
         zIndex: 100,
       }}>
         {[
-          { id: "attendance", icon: "✓", label: "Attendance" },
+          { id: "players", icon: "👥", label: "Players" },
           { id: "phases", icon: "🎯", label: "Phases" },
           { id: "plan", icon: "📅", label: "Plan" },
           { id: "progress", icon: "📊", label: "Progress", coachOnly: true, needsPlayer: true },
