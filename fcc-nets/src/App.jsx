@@ -6301,20 +6301,16 @@ export default function App() {
             </button>
             
             {/* Season Plan */}
-            <button onClick={()=>showToast("Season Plan coming soon!")}
+            <button onClick={()=>setView("season-plan")}
               style={{background:G.white,border:`1.5px solid ${G.border}`,borderRadius:14,
                 padding:"20px 16px",cursor:"pointer",fontFamily:"inherit",textAlign:"left",
-                display:"flex",flexDirection:"column",gap:8,opacity:0.6,
+                display:"flex",flexDirection:"column",gap:8,
                 transition:"all .15s",boxShadow:"0 2px 8px rgba(0,0,0,.04)"}}>
               <div style={{fontSize:28}}>📅</div>
               <div style={{fontWeight:800,fontSize:14,color:G.text}}>Season Plan</div>
               <div style={{fontSize:11,color:G.muted,lineHeight:1.4}}>
                 Training curriculum & phase planning
               </div>
-              <span style={{fontSize:9,background:"#fef3c7",color:"#92400e",
-                padding:"2px 8px",borderRadius:10,fontWeight:700,alignSelf:"flex-start"}}>
-                Coming soon
-              </span>
             </button>
             
             {/* Session Notes */}
@@ -6401,7 +6397,7 @@ export default function App() {
   // ════════════════════════════════════════════════════════════
   // RENDER: Progress Tracker (from Coach HQ)
   // ════════════════════════════════════════════════════════════
-  if(view==="progress-tracker" && (can(userRole,"accessMembers") || isCoachMember(currentUser?.name, teams))) {
+  if((view==="progress-tracker" || view==="season-plan") && (can(userRole,"accessMembers") || isCoachMember(currentUser?.name, teams))) {
     const coachTeams = (teams||[]).filter(t=>(t.coaches||[]).includes(currentUser?.name));
     const isAdmin = can(userRole,"accessMembers");
     
@@ -6455,6 +6451,7 @@ export default function App() {
         seasonPlans={seasonPlans}
         userRole={userRole}
         currentUser={currentUser}
+        initialScreen={view === "season-plan" ? "phases" : "attendance"}
         onBack={() => setView("coachhq")}
         onSaveAttendance={(att) => {
           // TODO: Save to attendance/{sessionId}/records
