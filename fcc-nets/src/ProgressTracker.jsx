@@ -514,7 +514,7 @@ function AttendanceToggle({ isPresent, onToggle }) {
 
 // ─── Session Item (Draggable) ─────────────────────────────────────────────────
 function SessionItem({ session, onDragStart, onDragOver, onDrop, onEdit }) {
-  const pillarData = PILLARS.find(p => p.id === session.pillar);
+  const pillarData = PILLARS[session.pillar];
   
   return (
     <div
@@ -526,39 +526,36 @@ function SessionItem({ session, onDragStart, onDragOver, onDrop, onEdit }) {
         display: "flex",
         alignItems: "center",
         gap: 10,
-        padding: "12px 14px",
+        padding: "10px 12px",
         background: PT.bg,
         border: `1px solid ${PT.border}`,
         borderRadius: 10,
-        marginBottom: 8,
+        marginBottom: 6,
         cursor: "grab",
         transition: "background 0.15s",
       }}
     >
-      <span style={{ color: PT.subtle, fontSize: 16, cursor: "grab" }}>≡</span>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: PT.text }}>
+      <div style={{
+        width: 28,
+        height: 28,
+        borderRadius: 8,
+        background: pillarData?.bg || PT.navy,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 14,
+        flexShrink: 0,
+      }}>
+        {pillarData?.icon || "🏏"}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: PT.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {session.title}
         </div>
-        <div style={{ fontSize: 11, color: PT.muted, marginTop: 2 }}>
-          {session.week} · {formatDateFull(session.date)}
+        <div style={{ fontSize: 10, color: PT.muted, marginTop: 1 }}>
+          {session.week} · {session.phase || ""}
         </div>
       </div>
-      <span style={{ fontSize: 18 }}>{pillarData?.icon || "📋"}</span>
-      <button
-        onClick={() => onEdit?.(session)}
-        style={{
-          background: "transparent",
-          border: `1px solid ${PT.border}`,
-          borderRadius: 6,
-          padding: "4px 8px",
-          fontSize: 10,
-          color: PT.muted,
-          cursor: "pointer",
-        }}
-      >
-        Edit
-      </button>
     </div>
   );
 }
@@ -783,36 +780,138 @@ function TrainingPlan({
         </button>
       </div>
       
-      {/* Session list */}
-      <div style={{
-        background: PT.card,
-        border: `1px solid ${PT.border}`,
-        borderRadius: 12,
-        padding: "14px 16px",
-        marginBottom: 12,
-      }}>
-        <div style={{
-          fontSize: 10,
-          fontWeight: 700,
-          color: PT.subtle,
-          textTransform: "uppercase",
-          letterSpacing: "0.5px",
-          marginBottom: 12,
-        }}>
-          Upcoming sessions · drag to reorder
-        </div>
+      {/* Filter to show upcoming sessions only */}
+      {(() => {
+        const upcomingSessions = sessions.filter(s => s.status !== "complete");
+        const completedCount = sessions.filter(s => s.status === "complete").length;
         
-        {sessions.map(session => (
-          <SessionItem
-            key={session.id}
-            session={session}
-            onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-            onEdit={onEditSession}
-          />
-        ))}
-      </div>
+        return (
+          <>
+            {/* Completed summary */}
+            {completedCount > 0 && (
+              <div style={{
+                background: "#f0fdf4",
+                border: "1px solid #bbf7d0",
+                borderRadius: 10,
+                padding: "10px 14px",
+                marginBottom: 12,
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}>
+                <span style={{ fontSize: 18 }}>✓</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#166534" }}>
+                  {completedCount} session{completedCount !== 1 ? "s" : ""} completed
+                </span>
+              </div>
+            )}
+            
+            {/* Current session highlight */}
+            {(() => {
+              const currentSess = sessions.find(s => s.status === "current");
+              if (!currentSess) return null;
+              return (
+                <div style={{
+                  background: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
+                  border: "1.5px solid #f59e0b",
+                  borderRadius: 12,
+                  padding: "14px 16px",
+                  marginBottom: 12,
+                }}>
+                  <div style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "#92400e",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    marginBottom: 6,
+                  }}>
+                    📍 This Week
+                  </div>
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                  }}>
+                    <div style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 10,
+                      background: PILLARS[currentSess.pillar]?.bg || PT.navy,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 18,
+                    }}>
+                      {PILLARS[currentSess.pillar]?.icon || "🏏"}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{
+                        fontSize: 15,
+                        fontWeight: 700,
+                        color: "#78350f",
+                      }}>
+                        {currentSess.title}
+                      </div>
+                      <div style={{
+                        fontSize: 11,
+                        color: "#92400e",
+                        marginTop: 2,
+                      }}>
+                        {currentSess.week} · {currentSess.date} · {currentSess.phase}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+            
+            {/* Upcoming sessions list */}
+            <div style={{
+              background: PT.card,
+              border: `1px solid ${PT.border}`,
+              borderRadius: 12,
+              padding: "14px 16px",
+              marginBottom: 12,
+            }}>
+              <div style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: PT.subtle,
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+                marginBottom: 12,
+              }}>
+                Upcoming sessions ({upcomingSessions.filter(s => s.status === "upcoming").length})
+              </div>
+              
+              {upcomingSessions.filter(s => s.status === "upcoming").slice(0, 6).map(session => (
+                <SessionItem
+                  key={session.id}
+                  session={session}
+                  onDragStart={handleDragStart}
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                  onEdit={onEditSession}
+                />
+              ))}
+              
+              {upcomingSessions.filter(s => s.status === "upcoming").length > 6 && (
+                <div style={{
+                  fontSize: 11,
+                  color: PT.muted,
+                  textAlign: "center",
+                  padding: "8px",
+                  borderTop: `1px solid ${PT.border}`,
+                  marginTop: 8,
+                }}>
+                  + {upcomingSessions.filter(s => s.status === "upcoming").length - 6} more sessions
+                </div>
+              )}
+            </div>
+          </>
+        );
+      })()}
       
       <div style={{
         fontSize: 11,
@@ -820,7 +919,7 @@ function TrainingPlan({
         textAlign: "center",
         padding: "8px",
       }}>
-        Drag sessions to reorder · Tap "Edit" to change details
+        Tap "Phases" to see full season overview
       </div>
     </div>
   );
@@ -1554,7 +1653,8 @@ export default function ProgressTracker({
   // Screen titles
   const screenTitles = {
     attendance: { title: session?.name || "U11 Session", sub: "Mark Attendance" },
-    plan: { title: "Training Plan", sub: session?.phase || "Phase 2" },
+    plan: { title: "Training Plan", sub: "Season 2026" },
+    phases: { title: "Season Overview", sub: "Phase Progress" },
     note: { title: "Quick Note", sub: selectedPlayer?.name },
     progress: { title: "Player Progress", sub: selectedPlayer?.name || "Coach View" },
     report: { title: "Season Report", sub: "Parent View" },
@@ -1562,14 +1662,90 @@ export default function ProgressTracker({
   
   const currentTitle = screenTitles[activeScreen];
   
-  // Default training sessions for demo
-  const defaultTrainingSessions = trainingSessions || [
-    { id: "s1", title: "Bowling — Line & Length", pillar: "bowling", week: "Week 6", date: "2026-01-17" },
-    { id: "s2", title: "Batting — Front foot drives", pillar: "batting", week: "Week 7", date: "2026-01-24" },
-    { id: "s3", title: "Wicket Keeping — Stance & take", pillar: "wicketKeeping", week: "Week 8", date: "2026-01-31" },
-    { id: "s4", title: "Fielding — Catching drills", pillar: "fielding", week: "Week 9", date: "2026-02-07" },
-    { id: "s5", title: "Cricket IQ — Game scenarios", pillar: "cricketIQ", week: "Week 10", date: "2026-02-14" },
-  ];
+  // U11 Season 2026 Training Plan - 4 Phases
+  const U11_SEASON_PLAN = {
+    currentPhase: "phase2",
+    phases: [
+      {
+        id: "pre",
+        name: "Pre-Season",
+        shortName: "Pre",
+        dates: "Mar 1 – Apr 5",
+        weeks: 5,
+        focus: "Building fitness, fun introduction",
+        status: "complete",
+        sessions: [
+          { id: "pre1", title: "Welcome & Fitness Games", pillar: "cricketIQ", week: "Week 1", date: "2026-03-07", status: "complete" },
+          { id: "pre2", title: "Basic Catching & Throwing", pillar: "fielding", week: "Week 2", date: "2026-03-14", status: "complete" },
+          { id: "pre3", title: "Grip & Stance Basics", pillar: "batting", week: "Week 3", date: "2026-03-21", status: "complete" },
+          { id: "pre4", title: "Run-up & Bowling Action", pillar: "bowling", week: "Week 4", date: "2026-03-28", status: "complete" },
+          { id: "pre5", title: "Mini Games & Assessment", pillar: "cricketIQ", week: "Week 5", date: "2026-04-04", status: "complete" },
+        ],
+      },
+      {
+        id: "phase1",
+        name: "Phase 1: Foundations",
+        shortName: "Ph1",
+        dates: "Apr 6 – May 17",
+        weeks: 6,
+        focus: "Core technique building",
+        status: "complete",
+        sessions: [
+          { id: "p1s1", title: "Batting — Stance & Backlift", pillar: "batting", week: "Week 6", date: "2026-04-11", status: "complete" },
+          { id: "p1s2", title: "Bowling — Line & Length", pillar: "bowling", week: "Week 7", date: "2026-04-18", status: "complete" },
+          { id: "p1s3", title: "Fielding — Ground Fielding", pillar: "fielding", week: "Week 8", date: "2026-04-25", status: "complete" },
+          { id: "p1s4", title: "Batting — Front Foot Defense", pillar: "batting", week: "Week 9", date: "2026-05-02", status: "complete" },
+          { id: "p1s5", title: "Bowling — Seam Position", pillar: "bowling", week: "Week 10", date: "2026-05-09", status: "complete" },
+          { id: "p1s6", title: "Phase 1 Assessment Games", pillar: "cricketIQ", week: "Week 11", date: "2026-05-16", status: "complete" },
+        ],
+      },
+      {
+        id: "phase2",
+        name: "Phase 2: Development",
+        shortName: "Ph2",
+        dates: "May 18 – Jul 5",
+        weeks: 7,
+        focus: "Shot selection & match awareness",
+        status: "current",
+        sessions: [
+          { id: "p2s1", title: "Batting — Front Foot Drives", pillar: "batting", week: "Week 12", date: "2026-05-23", status: "complete" },
+          { id: "p2s2", title: "WK — Stance & Takes", pillar: "wicketKeeping", week: "Week 13", date: "2026-05-30", status: "complete" },
+          { id: "p2s3", title: "Fielding — High Catches", pillar: "fielding", week: "Week 14", date: "2026-06-06", status: "current" },
+          { id: "p2s4", title: "Batting — Playing Spin", pillar: "batting", week: "Week 15", date: "2026-06-13", status: "upcoming" },
+          { id: "p2s5", title: "Bowling — Variations", pillar: "bowling", week: "Week 16", date: "2026-06-20", status: "upcoming" },
+          { id: "p2s6", title: "Cricket IQ — Running Between", pillar: "cricketIQ", week: "Week 17", date: "2026-06-27", status: "upcoming" },
+          { id: "p2s7", title: "Phase 2 Assessment Match", pillar: "cricketIQ", week: "Week 18", date: "2026-07-04", status: "upcoming" },
+        ],
+      },
+      {
+        id: "phase3",
+        name: "Phase 3: Match Ready",
+        shortName: "Ph3",
+        dates: "Jul 6 – Aug 30",
+        weeks: 8,
+        focus: "Match play & pressure situations",
+        status: "upcoming",
+        sessions: [
+          { id: "p3s1", title: "Batting — Back Foot Play", pillar: "batting", week: "Week 19", date: "2026-07-11", status: "upcoming" },
+          { id: "p3s2", title: "Bowling — Death Bowling", pillar: "bowling", week: "Week 20", date: "2026-07-18", status: "upcoming" },
+          { id: "p3s3", title: "Fielding — Relay Throws", pillar: "fielding", week: "Week 21", date: "2026-07-25", status: "upcoming" },
+          { id: "p3s4", title: "WK — Standing Up", pillar: "wicketKeeping", week: "Week 22", date: "2026-08-01", status: "upcoming" },
+          { id: "p3s5", title: "Match Simulation 1", pillar: "cricketIQ", week: "Week 23", date: "2026-08-08", status: "upcoming" },
+          { id: "p3s6", title: "Batting Under Pressure", pillar: "batting", week: "Week 24", date: "2026-08-15", status: "upcoming" },
+          { id: "p3s7", title: "Match Simulation 2", pillar: "cricketIQ", week: "Week 25", date: "2026-08-22", status: "upcoming" },
+          { id: "p3s8", title: "Season Finale & Awards", pillar: "cricketIQ", week: "Week 26", date: "2026-08-29", status: "upcoming" },
+        ],
+      },
+    ],
+  };
+  
+  // Flatten all sessions for plan view
+  const defaultTrainingSessions = trainingSessions || U11_SEASON_PLAN.phases.flatMap(p => 
+    p.sessions.map(s => ({ ...s, phase: p.shortName, phaseName: p.name }))
+  );
+  
+  // Get current phase info
+  const currentPhaseData = U11_SEASON_PLAN.phases.find(p => p.status === "current") || U11_SEASON_PLAN.phases[1];
   
   return (
     <div style={{
@@ -1701,7 +1877,7 @@ export default function ProgressTracker({
       </div>
       
       {/* Content */}
-      <div style={{ paddingBottom: 90 }}>
+      <div style={{ paddingBottom: 100 }}>
         {activeScreen === "attendance" && (
           <MarkAttendance
             session={session}
@@ -1716,11 +1892,287 @@ export default function ProgressTracker({
         {activeScreen === "plan" && (
           <TrainingPlan
             sessions={defaultTrainingSessions}
-            currentPhase={session?.phase || "Phase 2"}
+            currentPhase={currentPhaseData?.shortName || "Ph2"}
             onReorder={onReorderSessions}
             onAddSession={onAddSession}
             onEditSession={onEditSession}
           />
+        )}
+        
+        {/* Phase Overview Screen */}
+        {activeScreen === "phases" && (
+          <div style={{ padding: "12px 16px" }}>
+            {/* Season Progress Bar */}
+            <div style={{
+              background: PT.card,
+              border: `1px solid ${PT.border}`,
+              borderRadius: 14,
+              padding: "16px",
+              marginBottom: 16,
+            }}>
+              <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 12,
+              }}>
+                <div style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: PT.subtle,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                }}>
+                  Season 2026 Progress
+                </div>
+                <div style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: PT.navy,
+                }}>
+                  Week {(() => {
+                    const completedSessions = U11_SEASON_PLAN.phases.flatMap(p => p.sessions).filter(s => s.status === "complete").length;
+                    const currentSession = U11_SEASON_PLAN.phases.flatMap(p => p.sessions).find(s => s.status === "current");
+                    return currentSession?.week?.replace("Week ", "") || completedSessions + 1;
+                  })()} of 26
+                </div>
+              </div>
+              
+              {/* Phase timeline visual */}
+              <div style={{
+                display: "flex",
+                gap: 4,
+                marginBottom: 16,
+              }}>
+                {U11_SEASON_PLAN.phases.map((phase, idx) => {
+                  const isComplete = phase.status === "complete";
+                  const isCurrent = phase.status === "current";
+                  const completedInPhase = phase.sessions.filter(s => s.status === "complete").length;
+                  const pct = (completedInPhase / phase.sessions.length) * 100;
+                  
+                  return (
+                    <div key={phase.id} style={{ flex: phase.weeks, position: "relative" }}>
+                      <div style={{
+                        height: 8,
+                        borderRadius: 4,
+                        background: PT.border,
+                        overflow: "hidden",
+                      }}>
+                        <div style={{
+                          height: "100%",
+                          width: `${pct}%`,
+                          background: isComplete ? PT.navy : isCurrent ? PT.gold : PT.border,
+                          transition: "width 0.3s ease",
+                        }} />
+                      </div>
+                      <div style={{
+                        fontSize: 9,
+                        fontWeight: 700,
+                        color: isCurrent ? PT.navy : PT.muted,
+                        textAlign: "center",
+                        marginTop: 4,
+                      }}>
+                        {phase.shortName}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {/* Current phase highlight */}
+              <div style={{
+                background: "linear-gradient(135deg, #1B2A5C 0%, #2d3a6e 100%)",
+                borderRadius: 12,
+                padding: "14px 16px",
+                color: PT.white,
+              }}>
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                }}>
+                  <div>
+                    <div style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      opacity: 0.7,
+                      marginBottom: 4,
+                    }}>
+                      Currently in
+                    </div>
+                    <div style={{
+                      fontSize: 17,
+                      fontWeight: 800,
+                    }}>
+                      {currentPhaseData?.name}
+                    </div>
+                    <div style={{
+                      fontSize: 12,
+                      opacity: 0.8,
+                      marginTop: 4,
+                    }}>
+                      {currentPhaseData?.dates}
+                    </div>
+                  </div>
+                  <div style={{
+                    background: PT.gold,
+                    color: "#412402",
+                    padding: "6px 12px",
+                    borderRadius: 20,
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}>
+                    {currentPhaseData?.sessions.filter(s => s.status === "complete").length}/{currentPhaseData?.sessions.length} done
+                  </div>
+                </div>
+                <div style={{
+                  fontSize: 12,
+                  opacity: 0.9,
+                  marginTop: 10,
+                  paddingTop: 10,
+                  borderTop: "1px solid rgba(255,255,255,0.15)",
+                }}>
+                  🎯 Focus: {currentPhaseData?.focus}
+                </div>
+              </div>
+            </div>
+            
+            {/* Phase Cards */}
+            {U11_SEASON_PLAN.phases.map((phase, idx) => {
+              const isComplete = phase.status === "complete";
+              const isCurrent = phase.status === "current";
+              const completedCount = phase.sessions.filter(s => s.status === "complete").length;
+              
+              return (
+                <div key={phase.id} style={{
+                  background: PT.card,
+                  border: `1.5px solid ${isCurrent ? PT.gold : PT.border}`,
+                  borderRadius: 14,
+                  padding: "14px 16px",
+                  marginBottom: 12,
+                  opacity: phase.status === "upcoming" ? 0.7 : 1,
+                }}>
+                  {/* Phase header */}
+                  <div style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 10,
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        background: isComplete ? "#dcfce7" : isCurrent ? PT.gold : PT.bg,
+                        border: `1.5px solid ${isComplete ? "#86efac" : isCurrent ? "#b8860b" : PT.border}`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 14,
+                        fontWeight: 800,
+                        color: isComplete ? "#166534" : isCurrent ? "#412402" : PT.muted,
+                      }}>
+                        {isComplete ? "✓" : idx + 1}
+                      </div>
+                      <div>
+                        <div style={{
+                          fontSize: 14,
+                          fontWeight: 700,
+                          color: PT.text,
+                        }}>
+                          {phase.name}
+                        </div>
+                        <div style={{
+                          fontSize: 11,
+                          color: PT.muted,
+                        }}>
+                          {phase.dates} · {phase.weeks} weeks
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: isComplete ? "#166534" : isCurrent ? "#92400e" : PT.muted,
+                      background: isComplete ? "#dcfce7" : isCurrent ? "#fef3c7" : PT.bg,
+                      padding: "4px 10px",
+                      borderRadius: 12,
+                    }}>
+                      {completedCount}/{phase.sessions.length}
+                    </div>
+                  </div>
+                  
+                  {/* Focus */}
+                  <div style={{
+                    fontSize: 12,
+                    color: PT.muted,
+                    marginBottom: 12,
+                    paddingLeft: 42,
+                  }}>
+                    🎯 {phase.focus}
+                  </div>
+                  
+                  {/* Session list (collapsed for non-current) */}
+                  {isCurrent && (
+                    <div style={{
+                      borderTop: `1px solid ${PT.border}`,
+                      paddingTop: 12,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 6,
+                    }}>
+                      {phase.sessions.map(sess => (
+                        <div key={sess.id} style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          padding: "8px 10px",
+                          borderRadius: 8,
+                          background: sess.status === "current" ? "#fef3c7" : sess.status === "complete" ? "#f0fdf4" : PT.bg,
+                          border: sess.status === "current" ? "1.5px solid #fde68a" : "1px solid transparent",
+                        }}>
+                          <div style={{
+                            width: 22,
+                            height: 22,
+                            borderRadius: 6,
+                            background: PILLARS[sess.pillar]?.bg || PT.navy,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 11,
+                          }}>
+                            {PILLARS[sess.pillar]?.icon || "🏏"}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: PT.text,
+                            }}>
+                              {sess.title}
+                            </div>
+                            <div style={{
+                              fontSize: 10,
+                              color: PT.muted,
+                            }}>
+                              {sess.week} · {sess.date}
+                            </div>
+                          </div>
+                          <div style={{
+                            fontSize: 12,
+                            color: sess.status === "complete" ? "#166534" : sess.status === "current" ? "#92400e" : PT.muted,
+                          }}>
+                            {sess.status === "complete" ? "✓" : sess.status === "current" ? "◉" : "○"}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
         
         {activeScreen === "note" && selectedPlayer && (
@@ -1753,23 +2205,24 @@ export default function ProgressTracker({
         )}
       </div>
       
-      {/* Bottom navigation */}
+      {/* Bottom navigation - 3D styled */}
       <div style={{
         position: "fixed",
         bottom: 0,
         left: 0,
         right: 0,
-        background: PT.card,
+        background: "linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%)",
         borderTop: `1px solid ${PT.border}`,
+        boxShadow: "0 -4px 20px rgba(0,0,0,0.08)",
         display: "flex",
         justifyContent: "space-around",
-        padding: "10px 0 20px",
+        padding: "8px 4px 22px",
         zIndex: 100,
       }}>
         {[
           { id: "attendance", icon: "✓", label: "Attendance" },
+          { id: "phases", icon: "🎯", label: "Phases" },
           { id: "plan", icon: "📅", label: "Plan" },
-          { id: "note", icon: "✏️", label: "Log Note", needsPlayer: true },
           { id: "progress", icon: "📊", label: "Progress", coachOnly: true, needsPlayer: true },
           { id: "report", icon: "📄", label: "Report", needsPlayer: true },
         ].map(nav => {
@@ -1795,30 +2248,47 @@ export default function ProgressTracker({
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                gap: 3,
+                gap: 4,
                 background: "transparent",
                 border: "none",
-                padding: "4px 10px",
+                padding: "4px 8px",
                 cursor: isDisabled ? "not-allowed" : "pointer",
-                opacity: isDisabled ? 0.3 : 1,
+                opacity: isDisabled ? 0.35 : 1,
+                transition: "all .15s",
               }}
             >
               <div style={{
-                width: 28,
-                height: 28,
-                borderRadius: 6,
-                background: isActive ? PT.navy : PT.bg,
+                width: 44,
+                height: 44,
+                borderRadius: 12,
+                background: isActive 
+                  ? "linear-gradient(180deg, #1B2A5C 0%, #0f1a3a 100%)"
+                  : "linear-gradient(180deg, #ffffff 0%, #e5e7eb 100%)",
+                border: isActive 
+                  ? "1.5px solid rgba(255,255,255,0.1)"
+                  : "1.5px solid rgba(0,0,0,0.08)",
+                boxShadow: isActive
+                  ? "0 4px 12px rgba(27,42,92,0.4), inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -2px 0 rgba(0,0,0,0.2)"
+                  : "0 2px 6px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.8), inset 0 -1px 0 rgba(0,0,0,0.05)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: 14,
+                fontSize: 18,
+                transition: "all .15s",
               }}>
-                {nav.icon}
+                <span style={{ 
+                  filter: isActive ? "none" : "grayscale(0.3)",
+                  opacity: isActive ? 1 : 0.7,
+                }}>
+                  {nav.icon}
+                </span>
               </div>
               <span style={{
-                fontSize: 9,
-                color: isActive ? PT.navy : PT.muted,
-                fontWeight: isActive ? 700 : 500,
+                fontSize: 10,
+                color: isActive ? PT.navy : "#64748b",
+                fontWeight: isActive ? 800 : 600,
+                letterSpacing: isActive ? "0.3px" : "0",
+                textShadow: isActive ? "none" : "0 1px 0 rgba(255,255,255,0.8)",
               }}>
                 {nav.label}
               </span>
