@@ -632,7 +632,7 @@ export default function CoachCoordination({
                     {visibleSessions.map(session => {
                       const conflicts = getConflictsForSession(session, date);
                       const hasConflict = conflicts.length > 0;
-                      const teamColor = TEAM_COLORS[session.team) || CC.muted;
+                      const teamColor = TEAM_COLORS[session.team] || CC.muted;
                       const coachColor = getCoachColor(session.coach) || CC.muted;
                       
                       return (
@@ -783,7 +783,7 @@ export default function CoachCoordination({
                             marginBottom: 2,
                           }}>
                             <span style={{
-                              color: DIVISION_COLORS[match.division) || CC.muted,
+                              color: DIVISION_COLORS[match.division] || CC.muted,
                               fontWeight: 600,
                             }}>
                               {match.division}
@@ -838,7 +838,7 @@ export default function CoachCoordination({
                   </div>
                   
                   {matches.map((match, i) => {
-                    const divColor = DIVISION_COLORS[match.division) || CC.muted;
+                    const divColor = DIVISION_COLORS[match.division] || CC.muted;
                     return (
                       <div key={i} style={{
                         padding: "10px 12px",
