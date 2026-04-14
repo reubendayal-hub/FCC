@@ -6451,7 +6451,7 @@ export default function App() {
         seasonPlans={seasonPlans}
         userRole={userRole}
         currentUser={currentUser}
-        initialScreen={view === "season-plan" ? "phases" : "attendance"}
+        initialScreen={view === "season-plan" ? "phases" : "players"}
         onBack={() => setView("coachhq")}
         onSaveAttendance={(att) => {
           // TODO: Save to attendance/{sessionId}/records
