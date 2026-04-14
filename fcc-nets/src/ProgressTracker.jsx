@@ -1608,6 +1608,7 @@ export default function ProgressTracker({
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [attendance, setAttendance] = useState({});
   const [selectedTeam, setSelectedTeam] = useState(teams[0] || "all"); // Team filter
+  const [expandedPhases, setExpandedPhases] = useState({}); // {phaseId: true/false} for collapsible phases
   
   // Filter players by selected team
   const filteredPlayers = useMemo(() => {
@@ -1629,6 +1630,11 @@ export default function ProgressTracker({
   }, [session, filteredPlayers]);
   
   const isCoach = userRole === "admin" || userRole === "coach";
+  
+  // Toggle phase expansion
+  const togglePhaseExpanded = (phaseId) => {
+    setExpandedPhases(prev => ({ ...prev, [phaseId]: !prev[phaseId] }));
+  };
   
   const handleToggleAttendance = (playerId, value) => {
     setAttendance(prev => ({
@@ -2397,7 +2403,6 @@ export default function ProgressTracker({
                   borderRadius: 14,
                   padding: "14px 16px",
                   marginBottom: 12,
-                  opacity: phase.status === "upcoming" ? 0.7 : 1,
                 }}>
                   {/* Phase header */}
                   <div style={{
@@ -2450,18 +2455,37 @@ export default function ProgressTracker({
                     </div>
                   </div>
                   
-                  {/* Focus */}
-                  <div style={{
-                    fontSize: 12,
-                    color: PT.muted,
-                    marginBottom: 12,
-                    paddingLeft: 42,
-                  }}>
-                    🎯 {phase.focus}
-                  </div>
+                  {/* Focus - tappable to expand/collapse */}
+                  <button
+                    onClick={() => togglePhaseExpanded(phase.id)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      width: "100%",
+                      background: "none",
+                      border: "none",
+                      padding: "0 0 0 42px",
+                      marginBottom: expandedPhases[phase.id] ? 12 : 0,
+                      cursor: "pointer",
+                      textAlign: "left",
+                    }}
+                  >
+                    <span style={{ fontSize: 12, color: PT.muted }}>
+                      🎯 {phase.focus}
+                    </span>
+                    <span style={{ 
+                      fontSize: 10, 
+                      color: PT.muted,
+                      transform: expandedPhases[phase.id] ? "rotate(180deg)" : "rotate(0deg)",
+                      transition: "transform 0.2s",
+                    }}>
+                      ▼
+                    </span>
+                  </button>
                   
-                  {/* Session list (collapsed for non-current) */}
-                  {isCurrent && (
+                  {/* Session list - expandable for ALL phases */}
+                  {expandedPhases[phase.id] && (
                     <div style={{
                       borderTop: `1px solid ${PT.border}`,
                       paddingTop: 12,
@@ -2640,6 +2664,7 @@ export default function ProgressTracker({
                 <span style={{ 
                   filter: isActive ? "none" : "grayscale(0.3)",
                   opacity: isActive ? 1 : 0.7,
+                  color: isActive ? "#ffffff" : "inherit",
                 }}>
                   {nav.icon}
                 </span>
