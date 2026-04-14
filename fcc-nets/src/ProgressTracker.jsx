@@ -1662,90 +1662,366 @@ export default function ProgressTracker({
   
   const currentTitle = screenTitles[activeScreen];
   
-  // U11 Season 2026 Training Plan - 4 Phases
-  const U11_SEASON_PLAN = {
-    currentPhase: "phase2",
-    phases: [
-      {
-        id: "pre",
-        name: "Pre-Season",
-        shortName: "Pre",
-        dates: "Mar 1 – Apr 5",
-        weeks: 5,
-        focus: "Building fitness, fun introduction",
-        status: "complete",
-        sessions: [
-          { id: "pre1", title: "Welcome & Fitness Games", pillar: "cricketIQ", week: "Week 1", date: "2026-03-07", status: "complete" },
-          { id: "pre2", title: "Basic Catching & Throwing", pillar: "fielding", week: "Week 2", date: "2026-03-14", status: "complete" },
-          { id: "pre3", title: "Grip & Stance Basics", pillar: "batting", week: "Week 3", date: "2026-03-21", status: "complete" },
-          { id: "pre4", title: "Run-up & Bowling Action", pillar: "bowling", week: "Week 4", date: "2026-03-28", status: "complete" },
-          { id: "pre5", title: "Mini Games & Assessment", pillar: "cricketIQ", week: "Week 5", date: "2026-04-04", status: "complete" },
-        ],
-      },
-      {
-        id: "phase1",
-        name: "Phase 1: Foundations",
-        shortName: "Ph1",
-        dates: "Apr 6 – May 17",
-        weeks: 6,
-        focus: "Core technique building",
-        status: "complete",
-        sessions: [
-          { id: "p1s1", title: "Batting — Stance & Backlift", pillar: "batting", week: "Week 6", date: "2026-04-11", status: "complete" },
-          { id: "p1s2", title: "Bowling — Line & Length", pillar: "bowling", week: "Week 7", date: "2026-04-18", status: "complete" },
-          { id: "p1s3", title: "Fielding — Ground Fielding", pillar: "fielding", week: "Week 8", date: "2026-04-25", status: "complete" },
-          { id: "p1s4", title: "Batting — Front Foot Defense", pillar: "batting", week: "Week 9", date: "2026-05-02", status: "complete" },
-          { id: "p1s5", title: "Bowling — Seam Position", pillar: "bowling", week: "Week 10", date: "2026-05-09", status: "complete" },
-          { id: "p1s6", title: "Phase 1 Assessment Games", pillar: "cricketIQ", week: "Week 11", date: "2026-05-16", status: "complete" },
-        ],
-      },
-      {
-        id: "phase2",
-        name: "Phase 2: Development",
-        shortName: "Ph2",
-        dates: "May 18 – Jul 5",
-        weeks: 7,
-        focus: "Shot selection & match awareness",
-        status: "current",
-        sessions: [
-          { id: "p2s1", title: "Batting — Front Foot Drives", pillar: "batting", week: "Week 12", date: "2026-05-23", status: "complete" },
-          { id: "p2s2", title: "WK — Stance & Takes", pillar: "wicketKeeping", week: "Week 13", date: "2026-05-30", status: "complete" },
-          { id: "p2s3", title: "Fielding — High Catches", pillar: "fielding", week: "Week 14", date: "2026-06-06", status: "current" },
-          { id: "p2s4", title: "Batting — Playing Spin", pillar: "batting", week: "Week 15", date: "2026-06-13", status: "upcoming" },
-          { id: "p2s5", title: "Bowling — Variations", pillar: "bowling", week: "Week 16", date: "2026-06-20", status: "upcoming" },
-          { id: "p2s6", title: "Cricket IQ — Running Between", pillar: "cricketIQ", week: "Week 17", date: "2026-06-27", status: "upcoming" },
-          { id: "p2s7", title: "Phase 2 Assessment Match", pillar: "cricketIQ", week: "Week 18", date: "2026-07-04", status: "upcoming" },
-        ],
-      },
-      {
-        id: "phase3",
-        name: "Phase 3: Match Ready",
-        shortName: "Ph3",
-        dates: "Jul 6 – Aug 30",
-        weeks: 8,
-        focus: "Match play & pressure situations",
-        status: "upcoming",
-        sessions: [
-          { id: "p3s1", title: "Batting — Back Foot Play", pillar: "batting", week: "Week 19", date: "2026-07-11", status: "upcoming" },
-          { id: "p3s2", title: "Bowling — Death Bowling", pillar: "bowling", week: "Week 20", date: "2026-07-18", status: "upcoming" },
-          { id: "p3s3", title: "Fielding — Relay Throws", pillar: "fielding", week: "Week 21", date: "2026-07-25", status: "upcoming" },
-          { id: "p3s4", title: "WK — Standing Up", pillar: "wicketKeeping", week: "Week 22", date: "2026-08-01", status: "upcoming" },
-          { id: "p3s5", title: "Match Simulation 1", pillar: "cricketIQ", week: "Week 23", date: "2026-08-08", status: "upcoming" },
-          { id: "p3s6", title: "Batting Under Pressure", pillar: "batting", week: "Week 24", date: "2026-08-15", status: "upcoming" },
-          { id: "p3s7", title: "Match Simulation 2", pillar: "cricketIQ", week: "Week 25", date: "2026-08-22", status: "upcoming" },
-          { id: "p3s8", title: "Season Finale & Awards", pillar: "cricketIQ", week: "Week 26", date: "2026-08-29", status: "upcoming" },
-        ],
-      },
-    ],
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // TEAM-SPECIFIC SEASON PLANS (Draft templates - stored in Firestore for editing)
+  // ═══════════════════════════════════════════════════════════════════════════════
+  const TEAM_SEASON_PLANS = {
+    // ─────────────────────────────────────────────────────────────────────────────
+    // U11 — Focus: Fun, fundamentals, love of the game
+    // ─────────────────────────────────────────────────────────────────────────────
+    "U11": {
+      team: "U11",
+      season: "2026",
+      currentPhase: "phase2",
+      phases: [
+        {
+          id: "pre", name: "Pre-Season", shortName: "Pre",
+          dates: "Mar 1 – Apr 5", weeks: 5,
+          focus: "Building fitness, fun introduction, making friends",
+          status: "complete",
+          sessions: [
+            { id: "u11-pre1", title: "Welcome & Fun Fitness Games", pillar: "cricketIQ", week: "Week 1", date: "2026-03-07", status: "complete" },
+            { id: "u11-pre2", title: "Basic Catching & Throwing", pillar: "fielding", week: "Week 2", date: "2026-03-14", status: "complete" },
+            { id: "u11-pre3", title: "Grip & Stance Basics", pillar: "batting", week: "Week 3", date: "2026-03-21", status: "complete" },
+            { id: "u11-pre4", title: "Run-up & Bowling Action", pillar: "bowling", week: "Week 4", date: "2026-03-28", status: "complete" },
+            { id: "u11-pre5", title: "Mini Games & Fun Assessment", pillar: "cricketIQ", week: "Week 5", date: "2026-04-04", status: "complete" },
+          ],
+        },
+        {
+          id: "phase1", name: "Phase 1: Foundations", shortName: "Ph1",
+          dates: "Apr 6 – May 17", weeks: 6,
+          focus: "Core technique building through games",
+          status: "complete",
+          sessions: [
+            { id: "u11-p1s1", title: "Batting — Stance & Backlift", pillar: "batting", week: "Week 6", date: "2026-04-11", status: "complete" },
+            { id: "u11-p1s2", title: "Bowling — Line & Length", pillar: "bowling", week: "Week 7", date: "2026-04-18", status: "complete" },
+            { id: "u11-p1s3", title: "Fielding — Ground Fielding", pillar: "fielding", week: "Week 8", date: "2026-04-25", status: "complete" },
+            { id: "u11-p1s4", title: "Batting — Front Foot Defense", pillar: "batting", week: "Week 9", date: "2026-05-02", status: "complete" },
+            { id: "u11-p1s5", title: "Bowling — Seam Position", pillar: "bowling", week: "Week 10", date: "2026-05-09", status: "complete" },
+            { id: "u11-p1s6", title: "Phase 1 Assessment Games", pillar: "cricketIQ", week: "Week 11", date: "2026-05-16", status: "complete" },
+          ],
+        },
+        {
+          id: "phase2", name: "Phase 2: Development", shortName: "Ph2",
+          dates: "May 18 – Jul 5", weeks: 7,
+          focus: "Shot selection & match awareness",
+          status: "current",
+          sessions: [
+            { id: "u11-p2s1", title: "Batting — Front Foot Drives", pillar: "batting", week: "Week 12", date: "2026-05-23", status: "complete" },
+            { id: "u11-p2s2", title: "WK — Stance & Takes", pillar: "wicketKeeping", week: "Week 13", date: "2026-05-30", status: "complete" },
+            { id: "u11-p2s3", title: "Fielding — High Catches", pillar: "fielding", week: "Week 14", date: "2026-06-06", status: "current" },
+            { id: "u11-p2s4", title: "Batting — Playing Spin", pillar: "batting", week: "Week 15", date: "2026-06-13", status: "upcoming" },
+            { id: "u11-p2s5", title: "Bowling — Variations Intro", pillar: "bowling", week: "Week 16", date: "2026-06-20", status: "upcoming" },
+            { id: "u11-p2s6", title: "Cricket IQ — Running Between", pillar: "cricketIQ", week: "Week 17", date: "2026-06-27", status: "upcoming" },
+            { id: "u11-p2s7", title: "Phase 2 Fun Match", pillar: "cricketIQ", week: "Week 18", date: "2026-07-04", status: "upcoming" },
+          ],
+        },
+        {
+          id: "phase3", name: "Phase 3: Match Ready", shortName: "Ph3",
+          dates: "Jul 6 – Aug 30", weeks: 8,
+          focus: "Match play & building confidence",
+          status: "upcoming",
+          sessions: [
+            { id: "u11-p3s1", title: "Batting — Back Foot Basics", pillar: "batting", week: "Week 19", date: "2026-07-11", status: "upcoming" },
+            { id: "u11-p3s2", title: "Bowling — Accuracy Games", pillar: "bowling", week: "Week 20", date: "2026-07-18", status: "upcoming" },
+            { id: "u11-p3s3", title: "Fielding — Throwing Accuracy", pillar: "fielding", week: "Week 21", date: "2026-07-25", status: "upcoming" },
+            { id: "u11-p3s4", title: "WK — Moving to the Ball", pillar: "wicketKeeping", week: "Week 22", date: "2026-08-01", status: "upcoming" },
+            { id: "u11-p3s5", title: "Mini Match Day 1", pillar: "cricketIQ", week: "Week 23", date: "2026-08-08", status: "upcoming" },
+            { id: "u11-p3s6", title: "Batting — Building an Innings", pillar: "batting", week: "Week 24", date: "2026-08-15", status: "upcoming" },
+            { id: "u11-p3s7", title: "Mini Match Day 2", pillar: "cricketIQ", week: "Week 25", date: "2026-08-22", status: "upcoming" },
+            { id: "u11-p3s8", title: "Season Finale & Awards 🏆", pillar: "cricketIQ", week: "Week 26", date: "2026-08-29", status: "upcoming" },
+          ],
+        },
+      ],
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // U13 — Focus: Technique refinement, game understanding, role specialization
+    // ─────────────────────────────────────────────────────────────────────────────
+    "U13": {
+      team: "U13",
+      season: "2026",
+      currentPhase: "phase2",
+      phases: [
+        {
+          id: "pre", name: "Pre-Season", shortName: "Pre",
+          dates: "Mar 1 – Apr 5", weeks: 5,
+          focus: "Fitness testing, technique refresh, team bonding",
+          status: "complete",
+          sessions: [
+            { id: "u13-pre1", title: "Fitness Assessment & Goals", pillar: "cricketIQ", week: "Week 1", date: "2026-03-07", status: "complete" },
+            { id: "u13-pre2", title: "Catching Mechanics Review", pillar: "fielding", week: "Week 2", date: "2026-03-14", status: "complete" },
+            { id: "u13-pre3", title: "Batting Technique Refresh", pillar: "batting", week: "Week 3", date: "2026-03-21", status: "complete" },
+            { id: "u13-pre4", title: "Bowling Action Analysis", pillar: "bowling", week: "Week 4", date: "2026-03-28", status: "complete" },
+            { id: "u13-pre5", title: "Intra-squad Practice Match", pillar: "cricketIQ", week: "Week 5", date: "2026-04-04", status: "complete" },
+          ],
+        },
+        {
+          id: "phase1", name: "Phase 1: Technique", shortName: "Ph1",
+          dates: "Apr 6 – May 17", weeks: 6,
+          focus: "Refining individual techniques",
+          status: "complete",
+          sessions: [
+            { id: "u13-p1s1", title: "Batting — Footwork Drills", pillar: "batting", week: "Week 6", date: "2026-04-11", status: "complete" },
+            { id: "u13-p1s2", title: "Bowling — Run-up Consistency", pillar: "bowling", week: "Week 7", date: "2026-04-18", status: "complete" },
+            { id: "u13-p1s3", title: "Fielding — Positions & Movement", pillar: "fielding", week: "Week 8", date: "2026-04-25", status: "complete" },
+            { id: "u13-p1s4", title: "Batting — Playing Pace", pillar: "batting", week: "Week 9", date: "2026-05-02", status: "complete" },
+            { id: "u13-p1s5", title: "Bowling — Swing Basics", pillar: "bowling", week: "Week 10", date: "2026-05-09", status: "complete" },
+            { id: "u13-p1s6", title: "WK — Standing Back", pillar: "wicketKeeping", week: "Week 11", date: "2026-05-16", status: "complete" },
+          ],
+        },
+        {
+          id: "phase2", name: "Phase 2: Game Awareness", shortName: "Ph2",
+          dates: "May 18 – Jul 5", weeks: 7,
+          focus: "Understanding match situations & decision making",
+          status: "current",
+          sessions: [
+            { id: "u13-p2s1", title: "Batting — Shot Selection", pillar: "batting", week: "Week 12", date: "2026-05-23", status: "complete" },
+            { id: "u13-p2s2", title: "Bowling — Field Settings", pillar: "bowling", week: "Week 13", date: "2026-05-30", status: "complete" },
+            { id: "u13-p2s3", title: "Fielding — Relay & Backing Up", pillar: "fielding", week: "Week 14", date: "2026-06-06", status: "current" },
+            { id: "u13-p2s4", title: "Cricket IQ — Reading the Game", pillar: "cricketIQ", week: "Week 15", date: "2026-06-13", status: "upcoming" },
+            { id: "u13-p2s5", title: "Batting — Building Partnerships", pillar: "batting", week: "Week 16", date: "2026-06-20", status: "upcoming" },
+            { id: "u13-p2s6", title: "Bowling — Bowling to a Plan", pillar: "bowling", week: "Week 17", date: "2026-06-27", status: "upcoming" },
+            { id: "u13-p2s7", title: "Match Simulation — Scenarios", pillar: "cricketIQ", week: "Week 18", date: "2026-07-04", status: "upcoming" },
+          ],
+        },
+        {
+          id: "phase3", name: "Phase 3: Competition", shortName: "Ph3",
+          dates: "Jul 6 – Aug 30", weeks: 8,
+          focus: "Match preparation & pressure handling",
+          status: "upcoming",
+          sessions: [
+            { id: "u13-p3s1", title: "Batting — Playing Spin Bowling", pillar: "batting", week: "Week 19", date: "2026-07-11", status: "upcoming" },
+            { id: "u13-p3s2", title: "Bowling — Death Overs", pillar: "bowling", week: "Week 20", date: "2026-07-18", status: "upcoming" },
+            { id: "u13-p3s3", title: "Fielding — Pressure Catches", pillar: "fielding", week: "Week 21", date: "2026-07-25", status: "upcoming" },
+            { id: "u13-p3s4", title: "WK — Standing Up to Medium", pillar: "wicketKeeping", week: "Week 22", date: "2026-08-01", status: "upcoming" },
+            { id: "u13-p3s5", title: "Match Simulation — Chase", pillar: "cricketIQ", week: "Week 23", date: "2026-08-08", status: "upcoming" },
+            { id: "u13-p3s6", title: "Batting — Finishing Innings", pillar: "batting", week: "Week 24", date: "2026-08-15", status: "upcoming" },
+            { id: "u13-p3s7", title: "Match Simulation — Defend", pillar: "cricketIQ", week: "Week 25", date: "2026-08-22", status: "upcoming" },
+            { id: "u13-p3s8", title: "Season Review & Awards 🏆", pillar: "cricketIQ", week: "Week 26", date: "2026-08-29", status: "upcoming" },
+          ],
+        },
+      ],
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // U15 — Focus: Advanced skills, role specialization, match intensity
+    // ─────────────────────────────────────────────────────────────────────────────
+    "U15": {
+      team: "U15",
+      season: "2026",
+      currentPhase: "phase2",
+      phases: [
+        {
+          id: "pre", name: "Pre-Season", shortName: "Pre",
+          dates: "Mar 1 – Apr 5", weeks: 5,
+          focus: "Physical conditioning, skill assessment, role identification",
+          status: "complete",
+          sessions: [
+            { id: "u15-pre1", title: "Fitness & Conditioning Test", pillar: "cricketIQ", week: "Week 1", date: "2026-03-07", status: "complete" },
+            { id: "u15-pre2", title: "Skill Assessment — Batting", pillar: "batting", week: "Week 2", date: "2026-03-14", status: "complete" },
+            { id: "u15-pre3", title: "Skill Assessment — Bowling", pillar: "bowling", week: "Week 3", date: "2026-03-21", status: "complete" },
+            { id: "u15-pre4", title: "Fielding & Catching Drills", pillar: "fielding", week: "Week 4", date: "2026-03-28", status: "complete" },
+            { id: "u15-pre5", title: "Practice Match & Role Selection", pillar: "cricketIQ", week: "Week 5", date: "2026-04-04", status: "complete" },
+          ],
+        },
+        {
+          id: "phase1", name: "Phase 1: Specialization", shortName: "Ph1",
+          dates: "Apr 6 – May 17", weeks: 6,
+          focus: "Developing specialist roles",
+          status: "complete",
+          sessions: [
+            { id: "u15-p1s1", title: "Openers — Setting Platform", pillar: "batting", week: "Week 6", date: "2026-04-11", status: "complete" },
+            { id: "u15-p1s2", title: "New Ball Bowling", pillar: "bowling", week: "Week 7", date: "2026-04-18", status: "complete" },
+            { id: "u15-p1s3", title: "Middle Order — Rotation", pillar: "batting", week: "Week 8", date: "2026-04-25", status: "complete" },
+            { id: "u15-p1s4", title: "Spin Bowling Development", pillar: "bowling", week: "Week 9", date: "2026-05-02", status: "complete" },
+            { id: "u15-p1s5", title: "Slip & Close Catching", pillar: "fielding", week: "Week 10", date: "2026-05-09", status: "complete" },
+            { id: "u15-p1s6", title: "WK — Keeping to Spin", pillar: "wicketKeeping", week: "Week 11", date: "2026-05-16", status: "complete" },
+          ],
+        },
+        {
+          id: "phase2", name: "Phase 2: Match Craft", shortName: "Ph2",
+          dates: "May 18 – Jul 5", weeks: 7,
+          focus: "Game management & tactical awareness",
+          status: "current",
+          sessions: [
+            { id: "u15-p2s1", title: "Batting — Powerplay Strategy", pillar: "batting", week: "Week 12", date: "2026-05-23", status: "complete" },
+            { id: "u15-p2s2", title: "Bowling — Middle Overs Control", pillar: "bowling", week: "Week 13", date: "2026-05-30", status: "complete" },
+            { id: "u15-p2s3", title: "Fielding — Boundary Saves", pillar: "fielding", week: "Week 14", date: "2026-06-06", status: "current" },
+            { id: "u15-p2s4", title: "Cricket IQ — Captaincy Basics", pillar: "cricketIQ", week: "Week 15", date: "2026-06-13", status: "upcoming" },
+            { id: "u15-p2s5", title: "Finishers — Death Batting", pillar: "batting", week: "Week 16", date: "2026-06-20", status: "upcoming" },
+            { id: "u15-p2s6", title: "Bowling — Yorkers & Slower Balls", pillar: "bowling", week: "Week 17", date: "2026-06-27", status: "upcoming" },
+            { id: "u15-p2s7", title: "T20 Match Simulation", pillar: "cricketIQ", week: "Week 18", date: "2026-07-04", status: "upcoming" },
+          ],
+        },
+        {
+          id: "phase3", name: "Phase 3: Performance", shortName: "Ph3",
+          dates: "Jul 6 – Aug 30", weeks: 8,
+          focus: "Peak performance & competition readiness",
+          status: "upcoming",
+          sessions: [
+            { id: "u15-p3s1", title: "Batting Under Pressure", pillar: "batting", week: "Week 19", date: "2026-07-11", status: "upcoming" },
+            { id: "u15-p3s2", title: "Bowling — Clutch Situations", pillar: "bowling", week: "Week 20", date: "2026-07-18", status: "upcoming" },
+            { id: "u15-p3s3", title: "Fielding — Run-out Practice", pillar: "fielding", week: "Week 21", date: "2026-07-25", status: "upcoming" },
+            { id: "u15-p3s4", title: "WK — Stumpings & Run-outs", pillar: "wicketKeeping", week: "Week 22", date: "2026-08-01", status: "upcoming" },
+            { id: "u15-p3s5", title: "Match Day — Full Game", pillar: "cricketIQ", week: "Week 23", date: "2026-08-08", status: "upcoming" },
+            { id: "u15-p3s6", title: "Video Analysis Session", pillar: "cricketIQ", week: "Week 24", date: "2026-08-15", status: "upcoming" },
+            { id: "u15-p3s7", title: "Final Tournament Prep", pillar: "cricketIQ", week: "Week 25", date: "2026-08-22", status: "upcoming" },
+            { id: "u15-p3s8", title: "Season Awards & U17 Preview 🏆", pillar: "cricketIQ", week: "Week 26", date: "2026-08-29", status: "upcoming" },
+          ],
+        },
+      ],
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // U15 Girls — Focus: Building confidence, skills & love of cricket
+    // ─────────────────────────────────────────────────────────────────────────────
+    "U15 Girls": {
+      team: "U15 Girls",
+      season: "2026",
+      currentPhase: "phase1",
+      phases: [
+        {
+          id: "pre", name: "Pre-Season", shortName: "Pre",
+          dates: "Mar 1 – Apr 5", weeks: 5,
+          focus: "Welcome, fitness games, building team spirit",
+          status: "complete",
+          sessions: [
+            { id: "u15g-pre1", title: "Welcome & Team Introductions", pillar: "cricketIQ", week: "Week 1", date: "2026-03-07", status: "complete" },
+            { id: "u15g-pre2", title: "Fun Fitness & Catching Games", pillar: "fielding", week: "Week 2", date: "2026-03-14", status: "complete" },
+            { id: "u15g-pre3", title: "Batting — Grip & Stance", pillar: "batting", week: "Week 3", date: "2026-03-21", status: "complete" },
+            { id: "u15g-pre4", title: "Bowling — Basic Action", pillar: "bowling", week: "Week 4", date: "2026-03-28", status: "complete" },
+            { id: "u15g-pre5", title: "Fun Mini Games", pillar: "cricketIQ", week: "Week 5", date: "2026-04-04", status: "complete" },
+          ],
+        },
+        {
+          id: "phase1", name: "Phase 1: Building Blocks", shortName: "Ph1",
+          dates: "Apr 6 – May 17", weeks: 6,
+          focus: "Core skills in supportive environment",
+          status: "current",
+          sessions: [
+            { id: "u15g-p1s1", title: "Batting — Forward Defense", pillar: "batting", week: "Week 6", date: "2026-04-11", status: "complete" },
+            { id: "u15g-p1s2", title: "Bowling — Line & Length", pillar: "bowling", week: "Week 7", date: "2026-04-18", status: "complete" },
+            { id: "u15g-p1s3", title: "Fielding — Ground Skills", pillar: "fielding", week: "Week 8", date: "2026-04-25", status: "current" },
+            { id: "u15g-p1s4", title: "Batting — Straight Drives", pillar: "batting", week: "Week 9", date: "2026-05-02", status: "upcoming" },
+            { id: "u15g-p1s5", title: "Bowling — Accuracy Games", pillar: "bowling", week: "Week 10", date: "2026-05-09", status: "upcoming" },
+            { id: "u15g-p1s6", title: "Skills Showcase Day", pillar: "cricketIQ", week: "Week 11", date: "2026-05-16", status: "upcoming" },
+          ],
+        },
+        {
+          id: "phase2", name: "Phase 2: Growing Skills", shortName: "Ph2",
+          dates: "May 18 – Jul 5", weeks: 7,
+          focus: "Developing confidence & game awareness",
+          status: "upcoming",
+          sessions: [
+            { id: "u15g-p2s1", title: "Batting — Pull & Cut Shots", pillar: "batting", week: "Week 12", date: "2026-05-23", status: "upcoming" },
+            { id: "u15g-p2s2", title: "WK — Introduction", pillar: "wicketKeeping", week: "Week 13", date: "2026-05-30", status: "upcoming" },
+            { id: "u15g-p2s3", title: "Fielding — Catching Practice", pillar: "fielding", week: "Week 14", date: "2026-06-06", status: "upcoming" },
+            { id: "u15g-p2s4", title: "Cricket IQ — Running Between", pillar: "cricketIQ", week: "Week 15", date: "2026-06-13", status: "upcoming" },
+            { id: "u15g-p2s5", title: "Bowling — Swing Intro", pillar: "bowling", week: "Week 16", date: "2026-06-20", status: "upcoming" },
+            { id: "u15g-p2s6", title: "Pairs Cricket Match", pillar: "cricketIQ", week: "Week 17", date: "2026-06-27", status: "upcoming" },
+            { id: "u15g-p2s7", title: "Phase 2 Friendly Match", pillar: "cricketIQ", week: "Week 18", date: "2026-07-04", status: "upcoming" },
+          ],
+        },
+        {
+          id: "phase3", name: "Phase 3: Match Ready", shortName: "Ph3",
+          dates: "Jul 6 – Aug 30", weeks: 8,
+          focus: "Playing matches & building match confidence",
+          status: "upcoming",
+          sessions: [
+            { id: "u15g-p3s1", title: "Batting — Match Scenarios", pillar: "batting", week: "Week 19", date: "2026-07-11", status: "upcoming" },
+            { id: "u15g-p3s2", title: "Bowling — Variations", pillar: "bowling", week: "Week 20", date: "2026-07-18", status: "upcoming" },
+            { id: "u15g-p3s3", title: "Fielding — Match Positions", pillar: "fielding", week: "Week 21", date: "2026-07-25", status: "upcoming" },
+            { id: "u15g-p3s4", title: "WK — Game Situations", pillar: "wicketKeeping", week: "Week 22", date: "2026-08-01", status: "upcoming" },
+            { id: "u15g-p3s5", title: "Friendly Match vs Kvinder", pillar: "cricketIQ", week: "Week 23", date: "2026-08-08", status: "upcoming" },
+            { id: "u15g-p3s6", title: "Personal Goals Review", pillar: "cricketIQ", week: "Week 24", date: "2026-08-15", status: "upcoming" },
+            { id: "u15g-p3s7", title: "Fun Tournament Day", pillar: "cricketIQ", week: "Week 25", date: "2026-08-22", status: "upcoming" },
+            { id: "u15g-p3s8", title: "Season Celebration 🏆", pillar: "cricketIQ", week: "Week 26", date: "2026-08-29", status: "upcoming" },
+          ],
+        },
+      ],
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Kvinder — Focus: Skills development, match experience, team building
+    // ─────────────────────────────────────────────────────────────────────────────
+    "Kvinder": {
+      team: "Kvinder",
+      season: "2026",
+      currentPhase: "phase2",
+      phases: [
+        {
+          id: "pre", name: "Pre-Season", shortName: "Pre",
+          dates: "Mar 1 – Apr 5", weeks: 5,
+          focus: "Fitness, skills refresh, team bonding",
+          status: "complete",
+          sessions: [
+            { id: "kv-pre1", title: "Season Kickoff & Fitness", pillar: "cricketIQ", week: "Week 1", date: "2026-03-07", status: "complete" },
+            { id: "kv-pre2", title: "Batting Refresh", pillar: "batting", week: "Week 2", date: "2026-03-14", status: "complete" },
+            { id: "kv-pre3", title: "Bowling Refresh", pillar: "bowling", week: "Week 3", date: "2026-03-21", status: "complete" },
+            { id: "kv-pre4", title: "Fielding Stations", pillar: "fielding", week: "Week 4", date: "2026-03-28", status: "complete" },
+            { id: "kv-pre5", title: "Practice Match", pillar: "cricketIQ", week: "Week 5", date: "2026-04-04", status: "complete" },
+          ],
+        },
+        {
+          id: "phase1", name: "Phase 1: Skill Building", shortName: "Ph1",
+          dates: "Apr 6 – May 17", weeks: 6,
+          focus: "Individual skill development",
+          status: "complete",
+          sessions: [
+            { id: "kv-p1s1", title: "Batting — Stroke Play", pillar: "batting", week: "Week 6", date: "2026-04-11", status: "complete" },
+            { id: "kv-p1s2", title: "Bowling — Accuracy & Pace", pillar: "bowling", week: "Week 7", date: "2026-04-18", status: "complete" },
+            { id: "kv-p1s3", title: "Fielding — Throwing & Catching", pillar: "fielding", week: "Week 8", date: "2026-04-25", status: "complete" },
+            { id: "kv-p1s4", title: "Batting — Rotation of Strike", pillar: "batting", week: "Week 9", date: "2026-05-02", status: "complete" },
+            { id: "kv-p1s5", title: "Bowling — Variations", pillar: "bowling", week: "Week 10", date: "2026-05-09", status: "complete" },
+            { id: "kv-p1s6", title: "WK Fundamentals", pillar: "wicketKeeping", week: "Week 11", date: "2026-05-16", status: "complete" },
+          ],
+        },
+        {
+          id: "phase2", name: "Phase 2: Match Preparation", shortName: "Ph2",
+          dates: "May 18 – Jul 5", weeks: 7,
+          focus: "Match skills & situational play",
+          status: "current",
+          sessions: [
+            { id: "kv-p2s1", title: "Batting — Powerplay & Death", pillar: "batting", week: "Week 12", date: "2026-05-23", status: "complete" },
+            { id: "kv-p2s2", title: "Bowling — Match Scenarios", pillar: "bowling", week: "Week 13", date: "2026-05-30", status: "complete" },
+            { id: "kv-p2s3", title: "Fielding — Match Positions", pillar: "fielding", week: "Week 14", date: "2026-06-06", status: "current" },
+            { id: "kv-p2s4", title: "Cricket IQ — Game Plans", pillar: "cricketIQ", week: "Week 15", date: "2026-06-13", status: "upcoming" },
+            { id: "kv-p2s5", title: "Batting Partnerships", pillar: "batting", week: "Week 16", date: "2026-06-20", status: "upcoming" },
+            { id: "kv-p2s6", title: "Bowling — Economy Focus", pillar: "bowling", week: "Week 17", date: "2026-06-27", status: "upcoming" },
+            { id: "kv-p2s7", title: "T20 Practice Match", pillar: "cricketIQ", week: "Week 18", date: "2026-07-04", status: "upcoming" },
+          ],
+        },
+        {
+          id: "phase3", name: "Phase 3: Competition", shortName: "Ph3",
+          dates: "Jul 6 – Aug 30", weeks: 8,
+          focus: "League matches & tournament prep",
+          status: "upcoming",
+          sessions: [
+            { id: "kv-p3s1", title: "Batting — Scoring Areas", pillar: "batting", week: "Week 19", date: "2026-07-11", status: "upcoming" },
+            { id: "kv-p3s2", title: "Bowling — Pressure Overs", pillar: "bowling", week: "Week 20", date: "2026-07-18", status: "upcoming" },
+            { id: "kv-p3s3", title: "Fielding — Match Intensity", pillar: "fielding", week: "Week 21", date: "2026-07-25", status: "upcoming" },
+            { id: "kv-p3s4", title: "WK — Match Keeping", pillar: "wicketKeeping", week: "Week 22", date: "2026-08-01", status: "upcoming" },
+            { id: "kv-p3s5", title: "Match Day 1", pillar: "cricketIQ", week: "Week 23", date: "2026-08-08", status: "upcoming" },
+            { id: "kv-p3s6", title: "Match Review & Adjustments", pillar: "cricketIQ", week: "Week 24", date: "2026-08-15", status: "upcoming" },
+            { id: "kv-p3s7", title: "Match Day 2", pillar: "cricketIQ", week: "Week 25", date: "2026-08-22", status: "upcoming" },
+            { id: "kv-p3s8", title: "Season Celebration 🏆", pillar: "cricketIQ", week: "Week 26", date: "2026-08-29", status: "upcoming" },
+          ],
+        },
+      ],
+    },
   };
   
+  // Get the plan for selected team (or default to U11)
+  const selectedPlan = TEAM_SEASON_PLANS[selectedTeam] || TEAM_SEASON_PLANS["U11"];
+  
   // Flatten all sessions for plan view
-  const defaultTrainingSessions = trainingSessions || U11_SEASON_PLAN.phases.flatMap(p => 
+  const defaultTrainingSessions = trainingSessions || selectedPlan.phases.flatMap(p => 
     p.sessions.map(s => ({ ...s, phase: p.shortName, phaseName: p.name }))
   );
   
-  // Get current phase info
-  const currentPhaseData = U11_SEASON_PLAN.phases.find(p => p.status === "current") || U11_SEASON_PLAN.phases[1];
+  // Get current phase info for selected team
+  const currentPhaseData = selectedPlan.phases.find(p => p.status === "current") || selectedPlan.phases[1];
   
   return (
     <div style={{
@@ -1931,8 +2207,8 @@ export default function ProgressTracker({
                   color: PT.navy,
                 }}>
                   Week {(() => {
-                    const completedSessions = U11_SEASON_PLAN.phases.flatMap(p => p.sessions).filter(s => s.status === "complete").length;
-                    const currentSession = U11_SEASON_PLAN.phases.flatMap(p => p.sessions).find(s => s.status === "current");
+                    const completedSessions = selectedPlan.phases.flatMap(p => p.sessions).filter(s => s.status === "complete").length;
+                    const currentSession = selectedPlan.phases.flatMap(p => p.sessions).find(s => s.status === "current");
                     return currentSession?.week?.replace("Week ", "") || completedSessions + 1;
                   })()} of 26
                 </div>
@@ -1944,7 +2220,7 @@ export default function ProgressTracker({
                 gap: 4,
                 marginBottom: 16,
               }}>
-                {U11_SEASON_PLAN.phases.map((phase, idx) => {
+                {selectedPlan.phases.map((phase, idx) => {
                   const isComplete = phase.status === "complete";
                   const isCurrent = phase.status === "current";
                   const completedInPhase = phase.sessions.filter(s => s.status === "complete").length;
@@ -2038,7 +2314,7 @@ export default function ProgressTracker({
             </div>
             
             {/* Phase Cards */}
-            {U11_SEASON_PLAN.phases.map((phase, idx) => {
+            {selectedPlan.phases.map((phase, idx) => {
               const isComplete = phase.status === "complete";
               const isCurrent = phase.status === "current";
               const completedCount = phase.sessions.filter(s => s.status === "complete").length;
