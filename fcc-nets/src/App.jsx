@@ -6338,7 +6338,7 @@ export default function App() {
                 padding:"20px 16px",cursor:"pointer",fontFamily:"inherit",textAlign:"left",
                 display:"flex",flexDirection:"column",gap:8,
                 transition:"all .15s",boxShadow:"0 4px 12px rgba(0,0,0,.15)"}}>
-              <div style={{fontSize:28}}>📆</div>
+              <div style={{fontSize:28}}>🧩</div>
               <div style={{fontWeight:800,fontSize:14,color:"#c9a84c"}}>Coach Coordination</div>
               <div style={{fontSize:11,color:"rgba(232,234,240,0.7)",lineHeight:1.4}}>
                 Schedule, conflicts & availability
