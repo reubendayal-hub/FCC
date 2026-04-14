@@ -1591,6 +1591,7 @@ export default function ProgressTracker({
   session,
   players,
   teams = [], // Array of team names the coach has access to
+  seasonPlans = {}, // Stored plans from Firestore {teamName: plan}
   trainingSessions,
   currentUser,
   userRole,
@@ -1601,8 +1602,9 @@ export default function ProgressTracker({
   onReorderSessions,
   onAddSession,
   onEditSession,
+  onSaveSeasonPlan, // Callback to save plan: (teamName, plan) => void
 }) {
-  const [activeScreen, setActiveScreen] = useState("attendance"); // attendance | plan | note | progress | report
+  const [activeScreen, setActiveScreen] = useState("attendance"); // attendance | plan | phases | note | progress | report
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [attendance, setAttendance] = useState({});
   const [selectedTeam, setSelectedTeam] = useState(teams[0] || "all"); // Team filter
@@ -2012,8 +2014,39 @@ export default function ProgressTracker({
     },
   };
   
-  // Get the plan for selected team (or default to U11)
-  const selectedPlan = TEAM_SEASON_PLANS[selectedTeam] || TEAM_SEASON_PLANS["U11"];
+  // Get the plan for selected team - prefer Firestore data, fall back to defaults
+  const selectedPlan = seasonPlans[selectedTeam] || TEAM_SEASON_PLANS[selectedTeam] || TEAM_SEASON_PLANS["U11"];
+  
+  // Track if we're using default (unsaved) plan
+  const isUsingDefaultPlan = !seasonPlans[selectedTeam];
+  
+  // Handler to save current plan to Firestore
+  const handleSavePlan = () => {
+    if (onSaveSeasonPlan && selectedTeam && selectedTeam !== "all") {
+      onSaveSeasonPlan(selectedTeam, selectedPlan);
+    }
+  };
+  
+  // Handler to update a session in the plan
+  const handleUpdateSession = (sessionId, updates) => {
+    const updatedPlan = {
+      ...selectedPlan,
+      phases: selectedPlan.phases.map(phase => ({
+        ...phase,
+        sessions: phase.sessions.map(sess => 
+          sess.id === sessionId ? { ...sess, ...updates } : sess
+        ),
+      })),
+    };
+    if (onSaveSeasonPlan && selectedTeam && selectedTeam !== "all") {
+      onSaveSeasonPlan(selectedTeam, updatedPlan);
+    }
+  };
+  
+  // Handler to mark session status
+  const handleMarkSessionStatus = (sessionId, status) => {
+    handleUpdateSession(sessionId, { status });
+  };
   
   // Flatten all sessions for plan view
   const defaultTrainingSessions = trainingSessions || selectedPlan.phases.flatMap(p => 
@@ -2178,6 +2211,44 @@ export default function ProgressTracker({
         {/* Phase Overview Screen */}
         {activeScreen === "phases" && (
           <div style={{ padding: "12px 16px" }}>
+            {/* Unsaved draft banner */}
+            {isUsingDefaultPlan && selectedTeam !== "all" && (
+              <div style={{
+                background: "#fef3c7",
+                border: "1.5px solid #fde68a",
+                borderRadius: 10,
+                padding: "10px 14px",
+                marginBottom: 12,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#92400e" }}>
+                    📋 Draft Plan
+                  </div>
+                  <div style={{ fontSize: 11, color: "#a16207" }}>
+                    This is a template. Save to customize for {selectedTeam}.
+                  </div>
+                </div>
+                <button
+                  onClick={handleSavePlan}
+                  style={{
+                    background: PT.navy,
+                    color: PT.white,
+                    border: "none",
+                    borderRadius: 8,
+                    padding: "8px 14px",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  💾 Save Plan
+                </button>
+              </div>
+            )}
+            
             {/* Season Progress Bar */}
             <div style={{
               background: PT.card,
@@ -2199,7 +2270,7 @@ export default function ProgressTracker({
                   textTransform: "uppercase",
                   letterSpacing: "0.5px",
                 }}>
-                  Season 2026 Progress
+                  {selectedTeam} · Season 2026
                 </div>
                 <div style={{
                   fontSize: 12,
@@ -2435,12 +2506,26 @@ export default function ProgressTracker({
                               {sess.week} · {sess.date}
                             </div>
                           </div>
-                          <div style={{
-                            fontSize: 12,
-                            color: sess.status === "complete" ? "#166534" : sess.status === "current" ? "#92400e" : PT.muted,
-                          }}>
+                          {/* Tappable status button - cycles: upcoming → current → complete → upcoming */}
+                          <button
+                            onClick={() => {
+                              const nextStatus = sess.status === "upcoming" ? "current" 
+                                : sess.status === "current" ? "complete" 
+                                : "upcoming";
+                              handleMarkSessionStatus(sess.id, nextStatus);
+                            }}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              padding: "4px 8px",
+                              cursor: "pointer",
+                              fontSize: 14,
+                              color: sess.status === "complete" ? "#166534" : sess.status === "current" ? "#92400e" : PT.muted,
+                            }}
+                            title="Tap to change status"
+                          >
                             {sess.status === "complete" ? "✓" : sess.status === "current" ? "◉" : "○"}
-                          </div>
+                          </button>
                         </div>
                       ))}
                     </div>
