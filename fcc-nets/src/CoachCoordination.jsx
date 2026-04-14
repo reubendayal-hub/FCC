@@ -48,7 +48,7 @@ const PREDEFINED_COACH_COLORS = {
 };
 
 // Get coach color (predefined or generated)
-const getCoachColor = (name) => PREDEFINED_getCoachColor(name] || stringToColor(name);
+const getCoachColor = (name) => PREDEFINED_COACH_COLORS[name] || stringToColor(name);
 
 // Get short name (first name)
 const getShortName = (fullName) => {
@@ -746,7 +746,7 @@ export default function CoachCoordination({
                                   color: CC.text,
                                   marginBottom: 4,
                                 }}>
-                                  • <strong style={{ color: getCoachColor(match.conflictCoach] }}>
+                                  • <strong style={{ color: getCoachColor(match.conflictCoach) }}>
                                     {getShortName(match.conflictCoach)}
                                   </strong> playing: {match.label}
                                 </div>
@@ -1000,7 +1000,7 @@ export default function CoachCoordination({
                             {getShortName(match.conflictCoach)?.slice(0, 2).toUpperCase()}
                           </div>
                           <div style={{ fontSize: 11, color: CC.text }}>
-                            <strong style={{ color: getCoachColor(match.conflictCoach] }}>
+                            <strong style={{ color: getCoachColor(match.conflictCoach) }}>
                               {getShortName(match.conflictCoach)}
                             </strong>
                             {" playing "}
