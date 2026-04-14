@@ -1398,8 +1398,8 @@ function PlayerProgressCard({ player, snapshots, notes, currentPhase }) {
             Attendance
           </div>
           <AttendanceRing 
-            attended={player.sessionsAttended || 13} 
-            total={player.sessionsTotal || 18} 
+            attended={player.sessionsAttended || 0} 
+            total={player.sessionsTotal || 0} 
             size={70}
           />
           <div style={{
@@ -1408,7 +1408,7 @@ function PlayerProgressCard({ player, snapshots, notes, currentPhase }) {
             color: PT.text,
             marginTop: 8,
           }}>
-            {player.sessionsAttended || 13}/{player.sessionsTotal || 18}
+            {player.sessionsAttended || 0}/{player.sessionsTotal || 0}
           </div>
           <div style={{
             fontSize: 10,
