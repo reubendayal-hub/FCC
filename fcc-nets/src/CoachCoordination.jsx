@@ -26,25 +26,42 @@ const CC = {
   ok: "#10b981",
 };
 
-// Coach colors (matching original)
-const COACH_COLORS = {
+// Generate a consistent color from a name (for coaches not in predefined list)
+const stringToColor = (str) => {
+  if (!str) return "#8b8fa8";
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const colors = ["#3ecf8e", "#f59e0b", "#818cf8", "#38bdf8", "#f43f5e", "#a3e635", "#e879f9", "#fb923c", "#34d399"];
+  return colors[Math.abs(hash) % colors.length];
+};
+
+// Predefined coach colors (for known coaches)
+const PREDEFINED_COACH_COLORS = {
   "Zeb Pirzada": "#3ecf8e",
   "Rajesh Muthukumar": "#f59e0b",
   "Nitin Gupta": "#818cf8",
   "Aniket Sharma": "#38bdf8",
   "Reuben Dayal": "#f43f5e",
   "Arun Krishnamurthy": "#a3e635",
-  NA: "#8b8fa8",
 };
 
-// Short names for display
-const SHORT_NAMES = {
-  "Zeb Pirzada": "Zeb",
-  "Rajesh Muthukumar": "Rajesh",
-  "Nitin Gupta": "Nitin",
-  "Aniket Sharma": "Aniket",
-  "Reuben Dayal": "Reuben",
-  "Arun Krishnamurthy": "Arun",
+// Get coach color (predefined or generated)
+const getCoachColor = (name) => PREDEFINED_getCoachColor(name] || stringToColor(name);
+
+// Get short name (first name)
+const getShortName = (fullName) => {
+  if (!fullName) return "?";
+  return fullName.split(" ")[0];
+};
+
+// Get initials
+const getInitials = (fullName) => {
+  if (!fullName) return "??";
+  const parts = fullName.split(" ").filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return parts[0].slice(0, 2).toUpperCase();
 };
 
 // Team colors
@@ -58,6 +75,9 @@ const TEAM_COLORS = {
   Kvinder: "#e879f9",
   "Women's": "#e879f9",
   Mens: "#94a3b8",
+  "Div 2": "#f87171",
+  "Div 3": "#fb923c",
+  "Div 4": "#fbbf24",
   OB: "#a3e635",
 };
 
@@ -78,6 +98,7 @@ const DIVISION_COLORS = {
 };
 
 // Divisions each coach PLAYS IN (for conflict detection)
+// TODO: This could be stored on member records in Firestore
 const COACH_PLAYS_IN = {
   "Zeb Pirzada": ["Div 4", "OB"],
   "Rajesh Muthukumar": [], // plays at another club
@@ -87,30 +108,28 @@ const COACH_PLAYS_IN = {
   "Arun Krishnamurthy": ["Div 3", "T20 Serie 5", "OB"],
 };
 
-// Training sessions (outdoor season)
-const DEFAULT_SESSIONS_OUTDOOR = [
-  { id: "u11-sat", team: "U11", day: 5, time: "14:00–15:30", coach: "Reuben Dayal", coCoach: "Aniket Sharma", coCoach2: "Arun Krishnamurthy", venue: "Karlebo" },
-  { id: "u13-wed", team: "U13", day: 2, time: "16:30–18:00", coach: "Zeb Pirzada", venue: "Karlebo" },
-  { id: "u13-sat", team: "U13", day: 5, time: "14:00–15:30", coach: "Zeb Pirzada", venue: "Karlebo" },
-  { id: "u15-wed", team: "U15", day: 2, time: "16:30–18:00", coach: "Zeb Pirzada", venue: "Karlebo" },
-  { id: "u15-sat", team: "U15", day: 5, time: "15:30–17:00", coach: "Zeb Pirzada", venue: "Karlebo" },
-  { id: "kvinder-sat", team: "Kvinder", day: 5, time: "17:00–19:00", coach: "Rajesh Muthukumar", coCoach: "Arun Krishnamurthy", venue: "Karlebo" },
-  { id: "girls-fri", team: "U15 Girls", day: 4, time: "16:30–18:00", coach: "Rajesh Muthukumar", venue: "Karlebo" },
-  { id: "u19-wed", team: "U19", day: 2, time: "18:00–19:30", coach: "Rajesh Muthukumar", venue: "Karlebo" },
-  { id: "u19-fri", team: "U19", day: 4, time: "18:00–19:30", coach: "Rajesh Muthukumar", venue: "Karlebo" },
-  { id: "adults-tue", team: "Mens", day: 1, time: "17:00–19:00", coach: "NA", venue: "Karlebo" },
-  { id: "adults-thu", team: "Mens", day: 3, time: "17:00–19:00", coach: "NA", venue: "Karlebo" },
+// Training sessions templates (outdoor season)
+// These define the recurring schedule - coaches are pulled from teams data
+const SESSION_TEMPLATES_OUTDOOR = [
+  { id: "u11-sat", team: "U11", day: 5, time: "14:00–15:30", venue: "Karlebo" },
+  { id: "u13-wed", team: "U13", day: 2, time: "16:30–18:00", venue: "Karlebo" },
+  { id: "u13-sat", team: "U13", day: 5, time: "14:00–15:30", venue: "Karlebo" },
+  { id: "u15-wed", team: "U15", day: 2, time: "16:30–18:00", venue: "Karlebo" },
+  { id: "u15-sat", team: "U15", day: 5, time: "15:30–17:00", venue: "Karlebo" },
+  { id: "u15g-fri", team: "U15 Girls", day: 4, time: "16:30–18:00", venue: "Karlebo" },
+  { id: "kvinder-sat", team: "Kvinder", day: 5, time: "17:00–19:00", venue: "Karlebo" },
+  { id: "div3-tue", team: "Div 3", day: 1, time: "17:00–19:00", venue: "Karlebo", label: "Div 3 Training" },
+  { id: "div3-thu", team: "Div 3", day: 3, time: "17:00–19:00", venue: "Karlebo", label: "Div 3 Training" },
 ];
 
-const DEFAULT_SESSIONS_INDOOR = [
-  { id: "u11-sat", team: "U11", day: 5, time: "14:00–15:30", coach: "Reuben Dayal", coCoach: "Aniket Sharma", coCoach2: "Arun Krishnamurthy", venue: "Nivåhallen" },
-  { id: "u13-tue", team: "U13", day: 1, time: "16:30–18:00", coach: "Zeb Pirzada", venue: "Egedalshallen" },
-  { id: "u13-sat", team: "U13", day: 5, time: "14:00–15:30", coach: "Zeb Pirzada", venue: "Nivåhallen" },
-  { id: "u15-tue", team: "U15", day: 1, time: "16:30–18:00", coach: "Zeb Pirzada", venue: "Egedalshallen" },
-  { id: "u15-sat", team: "U15", day: 5, time: "15:30–17:00", coach: "Zeb Pirzada", venue: "Nivåhallen" },
-  { id: "kvinder-sat", team: "Kvinder", day: 5, time: "17:00–19:00", coach: "Rajesh Muthukumar", coCoach: "Arun Krishnamurthy", venue: "Nivåhallen" },
-  { id: "girls-fri", team: "U15 Girls", day: 4, time: "16:30–18:00", coach: "Rajesh Muthukumar", venue: "Nivåhallen" },
-  { id: "adults-sat", team: "Mens", day: 5, time: "18:00–22:00", coach: "NA", venue: "KB Hallen" },
+const SESSION_TEMPLATES_INDOOR = [
+  { id: "u11-sat", team: "U11", day: 5, time: "14:00–15:30", venue: "Nivåhallen" },
+  { id: "u13-tue", team: "U13", day: 1, time: "16:30–18:00", venue: "Egedalshallen" },
+  { id: "u13-sat", team: "U13", day: 5, time: "14:00–15:30", venue: "Nivåhallen" },
+  { id: "u15-tue", team: "U15", day: 1, time: "16:30–18:00", venue: "Egedalshallen" },
+  { id: "u15-sat", team: "U15", day: 5, time: "15:30–17:00", venue: "Nivåhallen" },
+  { id: "u15g-fri", team: "U15 Girls", day: 4, time: "16:30–18:00", venue: "Nivåhallen" },
+  { id: "kvinder-sat", team: "Kvinder", day: 5, time: "17:00–19:00", venue: "Nivåhallen" },
 ];
 
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -157,21 +176,46 @@ export default function CoachCoordination({
 }) {
   const [currentWeekStart, setCurrentWeekStart] = useState(() => getWeekStart(new Date()));
   const [currentMode, setCurrentMode] = useState("outdoor");
-  const [currentView, setCurrentView] = useState("schedule"); // schedule | matches | conflicts
+  const [currentView, setCurrentView] = useState("schedule"); // schedule | matches | conflicts | overview
   const [focusCoach, setFocusCoach] = useState(null);
   const [selectedSession, setSelectedSession] = useState(null);
+  const [reassignModal, setReassignModal] = useState(null); // {session, date, conflicts}
   
-  // Build coaches list from teams data
-  const coaches = useMemo(() => {
-    const coachSet = new Set();
+  // Build coaches list from teams data - filter out empty/null names
+  const coachesWithTeams = useMemo(() => {
+    const coachMap = new Map(); // name -> {name, teams: [], color}
     teams.forEach(t => {
-      (t.coaches || []).forEach(c => coachSet.add(c));
+      (t.coaches || []).forEach(c => {
+        if (!c || c.trim() === "" || c === "NA") return; // Skip empty names
+        if (!coachMap.has(c)) {
+          coachMap.set(c, { name: c, teams: [], color: getCoachColor(c) });
+        }
+        coachMap.get(c).teams.push(t.name);
+      });
     });
-    return Array.from(coachSet).filter(c => c && c !== "NA");
+    return Array.from(coachMap.values());
   }, [teams]);
   
-  // Sessions based on mode
-  const sessions = currentMode === "outdoor" ? DEFAULT_SESSIONS_OUTDOOR : DEFAULT_SESSIONS_INDOOR;
+  const coaches = coachesWithTeams.map(c => c.name);
+  
+  // Build sessions from templates, attaching coaches from teams data
+  const sessions = useMemo(() => {
+    const templates = currentMode === "outdoor" ? SESSION_TEMPLATES_OUTDOOR : SESSION_TEMPLATES_INDOOR;
+    
+    return templates.map(template => {
+      // Find the team to get its coaches
+      const team = teams.find(t => t.name === template.team);
+      const teamCoaches = team?.coaches?.filter(c => c && c.trim() !== "") || [];
+      
+      return {
+        ...template,
+        coach: teamCoaches[0] || null,
+        coCoach: teamCoaches[1] || null,
+        coCoach2: teamCoaches[2] || null,
+        label: template.label || `${template.team} Training`,
+      };
+    });
+  }, [currentMode, teams]);
   
   // Week days
   const weekDays = useMemo(() => {
@@ -219,7 +263,7 @@ export default function CoachCoordination({
     for (let d = 0; d < 7; d++) {
       const date = addDays(currentWeekStart, d);
       sessions.forEach(s => {
-        if (s.day === d) {
+        if (s.day === d && s.coach) { // Only check sessions with assigned coaches
           const cs = getConflictsForSession(s, date);
           if (cs.length > 0) {
             conflicts.push({ session: s, date, matches: cs });
@@ -239,9 +283,6 @@ export default function CoachCoordination({
   const toggleCoachFocus = (coach) => {
     setFocusCoach(focusCoach === coach ? null : coach);
   };
-  
-  // Get short name
-  const shortName = (fullName) => SHORT_NAMES[fullName] || fullName?.split(" ")[0] || fullName;
   
   // ─────────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -348,9 +389,11 @@ export default function CoachCoordination({
         background: CC.surface,
         borderBottom: `1px solid ${CC.border}`,
         padding: "0 16px",
+        overflowX: "auto",
       }}>
         {[
           { id: "schedule", label: "Schedule", icon: "📅" },
+          { id: "overview", label: "Overview", icon: "👥" },
           { id: "matches", label: "Matches", icon: "🏏" },
           { id: "conflicts", label: "Conflicts", icon: "⚠️", count: weekConflicts.length },
         ].map(tab => (
@@ -370,6 +413,7 @@ export default function CoachCoordination({
               display: "flex",
               alignItems: "center",
               gap: 6,
+              whiteSpace: "nowrap",
             }}
           >
             <span>{tab.icon}</span>
@@ -489,7 +533,7 @@ export default function CoachCoordination({
             </span>
             {coaches.map(coach => {
               const isActive = focusCoach === null || focusCoach === coach;
-              const color = COACH_COLORS[coach] || CC.muted;
+              const color = getCoachColor(coach) || CC.muted;
               return (
                 <button
                   key={coach}
@@ -508,7 +552,7 @@ export default function CoachCoordination({
                     opacity: isActive ? 1 : 0.5,
                   }}
                 >
-                  {shortName(coach)}
+                  {getShortName(coach)}
                 </button>
               );
             })}
@@ -588,8 +632,8 @@ export default function CoachCoordination({
                     {visibleSessions.map(session => {
                       const conflicts = getConflictsForSession(session, date);
                       const hasConflict = conflicts.length > 0;
-                      const teamColor = TEAM_COLORS[session.team] || CC.muted;
-                      const coachColor = COACH_COLORS[session.coach] || CC.muted;
+                      const teamColor = TEAM_COLORS[session.team) || CC.muted;
+                      const coachColor = getCoachColor(session.coach) || CC.muted;
                       
                       return (
                         <div
@@ -646,14 +690,14 @@ export default function CoachCoordination({
                                 color: "#fff",
                                 border: `2px solid ${CC.surface}`,
                               }}>
-                                {shortName(session.coach).slice(0, 2).toUpperCase()}
+                                {getShortName(session.coach).slice(0, 2).toUpperCase()}
                               </div>
                               {session.coCoach && (
                                 <div style={{
                                   width: 28,
                                   height: 28,
                                   borderRadius: "50%",
-                                  background: COACH_COLORS[session.coCoach] || CC.muted,
+                                  background: getCoachColor(session.coCoach) || CC.muted,
                                   display: "flex",
                                   alignItems: "center",
                                   justifyContent: "center",
@@ -663,7 +707,7 @@ export default function CoachCoordination({
                                   border: `2px solid ${CC.surface}`,
                                   marginLeft: -8,
                                 }}>
-                                  {shortName(session.coCoach).slice(0, 2).toUpperCase()}
+                                  {getShortName(session.coCoach).slice(0, 2).toUpperCase()}
                                 </div>
                               )}
                             </div>
@@ -702,8 +746,8 @@ export default function CoachCoordination({
                                   color: CC.text,
                                   marginBottom: 4,
                                 }}>
-                                  • <strong style={{ color: COACH_COLORS[match.conflictCoach] }}>
-                                    {shortName(match.conflictCoach)}
+                                  • <strong style={{ color: getCoachColor(match.conflictCoach] }}>
+                                    {getShortName(match.conflictCoach)}
                                   </strong> playing: {match.label}
                                 </div>
                               ))}
@@ -739,7 +783,7 @@ export default function CoachCoordination({
                             marginBottom: 2,
                           }}>
                             <span style={{
-                              color: DIVISION_COLORS[match.division] || CC.muted,
+                              color: DIVISION_COLORS[match.division) || CC.muted,
                               fontWeight: 600,
                             }}>
                               {match.division}
@@ -794,7 +838,7 @@ export default function CoachCoordination({
                   </div>
                   
                   {matches.map((match, i) => {
-                    const divColor = DIVISION_COLORS[match.division] || CC.muted;
+                    const divColor = DIVISION_COLORS[match.division) || CC.muted;
                     return (
                       <div key={i} style={{
                         padding: "10px 12px",
@@ -945,7 +989,7 @@ export default function CoachCoordination({
                             width: 24,
                             height: 24,
                             borderRadius: "50%",
-                            background: COACH_COLORS[match.conflictCoach] || CC.muted,
+                            background: getCoachColor(match.conflictCoach) || CC.muted,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -953,11 +997,11 @@ export default function CoachCoordination({
                             fontWeight: 700,
                             color: "#fff",
                           }}>
-                            {shortName(match.conflictCoach)?.slice(0, 2).toUpperCase()}
+                            {getShortName(match.conflictCoach)?.slice(0, 2).toUpperCase()}
                           </div>
                           <div style={{ fontSize: 11, color: CC.text }}>
-                            <strong style={{ color: COACH_COLORS[match.conflictCoach] }}>
-                              {shortName(match.conflictCoach)}
+                            <strong style={{ color: getCoachColor(match.conflictCoach] }}>
+                              {getShortName(match.conflictCoach)}
                             </strong>
                             {" playing "}
                             <span style={{ color: DIVISION_COLORS[match.division] }}>
@@ -974,7 +1018,462 @@ export default function CoachCoordination({
             )}
           </div>
         )}
+        
+        {/* OVERVIEW VIEW - Coach heatmap */}
+        {currentView === "overview" && (
+          <div>
+            <div style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: CC.muted,
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+              marginBottom: 16,
+            }}>
+              Coach Overview — This Week
+            </div>
+            
+            {coachesWithTeams.map(coachData => {
+              const coachName = coachData.name;
+              const coachColor = coachData.color;
+              
+              // Get sessions this coach is involved in
+              const coachSessions = sessions.filter(s => 
+                s.coach === coachName || s.coCoach === coachName || s.coCoach2 === coachName
+              );
+              
+              // Get conflicts for this coach this week
+              const coachConflicts = weekConflicts.filter(c => 
+                c.matches.some(m => m.conflictCoach === coachName)
+              );
+              
+              // Build day schedule
+              const daySchedule = [];
+              for (let d = 0; d < 7; d++) {
+                const daySessions = coachSessions.filter(s => s.day === d);
+                const hasConflict = coachConflicts.some(c => {
+                  const conflictDay = c.date.getDay();
+                  const adjustedDay = conflictDay === 0 ? 6 : conflictDay - 1;
+                  return adjustedDay === d;
+                });
+                daySchedule.push({ day: d, sessions: daySessions, hasConflict });
+              }
+              
+              return (
+                <div key={coachName} style={{
+                  background: CC.surface,
+                  border: `1px solid ${CC.border}`,
+                  borderRadius: 12,
+                  padding: "14px 16px",
+                  marginBottom: 12,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                    <div style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: "50%",
+                      background: coachColor,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "#fff",
+                    }}>
+                      {getInitials(coachName)}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: CC.text }}>
+                        {getShortName(coachName)}
+                      </div>
+                      <div style={{ fontSize: 11, color: CC.muted }}>
+                        {coachData.teams.join(" · ")}
+                      </div>
+                    </div>
+                    {coachConflicts.length > 0 && (
+                      <button
+                        onClick={() => setCurrentView("conflicts")}
+                        style={{
+                          padding: "6px 12px",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          background: CC.conflictBg,
+                          border: `1px solid ${CC.conflict}40`,
+                          color: CC.conflict,
+                          borderRadius: 6,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        {coachConflicts.length} conflict{coachConflicts.length > 1 ? "s" : ""} ▾
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Day heatmap */}
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {daySchedule.map(({ day, sessions: daySessions, hasConflict }) => (
+                      <div key={day} style={{ flex: 1, textAlign: "center" }}>
+                        <div style={{
+                          fontSize: 9,
+                          fontWeight: 600,
+                          color: CC.muted,
+                          marginBottom: 4,
+                        }}>
+                          {DAY_NAMES[day]}
+                        </div>
+                        <div style={{
+                          height: 6,
+                          borderRadius: 3,
+                          background: hasConflict ? CC.conflict :
+                                     daySessions.length > 0 ? coachColor :
+                                     CC.surface2,
+                        }} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            
+            {/* Conflicts summary for this week */}
+            {weekConflicts.length > 0 && (
+              <div style={{
+                marginTop: 20,
+                padding: "14px 16px",
+                background: CC.conflictBg,
+                border: `1px solid ${CC.conflict}40`,
+                borderRadius: 12,
+              }}>
+                <div style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: CC.conflict,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                  marginBottom: 10,
+                }}>
+                  Conflicts This Week
+                </div>
+                {weekConflicts.map((conflict, i) => (
+                  <div key={i} style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "8px 0",
+                    borderBottom: i < weekConflicts.length - 1 ? `1px solid ${CC.border}` : "none",
+                  }}>
+                    <div style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 6,
+                      background: `${TEAM_COLORS[conflict.session.team]}20`,
+                      border: `1.5px solid ${TEAM_COLORS[conflict.session.team]}`,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 8,
+                      fontWeight: 800,
+                      color: TEAM_COLORS[conflict.session.team],
+                    }}>
+                      {conflict.session.team}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: CC.text }}>
+                        {conflict.session.label}
+                      </div>
+                      <div style={{ fontSize: 10, color: CC.muted }}>
+                        {fmtDate(conflict.date)} · {conflict.matches.map(m => getShortName(m.conflictCoach)).join(", ")} on match duty
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setReassignModal({ 
+                        session: conflict.session, 
+                        date: conflict.date, 
+                        conflicts: conflict.matches 
+                      })}
+                      style={{
+                        padding: "4px 10px",
+                        fontSize: 10,
+                        fontWeight: 600,
+                        background: "transparent",
+                        border: `1px solid ${CC.gold}60`,
+                        color: CC.gold,
+                        borderRadius: 4,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      Reassign
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
+      
+      {/* Reassign Modal */}
+      {reassignModal && (
+        <div 
+          onClick={() => setReassignModal(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: 20,
+          }}
+        >
+          <div 
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: CC.surface,
+              borderRadius: 16,
+              padding: "24px",
+              maxWidth: 400,
+              width: "100%",
+              maxHeight: "80vh",
+              overflow: "auto",
+              border: `1px solid ${CC.goldBorder}`,
+            }}
+          >
+            <div style={{
+              fontSize: 16,
+              fontWeight: 700,
+              color: CC.text,
+              marginBottom: 4,
+            }}>
+              Reassign — {reassignModal.session.label}
+            </div>
+            <div style={{
+              fontSize: 12,
+              color: CC.muted,
+              marginBottom: 16,
+            }}>
+              {fmtDateFull(reassignModal.date)} · {reassignModal.session.time} · {reassignModal.session.venue}
+              <span style={{ color: CC.conflict, marginLeft: 8 }}>⚠ Match conflict!</span>
+            </div>
+            
+            {/* Current coach */}
+            <div style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: CC.muted,
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+              marginBottom: 8,
+            }}>
+              Current Coach
+            </div>
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "10px 12px",
+              background: CC.surface2,
+              borderRadius: 8,
+              marginBottom: 16,
+            }}>
+              <div style={{
+                width: 36,
+                height: 36,
+                borderRadius: "50%",
+                background: getCoachColor(reassignModal.session.coach),
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 12,
+                fontWeight: 700,
+                color: "#fff",
+              }}>
+                {getInitials(reassignModal.session.coach)}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: CC.text }}>
+                  {getShortName(reassignModal.session.coach)}
+                </div>
+                <div style={{ fontSize: 11, color: CC.muted }}>
+                  {reassignModal.session.team}
+                </div>
+              </div>
+              <span style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: CC.conflict,
+                background: CC.conflictBg,
+                padding: "4px 8px",
+                borderRadius: 4,
+              }}>
+                on match duty
+              </span>
+            </div>
+            
+            {/* Reassign to */}
+            <div style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: CC.muted,
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+              marginBottom: 8,
+            }}>
+              Reassign To
+            </div>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 8,
+              marginBottom: 16,
+            }}>
+              {coachesWithTeams.map(c => {
+                const isOnMatchDuty = reassignModal.conflicts.some(m => 
+                  (COACH_PLAYS_IN[c.name] || []).includes(m.division)
+                );
+                const isCurrentCoach = c.name === reassignModal.session.coach;
+                
+                return (
+                  <button
+                    key={c.name}
+                    disabled={isCurrentCoach}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "10px 12px",
+                      background: isCurrentCoach ? CC.surface2 : CC.surface2,
+                      border: `1.5px solid ${isCurrentCoach ? CC.border : CC.border}`,
+                      borderRadius: 8,
+                      cursor: isCurrentCoach ? "not-allowed" : "pointer",
+                      opacity: isCurrentCoach ? 0.5 : 1,
+                      fontFamily: "inherit",
+                      textAlign: "left",
+                    }}
+                  >
+                    <div style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: "50%",
+                      background: c.color,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "#fff",
+                    }}>
+                      {getInitials(c.name)}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: CC.text }}>
+                        {getShortName(c.name)}
+                      </div>
+                      <div style={{ fontSize: 10, color: CC.muted }}>
+                        {c.teams.slice(0, 2).join(", ")}
+                      </div>
+                    </div>
+                    {isOnMatchDuty && (
+                      <span style={{
+                        fontSize: 8,
+                        fontWeight: 600,
+                        color: CC.warn,
+                        background: CC.warnBg,
+                        padding: "2px 6px",
+                        borderRadius: 4,
+                      }}>
+                        match day
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            
+            {/* Match conflicts on this day */}
+            <div style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: CC.muted,
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+              marginBottom: 8,
+            }}>
+              Match Conflicts On This Day
+            </div>
+            <div style={{
+              background: CC.surface2,
+              borderRadius: 8,
+              padding: "10px 12px",
+              marginBottom: 16,
+            }}>
+              {reassignModal.conflicts.map((match, i) => (
+                <div key={i} style={{
+                  fontSize: 11,
+                  color: CC.text,
+                  marginBottom: i < reassignModal.conflicts.length - 1 ? 6 : 0,
+                }}>
+                  <span style={{ color: DIVISION_COLORS[match.division] }}>
+                    {match.division}
+                  </span>: {match.label.replace(match.division + " ", "")}
+                </div>
+              ))}
+            </div>
+            
+            <div style={{
+              fontSize: 11,
+              color: CC.muted,
+              fontStyle: "italic",
+              marginBottom: 16,
+            }}>
+              💡 Reassignments will update the training session for this date only.
+            </div>
+            
+            {/* Actions */}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setReassignModal(null)}
+                style={{
+                  padding: "10px 16px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  background: "transparent",
+                  border: `1px solid ${CC.border}`,
+                  color: CC.muted,
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  // TODO: Save reassignment to Firestore
+                  setReassignModal(null);
+                  // Show toast
+                }}
+                style={{
+                  padding: "10px 20px",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  background: `${CC.ok}20`,
+                  border: `1.5px solid ${CC.ok}`,
+                  color: CC.ok,
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                Confirm reassign
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
