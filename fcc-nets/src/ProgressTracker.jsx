@@ -1595,6 +1595,7 @@ export default function ProgressTracker({
   trainingSessions,
   currentUser,
   userRole,
+  initialScreen = "attendance", // Can be "attendance", "phases", "plan", etc.
   onBack,
   onSaveNote,
   onSaveAttendance,
@@ -1604,11 +1605,17 @@ export default function ProgressTracker({
   onEditSession,
   onSaveSeasonPlan, // Callback to save plan: (teamName, plan) => void
 }) {
-  const [activeScreen, setActiveScreen] = useState("attendance"); // attendance | plan | phases | note | progress | report
+  const [activeScreen, setActiveScreen] = useState(initialScreen); // attendance | plan | phases | note | progress | report
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [attendance, setAttendance] = useState({});
   const [selectedTeam, setSelectedTeam] = useState(teams[0] || "all"); // Team filter
   const [expandedPhases, setExpandedPhases] = useState({}); // {phaseId: true/false} for collapsible phases
+  
+  // Editing state
+  const [editingSession, setEditingSession] = useState(null); // Session being edited
+  const [editingPhase, setEditingPhase] = useState(null); // Phase being edited
+  const [sessionDraft, setSessionDraft] = useState({}); // Draft values for session edit
+  const [phaseDraft, setPhaseDraft] = useState({}); // Draft values for phase edit
   
   // Filter players by selected team
   const filteredPlayers = useMemo(() => {
@@ -1634,6 +1641,53 @@ export default function ProgressTracker({
   // Toggle phase expansion
   const togglePhaseExpanded = (phaseId) => {
     setExpandedPhases(prev => ({ ...prev, [phaseId]: !prev[phaseId] }));
+  };
+  
+  // Start editing a session
+  const startEditSession = (sess) => {
+    setEditingSession(sess.id);
+    setSessionDraft({
+      title: sess.title,
+      date: sess.date,
+      pillar: sess.pillar,
+      week: sess.week,
+    });
+  };
+  
+  // Save session edit
+  const saveSessionEdit = (sessionId) => {
+    handleUpdateSession(sessionId, sessionDraft);
+    setEditingSession(null);
+    setSessionDraft({});
+  };
+  
+  // Cancel session edit
+  const cancelSessionEdit = () => {
+    setEditingSession(null);
+    setSessionDraft({});
+  };
+  
+  // Start editing a phase
+  const startEditPhase = (phase) => {
+    setEditingPhase(phase.id);
+    setPhaseDraft({
+      name: phase.name,
+      dates: phase.dates,
+      focus: phase.focus,
+    });
+  };
+  
+  // Save phase edit
+  const savePhaseEdit = (phaseId) => {
+    handleUpdatePhase(phaseId, phaseDraft);
+    setEditingPhase(null);
+    setPhaseDraft({});
+  };
+  
+  // Cancel phase edit
+  const cancelPhaseEdit = () => {
+    setEditingPhase(null);
+    setPhaseDraft({});
   };
   
   const handleToggleAttendance = (playerId, value) => {
@@ -2049,6 +2103,64 @@ export default function ProgressTracker({
     }
   };
   
+  // Handler to update a phase in the plan
+  const handleUpdatePhase = (phaseId, updates) => {
+    const updatedPlan = {
+      ...selectedPlan,
+      phases: selectedPlan.phases.map(phase => 
+        phase.id === phaseId ? { ...phase, ...updates } : phase
+      ),
+    };
+    if (onSaveSeasonPlan && selectedTeam && selectedTeam !== "all") {
+      onSaveSeasonPlan(selectedTeam, updatedPlan);
+    }
+  };
+  
+  // Handler to add a new session to a phase
+  const handleAddSession = (phaseId) => {
+    const phase = selectedPlan.phases.find(p => p.id === phaseId);
+    if (!phase) return;
+    
+    const newSession = {
+      id: `${selectedTeam.toLowerCase().replace(/\s/g, "")}-${phaseId}-new-${Date.now()}`,
+      title: "New Session",
+      pillar: "cricketIQ",
+      week: `Week ${phase.sessions.length + 1}`,
+      date: new Date().toISOString().split("T")[0],
+      status: "upcoming",
+    };
+    
+    const updatedPlan = {
+      ...selectedPlan,
+      phases: selectedPlan.phases.map(p => 
+        p.id === phaseId 
+          ? { ...p, sessions: [...p.sessions, newSession] }
+          : p
+      ),
+    };
+    
+    if (onSaveSeasonPlan && selectedTeam && selectedTeam !== "all") {
+      onSaveSeasonPlan(selectedTeam, updatedPlan);
+    }
+    
+    // Start editing the new session immediately
+    startEditSession(newSession);
+  };
+  
+  // Handler to delete a session
+  const handleDeleteSession = (sessionId) => {
+    const updatedPlan = {
+      ...selectedPlan,
+      phases: selectedPlan.phases.map(phase => ({
+        ...phase,
+        sessions: phase.sessions.filter(sess => sess.id !== sessionId),
+      })),
+    };
+    if (onSaveSeasonPlan && selectedTeam && selectedTeam !== "all") {
+      onSaveSeasonPlan(selectedTeam, updatedPlan);
+    }
+  };
+  
   // Handler to mark session status
   const handleMarkSessionStatus = (sessionId, status) => {
     handleUpdateSession(sessionId, { status });
@@ -2404,56 +2516,171 @@ export default function ProgressTracker({
                   padding: "14px 16px",
                   marginBottom: 12,
                 }}>
-                  {/* Phase header */}
-                  <div style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: 10,
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 8,
-                        background: isComplete ? "#dcfce7" : isCurrent ? PT.gold : PT.bg,
-                        border: `1.5px solid ${isComplete ? "#86efac" : isCurrent ? "#b8860b" : PT.border}`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 14,
-                        fontWeight: 800,
-                        color: isComplete ? "#166534" : isCurrent ? "#412402" : PT.muted,
-                      }}>
-                        {isComplete ? "✓" : idx + 1}
-                      </div>
-                      <div>
-                        <div style={{
-                          fontSize: 14,
-                          fontWeight: 700,
-                          color: PT.text,
-                        }}>
-                          {phase.name}
-                        </div>
-                        <div style={{
-                          fontSize: 11,
-                          color: PT.muted,
-                        }}>
-                          {phase.dates} · {phase.weeks} weeks
-                        </div>
-                      </div>
-                    </div>
+                  {/* Phase header - editable */}
+                  {editingPhase === phase.id ? (
+                    /* Edit mode for phase */
                     <div style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: isComplete ? "#166534" : isCurrent ? "#92400e" : PT.muted,
-                      background: isComplete ? "#dcfce7" : isCurrent ? "#fef3c7" : PT.bg,
-                      padding: "4px 10px",
-                      borderRadius: 12,
+                      background: "#f0f9ff",
+                      border: "1.5px solid #bae6fd",
+                      borderRadius: 10,
+                      padding: "12px",
+                      marginBottom: 10,
                     }}>
-                      {completedCount}/{phase.sessions.length}
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={{ fontSize: 10, fontWeight: 700, color: PT.muted, display: "block", marginBottom: 4 }}>
+                          Phase Name
+                        </label>
+                        <input
+                          type="text"
+                          value={phaseDraft.name || ""}
+                          onChange={(e) => setPhaseDraft(d => ({ ...d, name: e.target.value }))}
+                          style={{
+                            width: "100%",
+                            padding: "8px 10px",
+                            fontSize: 13,
+                            border: `1px solid ${PT.border}`,
+                            borderRadius: 6,
+                            fontFamily: "inherit",
+                            boxSizing: "border-box",
+                          }}
+                        />
+                      </div>
+                      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ fontSize: 10, fontWeight: 700, color: PT.muted, display: "block", marginBottom: 4 }}>
+                            Date Range
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Apr 6 – May 17"
+                            value={phaseDraft.dates || ""}
+                            onChange={(e) => setPhaseDraft(d => ({ ...d, dates: e.target.value }))}
+                            style={{
+                              width: "100%",
+                              padding: "8px 10px",
+                              fontSize: 12,
+                              border: `1px solid ${PT.border}`,
+                              borderRadius: 6,
+                              fontFamily: "inherit",
+                              boxSizing: "border-box",
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={{ fontSize: 10, fontWeight: 700, color: PT.muted, display: "block", marginBottom: 4 }}>
+                          Focus / Goal
+                        </label>
+                        <input
+                          type="text"
+                          value={phaseDraft.focus || ""}
+                          onChange={(e) => setPhaseDraft(d => ({ ...d, focus: e.target.value }))}
+                          style={{
+                            width: "100%",
+                            padding: "8px 10px",
+                            fontSize: 12,
+                            border: `1px solid ${PT.border}`,
+                            borderRadius: 6,
+                            fontFamily: "inherit",
+                            boxSizing: "border-box",
+                          }}
+                        />
+                      </div>
+                      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                        <button
+                          onClick={cancelPhaseEdit}
+                          style={{
+                            padding: "8px 12px",
+                            fontSize: 11,
+                            fontWeight: 600,
+                            background: PT.white,
+                            color: PT.muted,
+                            border: `1px solid ${PT.border}`,
+                            borderRadius: 6,
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => savePhaseEdit(phase.id)}
+                          style={{
+                            padding: "8px 14px",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            background: PT.navy,
+                            color: PT.white,
+                            border: "none",
+                            borderRadius: 6,
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          ✓ Save Phase
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    /* View mode for phase header */
+                    <div 
+                      onClick={() => startEditPhase(phase)}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: 10,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 8,
+                          background: isComplete ? "#dcfce7" : isCurrent ? PT.gold : PT.bg,
+                          border: `1.5px solid ${isComplete ? "#86efac" : isCurrent ? "#b8860b" : PT.border}`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 14,
+                          fontWeight: 800,
+                          color: isComplete ? "#166534" : isCurrent ? "#412402" : PT.muted,
+                        }}>
+                          {isComplete ? "✓" : idx + 1}
+                        </div>
+                        <div>
+                          <div style={{
+                            fontSize: 14,
+                            fontWeight: 700,
+                            color: PT.text,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                          }}>
+                            {phase.name}
+                            <span style={{ fontSize: 10, color: PT.muted }}>✏️</span>
+                          </div>
+                          <div style={{
+                            fontSize: 11,
+                            color: PT.muted,
+                          }}>
+                            {phase.dates} · {phase.weeks} weeks
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: isComplete ? "#166534" : isCurrent ? "#92400e" : PT.muted,
+                        background: isComplete ? "#dcfce7" : isCurrent ? "#fef3c7" : PT.bg,
+                        padding: "4px 10px",
+                        borderRadius: 12,
+                      }}>
+                        {completedCount}/{phase.sessions.length}
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Focus - tappable to expand/collapse */}
                   <button
@@ -2494,64 +2721,221 @@ export default function ProgressTracker({
                       gap: 6,
                     }}>
                       {phase.sessions.map(sess => (
-                        <div key={sess.id} style={{
+                        editingSession === sess.id ? (
+                          /* Edit mode for session */
+                          <div key={sess.id} style={{
+                            padding: "12px",
+                            borderRadius: 10,
+                            background: "#fef3c7",
+                            border: "1.5px solid #fde68a",
+                          }}>
+                            <div style={{ marginBottom: 10 }}>
+                              <label style={{ fontSize: 10, fontWeight: 700, color: PT.muted, display: "block", marginBottom: 4 }}>
+                                Session Title
+                              </label>
+                              <input
+                                type="text"
+                                value={sessionDraft.title || ""}
+                                onChange={(e) => setSessionDraft(d => ({ ...d, title: e.target.value }))}
+                                style={{
+                                  width: "100%",
+                                  padding: "8px 10px",
+                                  fontSize: 13,
+                                  border: `1px solid ${PT.border}`,
+                                  borderRadius: 6,
+                                  fontFamily: "inherit",
+                                  boxSizing: "border-box",
+                                }}
+                              />
+                            </div>
+                            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                              <div style={{ flex: 1 }}>
+                                <label style={{ fontSize: 10, fontWeight: 700, color: PT.muted, display: "block", marginBottom: 4 }}>
+                                  Date
+                                </label>
+                                <input
+                                  type="date"
+                                  value={sessionDraft.date || ""}
+                                  onChange={(e) => setSessionDraft(d => ({ ...d, date: e.target.value }))}
+                                  style={{
+                                    width: "100%",
+                                    padding: "8px 10px",
+                                    fontSize: 12,
+                                    border: `1px solid ${PT.border}`,
+                                    borderRadius: 6,
+                                    fontFamily: "inherit",
+                                    boxSizing: "border-box",
+                                  }}
+                                />
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <label style={{ fontSize: 10, fontWeight: 700, color: PT.muted, display: "block", marginBottom: 4 }}>
+                                  Pillar
+                                </label>
+                                <select
+                                  value={sessionDraft.pillar || "cricketIQ"}
+                                  onChange={(e) => setSessionDraft(d => ({ ...d, pillar: e.target.value }))}
+                                  style={{
+                                    width: "100%",
+                                    padding: "8px 10px",
+                                    fontSize: 12,
+                                    border: `1px solid ${PT.border}`,
+                                    borderRadius: 6,
+                                    fontFamily: "inherit",
+                                    boxSizing: "border-box",
+                                    background: PT.white,
+                                  }}
+                                >
+                                  <option value="batting">🏏 Batting</option>
+                                  <option value="bowling">🎯 Bowling</option>
+                                  <option value="fielding">🧤 Fielding</option>
+                                  <option value="wicketKeeping">🥅 Wicket Keeping</option>
+                                  <option value="cricketIQ">🧠 Cricket IQ</option>
+                                </select>
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                              <button
+                                onClick={() => handleDeleteSession(sess.id)}
+                                style={{
+                                  padding: "8px 12px",
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  background: "#fef2f2",
+                                  color: "#dc2626",
+                                  border: "1px solid #fecaca",
+                                  borderRadius: 6,
+                                  cursor: "pointer",
+                                  fontFamily: "inherit",
+                                }}
+                              >
+                                🗑️ Delete
+                              </button>
+                              <button
+                                onClick={cancelSessionEdit}
+                                style={{
+                                  padding: "8px 12px",
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  background: PT.white,
+                                  color: PT.muted,
+                                  border: `1px solid ${PT.border}`,
+                                  borderRadius: 6,
+                                  cursor: "pointer",
+                                  fontFamily: "inherit",
+                                }}
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={() => saveSessionEdit(sess.id)}
+                                style={{
+                                  padding: "8px 14px",
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  background: PT.navy,
+                                  color: PT.white,
+                                  border: "none",
+                                  borderRadius: 6,
+                                  cursor: "pointer",
+                                  fontFamily: "inherit",
+                                }}
+                              >
+                                ✓ Save
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          /* View mode for session - tap to edit */
+                          <div 
+                            key={sess.id} 
+                            onClick={() => startEditSession(sess)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                              padding: "8px 10px",
+                              borderRadius: 8,
+                              background: sess.status === "current" ? "#fef3c7" : sess.status === "complete" ? "#f0fdf4" : PT.bg,
+                              border: sess.status === "current" ? "1.5px solid #fde68a" : "1px solid transparent",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <div style={{
+                              width: 22,
+                              height: 22,
+                              borderRadius: 6,
+                              background: PILLARS[sess.pillar]?.bg || PT.navy,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: 11,
+                            }}>
+                              {PILLARS[sess.pillar]?.icon || "🏏"}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: PT.text,
+                              }}>
+                                {sess.title}
+                              </div>
+                              <div style={{
+                                fontSize: 10,
+                                color: PT.muted,
+                              }}>
+                                {sess.week} · {sess.date}
+                              </div>
+                            </div>
+                            {/* Status indicator */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation(); // Don't trigger edit
+                                const nextStatus = sess.status === "upcoming" ? "current" 
+                                  : sess.status === "current" ? "complete" 
+                                  : "upcoming";
+                                handleMarkSessionStatus(sess.id, nextStatus);
+                              }}
+                              style={{
+                                background: "none",
+                                border: "none",
+                                padding: "4px 8px",
+                                cursor: "pointer",
+                                fontSize: 14,
+                                color: sess.status === "complete" ? "#166534" : sess.status === "current" ? "#92400e" : PT.muted,
+                              }}
+                              title="Tap to change status"
+                            >
+                              {sess.status === "complete" ? "✓" : sess.status === "current" ? "◉" : "○"}
+                            </button>
+                            {/* Edit hint */}
+                            <span style={{ fontSize: 10, color: PT.muted }}>✏️</span>
+                          </div>
+                        )
+                      ))}
+                      
+                      {/* Add session button */}
+                      <button
+                        onClick={() => handleAddSession(phase.id)}
+                        style={{
                           display: "flex",
                           alignItems: "center",
-                          gap: 10,
-                          padding: "8px 10px",
+                          justifyContent: "center",
+                          gap: 6,
+                          padding: "10px",
                           borderRadius: 8,
-                          background: sess.status === "current" ? "#fef3c7" : sess.status === "complete" ? "#f0fdf4" : PT.bg,
-                          border: sess.status === "current" ? "1.5px solid #fde68a" : "1px solid transparent",
-                        }}>
-                          <div style={{
-                            width: 22,
-                            height: 22,
-                            borderRadius: 6,
-                            background: PILLARS[sess.pillar]?.bg || PT.navy,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontSize: 11,
-                          }}>
-                            {PILLARS[sess.pillar]?.icon || "🏏"}
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <div style={{
-                              fontSize: 12,
-                              fontWeight: 600,
-                              color: PT.text,
-                            }}>
-                              {sess.title}
-                            </div>
-                            <div style={{
-                              fontSize: 10,
-                              color: PT.muted,
-                            }}>
-                              {sess.week} · {sess.date}
-                            </div>
-                          </div>
-                          {/* Tappable status button - cycles: upcoming → current → complete → upcoming */}
-                          <button
-                            onClick={() => {
-                              const nextStatus = sess.status === "upcoming" ? "current" 
-                                : sess.status === "current" ? "complete" 
-                                : "upcoming";
-                              handleMarkSessionStatus(sess.id, nextStatus);
-                            }}
-                            style={{
-                              background: "none",
-                              border: "none",
-                              padding: "4px 8px",
-                              cursor: "pointer",
-                              fontSize: 14,
-                              color: sess.status === "complete" ? "#166534" : sess.status === "current" ? "#92400e" : PT.muted,
-                            }}
-                            title="Tap to change status"
-                          >
-                            {sess.status === "complete" ? "✓" : sess.status === "current" ? "◉" : "○"}
-                          </button>
-                        </div>
-                      ))}
+                          background: PT.bg,
+                          border: `1.5px dashed ${PT.border}`,
+                          cursor: "pointer",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: PT.muted,
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        + Add Session
+                      </button>
                     </div>
                   )}
                 </div>
