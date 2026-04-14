@@ -1491,6 +1491,7 @@ function SeasonReport({ player, report }) {
 export default function ProgressTracker({
   session,
   players,
+  teams = [], // Array of team names the coach has access to
   trainingSessions,
   currentUser,
   userRole,
@@ -1505,18 +1506,26 @@ export default function ProgressTracker({
   const [activeScreen, setActiveScreen] = useState("attendance"); // attendance | plan | note | progress | report
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [attendance, setAttendance] = useState({});
+  const [selectedTeam, setSelectedTeam] = useState(teams[0] || "all"); // Team filter
+  
+  // Filter players by selected team
+  const filteredPlayers = useMemo(() => {
+    if (!players) return [];
+    if (selectedTeam === "all") return players;
+    return players.filter(p => p.team === selectedTeam || (p.teams || []).includes(selectedTeam));
+  }, [players, selectedTeam]);
   
   // Initialize attendance from session data
   useEffect(() => {
     if (session?.attendance) {
       setAttendance(session.attendance);
-    } else if (players) {
+    } else if (filteredPlayers) {
       // Default all to null (not marked)
       const initial = {};
-      players.forEach(p => { initial[p.id] = null; });
+      filteredPlayers.forEach(p => { initial[p.id] = null; });
       setAttendance(initial);
     }
-  }, [session, players]);
+  }, [session, filteredPlayers]);
   
   const isCoach = userRole === "admin" || userRole === "coach";
   
@@ -1636,6 +1645,59 @@ export default function ProgressTracker({
             {currentTitle.sub}
           </div>
         </div>
+        
+        {/* Team filter pills */}
+        {teams.length > 1 && (
+          <div style={{
+            display: "flex",
+            gap: 6,
+            marginTop: 12,
+            overflowX: "auto",
+            paddingBottom: 2,
+          }}>
+            {(teams.length > 2 ? ["all", ...teams] : teams).map(team => {
+              const isActive = selectedTeam === team;
+              const label = team === "all" ? "All Teams" : team;
+              const count = team === "all" 
+                ? players?.length || 0
+                : (players || []).filter(p => p.team === team || (p.teams || []).includes(team)).length;
+              
+              return (
+                <button
+                  key={team}
+                  onClick={() => setSelectedTeam(team)}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 16,
+                    border: isActive ? "none" : "1px solid rgba(255,255,255,0.25)",
+                    background: isActive 
+                      ? "linear-gradient(180deg, #fcd34d 0%, #f59e0b 100%)"
+                      : "rgba(255,255,255,0.1)",
+                    color: isActive ? "#1B2A5C" : "rgba(255,255,255,0.8)",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    whiteSpace: "nowrap",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  {label}
+                  <span style={{
+                    background: isActive ? "rgba(27,42,92,0.2)" : "rgba(255,255,255,0.2)",
+                    padding: "2px 6px",
+                    borderRadius: 10,
+                    fontSize: 10,
+                  }}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
       
       {/* Content */}
@@ -1643,7 +1705,7 @@ export default function ProgressTracker({
         {activeScreen === "attendance" && (
           <MarkAttendance
             session={session}
-            players={players || []}
+            players={filteredPlayers}
             attendance={attendance}
             onToggleAttendance={handleToggleAttendance}
             onSaveAttendance={handleSaveAttendance}
@@ -1721,9 +1783,9 @@ export default function ProgressTracker({
               key={nav.id}
               onClick={() => {
                 if (!isDisabled) {
-                  if ((nav.id === "progress" || nav.id === "note" || nav.id === "report") && !selectedPlayer && players?.length > 0) {
+                  if ((nav.id === "progress" || nav.id === "note" || nav.id === "report") && !selectedPlayer && filteredPlayers?.length > 0) {
                     // Auto-select first player if none selected
-                    setSelectedPlayer(players[0]);
+                    setSelectedPlayer(filteredPlayers[0]);
                   }
                   setActiveScreen(nav.id);
                 }
