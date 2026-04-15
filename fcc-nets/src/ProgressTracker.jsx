@@ -788,8 +788,24 @@ function MarkAttendance({
                 style={{ flex: 1, cursor: "pointer" }}
                 onClick={() => onSelectPlayer?.(player)}
               >
-                <div style={{ fontSize: 13, fontWeight: 600, color: PT.text }}>
-                  {player.name}
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: PT.text }}>
+                    {player.name}
+                  </span>
+                  {/* Batting/Bowling hand indicators */}
+                  {(player.battingHand || player.bowlingHand) && (
+                    <span style={{
+                      fontSize: 9,
+                      color: PT.muted,
+                      background: PT.bg,
+                      padding: "1px 5px",
+                      borderRadius: 4,
+                      fontWeight: 600,
+                    }}>
+                      {player.battingHand === "left" ? "L" : "R"}
+                      {player.bowlingHand && `/${player.bowlingHand === "left" ? "L" : "R"}`}
+                    </span>
+                  )}
                 </div>
                 {player.lastNote && (
                   <div style={{ fontSize: 11, color: PT.muted, marginTop: 2 }}>
@@ -1319,7 +1335,7 @@ function PlayerProgressCard({ player, snapshots, notes, currentPhase }) {
         background: PT.card,
         border: `1px solid ${PT.border}`,
         borderRadius: 14,
-        marginBottom: 16,
+        marginBottom: 12,
       }}>
         <PlayerAvatar 
           name={player.name} 
@@ -1342,6 +1358,71 @@ function PlayerProgressCard({ player, snapshots, notes, currentPhase }) {
             {player.team || "U11"} · Season 2026 · Focus: {player.focus || "All-round"}
           </div>
         </div>
+      </div>
+      
+      {/* Player attributes row */}
+      <div style={{
+        display: "flex",
+        gap: 8,
+        marginBottom: 16,
+        flexWrap: "wrap",
+      }}>
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          background: PT.card,
+          border: `1px solid ${PT.border}`,
+          borderRadius: 8,
+          padding: "8px 12px",
+        }}>
+          <span style={{ fontSize: 14 }}>🏏</span>
+          <div>
+            <div style={{ fontSize: 9, color: PT.muted, fontWeight: 600, textTransform: "uppercase" }}>Batting</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: PT.text }}>
+              {player.battingHand === "left" ? "Left-handed" : "Right-handed"}
+            </div>
+          </div>
+        </div>
+        
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          background: PT.card,
+          border: `1px solid ${PT.border}`,
+          borderRadius: 8,
+          padding: "8px 12px",
+        }}>
+          <span style={{ fontSize: 14 }}>⚾</span>
+          <div>
+            <div style={{ fontSize: 9, color: PT.muted, fontWeight: 600, textTransform: "uppercase" }}>Bowling</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: PT.text }}>
+              {player.bowlingHand === "left" ? "Left-arm" : "Right-arm"}
+              {player.bowlingStyle && ` ${player.bowlingStyle}`}
+            </div>
+          </div>
+        </div>
+        
+        {player.parentName && (
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            background: "#f0f9ff",
+            border: "1px solid #bae6fd",
+            borderRadius: 8,
+            padding: "8px 12px",
+          }}>
+            <span style={{ fontSize: 14 }}>👤</span>
+            <div>
+              <div style={{ fontSize: 9, color: "#0369a1", fontWeight: 600, textTransform: "uppercase" }}>Parent</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#0c4a6e" }}>
+                {player.parentName}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       
       {/* Two-column layout: Radar + Attendance */}
