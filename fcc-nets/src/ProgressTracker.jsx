@@ -1648,6 +1648,7 @@ function PlayerDetailView({
   onBack,
   onSaveAttributes,
   onAddNote,
+  onSaveSkills,
   isCoach = false,
 }) {
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -1657,6 +1658,10 @@ function PlayerDetailView({
     bowlingHand: player.bowlingHand || "right",
     bowlingStyle: player.bowlingStyle || "",
   });
+  
+  // Skill editing state
+  const [isEditingSkills, setIsEditingSkills] = useState(false);
+  const [skillsDraft, setSkillsDraft] = useState({});
   
   // All players can edit attributes
   const canEditAttributes = true;
@@ -2046,17 +2051,44 @@ function PlayerDetailView({
             alignItems: "center",
           }}>
             <div style={{
-              fontSize: 10,
-              fontWeight: 700,
-              color: PT.subtle,
-              textTransform: "uppercase",
-              letterSpacing: "0.5px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              width: "100%",
               marginBottom: 12,
-              alignSelf: "flex-start",
             }}>
-              Current Skill Profile
+              <div style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: PT.subtle,
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+              }}>
+                Current Skill Profile
+              </div>
+              {isCoach && !isEditingSkills && (
+                <button
+                  onClick={() => {
+                    setIsEditingSkills(true);
+                    setSkillsDraft({...currentSkills});
+                  }}
+                  style={{
+                    padding: "4px 10px",
+                    fontSize: 10,
+                    fontWeight: 600,
+                    background: PT.cream,
+                    border: `1px solid ${PT.gold}40`,
+                    color: "#7A5500",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  ✏️ Edit Skills
+                </button>
+              )}
             </div>
-            <RadarChart data={currentSkills} size={180} />
+            <RadarChart data={isEditingSkills ? skillsDraft : currentSkills} size={180} />
           </div>
           
           {/* Pillar breakdown */}
@@ -2074,10 +2106,10 @@ function PlayerDetailView({
               letterSpacing: "0.5px",
               marginBottom: 12,
             }}>
-              Skills Breakdown
+              Skills Breakdown {isEditingSkills && <span style={{color: PT.gold}}>— Editing</span>}
             </div>
             {PILLARS.map(pillar => {
-              const level = currentSkills[pillar.id] || 1;
+              const level = isEditingSkills ? (skillsDraft[pillar.id] || 1) : (currentSkills[pillar.id] || 1);
               const style = getSkillStyle(level);
               return (
                 <div key={pillar.id} style={{
@@ -2093,19 +2125,137 @@ function PlayerDetailView({
                       {pillar.name}
                     </div>
                   </div>
-                  <span style={{
-                    padding: "4px 10px",
-                    fontSize: 10,
-                    fontWeight: 700,
-                    background: style.bg,
-                    color: style.text,
-                    borderRadius: 6,
-                  }}>
-                    {style.label}
-                  </span>
+                  {isEditingSkills ? (
+                    <div style={{ display: "flex", gap: 4 }}>
+                      {[1, 2, 3, 4].map(lvl => {
+                        const lvlStyle = getSkillStyle(lvl);
+                        const isSelected = level === lvl;
+                        return (
+                          <button
+                            key={lvl}
+                            onClick={() => setSkillsDraft(prev => ({...prev, [pillar.id]: lvl}))}
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 6,
+                              border: isSelected ? `2px solid ${lvlStyle.text}` : `1px solid ${PT.border}`,
+                              background: isSelected ? lvlStyle.bg : PT.bg,
+                              color: isSelected ? lvlStyle.text : PT.muted,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              fontFamily: "inherit",
+                            }}
+                            title={lvlStyle.label}
+                          >
+                            {lvl}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <span style={{
+                      padding: "4px 10px",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      background: style.bg,
+                      color: style.text,
+                      borderRadius: 6,
+                    }}>
+                      {style.label}
+                    </span>
+                  )}
                 </div>
               );
             })}
+            
+            {/* Save/Cancel buttons when editing */}
+            {isEditingSkills && (
+              <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+                <button
+                  onClick={() => setIsEditingSkills(false)}
+                  style={{
+                    flex: 1,
+                    padding: "10px",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    background: PT.bg,
+                    border: `1px solid ${PT.border}`,
+                    color: PT.muted,
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    // Save skills via callback
+                    onSaveSkills?.({
+                      playerId: player.id,
+                      phase: currentPhase,
+                      skills: skillsDraft,
+                      updatedBy: "coach", // Will be replaced with actual coach name
+                      updatedAt: new Date().toISOString(),
+                    });
+                    setIsEditingSkills(false);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "10px",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    background: PT.navy,
+                    border: "none",
+                    color: PT.white,
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  💾 Save Skills
+                </button>
+              </div>
+            )}
+            
+            {/* Skill level legend */}
+            {!isEditingSkills && (
+              <div style={{
+                marginTop: 16,
+                padding: "10px 12px",
+                background: PT.bg,
+                borderRadius: 8,
+                display: "flex",
+                justifyContent: "space-around",
+              }}>
+                {[1, 2, 3, 4].map(lvl => {
+                  const lvlStyle = getSkillStyle(lvl);
+                  return (
+                    <div key={lvl} style={{ textAlign: "center" }}>
+                      <div style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: 4,
+                        background: lvlStyle.bg,
+                        margin: "0 auto 4px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: lvlStyle.text,
+                      }}>
+                        {lvl}
+                      </div>
+                      <div style={{ fontSize: 8, color: PT.muted, fontWeight: 600 }}>
+                        {lvlStyle.label}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -2580,6 +2730,8 @@ export default function ProgressTracker({
   onAddSession,
   onEditSession,
   onSaveSeasonPlan, // Callback to save plan: (teamName, plan) => void
+  onSaveAttributes, // Callback: (playerId, attrs) => void
+  onSaveSkills,     // Callback: ({playerId, phase, skills, updatedBy, updatedAt}) => void
 }) {
   const [activeScreen, setActiveScreen] = useState(initialScreen); // players | plan | phases | note | progress | report
   const [selectedPlayer, setSelectedPlayer] = useState(null);
@@ -3955,10 +4107,12 @@ export default function ProgressTracker({
               setSelectedPlayer(null);
             }}
             onSaveAttributes={(attrs) => {
-              // TODO: Save to Firestore
-              console.log("Save attributes:", attrs);
+              onSaveAttributes?.(selectedPlayer.id, attrs);
             }}
             onAddNote={handleSaveNote}
+            onSaveSkills={(data) => {
+              onSaveSkills?.(data);
+            }}
             isCoach={isCoach}
           />
         )}
@@ -3977,9 +4131,12 @@ export default function ProgressTracker({
               setSelectedPlayer(null);
             }}
             onSaveAttributes={(attrs) => {
-              console.log("Save attributes:", attrs);
+              onSaveAttributes?.(selectedPlayer.id, attrs);
             }}
             onAddNote={handleSaveNote}
+            onSaveSkills={(data) => {
+              onSaveSkills?.(data);
+            }}
             isCoach={isCoach}
           />
         )}
@@ -3998,9 +4155,12 @@ export default function ProgressTracker({
               setSelectedPlayer(null);
             }}
             onSaveAttributes={(attrs) => {
-              console.log("Save attributes:", attrs);
+              onSaveAttributes?.(selectedPlayer.id, attrs);
             }}
             onAddNote={handleSaveNote}
+            onSaveSkills={(data) => {
+              onSaveSkills?.(data);
+            }}
             isCoach={isCoach}
           />
         )}
