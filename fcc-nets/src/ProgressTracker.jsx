@@ -1636,6 +1636,782 @@ function PlayerProgressCard({ player, snapshots, notes, currentPhase }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// PLAYER DETAIL VIEW - Full Profile with Tabs
+// ═══════════════════════════════════════════════════════════════════════════════
+function PlayerDetailView({ 
+  player, 
+  snapshots, 
+  notes, 
+  report, 
+  currentPhase,
+  initialTab = "profile",
+  onBack,
+  onSaveAttributes,
+  onAddNote,
+  isCoach = false,
+}) {
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editAttrs, setEditAttrs] = useState({
+    battingHand: player.battingHand || "right",
+    bowlingHand: player.bowlingHand || "right",
+    bowlingStyle: player.bowlingStyle || "",
+  });
+  
+  // Check if player is U11 (can't edit attributes)
+  const isU11 = (player.team || "").toLowerCase().includes("u11");
+  const canEditAttributes = !isU11;
+  
+  // Current skills from snapshots
+  const currentSkills = useMemo(() => {
+    if (!snapshots || !currentPhase) return {};
+    return snapshots[currentPhase] || {};
+  }, [snapshots, currentPhase]);
+  
+  const tabs = [
+    { id: "profile", label: "Profile", icon: "👤" },
+    { id: "progress", label: "Progress", icon: "📊" },
+    { id: "notes", label: "Notes", icon: "📝" },
+    { id: "report", label: "Report", icon: "📄" },
+  ];
+  
+  return (
+    <div style={{ padding: "12px 16px" }}>
+      {/* Back button + Player header */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        marginBottom: 16,
+      }}>
+        <button
+          onClick={onBack}
+          style={{
+            background: PT.card,
+            border: `1px solid ${PT.border}`,
+            borderRadius: 10,
+            width: 40,
+            height: 40,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 18,
+            cursor: "pointer",
+          }}
+        >
+          ←
+        </button>
+        <PlayerAvatar name={player.name} size={44} color={player.avatarColor} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: PT.text }}>
+            {player.name}
+          </div>
+          <div style={{ fontSize: 12, color: PT.muted }}>
+            {player.team || "U11"} · Season 2026
+          </div>
+        </div>
+      </div>
+      
+      {/* Tab navigation */}
+      <div style={{
+        display: "flex",
+        gap: 6,
+        marginBottom: 16,
+        overflowX: "auto",
+        paddingBottom: 4,
+      }}>
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              padding: "8px 14px",
+              fontSize: 12,
+              fontWeight: 600,
+              background: activeTab === tab.id ? PT.navy : PT.card,
+              color: activeTab === tab.id ? PT.white : PT.muted,
+              border: `1px solid ${activeTab === tab.id ? PT.navy : PT.border}`,
+              borderRadius: 8,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              whiteSpace: "nowrap",
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+            }}
+          >
+            <span>{tab.icon}</span>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      
+      {/* PROFILE TAB */}
+      {activeTab === "profile" && (
+        <div>
+          {/* Player attributes */}
+          <div style={{
+            background: PT.card,
+            border: `1px solid ${PT.border}`,
+            borderRadius: 14,
+            padding: "16px",
+            marginBottom: 16,
+          }}>
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 12,
+            }}>
+              <span style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: PT.subtle,
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+              }}>
+                Player Attributes
+              </span>
+              {canEditAttributes && !isEditing && (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  style={{
+                    padding: "4px 10px",
+                    fontSize: 10,
+                    fontWeight: 600,
+                    background: PT.cream,
+                    border: `1px solid ${PT.gold}40`,
+                    color: "#7A5500",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  ✏️ Edit
+                </button>
+              )}
+            </div>
+            
+            {!isEditing ? (
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  background: PT.bg,
+                  border: `1px solid ${PT.border}`,
+                  borderRadius: 8,
+                  padding: "10px 14px",
+                  flex: 1,
+                  minWidth: 130,
+                }}>
+                  <span style={{ fontSize: 18 }}>🏏</span>
+                  <div>
+                    <div style={{ fontSize: 9, color: PT.muted, fontWeight: 600, textTransform: "uppercase" }}>Batting</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: PT.text }}>
+                      {player.battingHand === "left" ? "Left-handed" : "Right-handed"}
+                    </div>
+                  </div>
+                </div>
+                
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  background: PT.bg,
+                  border: `1px solid ${PT.border}`,
+                  borderRadius: 8,
+                  padding: "10px 14px",
+                  flex: 1,
+                  minWidth: 130,
+                }}>
+                  <span style={{ fontSize: 18 }}>⚾</span>
+                  <div>
+                    <div style={{ fontSize: 9, color: PT.muted, fontWeight: 600, textTransform: "uppercase" }}>Bowling</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: PT.text }}>
+                      {player.bowlingHand === "left" ? "Left-arm" : "Right-arm"}
+                      {player.bowlingStyle && ` ${player.bowlingStyle}`}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: PT.muted, display: "block", marginBottom: 4 }}>
+                    Batting Hand
+                  </label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {["right", "left"].map(h => (
+                      <button
+                        key={h}
+                        onClick={() => setEditAttrs({ ...editAttrs, battingHand: h })}
+                        style={{
+                          flex: 1,
+                          padding: "10px",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          background: editAttrs.battingHand === h ? PT.navy : PT.bg,
+                          color: editAttrs.battingHand === h ? PT.white : PT.text,
+                          border: `1px solid ${editAttrs.battingHand === h ? PT.navy : PT.border}`,
+                          borderRadius: 8,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        {h === "right" ? "Right-handed" : "Left-handed"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: PT.muted, display: "block", marginBottom: 4 }}>
+                    Bowling Arm
+                  </label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {["right", "left"].map(h => (
+                      <button
+                        key={h}
+                        onClick={() => setEditAttrs({ ...editAttrs, bowlingHand: h })}
+                        style={{
+                          flex: 1,
+                          padding: "10px",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          background: editAttrs.bowlingHand === h ? PT.navy : PT.bg,
+                          color: editAttrs.bowlingHand === h ? PT.white : PT.text,
+                          border: `1px solid ${editAttrs.bowlingHand === h ? PT.navy : PT.border}`,
+                          borderRadius: 8,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        {h === "right" ? "Right-arm" : "Left-arm"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: PT.muted, display: "block", marginBottom: 4 }}>
+                    Bowling Style (optional)
+                  </label>
+                  <select
+                    value={editAttrs.bowlingStyle}
+                    onChange={(e) => setEditAttrs({ ...editAttrs, bowlingStyle: e.target.value })}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      fontSize: 13,
+                      border: `1px solid ${PT.border}`,
+                      borderRadius: 8,
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    <option value="">Not specified</option>
+                    <option value="Fast">Fast</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Spin">Spin</option>
+                    <option value="Off-spin">Off-spin</option>
+                    <option value="Leg-spin">Leg-spin</option>
+                  </select>
+                </div>
+                
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button
+                    onClick={() => setIsEditing(false)}
+                    style={{
+                      flex: 1,
+                      padding: "10px",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      background: PT.bg,
+                      border: `1px solid ${PT.border}`,
+                      color: PT.muted,
+                      borderRadius: 8,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      onSaveAttributes?.(editAttrs);
+                      setIsEditing(false);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: "10px",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      background: PT.navy,
+                      border: "none",
+                      color: PT.white,
+                      borderRadius: 8,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            {isU11 && (
+              <div style={{
+                marginTop: 12,
+                fontSize: 11,
+                color: PT.muted,
+                fontStyle: "italic",
+              }}>
+                💡 U11 players will be able to edit their attributes when they move to U13+
+              </div>
+            )}
+          </div>
+          
+          {/* Parent info if linked */}
+          {player.parentName && (
+            <div style={{
+              background: "#f0f9ff",
+              border: "1px solid #bae6fd",
+              borderRadius: 14,
+              padding: "14px 16px",
+              marginBottom: 16,
+            }}>
+              <div style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: "#0369a1",
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+                marginBottom: 6,
+              }}>
+                Parent / Guardian
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#0c4a6e" }}>
+                {player.parentName}
+              </div>
+              {player.parentEmail && (
+                <div style={{ fontSize: 12, color: "#0369a1", marginTop: 2 }}>
+                  {player.parentEmail}
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Quick stats */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 12,
+          }}>
+            <div style={{
+              background: PT.card,
+              border: `1px solid ${PT.border}`,
+              borderRadius: 14,
+              padding: "14px",
+              textAlign: "center",
+            }}>
+              <AttendanceRing 
+                attended={player.sessionsAttended || 0} 
+                total={player.sessionsTotal || 0} 
+                size={60}
+              />
+              <div style={{ fontSize: 10, color: PT.muted, marginTop: 6, fontWeight: 600 }}>
+                Attendance
+              </div>
+            </div>
+            
+            <div style={{
+              background: PT.card,
+              border: `1px solid ${PT.border}`,
+              borderRadius: 14,
+              padding: "14px",
+              textAlign: "center",
+            }}>
+              <div style={{ fontSize: 28, fontWeight: 800, color: PT.navy }}>
+                {notes?.length || 0}
+              </div>
+              <div style={{ fontSize: 10, color: PT.muted, fontWeight: 600 }}>
+                Session Notes
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* PROGRESS TAB */}
+      {activeTab === "progress" && (
+        <div>
+          {/* Skill radar */}
+          <div style={{
+            background: PT.card,
+            border: `1px solid ${PT.border}`,
+            borderRadius: 14,
+            padding: "16px",
+            marginBottom: 16,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+          }}>
+            <div style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: PT.subtle,
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+              marginBottom: 12,
+              alignSelf: "flex-start",
+            }}>
+              Current Skill Profile
+            </div>
+            <RadarChart data={currentSkills} size={180} />
+          </div>
+          
+          {/* Pillar breakdown */}
+          <div style={{
+            background: PT.card,
+            border: `1px solid ${PT.border}`,
+            borderRadius: 14,
+            padding: "16px",
+          }}>
+            <div style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: PT.subtle,
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+              marginBottom: 12,
+            }}>
+              Skills Breakdown
+            </div>
+            {PILLARS.map(pillar => {
+              const level = currentSkills[pillar.id] || 1;
+              const style = getSkillStyle(level);
+              return (
+                <div key={pillar.id} style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "10px 0",
+                  borderBottom: `1px solid ${PT.border}`,
+                }}>
+                  <span style={{ fontSize: 18 }}>{pillar.icon}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: PT.text }}>
+                      {pillar.name}
+                    </div>
+                  </div>
+                  <span style={{
+                    padding: "4px 10px",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    background: style.bg,
+                    color: style.text,
+                    borderRadius: 6,
+                  }}>
+                    {style.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      
+      {/* NOTES TAB */}
+      {activeTab === "notes" && (
+        <div>
+          {isCoach && (
+            <button
+              onClick={() => onAddNote?.({ playerId: player.id, text: "", date: new Date().toISOString() })}
+              style={{
+                width: "100%",
+                padding: "14px",
+                background: PT.cream,
+                border: `1.5px dashed ${PT.gold}`,
+                borderRadius: 12,
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#7A5500",
+                cursor: "pointer",
+                fontFamily: "inherit",
+                marginBottom: 16,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+              }}
+            >
+              ➕ Add Note
+            </button>
+          )}
+          
+          {(!notes || notes.length === 0) ? (
+            <div style={{
+              textAlign: "center",
+              padding: "40px 20px",
+              color: PT.muted,
+            }}>
+              <div style={{ fontSize: 32, marginBottom: 12 }}>📝</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>No notes yet</div>
+              <div style={{ fontSize: 12, marginTop: 4 }}>
+                Notes added during training sessions will appear here
+              </div>
+            </div>
+          ) : (
+            <div>
+              {notes.map((note, idx) => (
+                <div key={idx} style={{
+                  background: PT.card,
+                  border: `1px solid ${PT.border}`,
+                  borderRadius: 12,
+                  padding: "14px 16px",
+                  marginBottom: 10,
+                }}>
+                  <div style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    marginBottom: 8,
+                  }}>
+                    <span style={{ fontSize: 11, color: PT.muted, fontWeight: 600 }}>
+                      {formatDate(note.date)}
+                    </span>
+                    {note.pillar && (
+                      <span style={{
+                        fontSize: 10,
+                        padding: "2px 8px",
+                        background: PILLARS.find(p => p.id === note.pillar)?.color + "20",
+                        color: PILLARS.find(p => p.id === note.pillar)?.color,
+                        borderRadius: 4,
+                        fontWeight: 600,
+                      }}>
+                        {PILLARS.find(p => p.id === note.pillar)?.name}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 13, color: PT.text, lineHeight: 1.5 }}>
+                    {note.text}
+                  </div>
+                  {note.coach && (
+                    <div style={{ fontSize: 10, color: PT.muted, marginTop: 6 }}>
+                      — {note.coach}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* REPORT TAB */}
+      {activeTab === "report" && (
+        <SeasonReportContent player={player} report={report} />
+      )}
+    </div>
+  );
+}
+
+// Season report content (extracted for use in tabs)
+function SeasonReportContent({ player, report }) {
+  return (
+    <div>
+      {/* Hero header */}
+      <div style={{
+        background: PT.navy,
+        borderRadius: 16,
+        padding: "20px 16px",
+        textAlign: "center",
+        marginBottom: 16,
+      }}>
+        <div style={{
+          fontSize: 9,
+          textTransform: "uppercase",
+          letterSpacing: "1px",
+          color: "rgba(255,255,255,0.5)",
+          marginBottom: 4,
+        }}>
+          Season 2026 · End of Season Report
+        </div>
+        <div style={{
+          fontSize: 18,
+          fontWeight: 700,
+          color: PT.white,
+        }}>
+          {player.name}
+        </div>
+      </div>
+      
+      {/* Report content */}
+      {report ? (
+        <div style={{
+          background: PT.card,
+          border: `1px solid ${PT.border}`,
+          borderRadius: 14,
+          padding: "16px",
+        }}>
+          <div style={{ fontSize: 13, color: PT.text, lineHeight: 1.6 }}>
+            {report.summary || "Report will be available at the end of the season."}
+          </div>
+        </div>
+      ) : (
+        <div style={{
+          textAlign: "center",
+          padding: "40px 20px",
+          color: PT.muted,
+        }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>📄</div>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>Report not yet available</div>
+          <div style={{ fontSize: 12, marginTop: 4 }}>
+            End of season reports will be generated after Phase 3
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SESSION NOTES LOG - All Recent Notes
+// ═══════════════════════════════════════════════════════════════════════════════
+function SessionNotesLog({ players, sessions, onSelectPlayer }) {
+  // Collect all notes from all players, sorted by date
+  const allNotes = useMemo(() => {
+    const notes = [];
+    players.forEach(player => {
+      (player.notes || []).forEach(note => {
+        notes.push({
+          ...note,
+          playerId: player.id,
+          playerName: player.name,
+          playerTeam: player.team,
+          playerColor: player.avatarColor,
+        });
+      });
+    });
+    return notes.sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [players]);
+  
+  // Group by date
+  const notesByDate = useMemo(() => {
+    const grouped = {};
+    allNotes.forEach(note => {
+      const dateKey = note.date?.slice(0, 10) || "unknown";
+      if (!grouped[dateKey]) grouped[dateKey] = [];
+      grouped[dateKey].push(note);
+    });
+    return grouped;
+  }, [allNotes]);
+  
+  const dateKeys = Object.keys(notesByDate).sort((a, b) => b.localeCompare(a));
+  
+  return (
+    <div style={{ padding: "12px 16px" }}>
+      <div style={{
+        fontSize: 10,
+        fontWeight: 700,
+        color: PT.subtle,
+        textTransform: "uppercase",
+        letterSpacing: "0.5px",
+        marginBottom: 16,
+      }}>
+        Recent Session Notes
+      </div>
+      
+      {dateKeys.length === 0 ? (
+        <div style={{
+          textAlign: "center",
+          padding: "60px 20px",
+          color: PT.muted,
+        }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>📝</div>
+          <div style={{ fontSize: 15, fontWeight: 600 }}>No notes yet</div>
+          <div style={{ fontSize: 12, marginTop: 6, lineHeight: 1.5 }}>
+            Add notes during training sessions via the<br/>
+            session card or player profile
+          </div>
+        </div>
+      ) : (
+        dateKeys.map(dateKey => (
+          <div key={dateKey} style={{ marginBottom: 20 }}>
+            <div style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: PT.navy,
+              marginBottom: 10,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}>
+              <span>📅</span>
+              {formatDateFull(dateKey)}
+            </div>
+            
+            {notesByDate[dateKey].map((note, idx) => (
+              <div 
+                key={idx}
+                onClick={() => {
+                  const player = players.find(p => p.id === note.playerId);
+                  if (player) onSelectPlayer?.(player);
+                }}
+                style={{
+                  background: PT.card,
+                  border: `1px solid ${PT.border}`,
+                  borderRadius: 12,
+                  padding: "12px 14px",
+                  marginBottom: 8,
+                  cursor: "pointer",
+                }}
+              >
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  marginBottom: 8,
+                }}>
+                  <PlayerAvatar 
+                    name={note.playerName} 
+                    size={32} 
+                    color={note.playerColor}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: PT.text }}>
+                      {note.playerName}
+                    </div>
+                    <div style={{ fontSize: 10, color: PT.muted }}>
+                      {note.playerTeam}
+                    </div>
+                  </div>
+                  {note.pillar && (
+                    <span style={{
+                      fontSize: 9,
+                      padding: "2px 8px",
+                      background: PILLARS.find(p => p.id === note.pillar)?.color + "20",
+                      color: PILLARS.find(p => p.id === note.pillar)?.color,
+                      borderRadius: 4,
+                      fontWeight: 600,
+                    }}>
+                      {PILLARS.find(p => p.id === note.pillar)?.name}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 12, color: PT.text, lineHeight: 1.5 }}>
+                  {note.text}
+                </div>
+              </div>
+            ))}
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // SCREEN 5: Season Report (Parent View)
 // ═══════════════════════════════════════════════════════════════════════════════
 function SeasonReport({ player, report }) {
@@ -1916,7 +2692,7 @@ export default function ProgressTracker({
   
   const handleSelectPlayer = (player) => {
     setSelectedPlayer(player);
-    setActiveScreen("progress");
+    setActiveScreen("player-detail");
   };
   
   const handleSaveNote = (note) => {
@@ -1930,7 +2706,9 @@ export default function ProgressTracker({
     players: { title: "Training Session", sub: isEditingAttendance ? "Marking Attendance" : "Player List" },
     plan: { title: "Training Plan", sub: "Season 2026" },
     phases: { title: "Season Overview", sub: "Phase Progress" },
+    notes: { title: "Session Notes", sub: "Recent Notes" },
     note: { title: "Quick Note", sub: selectedPlayer?.name },
+    "player-detail": { title: selectedPlayer?.name || "Player", sub: selectedPlayer?.team || "Profile" },
     progress: { title: "Player Progress", sub: selectedPlayer?.name || "Coach View" },
     report: { title: "Season Report", sub: "Parent View" },
   };
@@ -3176,19 +3954,78 @@ export default function ProgressTracker({
           />
         )}
         
-        {activeScreen === "progress" && selectedPlayer && (
-          <PlayerProgressCard
+        {/* Player Detail View - Full profile with tabs */}
+        {activeScreen === "player-detail" && selectedPlayer && (
+          <PlayerDetailView
             player={selectedPlayer}
             snapshots={selectedPlayer.snapshots}
             notes={selectedPlayer.notes}
+            report={selectedPlayer.report}
             currentPhase={selectedPlayer.currentPhase || "phase2"}
+            onBack={() => {
+              setActiveScreen("players");
+              setSelectedPlayer(null);
+            }}
+            onSaveAttributes={(attrs) => {
+              // TODO: Save to Firestore
+              console.log("Save attributes:", attrs);
+            }}
+            onAddNote={handleSaveNote}
+            isCoach={isCoach}
           />
         )}
         
-        {activeScreen === "report" && selectedPlayer && (
-          <SeasonReport
+        {/* Legacy progress view - redirect to player-detail */}
+        {activeScreen === "progress" && selectedPlayer && (
+          <PlayerDetailView
             player={selectedPlayer}
+            snapshots={selectedPlayer.snapshots}
+            notes={selectedPlayer.notes}
             report={selectedPlayer.report}
+            currentPhase={selectedPlayer.currentPhase || "phase2"}
+            initialTab="progress"
+            onBack={() => {
+              setActiveScreen("players");
+              setSelectedPlayer(null);
+            }}
+            onSaveAttributes={(attrs) => {
+              console.log("Save attributes:", attrs);
+            }}
+            onAddNote={handleSaveNote}
+            isCoach={isCoach}
+          />
+        )}
+        
+        {/* Legacy report view - redirect to player-detail */}
+        {activeScreen === "report" && selectedPlayer && (
+          <PlayerDetailView
+            player={selectedPlayer}
+            snapshots={selectedPlayer.snapshots}
+            notes={selectedPlayer.notes}
+            report={selectedPlayer.report}
+            currentPhase={selectedPlayer.currentPhase || "phase2"}
+            initialTab="report"
+            onBack={() => {
+              setActiveScreen("players");
+              setSelectedPlayer(null);
+            }}
+            onSaveAttributes={(attrs) => {
+              console.log("Save attributes:", attrs);
+            }}
+            onAddNote={handleSaveNote}
+            isCoach={isCoach}
+          />
+        )}
+        
+        {/* Session Notes Log - All recent notes across players */}
+        {activeScreen === "notes" && (
+          <SessionNotesLog
+            players={filteredPlayers}
+            sessions={defaultTrainingSessions}
+            onSelectPlayer={(player) => {
+              setSelectedPlayer(player);
+              setActiveScreen("player-detail");
+            }}
           />
         )}
       </div>
@@ -3211,27 +4048,22 @@ export default function ProgressTracker({
           { id: "players", icon: "👥", label: "Players" },
           { id: "phases", icon: "🎯", label: "Phases" },
           { id: "plan", icon: "📅", label: "Plan" },
-          { id: "progress", icon: "📊", label: "Progress", coachOnly: true, needsPlayer: true },
-          { id: "report", icon: "📄", label: "Report", needsPlayer: true },
+          { id: "notes", icon: "📝", label: "Notes", coachOnly: true },
         ].map(nav => {
           if (nav.coachOnly && !isCoach) return null;
           
-          const isActive = activeScreen === nav.id;
-          const isDisabled = nav.needsPlayer && !selectedPlayer;
+          const isActive = activeScreen === nav.id || 
+            (nav.id === "players" && (activeScreen === "player-detail" || activeScreen === "progress" || activeScreen === "report"));
           
           return (
             <button
               key={nav.id}
               onClick={() => {
-                if (!isDisabled) {
-                  if ((nav.id === "progress" || nav.id === "note" || nav.id === "report") && !selectedPlayer && filteredPlayers?.length > 0) {
-                    // Auto-select first player if none selected
-                    setSelectedPlayer(filteredPlayers[0]);
-                  }
-                  setActiveScreen(nav.id);
+                if (nav.id === "players") {
+                  setSelectedPlayer(null); // Clear selection when going back to players list
                 }
+                setActiveScreen(nav.id);
               }}
-              disabled={isDisabled}
               style={{
                 display: "flex",
                 flexDirection: "column",
@@ -3240,8 +4072,7 @@ export default function ProgressTracker({
                 background: "transparent",
                 border: "none",
                 padding: "4px 8px",
-                cursor: isDisabled ? "not-allowed" : "pointer",
-                opacity: isDisabled ? 0.35 : 1,
+                cursor: "pointer",
                 transition: "all .15s",
               }}
             >
