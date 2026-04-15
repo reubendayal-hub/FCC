@@ -209,8 +209,9 @@ export default function CoachCoordination({
   teams = [],
   allFixtures = [],
   blockedDates = [], // Ground blocked dates from Admin Panel
+  currentUser = null, // Current logged in user
   onBack,
-  onReassign, // Callback to save reassignment: (sessionId, date, newCoach) => void
+  onReassign, // Callback to save reassignment: (sessionId, date, newCoach, oldCoach) => void
 }) {
   const [currentWeekStart, setCurrentWeekStart] = useState(() => getWeekStart(new Date()));
   const [currentMode, setCurrentMode] = useState("outdoor");
@@ -449,7 +450,7 @@ export default function CoachCoordination({
               fontFamily: "'IBM Plex Mono', monospace",
             }}
           >
-            ☀️ Outdoor
+            🌳 Outdoor
           </button>
           <button
             onClick={() => setCurrentMode("indoor")}
@@ -1178,6 +1179,34 @@ export default function CoachCoordination({
                         </div>
                       ))}
                     </div>
+                    
+                    {/* Reassign button */}
+                    <button
+                      onClick={() => setReassignModal({ 
+                        session: conflict.session, 
+                        date: conflict.date, 
+                        conflicts: conflict.matches 
+                      })}
+                      style={{
+                        width: "100%",
+                        marginTop: 12,
+                        padding: "10px 14px",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        background: theme.gold,
+                        color: "#1a1a1a",
+                        border: "none",
+                        borderRadius: 8,
+                        cursor: "pointer",
+                        fontFamily: "'IBM Plex Mono', monospace",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 6,
+                      }}
+                    >
+                      🔄 Reassign Coach
+                    </button>
                   </div>
                 ))}
               </>
@@ -1742,8 +1771,13 @@ export default function CoachCoordination({
               </button>
               <button
                 onClick={() => {
+                  // Check if current user is the one with the conflict (self-reassignment)
+                  const isSelfReassign = currentUser?.name === notifyModal.oldCoach;
+                  
                   // Generate WhatsApp message
-                  const message = `Hi ${getShortName(notifyModal.newCoach)}! 👋\n\nCould you please cover ${notifyModal.session.team} training on ${fmtDateFull(notifyModal.date)} (${notifyModal.session.time}) at ${notifyModal.session.venue}?\n\n${getShortName(notifyModal.oldCoach)} has a match conflict that day.\n\nThanks! 🙏`;
+                  const message = isSelfReassign
+                    ? `Hi ${getShortName(notifyModal.newCoach)}! 👋\n\nCould you please cover ${notifyModal.session.team} training on ${fmtDateFull(notifyModal.date)} (${notifyModal.session.time}) at ${notifyModal.session.venue}?\n\nI have a match conflict that day. Therefore, I have assigned you as the Coach for this session.\n\nThank you! 🙏`
+                    : `Hi ${getShortName(notifyModal.newCoach)}! 👋\n\nCould you please cover ${notifyModal.session.team} training on ${fmtDateFull(notifyModal.date)} (${notifyModal.session.time}) at ${notifyModal.session.venue}?\n\n${getShortName(notifyModal.oldCoach)} has a match conflict that day.\n\nThanks! 🙏`;
                   
                   // Open WhatsApp with pre-filled message
                   const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
