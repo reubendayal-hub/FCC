@@ -2546,6 +2546,12 @@ export default function App() {
   // Season plans for Progress Tracker (per team)
   const [seasonPlans, setSeasonPlans] = useState({});
 
+  // Attendance, notes, progress tracking (Firestore-backed)
+  const [allAttendance, setAllAttendance] = useState({});       // {sessionId: {playerId: true/false}}
+  const [allSessionNotes, setAllSessionNotes] = useState([]);   // [{sessionId, playerId, text, coach, date, pillar}]
+  const [playerProgress, setPlayerProgress] = useState({});     // {playerId: {currentPhase, snapshots: {phase: {pillar: level}}}}
+  const [coachOverrides, setCoachOverrides] = useState({});     // {"date-sessionId": {newCoach, oldCoach, assignedBy}}
+
   // Recurring slots
   const [recurring, setRecurring] = useState([]);
 
@@ -2687,10 +2693,14 @@ export default function App() {
       joinrequests:doc(db,"fccnets",JOINREQS_KEY),
       auditlog:    doc(db,"fccnets",AUDITLOG_KEY),
       seasonplans: doc(db,"fccnets","seasonplans"),
+      attendance:  doc(db,"fccnets","attendance"),      // {sessionId: {playerId: true/false}}
+      sessionnotes:doc(db,"fccnets","sessionnotes"),    // [{sessionId, playerId, text, coach, date}]
+      playerprogress:doc(db,"fccnets","playerprogress"),// {playerId: {snapshots, currentPhase}}
+      coachoverrides:doc(db,"fccnets","coachoverrides"),// {date-sessionId: {newCoach, oldCoach}}
     };
     (async()=>{
       try {
-        const [sr,mr,pr,tr,rr,br,ir,jr,ar,spr] = await Promise.all([
+        const [sr,mr,pr,tr,rr,br,ir,jr,ar,spr,attr,snr,ppr,cor] = await Promise.all([
           getDoc(refs.sessions),
           getDoc(refs.members),
           getDoc(refs.pins),
@@ -2701,6 +2711,10 @@ export default function App() {
           getDoc(refs.joinrequests),
           getDoc(refs.auditlog),
           getDoc(refs.seasonplans),
+          getDoc(refs.attendance),
+          getDoc(refs.sessionnotes),
+          getDoc(refs.playerprogress),
+          getDoc(refs.coachoverrides),
         ]);
         // Sessions MUST be loaded before setLoading(false) so sessionsRef is
         // populated before the recurring useEffect runs — prevents lifts being wiped
@@ -2731,8 +2745,14 @@ export default function App() {
         setJoinRequests(jr.exists() ? JSON.parse(jr.data().value) : []);
         setAuditLog(    ar.exists() ? JSON.parse(ar.data().value) : []);
         setSeasonPlans( spr.exists() ? JSON.parse(spr.data().value) : {});
+        // New: attendance, notes, progress, coach overrides
+        setAllAttendance(  attr.exists() ? JSON.parse(attr.data().value) : {});
+        setAllSessionNotes(snr.exists() ? JSON.parse(snr.data().value) : []);
+        setPlayerProgress( ppr.exists() ? JSON.parse(ppr.data().value) : {});
+        setCoachOverrides( cor.exists() ? JSON.parse(cor.data().value) : {});
       } catch(e) {
         setMembers(SEED_MEMBERS.map(normMember)); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]); setBlockCals([]); setInviteCodes({}); setJoinRequests([]); setAuditLog([]);
+        setAllAttendance({}); setAllSessionNotes([]); setPlayerProgress({}); setCoachOverrides({});
       }
       setLoading(false);
     })();
@@ -2754,6 +2774,11 @@ export default function App() {
   const saveInviteCodes = async u => { setInviteCodes(u);  await setDoc(doc(db,"fccnets","invitecodes"), {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveJoinRequests= async u => { setJoinRequests(u); await setDoc(doc(db,"fccnets",JOINREQS_KEY),  {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveSeasonPlans = async u => { setSeasonPlans(u); await setDoc(doc(db,"fccnets","seasonplans"), {value:JSON.stringify(u)}).catch(()=>{}); };
+  // New save functions
+  const saveAllAttendance   = async u => { setAllAttendance(u);   await setDoc(doc(db,"fccnets","attendance"),     {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveAllSessionNotes = async u => { setAllSessionNotes(u); await setDoc(doc(db,"fccnets","sessionnotes"),   {value:JSON.stringify(u)}).catch(()=>{}); };
+  const savePlayerProgress  = async u => { setPlayerProgress(u);  await setDoc(doc(db,"fccnets","playerprogress"), {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveCoachOverrides  = async u => { setCoachOverrides(u);  await setDoc(doc(db,"fccnets","coachoverrides"), {value:JSON.stringify(u)}).catch(()=>{}); };
 
   // ── Audit log ─────────────────────────────────────────────────
   // Cap at 500 entries; newest first. Only superadmin can read.
@@ -4988,7 +5013,21 @@ export default function App() {
                 <SLbl mt={4}>Upcoming</SLbl>
                 {visibleUpcoming.map(s=><SessCard key={s.id} s={s} members={members} teams={teams}
                   onCarpoolClick={()=>{setLiftDraft(null);setCarpoolSheetSess(s);}}
-                  onClick={()=>{setSelSess(s);setView("session");setLiftEditing(false);setLiftDraft(null);setNotInExpanded(false);setCarpoolFocus(false);setSessAttendance(s.attendance||{});}}/>)}
+                  onClick={()=>{
+                    setSelSess(s);
+                    setView("session");
+                    setLiftEditing(false);
+                    setLiftDraft(null);
+                    setNotInExpanded(false);
+                    setCarpoolFocus(false);
+                    setSessCoachView(null);
+                    // Load attendance from Firestore or session
+                    const sessionKey = `${s.date}_${s.id}`;
+                    setSessAttendance(allAttendance[sessionKey] || s.attendance || {});
+                    // Load notes for this session
+                    setSessNotes(allSessionNotes.filter(n => n.sessionId === s.id));
+                    setSessNotesDraft({});
+                  }}/>)}
                 {filteredUpcoming.length>UPCOMING_LIMIT&&(
                   <button onClick={()=>setShowUpcomingAll(v=>!v)}
                     style={{width:"100%",padding:"8px 0",background:"none",
@@ -5012,7 +5051,21 @@ export default function App() {
                 <SLbl>Past</SLbl>
                 {visiblePast.map(s=><SessCard key={s.id} s={s} members={members} teams={teams} faded
                   onCarpoolClick={()=>{setLiftDraft(null);setCarpoolSheetSess(s);}}
-                  onClick={()=>{setSelSess(s);setView("session");setLiftEditing(false);setLiftDraft(null);setNotInExpanded(false);setCarpoolFocus(false);setSessAttendance(s.attendance||{});}}/>)}
+                  onClick={()=>{
+                    setSelSess(s);
+                    setView("session");
+                    setLiftEditing(false);
+                    setLiftDraft(null);
+                    setNotInExpanded(false);
+                    setCarpoolFocus(false);
+                    setSessCoachView(null);
+                    // Load attendance from Firestore or session
+                    const sessionKey = `${s.date}_${s.id}`;
+                    setSessAttendance(allAttendance[sessionKey] || s.attendance || {});
+                    // Load notes for this session
+                    setSessNotes(allSessionNotes.filter(n => n.sessionId === s.id));
+                    setSessNotesDraft({});
+                  }}/>)}
                 {/* Toggle button */}
                 {filteredPast.length>1&&(
                   <button onClick={()=>setShowPastAll(v=>!v)}
@@ -5796,7 +5849,14 @@ export default function App() {
                     </div>
                     <button
                       onClick={()=>{
-                        // Save attendance to session
+                        // Save attendance to Firestore
+                        const sessionKey = `${selSess.date}_${selSess.id}`;
+                        const updatedAttendance = {
+                          ...allAttendance,
+                          [sessionKey]: sessAttendance,
+                        };
+                        saveAllAttendance(updatedAttendance);
+                        // Also update session object for immediate display
                         const updSess = {...selSess, attendance: sessAttendance};
                         setSelSess(updSess);
                         saveSessions(sessions.map(s=>s.id===selSess.id?updSess:s));
@@ -6000,7 +6060,9 @@ export default function App() {
                                 };
                                 setSessNotes(prev=>[...prev, newNote]);
                                 setSessNotesDraft(prev=>({...prev,[noteKey]:""}));
-                                // TODO: Save to Firestore
+                                // Auto-save to Firestore immediately
+                                const updatedNotes = [...allSessionNotes, newNote];
+                                saveAllSessionNotes(updatedNotes);
                               }}
                               style={{
                                 padding:"8px 12px",
@@ -6025,8 +6087,13 @@ export default function App() {
                   {sessNotes.filter(n=>n.sessionId===selSess.id).length > 0 && (
                     <button
                       onClick={()=>{
-                        // TODO: Save all notes to Firestore
+                        // Merge session notes with all notes and save
+                        const sessionNoteIds = new Set(sessNotes.filter(n=>n.sessionId===selSess.id).map(n=>n.timestamp));
+                        const otherNotes = allSessionNotes.filter(n=>!sessionNoteIds.has(n.timestamp));
+                        const mergedNotes = [...otherNotes, ...sessNotes.filter(n=>n.sessionId===selSess.id)];
+                        saveAllSessionNotes(mergedNotes);
                         showToast(`${sessNotes.filter(n=>n.sessionId===selSess.id).length} note(s) saved ✓`);
+                        setSessCoachView(null);
                       }}
                       style={{
                         width:"100%",
@@ -6185,129 +6252,6 @@ export default function App() {
                 single={dedupedGroups.length===1}
               />
             ));
-          })()}
-
-          {/* ── Attendance Section (Coaches/Admins only) ── */}
-          {(canOrCoach(userRole,"sendReminder",userMem,teams) || isCoachMember(currentUser?.name,teams)) && selSess.players.length > 0 && (()=>{
-            // Initialize attendance from session or empty
-            const att = sessAttendance;
-            const hasChanges = Object.keys(att).length > 0;
-            const presentCount = Object.values(att).filter(v=>v===true).length;
-            const absentCount = Object.values(att).filter(v=>v===false).length;
-            const unmarkedCount = selSess.players.length - presentCount - absentCount;
-            
-            return (
-              <div style={{marginBottom:20}}>
-                <SLbl mt={4}>📋 Attendance</SLbl>
-                <div style={{background:G.white,borderRadius:12,
-                  border:`1.5px solid ${G.border}`,padding:14}}>
-                  
-                  {/* Summary bar */}
-                  <div style={{display:"flex",gap:12,marginBottom:14,flexWrap:"wrap"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:4}}>
-                      <span style={{width:10,height:10,borderRadius:"50%",background:"#22c55e"}}/>
-                      <span style={{fontSize:12,fontWeight:700,color:G.text}}>{presentCount} present</span>
-                    </div>
-                    <div style={{display:"flex",alignItems:"center",gap:4}}>
-                      <span style={{width:10,height:10,borderRadius:"50%",background:"#ef4444"}}/>
-                      <span style={{fontSize:12,fontWeight:700,color:G.text}}>{absentCount} absent</span>
-                    </div>
-                    {unmarkedCount > 0 && (
-                      <div style={{display:"flex",alignItems:"center",gap:4}}>
-                        <span style={{width:10,height:10,borderRadius:"50%",background:G.border}}/>
-                        <span style={{fontSize:12,color:G.muted}}>{unmarkedCount} unmarked</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Player attendance toggles */}
-                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                    {[...selSess.players].sort((a,b)=>a.localeCompare(b)).map(playerName => {
-                      const mem = members.find(m=>m.name===playerName);
-                      const status = att[mem?.id || playerName]; // true=present, false=absent, undefined=unmarked
-                      
-                      return (
-                        <div key={playerName} style={{
-                          display:"flex",alignItems:"center",gap:10,
-                          padding:"8px 10px",borderRadius:8,
-                          background: status === true ? "#f0fdf4" : status === false ? "#fef2f2" : "#f8fafc",
-                          border: `1px solid ${status === true ? "#bbf7d0" : status === false ? "#fecaca" : G.border}`,
-                        }}>
-                          {/* Avatar */}
-                          <div style={{width:32,height:32,borderRadius:"50%",
-                            background: TEAM_META[(mem?.teams||[])[0]]?.bg || G.green,
-                            display:"flex",alignItems:"center",justifyContent:"center",
-                            fontSize:12,fontWeight:800,
-                            color: TEAM_META[(mem?.teams||[])[0]]?.text || G.lime}}>
-                            {playerName.split(" ").map(n=>n[0]).join("").slice(0,2)}
-                          </div>
-                          
-                          {/* Name */}
-                          <div style={{flex:1}}>
-                            <div style={{fontWeight:700,fontSize:13,color:G.text}}>{playerName}</div>
-                            {mem?.teams?.[0] && (
-                              <div style={{fontSize:10,color:G.muted}}>{mem.teams[0]}</div>
-                            )}
-                          </div>
-                          
-                          {/* Toggle buttons */}
-                          <div style={{display:"flex",gap:4}}>
-                            <button
-                              onClick={()=>{
-                                const key = mem?.id || playerName;
-                                setSessAttendance(prev => ({...prev, [key]: status === true ? null : true}));
-                              }}
-                              style={{
-                                width:36,height:36,borderRadius:8,border:"none",
-                                cursor:"pointer",fontFamily:"inherit",fontSize:16,
-                                background: status === true ? "#22c55e" : "#e5e7eb",
-                                color: status === true ? "#fff" : "#9ca3af",
-                                transition:"all .15s",
-                              }}>
-                              ✓
-                            </button>
-                            <button
-                              onClick={()=>{
-                                const key = mem?.id || playerName;
-                                setSessAttendance(prev => ({...prev, [key]: status === false ? null : false}));
-                              }}
-                              style={{
-                                width:36,height:36,borderRadius:8,border:"none",
-                                cursor:"pointer",fontFamily:"inherit",fontSize:16,
-                                background: status === false ? "#ef4444" : "#e5e7eb",
-                                color: status === false ? "#fff" : "#9ca3af",
-                                transition:"all .15s",
-                              }}>
-                              ✗
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  
-                  {/* Save button */}
-                  {hasChanges && (
-                    <button
-                      onClick={async ()=>{
-                        // TODO: Save to Firestore attendance/{sessionId}/records
-                        console.log("Saving attendance for session", selSess.id, sessAttendance);
-                        showToast("Attendance saved ✓");
-                        // Clear local state after save
-                        // setSessAttendance({});
-                      }}
-                      style={{
-                        width:"100%",marginTop:14,padding:"12px",borderRadius:10,
-                        border:"none",cursor:"pointer",fontFamily:"inherit",
-                        background:G.green,color:G.white,
-                        fontWeight:800,fontSize:14,
-                      }}>
-                      💾 Save Attendance
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
           })()}
 
 
@@ -6807,19 +6751,54 @@ export default function App() {
         initialScreen={view === "season-plan" ? "phases" : "players"}
         onBack={() => setView("coachhq")}
         onSaveAttendance={(att) => {
-          // TODO: Save to attendance/{sessionId}/records
-          console.log("Saving attendance:", att);
+          // Save to Firestore attendance
+          const sessionKey = `${att.date}_${att.sessionId}`;
+          const updated = { ...allAttendance, [sessionKey]: att.records };
+          saveAllAttendance(updated);
           showToast("Attendance saved ✓");
         }}
         onSaveNote={(note) => {
-          // TODO: Save to progressNotes/{playerId}/notes
-          console.log("Saving note:", note);
+          // Save to Firestore session notes
+          const updatedNotes = [...allSessionNotes, {
+            ...note,
+            timestamp: new Date().toISOString(),
+            coach: currentUser?.name,
+          }];
+          saveAllSessionNotes(updatedNotes);
           showToast("Note saved ✓");
         }}
         onSaveSeasonPlan={(teamName, plan) => {
           const updated = { ...seasonPlans, [teamName]: plan };
           saveSeasonPlans(updated);
           showToast(`${teamName} plan saved ✓`);
+        }}
+        onSaveAttributes={(playerId, attrs) => {
+          // Save player attributes to members
+          const updated = members.map(m => 
+            m.id === playerId ? { ...m, ...attrs } : m
+          );
+          saveMembers(updated);
+          showToast("Attributes saved ✓");
+        }}
+        onSaveSkills={(data) => {
+          // Save skills to player progress
+          // data: {playerId, phase, skills, updatedBy, updatedAt}
+          const existing = playerProgress[data.playerId] || { snapshots: {} };
+          const updated = {
+            ...playerProgress,
+            [data.playerId]: {
+              ...existing,
+              currentPhase: data.phase,
+              snapshots: {
+                ...existing.snapshots,
+                [data.phase]: data.skills,
+              },
+              lastUpdatedBy: currentUser?.name,
+              lastUpdatedAt: data.updatedAt,
+            },
+          };
+          savePlayerProgress(updated);
+          showToast("Skills updated ✓");
         }}
       />
     );
@@ -6839,9 +6818,19 @@ export default function App() {
           time: `${b.from}–${b.to}`,
         }))}
         onBack={() => setView("coachhq")}
-        onReassign={(sessionId, date, newCoach) => {
-          // TODO: Save to Firestore coachOverrides collection
-          console.log("Reassign:", sessionId, date, newCoach);
+        onReassign={(sessionId, date, newCoach, oldCoach) => {
+          // Save to Firestore coachOverrides
+          const overrideKey = `${date}_${sessionId}`;
+          const updated = {
+            ...coachOverrides,
+            [overrideKey]: {
+              newCoach,
+              oldCoach,
+              assignedBy: currentUser?.name,
+              assignedAt: new Date().toISOString(),
+            },
+          };
+          saveCoachOverrides(updated);
           showToast(`Reassigned to ${newCoach.split(" ")[0]} ✓`);
         }}
       />
@@ -10037,6 +10026,38 @@ export default function App() {
                           </div>
                         )}
 
+                        {/* Parent/Child link info */}
+                        {(m.parentName || m.childIds?.length > 0 || m.memberType === "parent") && (
+                          <div style={{
+                            background: "#f0f9ff",
+                            border: "1px solid #bae6fd",
+                            borderRadius: 8,
+                            padding: "8px 10px",
+                            fontSize: 11,
+                          }}>
+                            {m.memberType === "parent" && (
+                              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                                <span style={{fontSize:14}}>👨‍👧</span>
+                                <span style={{fontWeight:700,color:"#0369a1"}}>Parent Account</span>
+                              </div>
+                            )}
+                            {m.parentName && (
+                              <div style={{color:"#0c4a6e"}}>
+                                <span style={{fontWeight:600}}>Parent:</span> {m.parentName}
+                              </div>
+                            )}
+                            {m.childIds?.length > 0 && (
+                              <div style={{color:"#0c4a6e",marginTop:2}}>
+                                <span style={{fontWeight:600}}>Children:</span>{" "}
+                                {m.childIds.map(cid => {
+                                  const child = members.find(x=>x.id===cid);
+                                  return child?.name || cid;
+                                }).join(", ")}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         {/* Actions */}
                         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                           {can(userRole,"assignRoles")&&(m.id!==currentUser.id||userRole==="superadmin")&&(
@@ -10049,6 +10070,35 @@ export default function App() {
                               <option value="admin">👨🏻‍💻 Admin</option>
                               <option value="member">🏏 Member</option>
                             </select>
+                          )}
+                          {/* Member type toggle (player/parent) */}
+                          {can(userRole,"assignRoles")&&(
+                            <button
+                              onClick={()=>{
+                                const newType = m.memberType === "parent" ? "player" : "parent";
+                                const updated = members.map(x=>x.id===m.id?{...x, memberType: newType}:x);
+                                saveMembers(updated);
+                                setSelMember({...m, memberType: newType});
+                                logAction("member",`Changed ${m.name} type to ${newType}`);
+                                showToast(`${m.name.split(" ")[0]} is now a ${newType}`);
+                              }}
+                              style={{
+                                border:`1px solid ${m.memberType === "parent" ? "#3b82f6" : "#22c55e"}`,
+                                borderRadius:6,
+                                padding:"5px 10px",
+                                fontSize:11,
+                                fontWeight:700,
+                                fontFamily:"inherit",
+                                color: m.memberType === "parent" ? "#1e40af" : "#166534",
+                                background: m.memberType === "parent" ? "#dbeafe" : "#dcfce7",
+                                cursor:"pointer",
+                                display:"flex",
+                                alignItems:"center",
+                                gap:4,
+                              }}>
+                              {m.memberType === "parent" ? "👨‍👧 Parent" : "🏏 Player"}
+                              <span style={{fontSize:9,color:"#64748b"}}>↔</span>
+                            </button>
                           )}
                           {/* Reset PIN — member has a PIN */}
                           {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&pins[m.id]&&(
