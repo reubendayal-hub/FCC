@@ -2534,6 +2534,9 @@ export default function App() {
   const [toast,    setToast]    = useState(null);
   const [sessAttendance, setSessAttendance] = useState({}); // {playerId: true/false/null} for current session
   const [attendanceSessionContext, setAttendanceSessionContext] = useState(null); // For passing session to Progress Tracker
+  const [sessCoachView, setSessCoachView] = useState(null); // "attendance" | "notes" | null for inline coach views
+  const [sessNotes, setSessNotes] = useState([]); // [{playerId, playerName, text, date, pillar}]
+  const [sessNotesDraft, setSessNotesDraft] = useState({}); // {playerId: "text"}
 
   // Dynamic teams
   const [teams, setTeams] = useState(DEFAULT_TEAMS);
@@ -5723,70 +5726,328 @@ export default function App() {
 
           {/* ── Attendance & Notes pills for coaches ── */}
           {canOrCoach(userRole,"addOtherPlayer",userMem,teams) && selSess.restrictedTo && (
-            <div style={{
-              display:"flex",
-              gap:10,
-              marginBottom:14,
-            }}>
-              <button
-                onClick={()=>{
-                  // Navigate to Progress Tracker with this session's attendance
-                  setView("progress-tracker");
-                  // Store session context for attendance
-                  setAttendanceSessionContext({
-                    sessionId: selSess.id,
-                    date: selSess.date,
-                    team: selSess.restrictedTo,
-                    players: selSess.players,
-                  });
-                }}
-                style={{
-                  flex:1,
-                  display:"flex",
-                  alignItems:"center",
-                  justifyContent:"center",
-                  gap:8,
-                  padding:"12px 14px",
+            <>
+              <div style={{
+                display:"flex",
+                gap:8,
+                marginBottom:12,
+              }}>
+                <button
+                  onClick={()=>setSessCoachView(sessCoachView === "attendance" ? null : "attendance")}
+                  style={{
+                    flex:1,
+                    display:"flex",
+                    alignItems:"center",
+                    justifyContent:"center",
+                    gap:8,
+                    padding:"12px 14px",
+                    background: sessCoachView === "attendance" ? "#166534" : "#f0fdf4",
+                    border: `1.5px solid ${sessCoachView === "attendance" ? "#166534" : "#86efac"}`,
+                    borderRadius:10,
+                    cursor:"pointer",
+                    fontFamily:"inherit",
+                  }}
+                >
+                  <span style={{fontSize:16}}>✓</span>
+                  <span style={{fontSize:13,fontWeight:700,color: sessCoachView === "attendance" ? "#fff" : "#166534"}}>
+                    Attendance
+                  </span>
+                </button>
+                <button
+                  onClick={()=>setSessCoachView(sessCoachView === "notes" ? null : "notes")}
+                  style={{
+                    flex:1,
+                    display:"flex",
+                    alignItems:"center",
+                    justifyContent:"center",
+                    gap:8,
+                    padding:"12px 14px",
+                    background: sessCoachView === "notes" ? "#92400e" : "#fef3c7",
+                    border: `1.5px solid ${sessCoachView === "notes" ? "#92400e" : "#fde68a"}`,
+                    borderRadius:10,
+                    cursor:"pointer",
+                    fontFamily:"inherit",
+                  }}
+                >
+                  <span style={{fontSize:16}}>📝</span>
+                  <span style={{fontSize:13,fontWeight:700,color: sessCoachView === "notes" ? "#fff" : "#92400e"}}>
+                    Session Notes
+                  </span>
+                </button>
+              </div>
+              
+              {/* Inline Attendance View */}
+              {sessCoachView === "attendance" && (
+                <div style={{
                   background:"#f0fdf4",
                   border:"1.5px solid #86efac",
-                  borderRadius:10,
-                  cursor:"pointer",
-                  fontFamily:"inherit",
-                }}
-              >
-                <span style={{fontSize:16}}>✓</span>
-                <span style={{fontSize:13,fontWeight:700,color:"#166534"}}>Attendance</span>
-              </button>
-              <button
-                onClick={()=>{
-                  // Navigate to Progress Tracker notes view
-                  setView("progress-tracker");
-                  setAttendanceSessionContext({
-                    sessionId: selSess.id,
-                    date: selSess.date,
-                    team: selSess.restrictedTo,
-                    players: selSess.players,
-                    initialScreen: "notes",
-                  });
-                }}
-                style={{
-                  flex:1,
-                  display:"flex",
-                  alignItems:"center",
-                  justifyContent:"center",
-                  gap:8,
-                  padding:"12px 14px",
+                  borderRadius:12,
+                  padding:"14px 16px",
+                  marginBottom:14,
+                }}>
+                  <div style={{
+                    display:"flex",
+                    justifyContent:"space-between",
+                    alignItems:"center",
+                    marginBottom:12,
+                  }}>
+                    <div style={{fontSize:12,fontWeight:800,color:"#166534"}}>
+                      ✓ Mark Attendance
+                    </div>
+                    <button
+                      onClick={()=>{
+                        // Save attendance to session
+                        const updSess = {...selSess, attendance: sessAttendance};
+                        setSelSess(updSess);
+                        saveSessions(sessions.map(s=>s.id===selSess.id?updSess:s));
+                        showToast("Attendance saved ✓");
+                        setSessCoachView(null);
+                      }}
+                      style={{
+                        padding:"6px 14px",
+                        fontSize:11,
+                        fontWeight:700,
+                        background:"#166534",
+                        color:"#fff",
+                        border:"none",
+                        borderRadius:6,
+                        cursor:"pointer",
+                        fontFamily:"inherit",
+                      }}
+                    >
+                      💾 Save
+                    </button>
+                  </div>
+                  
+                  {/* Attendance summary */}
+                  {(()=>{
+                    const present = Object.values(sessAttendance).filter(v=>v===true).length;
+                    const absent = Object.values(sessAttendance).filter(v=>v===false).length;
+                    const total = selSess.players.length;
+                    return (
+                      <div style={{display:"flex",gap:8,marginBottom:12}}>
+                        <div style={{flex:1,textAlign:"center",background:"#dcfce7",borderRadius:8,padding:"8px"}}>
+                          <div style={{fontSize:18,fontWeight:800,color:"#166534"}}>{present}</div>
+                          <div style={{fontSize:10,color:"#15803d",fontWeight:600}}>Present</div>
+                        </div>
+                        <div style={{flex:1,textAlign:"center",background:"#fef2f2",borderRadius:8,padding:"8px"}}>
+                          <div style={{fontSize:18,fontWeight:800,color:"#dc2626"}}>{absent}</div>
+                          <div style={{fontSize:10,color:"#b91c1c",fontWeight:600}}>Absent</div>
+                        </div>
+                        <div style={{flex:1,textAlign:"center",background:"#f1f5f9",borderRadius:8,padding:"8px"}}>
+                          <div style={{fontSize:18,fontWeight:800,color:"#64748b"}}>{total - present - absent}</div>
+                          <div style={{fontSize:10,color:"#64748b",fontWeight:600}}>Unmarked</div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  
+                  {/* Player attendance list */}
+                  <div style={{maxHeight:300,overflowY:"auto"}}>
+                    {selSess.players.map((name, idx) => {
+                      const mem = members.find(m=>m.name===name);
+                      const status = sessAttendance[mem?.id||name];
+                      return (
+                        <div key={name} style={{
+                          display:"flex",
+                          alignItems:"center",
+                          gap:10,
+                          padding:"10px 0",
+                          borderBottom: idx < selSess.players.length - 1 ? "1px solid #c6f0d0" : "none",
+                        }}>
+                          {/* Toggle buttons */}
+                          <div style={{display:"flex",gap:4}}>
+                            <button
+                              onClick={()=>setSessAttendance(prev=>({...prev,[mem?.id||name]: status===true ? null : true}))}
+                              style={{
+                                width:32,height:32,borderRadius:"50%",
+                                background: status===true ? "#166534" : "#fff",
+                                border: `2px solid ${status===true ? "#166534" : "#d1d5db"}`,
+                                color: status===true ? "#fff" : "#9ca3af",
+                                fontSize:14,fontWeight:700,cursor:"pointer",
+                                display:"flex",alignItems:"center",justifyContent:"center",
+                              }}
+                            >✓</button>
+                            <button
+                              onClick={()=>setSessAttendance(prev=>({...prev,[mem?.id||name]: status===false ? null : false}))}
+                              style={{
+                                width:32,height:32,borderRadius:"50%",
+                                background: status===false ? "#dc2626" : "#fff",
+                                border: `2px solid ${status===false ? "#dc2626" : "#d1d5db"}`,
+                                color: status===false ? "#fff" : "#9ca3af",
+                                fontSize:14,fontWeight:700,cursor:"pointer",
+                                display:"flex",alignItems:"center",justifyContent:"center",
+                              }}
+                            >✗</button>
+                          </div>
+                          <div style={{flex:1}}>
+                            <div style={{fontSize:13,fontWeight:600,color:"#1e293b"}}>{name}</div>
+                          </div>
+                          {status !== null && status !== undefined && (
+                            <span style={{
+                              fontSize:10,fontWeight:700,padding:"3px 8px",borderRadius:10,
+                              background: status===true ? "#dcfce7" : "#fef2f2",
+                              color: status===true ? "#166534" : "#dc2626",
+                            }}>
+                              {status===true ? "Present" : "Absent"}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              
+              {/* Inline Notes View */}
+              {sessCoachView === "notes" && (
+                <div style={{
                   background:"#fef3c7",
                   border:"1.5px solid #fde68a",
-                  borderRadius:10,
-                  cursor:"pointer",
-                  fontFamily:"inherit",
-                }}
-              >
-                <span style={{fontSize:16}}>📝</span>
-                <span style={{fontSize:13,fontWeight:700,color:"#92400e"}}>Session Notes</span>
-              </button>
-            </div>
+                  borderRadius:12,
+                  padding:"14px 16px",
+                  marginBottom:14,
+                }}>
+                  <div style={{
+                    display:"flex",
+                    justifyContent:"space-between",
+                    alignItems:"center",
+                    marginBottom:12,
+                  }}>
+                    <div style={{fontSize:12,fontWeight:800,color:"#92400e"}}>
+                      📝 Session Notes
+                    </div>
+                    <div style={{fontSize:10,color:"#a16207"}}>
+                      {fmtShort(selSess.date)} · {selSess.restrictedTo}
+                    </div>
+                  </div>
+                  
+                  {/* Quick add note for each player */}
+                  <div style={{maxHeight:400,overflowY:"auto"}}>
+                    {selSess.players.map((name, idx) => {
+                      const mem = members.find(m=>m.name===name);
+                      const noteKey = mem?.id||name;
+                      const draftNote = sessNotesDraft[noteKey] || "";
+                      const existingNotes = sessNotes.filter(n=>n.playerId===noteKey && n.sessionId===selSess.id);
+                      
+                      return (
+                        <div key={name} style={{
+                          padding:"12px 0",
+                          borderBottom: idx < selSess.players.length - 1 ? "1px solid #fde68a" : "none",
+                        }}>
+                          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                            <div style={{
+                              width:32,height:32,borderRadius:"50%",
+                              background:"#fef9c3",border:"1.5px solid #fde68a",
+                              display:"flex",alignItems:"center",justifyContent:"center",
+                              fontSize:11,fontWeight:700,color:"#92400e",
+                            }}>
+                              {name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()}
+                            </div>
+                            <div style={{fontSize:13,fontWeight:600,color:"#78350f"}}>{name}</div>
+                          </div>
+                          
+                          {/* Existing notes */}
+                          {existingNotes.map((note, i) => (
+                            <div key={i} style={{
+                              background:"#fff",
+                              borderRadius:6,
+                              padding:"8px 10px",
+                              marginBottom:6,
+                              fontSize:12,
+                              color:"#78350f",
+                              borderLeft:"3px solid #f59e0b",
+                            }}>
+                              {note.text}
+                              {note.pillar && (
+                                <span style={{
+                                  marginLeft:8,fontSize:9,padding:"1px 6px",
+                                  background:"#fef3c7",borderRadius:4,color:"#92400e",
+                                }}>{note.pillar}</span>
+                              )}
+                            </div>
+                          ))}
+                          
+                          {/* Add note input */}
+                          <div style={{display:"flex",gap:6}}>
+                            <input
+                              type="text"
+                              placeholder="Add a note..."
+                              value={draftNote}
+                              onChange={e=>setSessNotesDraft(prev=>({...prev,[noteKey]:e.target.value}))}
+                              style={{
+                                flex:1,
+                                padding:"8px 10px",
+                                fontSize:12,
+                                border:"1px solid #fde68a",
+                                borderRadius:6,
+                                background:"#fff",
+                                fontFamily:"inherit",
+                              }}
+                            />
+                            <button
+                              disabled={!draftNote.trim()}
+                              onClick={()=>{
+                                if(!draftNote.trim()) return;
+                                const newNote = {
+                                  playerId: noteKey,
+                                  playerName: name,
+                                  sessionId: selSess.id,
+                                  date: selSess.date,
+                                  text: draftNote.trim(),
+                                  coach: currentUser?.name,
+                                  timestamp: new Date().toISOString(),
+                                };
+                                setSessNotes(prev=>[...prev, newNote]);
+                                setSessNotesDraft(prev=>({...prev,[noteKey]:""}));
+                                // TODO: Save to Firestore
+                              }}
+                              style={{
+                                padding:"8px 12px",
+                                fontSize:11,
+                                fontWeight:700,
+                                background: draftNote.trim() ? "#f59e0b" : "#e5e7eb",
+                                color: draftNote.trim() ? "#fff" : "#9ca3af",
+                                border:"none",
+                                borderRadius:6,
+                                cursor: draftNote.trim() ? "pointer" : "not-allowed",
+                                fontFamily:"inherit",
+                              }}
+                            >
+                              Add
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  {sessNotes.filter(n=>n.sessionId===selSess.id).length > 0 && (
+                    <button
+                      onClick={()=>{
+                        // TODO: Save all notes to Firestore
+                        showToast(`${sessNotes.filter(n=>n.sessionId===selSess.id).length} note(s) saved ✓`);
+                      }}
+                      style={{
+                        width:"100%",
+                        marginTop:12,
+                        padding:"10px",
+                        fontSize:12,
+                        fontWeight:700,
+                        background:"#92400e",
+                        color:"#fff",
+                        border:"none",
+                        borderRadius:8,
+                        cursor:"pointer",
+                        fontFamily:"inherit",
+                      }}
+                    >
+                      💾 Save All Notes
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
           )}
 
           <SLbl mt={4}>Players ({selSess.players.length})</SLbl>
