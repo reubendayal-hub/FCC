@@ -210,6 +210,7 @@ export default function CoachCoordination({
   allFixtures = [],
   blockedDates = [], // Ground blocked dates from Admin Panel
   currentUser = null, // Current logged in user
+  coachOverrides = {}, // {date_sessionId: {newCoach, oldCoach, assignedBy}}
   onBack,
   onReassign, // Callback to save reassignment: (sessionId, date, newCoach, oldCoach) => void
 }) {
@@ -351,8 +352,16 @@ export default function CoachCoordination({
     const conflicts = [];
     for (let d = 0; d < 7; d++) {
       const date = addDays(currentWeekStart, d);
+      const dateStr = toDateStr(date);
       sessions.forEach(s => {
         if (s.day === d && s.coach) { // Only check sessions with assigned coaches
+          // Check if there's an override for this session (conflict already resolved)
+          const overrideKey = `${dateStr}_${s.id}`;
+          if (coachOverrides[overrideKey]) {
+            // Conflict was resolved via reassignment, skip it
+            return;
+          }
+          
           const cs = getConflictsForSession(s, date);
           if (cs.length > 0) {
             conflicts.push({ session: s, date, matches: cs });
@@ -361,7 +370,7 @@ export default function CoachCoordination({
       });
     }
     return conflicts;
-  }, [currentWeekStart, sessions, allFixtures]);
+  }, [currentWeekStart, sessions, allFixtures, coachOverrides]);
   
   // Navigate weeks
   const prevWeek = () => setCurrentWeekStart(addDays(currentWeekStart, -7));
