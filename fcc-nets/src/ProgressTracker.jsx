@@ -2765,7 +2765,7 @@ export default function ProgressTracker({
     }
   }, [session, filteredPlayers]);
   
-  const isCoach = userRole === "admin" || userRole === "coach";
+  const isCoach = userRole === "superadmin" || userRole === "admin" || userRole === "coach";
   
   // Toggle phase expansion
   const togglePhaseExpanded = (phaseId) => {
