@@ -6812,6 +6812,7 @@ export default function App() {
       <CoachCoordination
         teams={teams}
         allFixtures={ALL_FIXTURES}
+        currentUser={currentUser}
         blockedDates={blockCals.map(b => ({
           date: b.date,
           reason: b.label,
