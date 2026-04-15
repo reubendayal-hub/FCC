@@ -166,7 +166,7 @@ export default async function handler(req, res) {
           method:"POST",
           headers:{"Authorization":`Bearer ${apiKey}`,"Content-Type":"application/json"},
           body: JSON.stringify({
-            from:    "FCC Training <onboarding@resend.dev>",
+            from:    "FCC Training App <fcc_training_app@nordicanchor.dk>",
             to:      [member.email],
             subject: `🏏 Reminder: You're booked in tomorrow — ${fmtDate(tomorrow)}`,
             html:    buildHtml(name, playerSess),
