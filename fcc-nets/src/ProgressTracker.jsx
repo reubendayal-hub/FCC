@@ -1658,9 +1658,8 @@ function PlayerDetailView({
     bowlingStyle: player.bowlingStyle || "",
   });
   
-  // Check if player is U11 (can't edit attributes)
-  const isU11 = (player.team || "").toLowerCase().includes("u11");
-  const canEditAttributes = !isU11;
+  // All players can edit attributes
+  const canEditAttributes = true;
   
   // Current skills from snapshots
   const currentSkills = useMemo(() => {
@@ -1957,17 +1956,6 @@ function PlayerDetailView({
                     Save Changes
                   </button>
                 </div>
-              </div>
-            )}
-            
-            {isU11 && (
-              <div style={{
-                marginTop: 12,
-                fontSize: 11,
-                color: PT.muted,
-                fontStyle: "italic",
-              }}>
-                💡 U11 players will be able to edit their attributes when they move to U13+
               </div>
             )}
           </div>
