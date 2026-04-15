@@ -2,726 +2,653 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>FCC U11 — Our Aim This Season</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FCC U11 — Season 2026</title>
 
 <meta property="og:title" content="FCC U11 — Our Aim This Season">
 <meta property="og:description" content="Welcome to the 2026 season! Everything you need to know about training, matches, and how we are building champions this year.">
 <meta property="og:image" content="https://fcc-training.vercel.app/preview-image.jpg">
-<meta property="og:url" content="https://fcc-training.vercel.app/u11-welcome2026.html">
+<meta property="og:url" content="https://fcc-training.vercel.app/u11-welcome.html">
 <meta property="og:type" content="website">
 
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600;700&display=swap');
-  
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  
-  :root {
-    --navy: #1B2A5C;
-    --gold: #D4A217;
-    --red: #CC1B33;
-    --red-light: rgba(204, 27, 51, 0.1);
-    --light-blue: #8899CC;
-    --bg: #EEF1F8;
-    --card: #fff;
-    --text: #0F1A3A;
-    --muted: #6B7FAA;
-    --border: #C0C8DC;
-  }
-  
-  body {
-    font-family: 'Source Sans 3', -apple-system, BlinkMacSystemFont, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-  }
-  
-  .container {
-    max-width: 480px;
-    margin: 0 auto;
-    padding: 0;
-  }
-  
-  /* Header - Hero Style */
-  .hero {
-    background: linear-gradient(135deg, var(--navy) 0%, #2a3d7a 100%);
-    padding: 28px 20px 24px;
-    position: relative;
-    overflow: hidden;
-  }
-  
-  .hero::after {
-    content: '🏏';
-    position: absolute;
-    right: -20px;
-    bottom: -10px;
-    font-size: 120px;
-    opacity: 0.08;
-    transform: rotate(-20deg);
-  }
-  
-  .hero-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: rgba(255,255,255,0.1);
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--gold);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin-bottom: 14px;
-  }
-  
-  .hero-badge img {
-    width: 24px;
-    height: 24px;
-    border-radius: 4px;
-  }
-  
-  .hero h1 {
-    font-family: 'Lora', serif;
-    font-size: 24px;
-    color: #fff;
-    line-height: 1.25;
-    font-weight: 600;
-    margin-bottom: 10px;
-  }
-  
-  .hero h1 .red { color: var(--red); }
-  .hero h1 .gold { color: var(--gold); }
-  
-  .hero-sub {
-    font-size: 14px;
-    color: var(--light-blue);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  
-  .hero-sub .divider {
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background: var(--gold);
-  }
-  
-  .hero-motto {
-    font-family: 'Lora', serif;
-    font-style: italic;
-    color: var(--gold);
-  }
-  
-  .gold-bar { height: 4px; background: var(--gold); }
-  .red-bar { height: 3px; background: var(--red); }
-  
-  /* Content Sections */
-  .content {
-    padding: 20px;
-  }
-  
-  .greeting {
-    font-family: 'Lora', serif;
-    font-size: 15px;
-    color: var(--navy);
-    font-style: italic;
-    margin-bottom: 16px;
-  }
-  
-  p {
-    font-size: 15px;
-    line-height: 1.7;
-    color: var(--text);
-    margin-bottom: 14px;
-  }
-  
-  p strong { color: var(--navy); }
-  
-  .highlight { color: var(--gold); font-weight: 600; }
-  
-  /* Collapsible Sections */
-  .accordion {
-    margin: 16px 0;
-  }
-  
-  .accordion-item {
-    background: var(--card);
-    border-radius: 12px;
-    margin-bottom: 10px;
-    box-shadow: 0 2px 8px rgba(27, 42, 92, 0.06);
-    overflow: hidden;
-  }
-  
-  .accordion-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 16px;
-    cursor: pointer;
-    border: none;
-    background: none;
-    width: 100%;
-    text-align: left;
-    font-family: inherit;
-  }
-  
-  .accordion-header:active {
-    background: rgba(27, 42, 92, 0.03);
-  }
-  
-  .accordion-title {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  
-  .accordion-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    background: linear-gradient(135deg, var(--navy) 0%, #2a3d7a 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-  }
-  
-  .accordion-label {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--navy);
-  }
-  
-  .accordion-sublabel {
-    font-size: 11px;
-    color: var(--muted);
-    margin-top: 2px;
-  }
-  
-  .accordion-arrow {
-    font-size: 12px;
-    color: var(--muted);
-    transition: transform 0.2s;
-  }
-  
-  .accordion-item.open .accordion-arrow {
-    transform: rotate(180deg);
-  }
-  
-  .accordion-content {
-    display: none;
-    padding: 0 16px 16px;
-  }
-  
-  .accordion-item.open .accordion-content {
-    display: block;
-  }
-  
-  /* Philosophy Box */
-  .philosophy-box {
-    background: linear-gradient(135deg, var(--navy) 0%, #2a3d7a 100%);
-    border-radius: 14px;
-    padding: 20px;
-    margin: 20px 0;
-    position: relative;
-    overflow: hidden;
-    border-bottom: 3px solid var(--red);
-  }
-  
-  .philosophy-box::before {
-    content: '❤️';
-    position: absolute;
-    right: 10px;
-    top: 10px;
-    font-size: 40px;
-    opacity: 0.15;
-  }
-  
-  .philosophy-box h3 {
-    font-family: 'Lora', serif;
-    font-size: 17px;
-    color: var(--gold);
-    margin-bottom: 12px;
-  }
-  
-  .philosophy-box p {
-    color: rgba(255,255,255,0.85);
-    font-size: 14px;
-    margin-bottom: 10px;
-  }
-  
-  .philosophy-box p:last-child { margin-bottom: 0; }
-  
-  .philosophy-box .gold { color: var(--gold); font-weight: 600; }
-  
-  /* Match Card - Featured */
-  .next-match {
-    background: linear-gradient(135deg, #f0f4ff 0%, #fff 100%);
-    border: 2px solid var(--navy);
-    border-radius: 14px;
-    padding: 16px;
-    margin: 16px 0;
-    position: relative;
-  }
-  
-  .next-match-badge {
-    position: absolute;
-    top: -10px;
-    left: 16px;
-    background: var(--red);
-    color: #fff;
-    font-size: 10px;
-    font-weight: 700;
-    padding: 4px 10px;
-    border-radius: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  
-  .next-match h4 {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin-bottom: 8px;
-    margin-top: 6px;
-  }
-  
-  .next-match-details {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  
-  .match-number {
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
-    background: var(--navy);
-    color: var(--gold);
-    font-size: 18px;
-    font-weight: 800;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-  
-  .match-info h5 {
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--navy);
-    margin-bottom: 2px;
-  }
-  
-  .match-info p {
-    font-size: 13px;
-    color: var(--muted);
-    margin: 0;
-  }
-  
-  /* Collapsed Match List */
-  .more-matches {
-    margin-top: 10px;
-  }
-  
-  .match-list-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border);
-  }
-  
-  .match-list-item:last-child { border-bottom: none; }
-  
-  .match-num-small {
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    background: var(--gold);
-    color: #3d2600;
-    font-size: 11px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-  
-  .match-num-small.home {
-    background: var(--red);
-    color: #fff;
-  }
-  
-  .match-list-info {
-    flex: 1;
-  }
-  
-  .match-list-date {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text);
-  }
-  
-  .match-list-name {
-    font-size: 12px;
-    color: var(--muted);
-  }
-  
-  .match-list-venue {
-    font-size: 11px;
-    color: var(--muted);
-    text-align: right;
-  }
-  
-  /* Important Alert Box */
-  .alert-box {
-    background: linear-gradient(135deg, #fff5f5 0%, #fff 100%);
-    border: 2px solid var(--red);
-    border-radius: 14px;
-    padding: 16px;
-    margin: 20px 0;
-  }
-  
-  .alert-box h3 {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--red);
-    margin-bottom: 10px;
-  }
-  
-  .alert-box p {
-    font-size: 14px;
-    margin-bottom: 10px;
-  }
-  
-  .alert-box p:last-child { margin-bottom: 0; }
-  
-  /* Support Parent Box */
-  .support-box {
-    background: linear-gradient(135deg, #fffbeb 0%, #fff 100%);
-    border: 2px solid var(--gold);
-    border-radius: 14px;
-    padding: 18px;
-    margin: 20px 0;
-  }
-  
-  .support-box h3 {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 15px;
-    font-weight: 700;
-    color: #7a5500;
-    margin-bottom: 10px;
-  }
-  
-  .support-box p {
-    font-size: 14px;
-    color: #5c4a00;
-    margin-bottom: 10px;
-  }
-  
-  .support-box .warning {
-    background: rgba(204, 27, 51, 0.08);
-    border-left: 3px solid var(--red);
-    padding: 10px 12px;
-    border-radius: 0 8px 8px 0;
-    margin-top: 12px;
-  }
-  
-  .support-box .warning p {
-    font-size: 13px;
-    color: var(--red);
-    font-weight: 500;
-    margin: 0;
-  }
-  
-  /* Tip Cards */
-  .tips-grid {
-    display: grid;
-    gap: 10px;
-    margin: 16px 0;
-  }
-  
-  .tip-card {
-    background: var(--card);
-    border-radius: 12px;
-    padding: 14px;
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    box-shadow: 0 2px 8px rgba(27, 42, 92, 0.06);
-  }
-  
-  .tip-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    background: var(--bg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-    flex-shrink: 0;
-  }
-  
-  .tip-content h4 {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--navy);
-    margin-bottom: 3px;
-  }
-  
-  .tip-content p {
-    font-size: 12px;
-    color: var(--muted);
-    margin: 0;
-    line-height: 1.5;
-  }
-  
-  /* Coach Chips */
-  .coaches {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin: 14px 0;
-  }
-  
-  .coach-chip {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 24px;
-    padding: 6px 14px 6px 6px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-  }
-  
-  .coach-avatar {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: var(--navy);
-    color: #fff;
-    font-size: 10px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid var(--red);
-  }
-  
-  .coach-chip span {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text);
-  }
-  
-  /* Communication Timeline */
-  .timeline {
-    margin: 16px 0;
-    padding-left: 20px;
-    border-left: 2px solid var(--border);
-  }
-  
-  .timeline-item {
-    position: relative;
-    padding-bottom: 16px;
-    padding-left: 16px;
-  }
-  
-  .timeline-item::before {
-    content: '';
-    position: absolute;
-    left: -7px;
-    top: 4px;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: var(--gold);
-    border: 2px solid var(--card);
-  }
-  
-  .timeline-item:last-child { padding-bottom: 0; }
-  
-  .timeline-when {
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--gold);
-    margin-bottom: 2px;
-  }
-  
-  .timeline-what {
-    font-size: 13px;
-    color: var(--text);
-    line-height: 1.5;
-  }
-  
-  /* Volunteer Reminder */
-  .volunteer-box {
-    background: linear-gradient(135deg, var(--navy) 0%, #2a3d7a 100%);
-    border-radius: 14px;
-    padding: 18px;
-    margin: 20px 0;
-    text-align: center;
-    border-top: 3px solid var(--red);
-    border-bottom: 3px solid var(--gold);
-  }
-  
-  .volunteer-box h3 {
-    font-family: 'Lora', serif;
-    font-size: 16px;
-    color: var(--gold);
-    margin-bottom: 10px;
-  }
-  
-  .volunteer-box p {
-    font-size: 14px;
-    color: rgba(255,255,255,0.9);
-    margin-bottom: 0;
-  }
-  
-  .volunteer-box .emoji {
-    font-size: 28px;
-    margin-bottom: 10px;
-  }
-  
-  /* Glossary */
-  .glossary {
-    background: var(--bg);
-    border-radius: 12px;
-    padding: 14px;
-    margin: 16px 0;
-  }
-  
-  .glossary h4 {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--navy);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin-bottom: 10px;
-  }
-  
-  .glossary-grid {
-    display: grid;
-    gap: 6px;
-  }
-  
-  .glossary-item {
-    display: flex;
-    gap: 8px;
-    font-size: 12px;
-  }
-  
-  .glossary-item strong {
-    min-width: 50px;
-    color: var(--navy);
-  }
-  
-  .glossary-item span {
-    color: var(--muted);
-  }
-  
-  /* Sign Off */
-  .signoff {
-    margin-top: 24px;
-    padding-top: 20px;
-    border-top: 1px solid var(--border);
-    text-align: center;
-  }
-  
-  .signoff p {
-    font-size: 14px;
-    margin-bottom: 8px;
-  }
-  
-  .signoff .names {
-    font-family: 'Lora', serif;
-    font-size: 15px;
-    color: var(--navy);
-    font-style: italic;
-  }
-  
-  .signoff .team-label {
-    font-size: 12px;
-    color: var(--muted);
-    margin-top: 4px;
-  }
-  
-  /* Footer */
-  .footer {
-    background: var(--navy);
-    padding: 16px 20px;
-    text-align: center;
-  }
-  
-  .footer p {
-    font-size: 12px;
-    color: var(--light-blue);
-    margin: 0;
-  }
-  
-  .footer a {
-    color: var(--gold);
-    text-decoration: none;
-  }
-  
-  /* Toggle Button Styles */
-  .toggle-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    width: 100%;
-    padding: 10px;
-    margin-top: 10px;
-    background: none;
-    border: 1.5px dashed var(--border);
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--muted);
-    cursor: pointer;
-    font-family: inherit;
-  }
-  
-  .toggle-btn:active {
-    background: var(--bg);
-  }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #EEF1F8;
+  color: #0F1A3A;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+
+.container {
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+/* Hero */
+.hero {
+  background: linear-gradient(135deg, #1B2A5C 0%, #2a3d7a 100%);
+  padding: 24px 20px 20px;
+}
+
+.hero-badge {
+  display: inline-block;
+  background: rgba(255,255,255,0.12);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #D4A217;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+}
+
+.hero h1 {
+  font-family: 'Lora', Georgia, serif;
+  font-size: 22px;
+  color: #ffffff;
+  line-height: 1.3;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.hero h1 span {
+  color: #D4A217;
+}
+
+.hero-sub {
+  font-size: 13px;
+  color: #8899CC;
+  margin-bottom: 4px;
+}
+
+.hero-motto {
+  font-family: 'Lora', Georgia, serif;
+  font-size: 15px;
+  font-style: italic;
+  color: #D4A217;
+  margin-top: 10px;
+}
+
+.color-bars {
+  height: 6px;
+  background: linear-gradient(to right, #D4A217 50%, #CC1B33 50%);
+}
+
+/* Content */
+.content {
+  padding: 20px;
+  background: #ffffff;
+}
+
+.greeting {
+  font-family: 'Lora', Georgia, serif;
+  font-size: 16px;
+  color: #1B2A5C;
+  font-style: italic;
+  margin-bottom: 16px;
+}
+
+p {
+  font-size: 15px;
+  line-height: 1.7;
+  color: #1A2A3A;
+  margin-bottom: 14px;
+}
+
+.highlight {
+  color: #D4A217;
+  font-weight: 600;
+}
+
+/* Philosophy Box */
+.philosophy-box {
+  background: linear-gradient(135deg, #1B2A5C 0%, #2a3d7a 100%);
+  border-radius: 12px;
+  padding: 18px;
+  margin: 18px 0;
+  border-bottom: 3px solid #CC1B33;
+}
+
+.philosophy-box h3 {
+  font-family: 'Lora', Georgia, serif;
+  font-size: 16px;
+  color: #D4A217;
+  margin-bottom: 12px;
+}
+
+.philosophy-box p {
+  color: rgba(255,255,255,0.9);
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.philosophy-box p:last-child {
+  margin-bottom: 0;
+}
+
+.philosophy-box .gold {
+  color: #D4A217;
+  font-weight: 600;
+}
+
+/* Alert Box */
+.alert-box {
+  background: #fff5f5;
+  border: 2px solid #CC1B33;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 18px 0;
+}
+
+.alert-box h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #CC1B33;
+  margin-bottom: 10px;
+}
+
+.alert-box p {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+/* Match Card */
+.next-match {
+  background: #f8faff;
+  border: 2px solid #1B2A5C;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 16px 0;
+  position: relative;
+}
+
+.next-match-badge {
+  position: absolute;
+  top: -10px;
+  left: 14px;
+  background: #CC1B33;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 10px;
+  text-transform: uppercase;
+}
+
+.next-match h4 {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6B7FAA;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 6px;
+  margin-bottom: 10px;
+}
+
+.match-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.match-num {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: #1B2A5C;
+  color: #D4A217;
+  font-size: 18px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.match-info h5 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1B2A5C;
+  margin-bottom: 2px;
+}
+
+.match-info p {
+  font-size: 13px;
+  color: #6B7FAA;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* More matches */
+.more-matches {
+  margin-top: 12px;
+  display: none;
+}
+
+.more-matches.show {
+  display: block;
+}
+
+.match-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #e0e4ed;
+}
+
+.match-item:last-child {
+  border-bottom: none;
+}
+
+.match-num-sm {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #D4A217;
+  color: #3d2600;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.match-num-sm.home {
+  background: #CC1B33;
+  color: #fff;
+}
+
+.match-item-info {
+  flex: 1;
+}
+
+.match-item-date {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0F1A3A;
+}
+
+.match-item-name {
+  font-size: 12px;
+  color: #6B7FAA;
+}
+
+.match-item-venue {
+  font-size: 11px;
+  color: #6B7FAA;
+}
+
+.toggle-btn {
+  width: 100%;
+  padding: 10px;
+  margin-top: 10px;
+  background: none;
+  border: 1.5px dashed #C0C8DC;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6B7FAA;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* Tip Cards */
+.tips {
+  margin: 16px 0;
+}
+
+.tip {
+  background: #ffffff;
+  border: 1px solid #e0e4ed;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.tip.red-accent {
+  border-left: 3px solid #CC1B33;
+}
+
+.tip-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #EEF1F8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.tip h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1B2A5C;
+  margin-bottom: 3px;
+}
+
+.tip p {
+  font-size: 13px;
+  color: #6B7FAA;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Support Box */
+.support-box {
+  background: #fffbeb;
+  border: 2px solid #D4A217;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 18px 0;
+}
+
+.support-box h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #7a5500;
+  margin-bottom: 10px;
+}
+
+.support-box p {
+  font-size: 14px;
+  color: #5c4a00;
+  margin-bottom: 10px;
+}
+
+.support-warning {
+  background: rgba(204, 27, 51, 0.08);
+  border-left: 3px solid #CC1B33;
+  padding: 10px 12px;
+  border-radius: 0 8px 8px 0;
+  margin-top: 12px;
+}
+
+.support-warning p {
+  font-size: 13px;
+  color: #CC1B33;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* Volunteer Box */
+.volunteer-box {
+  background: linear-gradient(135deg, #1B2A5C 0%, #2a3d7a 100%);
+  border-radius: 12px;
+  padding: 18px;
+  margin: 18px 0;
+  text-align: center;
+  border-top: 3px solid #CC1B33;
+  border-bottom: 3px solid #D4A217;
+}
+
+.volunteer-box .emoji {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.volunteer-box h3 {
+  font-family: 'Lora', Georgia, serif;
+  font-size: 16px;
+  color: #D4A217;
+  margin-bottom: 10px;
+}
+
+.volunteer-box p {
+  font-size: 14px;
+  color: rgba(255,255,255,0.9);
+  margin: 0;
+  line-height: 1.6;
+}
+
+.volunteer-box .gold {
+  color: #D4A217;
+  font-weight: 600;
+}
+
+/* Accordion */
+.accordion-item {
+  background: #ffffff;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  overflow: hidden;
+}
+
+.accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  cursor: pointer;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+}
+
+.accordion-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.accordion-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #1B2A5C 0%, #2a3d7a 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.accordion-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1B2A5C;
+}
+
+.accordion-sub {
+  font-size: 11px;
+  color: #6B7FAA;
+  margin-top: 2px;
+}
+
+.accordion-arrow {
+  font-size: 12px;
+  color: #6B7FAA;
+  transition: transform 0.2s;
+}
+
+.accordion-content {
+  display: none;
+  padding: 0 16px 16px;
+}
+
+.accordion-item.open .accordion-content {
+  display: block;
+}
+
+.accordion-item.open .accordion-arrow {
+  transform: rotate(180deg);
+}
+
+/* Timeline */
+.timeline {
+  padding-left: 18px;
+  border-left: 2px solid #C0C8DC;
+}
+
+.timeline-item {
+  position: relative;
+  padding-left: 14px;
+  padding-bottom: 14px;
+}
+
+.timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: -7px;
+  top: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #D4A217;
+}
+
+.timeline-when {
+  font-size: 12px;
+  font-weight: 700;
+  color: #D4A217;
+  margin-bottom: 2px;
+}
+
+.timeline-what {
+  font-size: 13px;
+  color: #1A2A3A;
+  line-height: 1.5;
+}
+
+/* Glossary */
+.glossary-item {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.glossary-item strong {
+  min-width: 55px;
+  color: #1B2A5C;
+}
+
+.glossary-item span {
+  color: #6B7FAA;
+}
+
+/* Coaches */
+.coaches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.coach {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  border: 1px solid #e0e4ed;
+  border-radius: 24px;
+  padding: 5px 12px 5px 5px;
+}
+
+.coach-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #1B2A5C;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #CC1B33;
+}
+
+.coach span {
+  font-size: 13px;
+  font-weight: 500;
+  color: #0F1A3A;
+}
+
+/* Sign Off */
+.signoff {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #C0C8DC;
+  text-align: center;
+}
+
+.signoff p {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.signoff .names {
+  font-family: 'Lora', Georgia, serif;
+  font-size: 15px;
+  color: #1B2A5C;
+  font-style: italic;
+}
+
+.signoff .team {
+  font-size: 12px;
+  color: #6B7FAA;
+  margin-top: 4px;
+}
+
+/* Footer */
+.footer {
+  background: #1B2A5C;
+  padding: 16px 20px;
+  text-align: center;
+}
+
+.footer p {
+  font-size: 12px;
+  color: #8899CC;
+  margin: 0 0 4px 0;
+}
+
+.footer a {
+  color: #D4A217;
+  text-decoration: none;
+}
 </style>
 </head>
 <body>
 
 <div class="container">
   <div class="hero">
-    <div class="hero-badge">
-      <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%231B2A5C' width='100' height='100' rx='10'/%3E%3Ctext x='50' y='62' font-family='Arial' font-size='40' fill='%23D4A217' text-anchor='middle' font-weight='bold'%3EFCC%3C/text%3E%3C/svg%3E" alt="FCC">
-      Fredensborg Cricket Club · U11
-    </div>
-    <h1>Building <span class="gold">Champions</span>, One Session at a <span class="red">Time</span></h1>
-    <div class="hero-sub">
-      Season 2026 · Cricket With Purpose
-      <span class="divider"></span>
-      <span class="hero-motto">"One Team, One Dream"</span>
-    </div>
+    <div class="hero-badge">FCC · Fredensborg Cricket Club · U11</div>
+    <h1>Our Vision for <span>U11</span> This Season</h1>
+    <div class="hero-sub">Season 2026 · Cricket With Purpose</div>
+    <div class="hero-motto">"One Team, One Dream"</div>
   </div>
-  <div class="gold-bar"></div>
-  <div class="red-bar"></div>
+  
+  <div class="color-bars"></div>
   
   <div class="content">
-    <div class="greeting">Dear U11 families,</div>
+    <div class="greeting">Dear U11 Families,</div>
     
     <p>We are genuinely excited about the 2026 season and wanted to share our plans with you — so you feel part of what your child is working towards this year.</p>
     
@@ -736,208 +663,201 @@
 
     <div class="alert-box">
       <h3>📢 Parent Season Kick-off Meeting</h3>
-      <p>We kindly request <strong>all parents</strong> to join us for a short meeting to set expectations and answer any questions for the season ahead.</p>
+      <p>We kindly request <strong>all parents</strong> to join us for a short meeting to set expectations and answer questions.</p>
       <p><strong>📍 Venue:</strong> Fredensborg Cricket Club House<br>
       <strong>📅 Date:</strong> TBA (Early April)<br>
       <strong>⏰ Duration:</strong> ~30 minutes</p>
-      <p>If you cannot attend in person, we will share a dial-in link so you can join remotely. <strong>Please make every effort to participate</strong> — your involvement makes a real difference.</p>
+      <p>If you cannot attend in person, we will share a dial-in link. <strong>Please make every effort to participate.</strong></p>
     </div>
 
-    <p>We have <strong>5 Ministævner matches</strong> in the DCF calendar this season — including our historic first home match in August!</p>
+    <p>We have <strong>5 Ministævner matches</strong> this season — including our historic first home match in August!</p>
     
     <div class="next-match">
       <div class="next-match-badge">Up Next</div>
       <h4>DCF Match Calendar 2026</h4>
-      <div class="next-match-details">
-        <div class="match-number">1</div>
+      <div class="match-row">
+        <div class="match-num">1</div>
         <div class="match-info">
           <h5>Spring Opener</h5>
           <p>📅 Sat 9 May · 11:00–13:00<br>📍 Albertslund</p>
         </div>
       </div>
       
-      <div id="moreMatches" class="more-matches" style="display: none;">
-        <div class="match-list-item">
-          <div class="match-num-small">2</div>
-          <div class="match-list-info">
-            <div class="match-list-date">Sun 31 May · 11:00–13:00</div>
-            <div class="match-list-name">Spring Finale</div>
+      <div class="more-matches" id="moreMatches">
+        <div class="match-item">
+          <div class="match-num-sm">2</div>
+          <div class="match-item-info">
+            <div class="match-item-date">Sun 31 May · 11:00–13:00</div>
+            <div class="match-item-name">Spring Finale</div>
           </div>
-          <div class="match-list-venue">Soraner</div>
+          <div class="match-item-venue">Soraner</div>
         </div>
-        <div class="match-list-item">
-          <div class="match-num-small">3</div>
-          <div class="match-list-info">
-            <div class="match-list-date">Sun 21 Jun · 13:00–15:00</div>
-            <div class="match-list-name">Midsummer Match</div>
+        <div class="match-item">
+          <div class="match-num-sm">3</div>
+          <div class="match-item-info">
+            <div class="match-item-date">Sun 21 Jun · 13:00–15:00</div>
+            <div class="match-item-name">Midsummer Match</div>
           </div>
-          <div class="match-list-venue">AB</div>
+          <div class="match-item-venue">AB</div>
         </div>
-        <div class="match-list-item">
-          <div class="match-num-small home">4</div>
-          <div class="match-list-info">
-            <div class="match-list-date">Sun 16 Aug · 11:00–13:00</div>
-            <div class="match-list-name">🏠 Our first HOME match!</div>
+        <div class="match-item">
+          <div class="match-num-sm home">4</div>
+          <div class="match-item-info">
+            <div class="match-item-date">Sun 16 Aug · 11:00–13:00</div>
+            <div class="match-item-name">🏠 Our first HOME match!</div>
           </div>
-          <div class="match-list-venue">Fredensborg</div>
+          <div class="match-item-venue">Fredensborg</div>
         </div>
-        <div class="match-list-item">
-          <div class="match-num-small">5</div>
-          <div class="match-list-info">
-            <div class="match-list-date">Sun 20 Sep · 11:00–13:00</div>
-            <div class="match-list-name">Season Finale</div>
+        <div class="match-item">
+          <div class="match-num-sm">5</div>
+          <div class="match-item-info">
+            <div class="match-item-date">Sun 20 Sep · 11:00–13:00</div>
+            <div class="match-item-name">Season Finale</div>
           </div>
-          <div class="match-list-venue">Ishoj</div>
+          <div class="match-item-venue">Ishoj</div>
         </div>
       </div>
       
-      <button class="toggle-btn" onclick="toggleMatches()">
-        <span id="matchToggleText">▼ Show all 5 matches</span>
-      </button>
+      <button class="toggle-btn" id="matchToggle" onclick="toggleMatches()">▼ Show all 5 matches</button>
     </div>
 
-    <p>There are a few things that genuinely make a difference, and we would love your help:</p>
+    <p>There are a few things that genuinely make a difference:</p>
     
-    <div class="tips-grid">
-      <div class="tip-card">
+    <div class="tips">
+      <div class="tip">
         <div class="tip-icon">👏</div>
-        <div class="tip-content">
+        <div>
           <h4>Celebrate effort, not just results</h4>
-          <p>A good catch or a well-played shot deserves to be celebrated — effort and attitude are what we reward at this age.</p>
+          <p>A good catch or a well-played shot deserves to be celebrated — effort and attitude are what we reward.</p>
         </div>
       </div>
-      <div class="tip-card">
+      <div class="tip">
         <div class="tip-icon">🤐</div>
-        <div class="tip-content">
+        <div>
           <h4>Let us do the coaching</h4>
           <p>Even well-meaning advice from the boundary can confuse. Trust us to guide them on the field.</p>
         </div>
       </div>
-      <div class="tip-card">
+      <div class="tip">
         <div class="tip-icon">📅</div>
-        <div class="tip-content">
+        <div>
           <h4>Consistent attendance</h4>
           <p>Every session builds on the last. Consistency really helps your child progress.</p>
         </div>
       </div>
-      <div class="tip-card" style="border-left: 3px solid var(--red);">
-        <div class="tip-icon" style="background: var(--red-light);">🏟️</div>
-        <div class="tip-content">
+      <div class="tip red-accent">
+        <div class="tip-icon">🏟️</div>
+        <div>
           <h4>Show up for matches!</h4>
-          <p>Your presence at matches gets the kids going and keeps them highly motivated. It means the world to them!</p>
+          <p>Your presence gets the kids going and keeps them highly motivated. It means the world to them!</p>
         </div>
       </div>
     </div>
 
     <div class="support-box">
       <h3>🙋 Support Parent Program</h3>
-      <p>Each training session, we need <strong>one volunteer parent</strong> present alongside the coaches — helping with equipment, keeping energy positive, and supporting safe group management.</p>
-      <p><strong>This is not a coaching role</strong> — it's a helping hand. We will set up a simple rota so the commitment is shared fairly among all families.</p>
-      <p>🆕 <strong>Coming soon:</strong> You'll be able to sign up for sessions directly through the FCC Training App — making it easy to pick dates that work for you!</p>
-      <div class="warning">
-        <p>⚠️ If we do not receive enough sign-ups, we will assign dates to families. Please sign up proactively to choose your preferred sessions!</p>
+      <p>Each session, we need <strong>one volunteer parent</strong> present alongside coaches — helping with equipment, keeping energy positive, and supporting safe group management.</p>
+      <p><strong>This is not a coaching role</strong> — it's a helping hand. We will set up a rota so the commitment is shared fairly.</p>
+      <p>🆕 <strong>Coming soon:</strong> You'll be able to sign up directly through the FCC Training App!</p>
+      <div class="support-warning">
+        <p>⚠️ If we don't receive enough sign-ups, we will assign dates. Please sign up proactively!</p>
       </div>
     </div>
 
     <div class="volunteer-box">
       <div class="emoji">🤝</div>
       <h3>A Gentle Reminder</h3>
-      <p>Fredensborg Cricket Club is run entirely by <strong style="color: var(--gold);">volunteers</strong>. This is not an after-school facility or childcare service — it's a community we build together. Your participation, whether on the rota or cheering from the boundary, is what makes this club special for our children.</p>
+      <p>Fredensborg Cricket Club is run entirely by <span class="gold">volunteers</span>. This is not an after-school facility or childcare service — it's a community we build together. Your participation is what makes this club special.</p>
     </div>
 
-    <div class="accordion">
-      <div class="accordion-item" id="commsAccordion">
-        <button class="accordion-header" onclick="toggleAccordion('commsAccordion')">
-          <div class="accordion-title">
-            <div class="accordion-icon">📬</div>
-            <div>
-              <div class="accordion-label">How we'll keep you updated</div>
-              <div class="accordion-sublabel">3 key touchpoints this season</div>
-            </div>
-          </div>
-          <div class="accordion-arrow">▼</div>
-        </button>
-        <div class="accordion-content">
-          <div class="timeline">
-            <div class="timeline-item">
-              <div class="timeline-when">April</div>
-              <div class="timeline-what">This message + Parent meeting — season overview, philosophy, how you can help</div>
-            </div>
-            <div class="timeline-item">
-              <div class="timeline-when">Late June</div>
-              <div class="timeline-what">A short personal note per family — what your child has been working on and what's coming next</div>
-            </div>
-            <div class="timeline-item">
-              <div class="timeline-when">September</div>
-              <div class="timeline-what">End-of-season note per player — what they achieved, and one thing to look forward to next year. Warm and celebratory!</div>
-            </div>
+    <div class="accordion-item" id="commsAccordion">
+      <button class="accordion-header" onclick="toggleAccordion('commsAccordion')">
+        <div class="accordion-left">
+          <div class="accordion-icon">📬</div>
+          <div>
+            <div class="accordion-label">How we'll keep you updated</div>
+            <div class="accordion-sub">3 key touchpoints this season</div>
           </div>
         </div>
-      </div>
-      
-      <div class="accordion-item" id="glossaryAccordion">
-        <button class="accordion-header" onclick="toggleAccordion('glossaryAccordion')">
-          <div class="accordion-title">
-            <div class="accordion-icon">📖</div>
-            <div>
-              <div class="accordion-label">Cricket terms explained</div>
-              <div class="accordion-sublabel">Quick glossary for parents</div>
-            </div>
+        <div class="accordion-arrow">▼</div>
+      </button>
+      <div class="accordion-content">
+        <div class="timeline">
+          <div class="timeline-item">
+            <div class="timeline-when">April</div>
+            <div class="timeline-what">This message + Parent meeting — season overview and how you can help</div>
           </div>
-          <div class="accordion-arrow">▼</div>
-        </button>
-        <div class="accordion-content">
-          <div class="glossary-grid">
-            <div class="glossary-item"><strong>FCC</strong><span>Fredensborg Cricket Club — that's us!</span></div>
-            <div class="glossary-item"><strong>DCF</strong><span>Danish Cricket Federation — organises matches</span></div>
-            <div class="glossary-item"><strong>U11</strong><span>Under 11 — our age group this season</span></div>
-            <div class="glossary-item"><strong>Ministævne</strong><span>Youth tournament format used in Denmark</span></div>
-            <div class="glossary-item"><strong>Implicit coaching</strong><span>Guiding with questions, not instructions</span></div>
+          <div class="timeline-item">
+            <div class="timeline-when">Late June</div>
+            <div class="timeline-what">A short personal note per family — what your child has been working on</div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-when">September</div>
+            <div class="timeline-what">End-of-season note per player — what they achieved. Warm and celebratory!</div>
           </div>
         </div>
       </div>
     </div>
+    
+    <div class="accordion-item" id="glossaryAccordion">
+      <button class="accordion-header" onclick="toggleAccordion('glossaryAccordion')">
+        <div class="accordion-left">
+          <div class="accordion-icon">📖</div>
+          <div>
+            <div class="accordion-label">Cricket terms explained</div>
+            <div class="accordion-sub">Quick glossary for parents</div>
+          </div>
+        </div>
+        <div class="accordion-arrow">▼</div>
+      </button>
+      <div class="accordion-content">
+        <div class="glossary-item"><strong>FCC</strong><span>Fredensborg Cricket Club</span></div>
+        <div class="glossary-item"><strong>DCF</strong><span>Danish Cricket Federation</span></div>
+        <div class="glossary-item"><strong>U11</strong><span>Under 11 age group</span></div>
+        <div class="glossary-item"><strong>Ministævne</strong><span>Youth tournament format</span></div>
+      </div>
+    </div>
 
-    <p style="margin-top: 20px;">Your child will be coached this season by:</p>
+    <p style="margin-top: 18px;">Your child will be coached this season by:</p>
     <div class="coaches">
-      <div class="coach-chip"><div class="coach-avatar">AN</div><span>Aniket</span></div>
-      <div class="coach-chip"><div class="coach-avatar">NI</div><span>Nitin</span></div>
-      <div class="coach-chip"><div class="coach-avatar">AR</div><span>Arun</span></div>
-      <div class="coach-chip"><div class="coach-avatar">RE</div><span>Reuben</span></div>
+      <div class="coach"><div class="coach-avatar">AN</div><span>Aniket</span></div>
+      <div class="coach"><div class="coach-avatar">NI</div><span>Nitin</span></div>
+      <div class="coach"><div class="coach-avatar">AR</div><span>Arun</span></div>
+      <div class="coach"><div class="coach-avatar">RE</div><span>Reuben</span></div>
     </div>
-    <p style="font-size: 13px; color: var(--muted);">All four of us are available via the WhatsApp group or in person on session days.</p>
+    <p style="font-size: 13px; color: #6B7FAA;">Reach us via WhatsApp or in person on session days.</p>
 
     <div class="signoff">
-      <p>We are genuinely excited about this season. With your support, we aim to make 2026 something your children talk about for years.</p>
+      <p>We are genuinely excited. With your support, we aim to make 2026 something your children talk about for years.</p>
       <p style="margin-bottom: 4px;">See you at the ground,</p>
       <div class="names">Aniket, Nitin, Arun & Reuben</div>
-      <div class="team-label">FCC U11 Coaching Team · Season 2026</div>
+      <div class="team">FCC U11 Coaching Team · Season 2026</div>
     </div>
   </div>
 
   <div class="footer">
-    <p>Fredensborg Cricket Club · <a href="https://fcc-training.vercel.app">fcc-training.vercel.app</a></p>
-    <p style="margin-top: 4px;">Questions? Message us on WhatsApp</p>
+    <p>Fredensborg Cricket Club</p>
+    <p><a href="https://fcc-training.vercel.app">fcc-training.vercel.app</a></p>
   </div>
 </div>
 
 <script>
-  function toggleMatches() {
-    const el = document.getElementById('moreMatches');
-    const btn = document.getElementById('matchToggleText');
-    if (el.style.display === 'none') {
-      el.style.display = 'block';
-      btn.textContent = '▲ Hide matches';
-    } else {
-      el.style.display = 'none';
-      btn.textContent = '▼ Show all 5 matches';
-    }
+function toggleMatches() {
+  var el = document.getElementById('moreMatches');
+  var btn = document.getElementById('matchToggle');
+  if (el.classList.contains('show')) {
+    el.classList.remove('show');
+    btn.textContent = '▼ Show all 5 matches';
+  } else {
+    el.classList.add('show');
+    btn.textContent = '▲ Hide matches';
   }
-  
-  function toggleAccordion(id) {
-    const el = document.getElementById(id);
-    el.classList.toggle('open');
-  }
+}
+
+function toggleAccordion(id) {
+  var el = document.getElementById(id);
+  el.classList.toggle('open');
+}
 </script>
 
 </body>
