@@ -2533,6 +2533,7 @@ export default function App() {
   const [selSess,  setSelSess]  = useState(null);
   const [toast,    setToast]    = useState(null);
   const [sessAttendance, setSessAttendance] = useState({}); // {playerId: true/false/null} for current session
+  const [attendanceSessionContext, setAttendanceSessionContext] = useState(null); // For passing session to Progress Tracker
 
   // Dynamic teams
   const [teams, setTeams] = useState(DEFAULT_TEAMS);
@@ -3395,6 +3396,8 @@ export default function App() {
   const [profileEmail, setProfileEmail]   = useState("");
   const [profilePhone, setProfilePhone]   = useState("");
   const [profileEditing, setProfileEditing] = useState(false);
+  const [profileAttrsEditing, setProfileAttrsEditing] = useState(false);
+  const [profileAttrsDraft, setProfileAttrsDraft] = useState({ battingHand: "right", bowlingHand: "right", bowlingStyle: "" });
   const [changingPin,  setChangingPin]    = useState(false);
   const [oldPin,       setOldPin]         = useState("");
   const [newPin1,      setNewPin1]        = useState("");
@@ -3862,10 +3865,10 @@ export default function App() {
               <FFld label="Child's Team / Group">
                 <select style={iSt()} value={jrChildTeam} onChange={e=>setJrChildTeam(e.target.value)}>
                   <option value="">— Select team —</option>
+                  <option value="unsure">I'm not sure</option>
                   {teamOptions.filter(t=>t!==nonPlayerOption).map(t=>(
                     <option key={t} value={t}>{t}</option>
                   ))}
-                  <option value="unsure">I'm not sure</option>
                 </select>
               </FFld>
             </div>
@@ -4185,11 +4188,11 @@ export default function App() {
             <select value={vfNewTeam} onChange={e=>setVfNewTeam(e.target.value)}
               style={iSt({fontSize:14,padding:"12px 14px",borderRadius:10})}>
               <option value="">{vfIsParent?"Select your child's team…":"Select your team…"}</option>
+              <option value="unsure">Not sure</option>
               {vfIsParent 
                 ? JUNIOR_TEAMS.map(t=><option key={t} value={t}>{t}</option>)
                 : ALL_TEAM_OPTS.map(t=><option key={t} value={t}>{t}</option>)
               }
-              <option value="unsure">Not sure</option>
             </select>
             {vfIsParent && (
               <div style={{fontSize:10,color:G.muted,marginTop:4}}>
@@ -5718,6 +5721,74 @@ export default function App() {
             );
           })()}
 
+          {/* ── Attendance & Notes pills for coaches ── */}
+          {canOrCoach(userRole,"addOtherPlayer",userMem,teams) && selSess.restrictedTo && (
+            <div style={{
+              display:"flex",
+              gap:10,
+              marginBottom:14,
+            }}>
+              <button
+                onClick={()=>{
+                  // Navigate to Progress Tracker with this session's attendance
+                  setView("progress-tracker");
+                  // Store session context for attendance
+                  setAttendanceSessionContext({
+                    sessionId: selSess.id,
+                    date: selSess.date,
+                    team: selSess.restrictedTo,
+                    players: selSess.players,
+                  });
+                }}
+                style={{
+                  flex:1,
+                  display:"flex",
+                  alignItems:"center",
+                  justifyContent:"center",
+                  gap:8,
+                  padding:"12px 14px",
+                  background:"#f0fdf4",
+                  border:"1.5px solid #86efac",
+                  borderRadius:10,
+                  cursor:"pointer",
+                  fontFamily:"inherit",
+                }}
+              >
+                <span style={{fontSize:16}}>✓</span>
+                <span style={{fontSize:13,fontWeight:700,color:"#166534"}}>Attendance</span>
+              </button>
+              <button
+                onClick={()=>{
+                  // Navigate to Progress Tracker notes view
+                  setView("progress-tracker");
+                  setAttendanceSessionContext({
+                    sessionId: selSess.id,
+                    date: selSess.date,
+                    team: selSess.restrictedTo,
+                    players: selSess.players,
+                    initialScreen: "notes",
+                  });
+                }}
+                style={{
+                  flex:1,
+                  display:"flex",
+                  alignItems:"center",
+                  justifyContent:"center",
+                  gap:8,
+                  padding:"12px 14px",
+                  background:"#fef3c7",
+                  border:"1.5px solid #fde68a",
+                  borderRadius:10,
+                  cursor:"pointer",
+                  fontFamily:"inherit",
+                }}
+              >
+                <span style={{fontSize:16}}>📝</span>
+                <span style={{fontSize:13,fontWeight:700,color:"#92400e"}}>Session Notes</span>
+              </button>
+            </div>
+          )}
+
           <SLbl mt={4}>Players ({selSess.players.length})</SLbl>
           {/* ── Persistent carpool section ─────────────────── */}
           {(userInTeam || selSess.players.includes(currentUser?.name))&&(()=>{
@@ -6711,6 +6782,129 @@ export default function App() {
                     {" · "}Next check-in: {new Date(new Date(me.profileConfirmedAt).getTime()+6*30*24*60*60*1000).toLocaleDateString("en-GB",{month:"short",year:"numeric"})}
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+
+          {/* Player attributes (batting/bowling hand) */}
+          <div style={{background:G.white,border:`1.5px solid ${G.border}`,
+            borderRadius:14,padding:"18px 16px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",
+              alignItems:"center",marginBottom:14}}>
+              <div style={{fontWeight:800,fontSize:14,color:G.text}}>🏏 Player Attributes</div>
+              {!profileAttrsEditing&&(
+                <button type="button" onClick={()=>{
+                  setProfileAttrsDraft({
+                    battingHand: me.battingHand||"right",
+                    bowlingHand: me.bowlingHand||"right",
+                    bowlingStyle: me.bowlingStyle||"",
+                  });
+                  setProfileAttrsEditing(true);
+                }} style={{background:G.cream,border:`1px solid ${G.border}`,
+                  borderRadius:8,padding:"5px 12px",fontSize:12,fontWeight:700,
+                  cursor:"pointer",fontFamily:"inherit",color:G.text}}>
+                  ✏️ Edit
+                </button>
+              )}
+            </div>
+            {profileAttrsEditing ? (
+              <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:G.muted,marginBottom:6,
+                    textTransform:"uppercase",letterSpacing:1}}>Batting Hand</div>
+                  <div style={{display:"flex",gap:8}}>
+                    {["right","left"].map(h=>(
+                      <button key={h}
+                        onClick={()=>setProfileAttrsDraft(d=>({...d,battingHand:h}))}
+                        style={{
+                          flex:1,padding:"10px",fontSize:13,fontWeight:600,
+                          background:profileAttrsDraft.battingHand===h?G.green:G.cream,
+                          color:profileAttrsDraft.battingHand===h?G.lime:G.text,
+                          border:`1.5px solid ${profileAttrsDraft.battingHand===h?G.green:G.border}`,
+                          borderRadius:8,cursor:"pointer",fontFamily:"inherit",
+                        }}>
+                        {h==="right"?"Right-handed":"Left-handed"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:G.muted,marginBottom:6,
+                    textTransform:"uppercase",letterSpacing:1}}>Bowling Arm</div>
+                  <div style={{display:"flex",gap:8}}>
+                    {["right","left"].map(h=>(
+                      <button key={h}
+                        onClick={()=>setProfileAttrsDraft(d=>({...d,bowlingHand:h}))}
+                        style={{
+                          flex:1,padding:"10px",fontSize:13,fontWeight:600,
+                          background:profileAttrsDraft.bowlingHand===h?G.green:G.cream,
+                          color:profileAttrsDraft.bowlingHand===h?G.lime:G.text,
+                          border:`1.5px solid ${profileAttrsDraft.bowlingHand===h?G.green:G.border}`,
+                          borderRadius:8,cursor:"pointer",fontFamily:"inherit",
+                        }}>
+                        {h==="right"?"Right-arm":"Left-arm"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:G.muted,marginBottom:6,
+                    textTransform:"uppercase",letterSpacing:1}}>Bowling Style (optional)</div>
+                  <select
+                    value={profileAttrsDraft.bowlingStyle}
+                    onChange={e=>setProfileAttrsDraft(d=>({...d,bowlingStyle:e.target.value}))}
+                    style={iSt({padding:"10px 12px",fontSize:13})}>
+                    <option value="">Not specified</option>
+                    <option value="Fast">Fast</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Spin">Spin</option>
+                    <option value="Off-spin">Off-spin</option>
+                    <option value="Leg-spin">Leg-spin</option>
+                  </select>
+                </div>
+                <div style={{display:"flex",gap:8,marginTop:4}}>
+                  <Btn bg={G.green} col={G.lime} full onClick={()=>{
+                    const updated = members.map(m => m.id===currentUser.id
+                      ? {...m,
+                          battingHand: profileAttrsDraft.battingHand,
+                          bowlingHand: profileAttrsDraft.bowlingHand,
+                          bowlingStyle: profileAttrsDraft.bowlingStyle,
+                        } : m);
+                    saveMembers(updated);
+                    const fresh = updated.find(m=>m.id===currentUser.id);
+                    setCurrentUser(fresh);
+                    localStorage.setItem("fcc-current-user",JSON.stringify(fresh));
+                    setProfileAttrsEditing(false);
+                    showToast("Attributes saved ✓");
+                  }}>Save</Btn>
+                  <Btn bg={G.cream} col={G.muted} onClick={()=>setProfileAttrsEditing(false)}>Cancel</Btn>
+                </div>
+              </div>
+            ) : (
+              <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,
+                  background:G.cream,border:`1px solid ${G.border}`,
+                  borderRadius:8,padding:"10px 14px",flex:1,minWidth:120}}>
+                  <span style={{fontSize:18}}>🏏</span>
+                  <div>
+                    <div style={{fontSize:9,color:G.muted,fontWeight:700,textTransform:"uppercase"}}>Batting</div>
+                    <div style={{fontSize:13,fontWeight:700,color:G.text}}>
+                      {me.battingHand==="left"?"Left-handed":"Right-handed"}
+                    </div>
+                  </div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:8,
+                  background:G.cream,border:`1px solid ${G.border}`,
+                  borderRadius:8,padding:"10px 14px",flex:1,minWidth:120}}>
+                  <span style={{fontSize:18}}>⚾</span>
+                  <div>
+                    <div style={{fontSize:9,color:G.muted,fontWeight:700,textTransform:"uppercase"}}>Bowling</div>
+                    <div style={{fontSize:13,fontWeight:700,color:G.text}}>
+                      {me.bowlingHand==="left"?"Left-arm":"Right-arm"}
+                      {me.bowlingStyle&&` ${me.bowlingStyle}`}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
