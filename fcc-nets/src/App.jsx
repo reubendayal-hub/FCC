@@ -3895,6 +3895,9 @@ export default function App() {
   // ════════════════════════════════════════════════════════════
   if(!currentUser && authView==="verify") {
     const ALL_TEAM_OPTS = teams.map(t=>t.name);
+    const JUNIOR_TEAMS = teams.filter(t => 
+      t.name.startsWith("U") || t.name === "Kvinder" || t.name.includes("Girls")
+    ).map(t => t.name);
     const vfFiltered = vfSearch.trim().length>=2
       ? members.filter(m=>m.name.toLowerCase().includes(vfSearch.toLowerCase())).slice(0,8)
       : [];
@@ -4132,15 +4135,27 @@ export default function App() {
           </div>
 
           {/* Parent toggle */}
-          <label style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,
-            cursor:"pointer",padding:"10px 12px",background:G.cream,borderRadius:10,
-            border:`1px solid ${G.border}`}}>
+          <label style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:16,
+            cursor:"pointer",padding:"12px 14px",background:vfIsParent?"#dbeafe":"#f0fdf4",borderRadius:10,
+            border:`1.5px solid ${vfIsParent?"#3b82f6":"#86efac"}`}}>
             <input type="checkbox" checked={vfIsParent}
               onChange={e=>setVfIsParent(e.target.checked)}
-              style={{width:16,height:16,cursor:"pointer"}}/>
-            <span style={{fontSize:13,fontWeight:700,color:G.text}}>
-              I'm a parent registering on behalf of my child
-            </span>
+              style={{width:18,height:18,cursor:"pointer",flexShrink:0,marginTop:2}}/>
+            <div>
+              <span style={{fontSize:13,fontWeight:700,color:vfIsParent?"#1e40af":"#166534"}}>
+                I'm a parent registering on behalf of my child
+              </span>
+              {vfIsParent && (
+                <div style={{fontSize:11,color:"#3b82f6",marginTop:4,lineHeight:1.4}}>
+                  ✓ Your child will be added to the team roster. You'll receive booking confirmations at your email.
+                </div>
+              )}
+              {!vfIsParent && (
+                <div style={{fontSize:11,color:"#15803d",marginTop:4,lineHeight:1.4}}>
+                  I am a player registering myself (adult or youth 16+)
+                </div>
+              )}
+            </div>
           </label>
 
           {vfIsParent&&(
@@ -4159,20 +4174,28 @@ export default function App() {
               {vfIsParent?"YOUR NAME (parent/guardian)":"YOUR FULL NAME"}
             </label>
             <input value={vfNewName} onChange={e=>setVfNewName(e.target.value)}
-              placeholder="Full name"
+              placeholder={vfIsParent?"Parent/guardian name":"Your full name"}
               style={iSt({fontSize:15,padding:"12px 14px",borderRadius:10})}/>
           </div>
 
           <div style={{marginBottom:12}}>
             <label style={{fontSize:12,fontWeight:700,color:G.muted,display:"block",marginBottom:5}}>
-              TEAM / GROUP
+              {vfIsParent?"CHILD'S TEAM / GROUP":"YOUR TEAM / GROUP"}
             </label>
             <select value={vfNewTeam} onChange={e=>setVfNewTeam(e.target.value)}
               style={iSt({fontSize:14,padding:"12px 14px",borderRadius:10})}>
-              <option value="">Select a group…</option>
-              {ALL_TEAM_OPTS.map(t=><option key={t} value={t}>{t}</option>)}
+              <option value="">{vfIsParent?"Select your child's team…":"Select your team…"}</option>
+              {vfIsParent 
+                ? JUNIOR_TEAMS.map(t=><option key={t} value={t}>{t}</option>)
+                : ALL_TEAM_OPTS.map(t=><option key={t} value={t}>{t}</option>)
+              }
               <option value="unsure">Not sure</option>
             </select>
+            {vfIsParent && (
+              <div style={{fontSize:10,color:G.muted,marginTop:4}}>
+                This is the team your child will train with (U11, U13, U15, etc.)
+              </div>
+            )}
           </div>
 
           <div style={{marginBottom:12}}>
