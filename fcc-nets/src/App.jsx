@@ -6813,6 +6813,7 @@ export default function App() {
         teams={teams}
         allFixtures={ALL_FIXTURES}
         currentUser={currentUser}
+        coachOverrides={coachOverrides}
         blockedDates={blockCals.map(b => ({
           date: b.date,
           reason: b.label,
@@ -6831,6 +6832,7 @@ export default function App() {
               assignedAt: new Date().toISOString(),
             },
           };
+          setCoachOverrides(updated); // Update local state immediately
           saveCoachOverrides(updated);
           showToast(`Reassigned to ${newCoach.split(" ")[0]} ✓`);
         }}
