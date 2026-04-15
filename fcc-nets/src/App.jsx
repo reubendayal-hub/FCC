@@ -6706,18 +6706,26 @@ export default function App() {
       }
       const memberTeams = m.teams || [];
       return coachTeams.some(ct => memberTeams.includes(ct.name));
-    }).map(m => ({
-      id: m.id,
-      name: m.name,
-      team: (m.teams||[]).find(t=>t.startsWith("U")) || m.teams?.[0] || "Unassigned",
-      avatarColor: TEAM_META[(m.teams||[])[0]]?.bg || G.green,
-      sessionsAttended: 0, // TODO: Calculate from attendance collection
-      sessionsTotal: 0,
-      // Placeholder data - will be populated from Firestore
-      snapshots: {},
-      currentPhase: "phase1",
-      notes: [],
-    }));
+    }).map(m => {
+      // Get progress data from playerProgress state
+      const progress = playerProgress[m.id] || {};
+      return {
+        id: m.id,
+        name: m.name,
+        team: (m.teams||[]).find(t=>t.startsWith("U")) || m.teams?.[0] || "Unassigned",
+        avatarColor: TEAM_META[(m.teams||[])[0]]?.bg || G.green,
+        sessionsAttended: 0, // TODO: Calculate from attendance collection
+        sessionsTotal: 0,
+        // Progress data from Firestore
+        snapshots: progress.snapshots || {},
+        currentPhase: progress.currentPhase || "phase1",
+        notes: allSessionNotes.filter(n => n.playerId === m.id),
+        // Player attributes
+        battingHand: m.battingHand,
+        bowlingArm: m.bowlingArm,
+        bowlingStyle: m.bowlingStyle,
+      };
+    });
     
     // Get upcoming session for this coach's teams
     const coachSessions = sessions.filter(s => {
@@ -6797,7 +6805,8 @@ export default function App() {
               lastUpdatedAt: data.updatedAt,
             },
           };
-          savePlayerProgress(updated);
+          setPlayerProgress(updated); // Update local state immediately
+          savePlayerProgress(updated); // Save to Firestore
           showToast("Skills updated ✓");
         }}
       />
