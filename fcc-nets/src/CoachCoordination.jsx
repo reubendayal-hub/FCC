@@ -307,6 +307,24 @@ export default function CoachCoordination({
     });
   }, [currentMode, teams]);
   
+  // Get effective coach for a session on a specific date (checking overrides)
+  const getEffectiveCoach = (session, date) => {
+    const dateStr = toDateStr(date);
+    const overrideKey = `${dateStr}_${session.id}`;
+    const override = coachOverrides[overrideKey];
+    if (override?.newCoach) {
+      return override.newCoach;
+    }
+    return session.coach;
+  };
+  
+  // Check if a session has been reassigned on a specific date
+  const hasOverride = (session, date) => {
+    const dateStr = toDateStr(date);
+    const overrideKey = `${dateStr}_${session.id}`;
+    return !!coachOverrides[overrideKey];
+  };
+  
   // Week days
   const weekDays = useMemo(() => {
     const days = [];
@@ -784,7 +802,9 @@ export default function CoachCoordination({
                       const conflicts = getConflictsForSession(session, date);
                       const hasConflict = conflicts.length > 0;
                       const teamColor = TEAM_COLORS[session.team] || theme.muted;
-                      const coachColor = getCoachColor(session.coach) || theme.muted;
+                      const effectiveCoach = getEffectiveCoach(session, date);
+                      const coachColor = getCoachColor(effectiveCoach) || theme.muted;
+                      const isReassigned = hasOverride(session, date);
                       
                       return (
                         <div
@@ -794,7 +814,7 @@ export default function CoachCoordination({
                             padding: "10px 12px",
                             marginBottom: 8,
                             background: hasConflict ? theme.conflictBg : theme.surface2,
-                            border: `1px solid ${hasConflict ? theme.conflict + "40" : theme.border}`,
+                            border: `1px solid ${hasConflict ? theme.conflict + "40" : isReassigned ? theme.ok + "40" : theme.border}`,
                             borderRadius: 8,
                             cursor: "pointer",
                           }}
@@ -841,9 +861,9 @@ export default function CoachCoordination({
                                 color: "#fff",
                                 border: `2px solid ${theme.surface}`,
                               }}>
-                                {getShortName(session.coach).slice(0, 2).toUpperCase()}
+                                {getShortName(effectiveCoach).slice(0, 2).toUpperCase()}
                               </div>
-                              {session.coCoach && (
+                              {session.coCoach && !isReassigned && (
                                 <div style={{
                                   width: 28,
                                   height: 28,
@@ -862,6 +882,20 @@ export default function CoachCoordination({
                                 </div>
                               )}
                             </div>
+                            
+                            {/* Reassigned indicator */}
+                            {isReassigned && (
+                              <span style={{
+                                fontSize: 10,
+                                fontWeight: 700,
+                                color: theme.ok,
+                                background: `${theme.ok}20`,
+                                padding: "2px 6px",
+                                borderRadius: 4,
+                              }}>
+                                ✓ Reassigned
+                              </span>
+                            )}
                             
                             {/* Conflict indicator */}
                             {hasConflict && (
