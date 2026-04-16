@@ -2765,6 +2765,23 @@ export default function ProgressTracker({
     }
   }, [session, filteredPlayers]);
   
+  // IMPORTANT: Sync selectedPlayer with fresh data from players prop
+  // This fixes the issue where saved skills don't appear until navigating away
+  useEffect(() => {
+    if (selectedPlayer && players) {
+      const freshPlayer = players.find(p => p.id === selectedPlayer.id);
+      if (freshPlayer && (
+        JSON.stringify(freshPlayer.snapshots) !== JSON.stringify(selectedPlayer.snapshots) ||
+        freshPlayer.currentPhase !== selectedPlayer.currentPhase ||
+        freshPlayer.battingHand !== selectedPlayer.battingHand ||
+        freshPlayer.bowlingArm !== selectedPlayer.bowlingArm ||
+        freshPlayer.bowlingStyle !== selectedPlayer.bowlingStyle
+      )) {
+        setSelectedPlayer(freshPlayer);
+      }
+    }
+  }, [players, selectedPlayer]);
+  
   const isCoach = userRole === "superadmin" || userRole === "admin" || userRole === "coach";
   
   // Toggle phase expansion
