@@ -3072,13 +3072,15 @@ export default function App() {
           }))];
           toAdd.push({
             id:uid(), date:dateStr, from:slot.from, to:slot.to,
-            label:slot.name, note:"", players:autoPlayers, poll:[],
+            label:slot.name, note:"", players:autoPlayers,
+            poll: [], // Poll is for custom options, not player names - players shown in WHO'S COMING
             restrictedTo: slot.restrictTeam ? slot.team : null,
             sessionTeams: slotTeams,
             coaches: slotCoaches,
             recurringId: slot.id,
             net: slot.net || "1",
             lifts: {},
+            createdBy: "Recurring",
           });
         }
       }
@@ -3829,26 +3831,37 @@ export default function App() {
   );
   const myTeamsList = currentUser ? (members.find(m=>m.id===currentUser.id)?.teams||[]) : [];
   // Build pickGrouped with user's teams first, then others
+  // IMPORTANT: Each player appears under their FIRST matching team only (no duplicates)
   const pickGrouped = (()=>{
-    const obj = ALL_TEAMS.reduce((acc,t)=>{
-      if(pFilter!=="All" && pFilter!==t) return acc;
-      const list = pickVisible.filter(m=>
-        t==="Unassigned"
-          ? (m.teams||[]).length===0
-          : (m.teams||[]).includes(t)
-      );
-      if(list.length) acc[t]=list;
-      return acc;
-    },{});
-    // Sort keys: user's teams first, then alphabetical
-    const sorted = Object.keys(obj).sort((a,b)=>{
+    // Sort teams: user's teams first, then alphabetical
+    const sortedTeams = [...ALL_TEAMS].sort((a,b)=>{
       const aIsMine = myTeamsList.includes(a);
       const bIsMine = myTeamsList.includes(b);
       if(aIsMine && !bIsMine) return -1;
       if(!aIsMine && bIsMine) return 1;
       return a.localeCompare(b);
     });
-    return sorted.reduce((acc,k)=>{ acc[k]=obj[k]; return acc; },{});
+    
+    const seen = new Set(); // Track which player IDs we've already placed
+    const obj = {};
+    
+    for(const t of sortedTeams) {
+      if(pFilter!=="All" && pFilter!==t) continue;
+      const list = pickVisible.filter(m => {
+        if(seen.has(m.id)) return false; // Already placed in another group
+        const belongsToTeam = t==="Unassigned" 
+          ? (m.teams||[]).length===0
+          : (m.teams||[]).includes(t);
+        if(belongsToTeam) {
+          seen.add(m.id); // Mark as placed
+          return true;
+        }
+        return false;
+      });
+      if(list.length) obj[t] = list;
+    }
+    
+    return obj;
   })();
 
   // Admin list — member shown under EACH team (or Unassigned if none)
@@ -6023,6 +6036,21 @@ export default function App() {
             <div style={{background:"#fff8e1",border:"1.5px solid #ffe082",borderRadius:10,
               padding:"10px 14px",marginBottom:14,fontSize:13,color:"#7a5c00",fontWeight:500}}>
               📋 {selSess.note}
+            </div>
+          )}
+
+          {/* Show who created this booking (for non-recurring) */}
+          {selSess.createdBy && selSess.createdBy !== "Recurring" && (
+            <div style={{fontSize:11,color:G.muted,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
+              <span>📝 Booked by</span>
+              <span style={{fontWeight:700,color:G.text}}>{selSess.createdBy}</span>
+              {selSess.recurringId && <span style={{background:"#f0f9ff",color:"#0369a1",
+                padding:"1px 6px",borderRadius:10,fontSize:9,fontWeight:700}}>from recurring</span>}
+            </div>
+          )}
+          {selSess.createdBy === "Recurring" && (
+            <div style={{fontSize:11,color:G.muted,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
+              <span>🔄 Auto-generated from recurring slot</span>
             </div>
           )}
 
@@ -10579,34 +10607,120 @@ export default function App() {
                               <option value="member">🏏 Member</option>
                             </select>
                           )}
-                          {/* Member type toggle (player/parent) */}
+                          {/* Member type & Link Children/Parent - for admin linking */}
                           {can(userRole,"assignRoles")&&(
-                            <button
-                              onClick={()=>{
-                                const newType = m.memberType === "parent" ? "player" : "parent";
-                                const updated = members.map(x=>x.id===m.id?{...x, memberType: newType}:x);
-                                saveMembers(updated);
-                                setSelMember({...m, memberType: newType});
-                                logAction("member",`Changed ${m.name} type to ${newType}`);
-                                showToast(`${m.name.split(" ")[0]} is now a ${newType}`);
-                              }}
-                              style={{
-                                border:`1px solid ${m.memberType === "parent" ? "#3b82f6" : "#22c55e"}`,
-                                borderRadius:6,
-                                padding:"5px 10px",
-                                fontSize:11,
-                                fontWeight:700,
-                                fontFamily:"inherit",
-                                color: m.memberType === "parent" ? "#1e40af" : "#166534",
+                            <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                              {/* Show member type badge */}
+                              <span style={{
                                 background: m.memberType === "parent" ? "#dbeafe" : "#dcfce7",
-                                cursor:"pointer",
-                                display:"flex",
-                                alignItems:"center",
-                                gap:4,
+                                color: m.memberType === "parent" ? "#1e40af" : "#166534",
+                                padding:"4px 10px",borderRadius:6,fontSize:11,fontWeight:700,
                               }}>
-                              {m.memberType === "parent" ? "👨‍👧 Parent" : "🏏 Player"}
-                              <span style={{fontSize:9,color:"#64748b"}}>↔</span>
-                            </button>
+                                {m.memberType === "parent" ? "👨‍👧 Parent" : "🏏 Player"}
+                                {(m.children||[]).length > 0 && ` (${(m.children||[]).length} linked)`}
+                              </span>
+                              
+                              {/* Link Child button - for adults (not in junior teams) */}
+                              {!(m.teams||[]).some(t => t.startsWith("U") || t.includes("Girls") || t.includes("Kvinder")) && (
+                                <button
+                                  onClick={() => {
+                                    // Find unlinked junior players
+                                    const unlinkedJuniors = members.filter(c => 
+                                      c.id !== m.id &&
+                                      !c.parentId &&
+                                      (c.teams||[]).some(t => t.startsWith("U") || t.includes("Girls") || t.includes("Kvinder"))
+                                    );
+                                    const childName = prompt(
+                                      `Link a child to ${m.name}'s account.\n\nAvailable children:\n${unlinkedJuniors.slice(0,10).map(c=>c.name).join("\n")}${unlinkedJuniors.length>10?`\n...and ${unlinkedJuniors.length-10} more`:""}\n\nEnter child's name:`
+                                    );
+                                    if (!childName?.trim()) return;
+                                    const child = members.find(c => 
+                                      c.name.toLowerCase() === childName.trim().toLowerCase() &&
+                                      (c.teams||[]).some(t => t.startsWith("U") || t.includes("Girls") || t.includes("Kvinder"))
+                                    );
+                                    if (!child) {
+                                      showToast("Child not found in junior teams");
+                                      return;
+                                    }
+                                    if (child.parentId) {
+                                      showToast(`${child.name} is already linked to another parent`);
+                                      return;
+                                    }
+                                    // Link them
+                                    const updated = members.map(x => {
+                                      if (x.id === m.id) {
+                                        return { ...x, children: [...(x.children||[]), child.id], memberType: "parent" };
+                                      }
+                                      if (x.id === child.id) {
+                                        return { ...x, parentId: m.id, parentName: m.name };
+                                      }
+                                      return x;
+                                    });
+                                    saveMembers(updated);
+                                    setSelMember({...m, children: [...(m.children||[]), child.id], memberType: "parent"});
+                                    logAction("member", `Linked child ${child.name} to parent ${m.name}`);
+                                    showToast(`${child.name} linked to ${m.name} ✓`);
+                                  }}
+                                  style={{
+                                    border:"1px solid #3b82f6",borderRadius:6,padding:"4px 8px",
+                                    fontSize:10,fontWeight:700,fontFamily:"inherit",
+                                    color:"#1e40af",background:"#eff6ff",cursor:"pointer",
+                                  }}>
+                                  + Link Child
+                                </button>
+                              )}
+                              
+                              {/* Link to Parent button - for juniors without parent */}
+                              {(m.teams||[]).some(t => t.startsWith("U") || t.includes("Girls") || t.includes("Kvinder")) && !m.parentId && (
+                                <button
+                                  onClick={() => {
+                                    // Find potential parents (adults)
+                                    const potentialParents = members.filter(p => 
+                                      p.id !== m.id &&
+                                      !(p.teams||[]).some(t => t.startsWith("U") || t.includes("Girls") || t.includes("Kvinder"))
+                                    );
+                                    const parentName = prompt(
+                                      `Link ${m.name} to a parent account.\n\nPotential parents:\n${potentialParents.slice(0,10).map(p=>p.name).join("\n")}${potentialParents.length>10?`\n...and ${potentialParents.length-10} more`:""}\n\nEnter parent's name:`
+                                    );
+                                    if (!parentName?.trim()) return;
+                                    const parent = potentialParents.find(p => 
+                                      p.name.toLowerCase() === parentName.trim().toLowerCase()
+                                    );
+                                    if (!parent) {
+                                      showToast("Parent not found");
+                                      return;
+                                    }
+                                    // Link them
+                                    const updated = members.map(x => {
+                                      if (x.id === parent.id) {
+                                        return { ...x, children: [...(x.children||[]), m.id], memberType: "parent" };
+                                      }
+                                      if (x.id === m.id) {
+                                        return { ...x, parentId: parent.id, parentName: parent.name };
+                                      }
+                                      return x;
+                                    });
+                                    saveMembers(updated);
+                                    setSelMember({...m, parentId: parent.id, parentName: parent.name});
+                                    logAction("member", `Linked child ${m.name} to parent ${parent.name}`);
+                                    showToast(`${m.name} linked to ${parent.name} ✓`);
+                                  }}
+                                  style={{
+                                    border:"1px solid #f59e0b",borderRadius:6,padding:"4px 8px",
+                                    fontSize:10,fontWeight:700,fontFamily:"inherit",
+                                    color:"#92400e",background:"#fffbeb",cursor:"pointer",
+                                  }}>
+                                  + Link Parent
+                                </button>
+                              )}
+                              
+                              {/* Show linked parent for juniors */}
+                              {m.parentId && (
+                                <span style={{fontSize:10,color:"#6b7280"}}>
+                                  → {m.parentName || "Linked"}
+                                </span>
+                              )}
+                            </div>
                           )}
                           {/* Reset PIN — member has a PIN */}
                           {can(userRole,"resetOtherPin")&&m.id!==currentUser.id&&pins[m.id]&&(
