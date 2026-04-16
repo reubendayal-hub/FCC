@@ -11736,32 +11736,41 @@ export default function App() {
       </Shell>
     );
   }
-  // ─── FAMILY MANAGER (no DOB) ─────────────────────────────
+  // ─── FAMILY MANAGER (self-contained, no extra helpers) ─────────────────────────────
   const FamilyManager = ({ currentUser, members, setMembers, saveMembers, logAction, showToast }) => {
     const [searchTerm, setSearchTerm] = useState("");
     const [newChildName, setNewChildName] = useState("");
 
-    const myChildren = members.filter(m => currentUser.children?.includes(m.id));
+    const myChildren = members.filter(m => currentUser.children?.includes(m.id) || false);
 
-    const handleLinkExisting = async (child) => {
-      await linkChildToParent(currentUser.id, child.id);
-      const updated = members.map(m =>
-        m.id === currentUser.id ? { ...m, children: [...(m.children || []), child.id] } : m
-      );
+    const handleLinkExisting = (child) => {
+      const updated = members.map(m => {
+        if (m.id === currentUser.id) {
+          const children = [...(m.children || []), child.id];
+          return { ...m, children };
+        }
+        return m;
+      });
       saveMembers(updated);
       logAction("family", `Linked ${child.name} to ${currentUser.name}`);
       showToast(`✅ ${child.name.split(" ")[0]} linked!`);
     };
 
-    const handleCreateAndLink = async () => {
+    const handleCreateAndLink = () => {
       if (!newChildName.trim()) return;
+
+      // Check if player already exists
       const existing = members.find(m =>
         m.memberType === "player" &&
         m.name.toLowerCase() === newChildName.trim().toLowerCase()
       );
 
-      if (existing) return handleLinkExisting(existing);
+      if (existing) {
+        handleLinkExisting(existing);
+        return;
+      }
 
+      // Create new child
       const newId = "child-" + Date.now();
       const newMember = {
         id: newId,
@@ -11774,19 +11783,40 @@ export default function App() {
 
       const updatedMembers = [...members, newMember];
       saveMembers(updatedMembers);
-      await linkChildToParent(currentUser.id, newId);
+
+      // Link it to parent
+      const updatedParent = updatedMembers.map(m => {
+        if (m.id === currentUser.id) {
+          return { ...m, children: [...(m.children || []), newId] };
+        }
+        return m;
+      });
+      saveMembers(updatedParent);
+
       setNewChildName("");
-      showToast(`✅ ${newChildName} created & linked`);
+      showToast(`✅ ${newChildName.trim()} created & linked`);
+    };
+
+    const unlinkChild = (childId) => {
+      const updated = members.map(m => {
+        if (m.id === currentUser.id) {
+          const children = (m.children || []).filter(id => id !== childId);
+          return { ...m, children };
+        }
+        return m;
+      });
+      saveMembers(updated);
+      showToast("Child unlinked");
     };
 
     return (
       <div style={{ padding: 24, background: G.white, borderRadius: 16, marginTop: 16 }}>
         <h3 style={{ margin: 0, fontSize: 18, color: G.text }}>👨‍👧 My Family</h3>
         <p style={{ fontSize: 13, color: G.muted, margin: "4px 0 20px" }}>
-          Link existing players or add new children
+          Link existing players or add new children to your account
         </p>
 
-        {/* Already linked */}
+        {/* Already linked children */}
         {myChildren.length > 0 && (
           <div style={{ marginBottom: 24 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: G.muted, marginBottom: 8 }}>Linked children</div>
@@ -11796,7 +11826,7 @@ export default function App() {
                 padding: "12px 16px", background: G.bg, borderRadius: 12, marginBottom: 8
               }}>
                 <strong>{child.name}</strong>
-                <button onClick={() => unlinkChild(currentUser.id, child.id)} style={{ color: G.red }}>Unlink</button>
+                <button onClick={() => unlinkChild(child.id)} style={{ color: G.red, fontSize: 13 }}>Unlink</button>
               </div>
             ))}
           </div>
