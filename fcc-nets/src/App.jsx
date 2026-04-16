@@ -8303,16 +8303,14 @@ export default function App() {
             </>
           )}
 
-          {/* FAMILY TAB */}
           {profileTab === "family" && (
-            <FamilyManager
-              currentUser={currentUser}
-              members={members}
-              setMembers={setMembers}
-              saveMembers={saveMembers}
-              logAction={logAction}
-              showToast={showToast}
-            />
+            <div style={{ padding: 30, background: "#f0fdf4", borderRadius: 16, marginTop: 16, textAlign: "center" }}>
+              <h2 style={{ fontSize: 26, color: "#14532d" }}>👨‍👧 My Family</h2>
+              <p style={{ fontSize: 17, color: "#166534", margin: "12px 0 24px" }}>
+                ✅ The tab is working!<br />
+                (We’ll add the real content in the next step)
+              </p>
+            </div>
           )}
 
         </div>
@@ -11737,19 +11735,96 @@ export default function App() {
       </Shell>
     );
   }
-  // ─── MINIMAL TEST FamilyManager (for debugging) ─────────────────────────────
-const FamilyManager = ({ currentUser, members, setMembers, saveMembers, logAction, showToast }) => {
-  return (
-    <div style={{padding:30, background:"#f0fdf4", borderRadius:16, textAlign:"center", marginTop:16}}>
-      <h2 style={{fontSize:24, color:"#14532d"}}>👨‍👧 My Family</h2>
-      <p style={{fontSize:16, color:"#166534", marginTop:8}}>✅ Component is rendering!</p>
-      <p style={{fontSize:13, color:"#6b7280", marginTop:20}}>
-        If you see this green box, the tab works.<br/>
-        Now we just need to fix the real component.
-      </p>
-    </div>
-  );
-};
+  // ─── FAMILY MANAGER COMPONENT ─────────────────────────────
+  const FamilyManager = ({ currentUser, members, setMembers, saveMembers, logAction, showToast }) => {
+    const [searchTerm, setSearchTerm] = useState("");
+    const [newChild, setNewChild] = useState({ name: "", dob: "" });
+
+    const myChildren = members.filter(m => currentUser.children?.includes(m.id));
+
+    const handleLinkExisting = async (child) => {
+      await linkChildToParent(currentUser.id, child.id);
+      const updated = members.map(m =>
+        m.id === currentUser.id ? { ...m, children: [...(m.children || []), child.id] } : m
+      );
+      saveMembers(updated);
+      logAction("family", `Linked ${child.name} to ${currentUser.name}`);
+      showToast(`✅ ${child.name.split(" ")[0]} linked!`);
+    };
+
+    const handleCreateAndLink = async () => {
+      if (!newChild.name || !newChild.dob) return;
+      const existing = findExistingChild(members, newChild.name, newChild.dob);
+      if (existing) return handleLinkExisting(existing);
+
+      const newId = "child-" + Date.now();
+      const newMember = {
+        id: newId,
+        name: newChild.name,
+        dob: newChild.dob,
+        memberType: "player",
+        teams: [],
+        children: [],
+        role: "member"
+      };
+      const updatedMembers = [...members, newMember];
+      saveMembers(updatedMembers);
+      await linkChildToParent(currentUser.id, newId);
+      setNewChild({ name: "", dob: "" });
+      showToast(`✅ ${newChild.name} created & linked`);
+    };
+
+    return (
+      <div style={{ padding: 20, background: G.white, borderRadius: 16, marginTop: 16 }}>
+        <h3 style={{ margin: 0, fontSize: 18, color: G.text }}>👨‍👧 My Family</h3>
+        <p style={{ fontSize: 13, color: G.muted, margin: "4px 0 16px" }}>Manage kids linked to your account</p>
+
+        {myChildren.length > 0 && myChildren.map(child => (
+          <div key={child.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px", background: G.bg, borderRadius: 12, marginBottom: 8 }}>
+            <div><strong>{child.name}</strong> <span style={{ fontSize: 12, color: G.muted }}>({child.dob})</span></div>
+            <button onClick={() => unlinkChild(currentUser.id, child.id)} style={{ color: G.red, fontSize: 13 }}>Unlink</button>
+          </div>
+        ))}
+
+        <div style={{ background: G.cream, padding: 16, borderRadius: 12 }}>
+          <input
+            placeholder="Search existing child by name or DOB"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            style={{ width: "100%", padding: 12, borderRadius: 8, marginBottom: 12, border: "1px solid " + G.border }}
+          />
+
+          {searchTerm && members.filter(m =>
+            m.memberType === "player" &&
+            (m.name.toLowerCase().includes(searchTerm.toLowerCase()) || m.dob?.includes(searchTerm))
+          ).map(child => (
+            <button key={child.id} onClick={() => handleLinkExisting(child)}
+              style={{ width: "100%", marginBottom: 8, background: G.green, color: G.lime, padding: 14, borderRadius: 10, fontWeight: 800 }}>
+              Link {child.name}
+            </button>
+          ))}
+
+          <div style={{ marginTop: 20, fontSize: 13, color: G.muted }}>Or create new child profile:</div>
+          <input
+            placeholder="Child full name"
+            value={newChild.name}
+            onChange={e => setNewChild({ ...newChild, name: e.target.value })}
+            style={{ width: "100%", padding: 12, borderRadius: 8, marginBottom: 8, border: "1px solid " + G.border }}
+          />
+          <input
+            type="date"
+            value={newChild.dob}
+            onChange={e => setNewChild({ ...newChild, dob: e.target.value })}
+            style={{ width: "100%", padding: 12, borderRadius: 8, marginBottom: 16, border: "1px solid " + G.border }}
+          />
+          <button onClick={handleCreateAndLink}
+            style={{ width: "100%", background: G.green, color: G.lime, padding: 16, borderRadius: 12, fontWeight: 800, fontSize: 15 }}>
+            Create + Link Child
+          </button>
+        </div>
+      </div>
+    );
+  };
   // Fallback
   return <Shell><div style={{ padding: 20, color: G.muted }}>Loading…</div></Shell>;
 }
