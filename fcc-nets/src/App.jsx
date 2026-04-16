@@ -7589,723 +7589,723 @@ export default function App() {
                   border: `1.5px solid ${isReconfirm ? "#fcd34d" : "#fca5a5"}`,
                   borderRadius: 12, padding: "14px 16px",
                 }}>
-              <div style={{
-                fontWeight: 800, fontSize: 14,
-                color: isReconfirm ? "#92400e" : "#991b1b", marginBottom: 6
-              }}>
-                {isReconfirm ? "⏰ Please reconfirm your details" : "📋 Profile incomplete"}
-              </div>
-              <div style={{
-                fontSize: 13, color: isReconfirm ? "#b45309" : "#b91c1c",
-                lineHeight: 1.5, marginBottom: 12
-              }}>
-                {isReconfirm
-                  ? `It's been over 6 months since you last confirmed your details (${confirmedAt?.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) || "never"}). Please check they're still correct and confirm below.`
-                  : "Your profile is missing contact details. The club needs these to reach you about training, matches and important updates."}
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {[
-                  { icon: "📧", label: "Email", val: me.email, field: "email" },
-                  { icon: "📱", label: "Phone", val: me.phone, field: "phone" },
-                ].map(f => (
-                  <div key={f.field} style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    background: "rgba(255,255,255,.6)", borderRadius: 8, padding: "8px 10px"
+                  <div style={{
+                    fontWeight: 800, fontSize: 14,
+                    color: isReconfirm ? "#92400e" : "#991b1b", marginBottom: 6
                   }}>
-                    <span style={{ fontSize: 16 }}>{f.icon}</span>
-                    <span style={{ fontSize: 13, color: G.text, flex: 1 }}>{f.label}</span>
-                    <span style={{
-                      fontSize: 12, fontWeight: 800,
-                      color: f.val ? "#16a34a" : "#dc2626"
-                    }}>
-                      {f.val ? "✓ Set" : "✗ Missing"}
-                    </span>
+                    {isReconfirm ? "⏰ Please reconfirm your details" : "📋 Profile incomplete"}
                   </div>
-                ))}
-              </div>
-              {isReconfirm && (
-                <button type="button"
-                  onClick={() => {
-                    const now = new Date().toISOString();
-                    const updated = members.map(m => m.id === currentUser.id
-                      ? { ...m, profileConfirmedAt: now } : m);
-                    saveMembers(updated);
-                    const fresh = updated.find(m => m.id === currentUser.id);
-                    setCurrentUser(fresh);
-                    localStorage.setItem("fcc-current-user", JSON.stringify(fresh));
-                    showToast("Details confirmed ✓");
-                  }}
-                  style={{
-                    marginTop: 12, width: "100%", padding: "11px 0", borderRadius: 10,
-                    border: "none", background: "#f59e0b", color: "#fff", fontWeight: 800,
-                    fontSize: 14, cursor: "pointer", fontFamily: "inherit"
+                  <div style={{
+                    fontSize: 13, color: isReconfirm ? "#b45309" : "#b91c1c",
+                    lineHeight: 1.5, marginBottom: 12
                   }}>
-                  ✓ Yes, my details are still correct
-                </button>
+                    {isReconfirm
+                      ? `It's been over 6 months since you last confirmed your details (${confirmedAt?.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) || "never"}). Please check they're still correct and confirm below.`
+                      : "Your profile is missing contact details. The club needs these to reach you about training, matches and important updates."}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {[
+                      { icon: "📧", label: "Email", val: me.email, field: "email" },
+                      { icon: "📱", label: "Phone", val: me.phone, field: "phone" },
+                    ].map(f => (
+                      <div key={f.field} style={{
+                        display: "flex", alignItems: "center", gap: 8,
+                        background: "rgba(255,255,255,.6)", borderRadius: 8, padding: "8px 10px"
+                      }}>
+                        <span style={{ fontSize: 16 }}>{f.icon}</span>
+                        <span style={{ fontSize: 13, color: G.text, flex: 1 }}>{f.label}</span>
+                        <span style={{
+                          fontSize: 12, fontWeight: 800,
+                          color: f.val ? "#16a34a" : "#dc2626"
+                        }}>
+                          {f.val ? "✓ Set" : "✗ Missing"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  {isReconfirm && (
+                    <button type="button"
+                      onClick={() => {
+                        const now = new Date().toISOString();
+                        const updated = members.map(m => m.id === currentUser.id
+                          ? { ...m, profileConfirmedAt: now } : m);
+                        saveMembers(updated);
+                        const fresh = updated.find(m => m.id === currentUser.id);
+                        setCurrentUser(fresh);
+                        localStorage.setItem("fcc-current-user", JSON.stringify(fresh));
+                        showToast("Details confirmed ✓");
+                      }}
+                      style={{
+                        marginTop: 12, width: "100%", padding: "11px 0", borderRadius: 10,
+                        border: "none", background: "#f59e0b", color: "#fff", fontWeight: 800,
+                        fontSize: 14, cursor: "pointer", fontFamily: "inherit"
+                      }}>
+                      ✓ Yes, my details are still correct
+                    </button>
+                  )}
+                </div>
               )}
-            </div>
-          )}
 
-          {/* Contact details */}
-          <div style={{
-            background: G.white, border: `1.5px solid ${G.border}`,
-            borderRadius: 14, padding: "18px 16px"
-          }}>
-            <div style={{
-              display: "flex", justifyContent: "space-between",
-              alignItems: "center", marginBottom: 14
-            }}>
-              <div style={{ fontWeight: 800, fontSize: 14, color: G.text }}>Contact Details</div>
-              {!profileEditing && (
-                <button type="button" onClick={() => {
-                  setProfileEmail(me.email || "");
-                  setProfilePhone(me.phone || "");
-                  setProfileEditing(true);
-                }} style={{
-                  background: G.cream, border: `1px solid ${G.border}`,
-                  borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700,
-                  cursor: "pointer", fontFamily: "inherit", color: G.text
+              {/* Contact details */}
+              <div style={{
+                background: G.white, border: `1.5px solid ${G.border}`,
+                borderRadius: 14, padding: "18px 16px"
+              }}>
+                <div style={{
+                  display: "flex", justifyContent: "space-between",
+                  alignItems: "center", marginBottom: 14
                 }}>
-                  ✏️ Edit
-                </button>
-              )}
-            </div>
-            {profileEditing ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <FFld label="Email address">
-                  <input type="email" placeholder="your@email.com"
-                    style={iSt({ padding: "9px 12px", fontSize: 14 })}
-                    value={profileEmail}
-                    onChange={e => setProfileEmail(e.target.value)} />
-                </FFld>
-                <FFld label="Phone / Mobile">
-                  <input type="tel" placeholder="+45 12 34 56 78"
-                    style={iSt({ padding: "9px 12px", fontSize: 14 })}
-                    value={profilePhone}
-                    onChange={e => setProfilePhone(e.target.value)} />
-                </FFld>
-                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                  <Btn bg={G.green} col={G.lime} full onClick={() => {
-                    // Save + auto-confirm if both fields now filled
-                    const emailOk = profileEmail.trim().length > 0;
-                    const phoneOk = profilePhone.trim().length > 0;
-                    const now = new Date().toISOString();
-                    const updated = members.map(m => m.id === currentUser.id
-                      ? {
-                        ...m,
-                        email: profileEmail.trim(),
-                        phone: profilePhone.trim(),
-                        profileConfirmedAt: (emailOk && phoneOk) ? now : (m.profileConfirmedAt || null),
-                      } : m);
-                    saveMembers(updated);
-                    const fresh = updated.find(m => m.id === currentUser.id);
-                    setCurrentUser(fresh);
-                    localStorage.setItem("fcc-current-user", JSON.stringify(fresh));
-                    setProfileEditing(false);
-                    showToast(emailOk && phoneOk ? "Profile complete ✓" : "Saved ✓");
-                  }}>Save</Btn>
-                  <Btn bg={G.cream} col={G.muted} onClick={() => setProfileEditing(false)}>Cancel</Btn>
+                  <div style={{ fontWeight: 800, fontSize: 14, color: G.text }}>Contact Details</div>
+                  {!profileEditing && (
+                    <button type="button" onClick={() => {
+                      setProfileEmail(me.email || "");
+                      setProfilePhone(me.phone || "");
+                      setProfileEditing(true);
+                    }} style={{
+                      background: G.cream, border: `1px solid ${G.border}`,
+                      borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700,
+                      cursor: "pointer", fontFamily: "inherit", color: G.text
+                    }}>
+                      ✏️ Edit
+                    </button>
+                  )}
                 </div>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontSize: 18 }}>📧</span>
-                  <div>
-                    <div style={{
-                      fontSize: 11, color: G.muted, fontWeight: 700,
-                      textTransform: "uppercase", letterSpacing: 1
-                    }}>Email</div>
-                    <div style={{ fontSize: 14, color: me.email ? G.text : G.muted, fontWeight: 600 }}>
-                      {me.email || "Not set yet"}
+                {profileEditing ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <FFld label="Email address">
+                      <input type="email" placeholder="your@email.com"
+                        style={iSt({ padding: "9px 12px", fontSize: 14 })}
+                        value={profileEmail}
+                        onChange={e => setProfileEmail(e.target.value)} />
+                    </FFld>
+                    <FFld label="Phone / Mobile">
+                      <input type="tel" placeholder="+45 12 34 56 78"
+                        style={iSt({ padding: "9px 12px", fontSize: 14 })}
+                        value={profilePhone}
+                        onChange={e => setProfilePhone(e.target.value)} />
+                    </FFld>
+                    <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                      <Btn bg={G.green} col={G.lime} full onClick={() => {
+                        // Save + auto-confirm if both fields now filled
+                        const emailOk = profileEmail.trim().length > 0;
+                        const phoneOk = profilePhone.trim().length > 0;
+                        const now = new Date().toISOString();
+                        const updated = members.map(m => m.id === currentUser.id
+                          ? {
+                            ...m,
+                            email: profileEmail.trim(),
+                            phone: profilePhone.trim(),
+                            profileConfirmedAt: (emailOk && phoneOk) ? now : (m.profileConfirmedAt || null),
+                          } : m);
+                        saveMembers(updated);
+                        const fresh = updated.find(m => m.id === currentUser.id);
+                        setCurrentUser(fresh);
+                        localStorage.setItem("fcc-current-user", JSON.stringify(fresh));
+                        setProfileEditing(false);
+                        showToast(emailOk && phoneOk ? "Profile complete ✓" : "Saved ✓");
+                      }}>Save</Btn>
+                      <Btn bg={G.cream} col={G.muted} onClick={() => setProfileEditing(false)}>Cancel</Btn>
                     </div>
                   </div>
-                </div>
-                <div style={{ height: 1, background: G.border }} />
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontSize: 18 }}>📱</span>
-                  <div>
-                    <div style={{
-                      fontSize: 11, color: G.muted, fontWeight: 700,
-                      textTransform: "uppercase", letterSpacing: 1
-                    }}>Phone</div>
-                    <div style={{ fontSize: 14, color: me.phone ? G.text : G.muted, fontWeight: 600 }}>
-                      {me.phone || "Not set yet"}
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontSize: 18 }}>📧</span>
+                      <div>
+                        <div style={{
+                          fontSize: 11, color: G.muted, fontWeight: 700,
+                          textTransform: "uppercase", letterSpacing: 1
+                        }}>Email</div>
+                        <div style={{ fontSize: 14, color: me.email ? G.text : G.muted, fontWeight: 600 }}>
+                          {me.email || "Not set yet"}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-                {/* Last confirmed date */}
-                {me.profileConfirmedAt && (
-                  <div style={{ fontSize: 11, color: G.muted, marginTop: 4, fontStyle: "italic" }}>
-                    Last confirmed: {new Date(me.profileConfirmedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                    {" · "}Next check-in: {new Date(new Date(me.profileConfirmedAt).getTime() + 6 * 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-GB", { month: "short", year: "numeric" })}
+                    <div style={{ height: 1, background: G.border }} />
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontSize: 18 }}>📱</span>
+                      <div>
+                        <div style={{
+                          fontSize: 11, color: G.muted, fontWeight: 700,
+                          textTransform: "uppercase", letterSpacing: 1
+                        }}>Phone</div>
+                        <div style={{ fontSize: 14, color: me.phone ? G.text : G.muted, fontWeight: 600 }}>
+                          {me.phone || "Not set yet"}
+                        </div>
+                      </div>
+                    </div>
+                    {/* Last confirmed date */}
+                    {me.profileConfirmedAt && (
+                      <div style={{ fontSize: 11, color: G.muted, marginTop: 4, fontStyle: "italic" }}>
+                        Last confirmed: {new Date(me.profileConfirmedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                        {" · "}Next check-in: {new Date(new Date(me.profileConfirmedAt).getTime() + 6 * 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-GB", { month: "short", year: "numeric" })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* Player attributes (batting/bowling hand) */}
-          <div style={{
-            background: G.white, border: `1.5px solid ${G.border}`,
-            borderRadius: 14, padding: "18px 16px"
-          }}>
-            <div style={{
-              display: "flex", justifyContent: "space-between",
-              alignItems: "center", marginBottom: 14
-            }}>
-              <div style={{ fontWeight: 800, fontSize: 14, color: G.text }}>🏏 Player Attributes</div>
-              {!profileAttrsEditing && (
-                <button type="button" onClick={() => {
-                  setProfileAttrsDraft({
-                    battingHand: me.battingHand || "right",
-                    bowlingHand: me.bowlingHand || "right",
-                    bowlingStyle: me.bowlingStyle || "",
-                  });
-                  setProfileAttrsEditing(true);
-                }} style={{
-                  background: G.cream, border: `1px solid ${G.border}`,
-                  borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700,
-                  cursor: "pointer", fontFamily: "inherit", color: G.text
-                }}>
-                  ✏️ Edit
-                </button>
-              )}
-            </div>
-            {profileAttrsEditing ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <div>
-                  <div style={{
-                    fontSize: 11, fontWeight: 700, color: G.muted, marginBottom: 6,
-                    textTransform: "uppercase", letterSpacing: 1
-                  }}>Batting Hand</div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    {["right", "left"].map(h => (
-                      <button key={h}
-                        onClick={() => setProfileAttrsDraft(d => ({ ...d, battingHand: h }))}
-                        style={{
-                          flex: 1, padding: "10px", fontSize: 13, fontWeight: 600,
-                          background: profileAttrsDraft.battingHand === h ? G.green : G.cream,
-                          color: profileAttrsDraft.battingHand === h ? G.lime : G.text,
-                          border: `1.5px solid ${profileAttrsDraft.battingHand === h ? G.green : G.border}`,
-                          borderRadius: 8, cursor: "pointer", fontFamily: "inherit",
-                        }}>
-                        {h === "right" ? "Right-handed" : "Left-handed"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <div style={{
-                    fontSize: 11, fontWeight: 700, color: G.muted, marginBottom: 6,
-                    textTransform: "uppercase", letterSpacing: 1
-                  }}>Bowling Arm</div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    {["right", "left"].map(h => (
-                      <button key={h}
-                        onClick={() => setProfileAttrsDraft(d => ({ ...d, bowlingHand: h }))}
-                        style={{
-                          flex: 1, padding: "10px", fontSize: 13, fontWeight: 600,
-                          background: profileAttrsDraft.bowlingHand === h ? G.green : G.cream,
-                          color: profileAttrsDraft.bowlingHand === h ? G.lime : G.text,
-                          border: `1.5px solid ${profileAttrsDraft.bowlingHand === h ? G.green : G.border}`,
-                          borderRadius: 8, cursor: "pointer", fontFamily: "inherit",
-                        }}>
-                        {h === "right" ? "Right-arm" : "Left-arm"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <div style={{
-                    fontSize: 11, fontWeight: 700, color: G.muted, marginBottom: 6,
-                    textTransform: "uppercase", letterSpacing: 1
-                  }}>Bowling Style (optional)</div>
-                  <select
-                    value={profileAttrsDraft.bowlingStyle}
-                    onChange={e => setProfileAttrsDraft(d => ({ ...d, bowlingStyle: e.target.value }))}
-                    style={iSt({ padding: "10px 12px", fontSize: 13 })}>
-                    <option value="">Not specified</option>
-                    <option value="Fast">Fast</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Spin">Spin</option>
-                    <option value="Off-spin">Off-spin</option>
-                    <option value="Leg-spin">Leg-spin</option>
-                  </select>
-                </div>
-                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                  <Btn bg={G.green} col={G.lime} full onClick={() => {
-                    const updated = members.map(m => m.id === currentUser.id
-                      ? {
-                        ...m,
-                        battingHand: profileAttrsDraft.battingHand,
-                        bowlingHand: profileAttrsDraft.bowlingHand,
-                        bowlingStyle: profileAttrsDraft.bowlingStyle,
-                      } : m);
-                    saveMembers(updated);
-                    const fresh = updated.find(m => m.id === currentUser.id);
-                    setCurrentUser(fresh);
-                    localStorage.setItem("fcc-current-user", JSON.stringify(fresh));
-                    setProfileAttrsEditing(false);
-                    showToast("Attributes saved ✓");
-                  }}>Save</Btn>
-                  <Btn bg={G.cream} col={G.muted} onClick={() => setProfileAttrsEditing(false)}>Cancel</Btn>
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              {/* Player attributes (batting/bowling hand) */}
+              <div style={{
+                background: G.white, border: `1.5px solid ${G.border}`,
+                borderRadius: 14, padding: "18px 16px"
+              }}>
                 <div style={{
-                  display: "flex", alignItems: "center", gap: 8,
-                  background: G.cream, border: `1px solid ${G.border}`,
-                  borderRadius: 8, padding: "10px 14px", flex: 1, minWidth: 120
+                  display: "flex", justifyContent: "space-between",
+                  alignItems: "center", marginBottom: 14
                 }}>
-                  <span style={{ fontSize: 18 }}>🏏</span>
-                  <div>
-                    <div style={{ fontSize: 9, color: G.muted, fontWeight: 700, textTransform: "uppercase" }}>Batting</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: G.text }}>
-                      {me.battingHand === "left" ? "Left-handed" : "Right-handed"}
+                  <div style={{ fontWeight: 800, fontSize: 14, color: G.text }}>🏏 Player Attributes</div>
+                  {!profileAttrsEditing && (
+                    <button type="button" onClick={() => {
+                      setProfileAttrsDraft({
+                        battingHand: me.battingHand || "right",
+                        bowlingHand: me.bowlingHand || "right",
+                        bowlingStyle: me.bowlingStyle || "",
+                      });
+                      setProfileAttrsEditing(true);
+                    }} style={{
+                      background: G.cream, border: `1px solid ${G.border}`,
+                      borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700,
+                      cursor: "pointer", fontFamily: "inherit", color: G.text
+                    }}>
+                      ✏️ Edit
+                    </button>
+                  )}
+                </div>
+                {profileAttrsEditing ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div>
+                      <div style={{
+                        fontSize: 11, fontWeight: 700, color: G.muted, marginBottom: 6,
+                        textTransform: "uppercase", letterSpacing: 1
+                      }}>Batting Hand</div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        {["right", "left"].map(h => (
+                          <button key={h}
+                            onClick={() => setProfileAttrsDraft(d => ({ ...d, battingHand: h }))}
+                            style={{
+                              flex: 1, padding: "10px", fontSize: 13, fontWeight: 600,
+                              background: profileAttrsDraft.battingHand === h ? G.green : G.cream,
+                              color: profileAttrsDraft.battingHand === h ? G.lime : G.text,
+                              border: `1.5px solid ${profileAttrsDraft.battingHand === h ? G.green : G.border}`,
+                              borderRadius: 8, cursor: "pointer", fontFamily: "inherit",
+                            }}>
+                            {h === "right" ? "Right-handed" : "Left-handed"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{
+                        fontSize: 11, fontWeight: 700, color: G.muted, marginBottom: 6,
+                        textTransform: "uppercase", letterSpacing: 1
+                      }}>Bowling Arm</div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        {["right", "left"].map(h => (
+                          <button key={h}
+                            onClick={() => setProfileAttrsDraft(d => ({ ...d, bowlingHand: h }))}
+                            style={{
+                              flex: 1, padding: "10px", fontSize: 13, fontWeight: 600,
+                              background: profileAttrsDraft.bowlingHand === h ? G.green : G.cream,
+                              color: profileAttrsDraft.bowlingHand === h ? G.lime : G.text,
+                              border: `1.5px solid ${profileAttrsDraft.bowlingHand === h ? G.green : G.border}`,
+                              borderRadius: 8, cursor: "pointer", fontFamily: "inherit",
+                            }}>
+                            {h === "right" ? "Right-arm" : "Left-arm"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{
+                        fontSize: 11, fontWeight: 700, color: G.muted, marginBottom: 6,
+                        textTransform: "uppercase", letterSpacing: 1
+                      }}>Bowling Style (optional)</div>
+                      <select
+                        value={profileAttrsDraft.bowlingStyle}
+                        onChange={e => setProfileAttrsDraft(d => ({ ...d, bowlingStyle: e.target.value }))}
+                        style={iSt({ padding: "10px 12px", fontSize: 13 })}>
+                        <option value="">Not specified</option>
+                        <option value="Fast">Fast</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Spin">Spin</option>
+                        <option value="Off-spin">Off-spin</option>
+                        <option value="Leg-spin">Leg-spin</option>
+                      </select>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                      <Btn bg={G.green} col={G.lime} full onClick={() => {
+                        const updated = members.map(m => m.id === currentUser.id
+                          ? {
+                            ...m,
+                            battingHand: profileAttrsDraft.battingHand,
+                            bowlingHand: profileAttrsDraft.bowlingHand,
+                            bowlingStyle: profileAttrsDraft.bowlingStyle,
+                          } : m);
+                        saveMembers(updated);
+                        const fresh = updated.find(m => m.id === currentUser.id);
+                        setCurrentUser(fresh);
+                        localStorage.setItem("fcc-current-user", JSON.stringify(fresh));
+                        setProfileAttrsEditing(false);
+                        showToast("Attributes saved ✓");
+                      }}>Save</Btn>
+                      <Btn bg={G.cream} col={G.muted} onClick={() => setProfileAttrsEditing(false)}>Cancel</Btn>
                     </div>
                   </div>
-                </div>
-                <div style={{
-                  display: "flex", alignItems: "center", gap: 8,
-                  background: G.cream, border: `1px solid ${G.border}`,
-                  borderRadius: 8, padding: "10px 14px", flex: 1, minWidth: 120
-                }}>
-                  <span style={{ fontSize: 18 }}>⚾</span>
-                  <div>
-                    <div style={{ fontSize: 9, color: G.muted, fontWeight: 700, textTransform: "uppercase" }}>Bowling</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: G.text }}>
-                      {me.bowlingHand === "left" ? "Left-arm" : "Right-arm"}
-                      {me.bowlingStyle && ` ${me.bowlingStyle}`}
+                ) : (
+                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 8,
+                      background: G.cream, border: `1px solid ${G.border}`,
+                      borderRadius: 8, padding: "10px 14px", flex: 1, minWidth: 120
+                    }}>
+                      <span style={{ fontSize: 18 }}>🏏</span>
+                      <div>
+                        <div style={{ fontSize: 9, color: G.muted, fontWeight: 700, textTransform: "uppercase" }}>Batting</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: G.text }}>
+                          {me.battingHand === "left" ? "Left-handed" : "Right-handed"}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 8,
+                      background: G.cream, border: `1px solid ${G.border}`,
+                      borderRadius: 8, padding: "10px 14px", flex: 1, minWidth: 120
+                    }}>
+                      <span style={{ fontSize: 18 }}>⚾</span>
+                      <div>
+                        <div style={{ fontSize: 9, color: G.muted, fontWeight: 700, textTransform: "uppercase" }}>Bowling</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: G.text }}>
+                          {me.bowlingHand === "left" ? "Left-arm" : "Right-arm"}
+                          {me.bowlingStyle && ` ${me.bowlingStyle}`}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {/* Change PIN */}
-          <div style={{
-            background: G.white, border: `1.5px solid ${G.border}`,
-            borderRadius: 14, padding: "18px 16px"
-          }}>
-            <div style={{
-              display: "flex", justifyContent: "space-between",
-              alignItems: "center", marginBottom: changingPin ? 14 : 0
-            }}>
-              <div style={{ fontWeight: 800, fontSize: 14, color: G.text }}>🔐 Change PIN</div>
-              {!changingPin && (
-                <button type="button"
-                  onClick={() => { setChangingPin(true); setPinMsg(""); }}
-                  style={{
-                    background: G.cream, border: `1px solid ${G.border}`,
-                    borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700,
-                    cursor: "pointer", fontFamily: "inherit", color: G.text
+              {/* Change PIN */}
+              <div style={{
+                background: G.white, border: `1.5px solid ${G.border}`,
+                borderRadius: 14, padding: "18px 16px"
+              }}>
+                <div style={{
+                  display: "flex", justifyContent: "space-between",
+                  alignItems: "center", marginBottom: changingPin ? 14 : 0
+                }}>
+                  <div style={{ fontWeight: 800, fontSize: 14, color: G.text }}>🔐 Change PIN</div>
+                  {!changingPin && (
+                    <button type="button"
+                      onClick={() => { setChangingPin(true); setPinMsg(""); }}
+                      style={{
+                        background: G.cream, border: `1px solid ${G.border}`,
+                        borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700,
+                        cursor: "pointer", fontFamily: "inherit", color: G.text
+                      }}>
+                      Change
+                    </button>
+                  )}
+                </div>
+                {changingPin && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <FFld label="Current PIN">
+                      <input type="password" inputMode="numeric" maxLength={4}
+                        placeholder="••••" style={iSt({
+                          padding: "9px 12px", fontSize: 18,
+                          letterSpacing: 6, textAlign: "center"
+                        })}
+                        value={oldPin} onChange={e => setOldPin(e.target.value.replace(/\D/g, ""))} />
+                    </FFld>
+                    <FFld label="New PIN">
+                      <input type="password" inputMode="numeric" maxLength={4}
+                        placeholder="••••" style={iSt({
+                          padding: "9px 12px", fontSize: 18,
+                          letterSpacing: 6, textAlign: "center"
+                        })}
+                        value={newPin1} onChange={e => setNewPin1(e.target.value.replace(/\D/g, ""))} />
+                    </FFld>
+                    <FFld label="Confirm new PIN">
+                      <input type="password" inputMode="numeric" maxLength={4}
+                        placeholder="••••" style={iSt({
+                          padding: "9px 12px", fontSize: 18,
+                          letterSpacing: 6, textAlign: "center"
+                        })}
+                        value={newPin2} onChange={e => setNewPin2(e.target.value.replace(/\D/g, ""))} />
+                    </FFld>
+                    {pinMsg && <div style={{ color: "#dc2626", fontSize: 13, fontWeight: 700 }}>{pinMsg}</div>}
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <Btn bg={G.green} col={G.lime} full onClick={handleChangePin}>Update PIN</Btn>
+                      <Btn bg={G.cream} col={G.muted} onClick={() => {
+                        setChangingPin(false); setOldPin(""); setNewPin1(""); setNewPin2(""); setPinMsg("");
+                      }}>Cancel</Btn>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── My Availability ───────────────────────────────── */}
+              {(() => {
+                const myAbsences = (me.absences || []).sort((a, b) => a.from.localeCompare(b.from));
+                const ABS_CATS = ["Holiday", "Work", "Injury", "Other"];
+                const catColour = { Holiday: "#1e40af", Work: "#92400e", Injury: "#dc2626", Other: "#374151" };
+                const catBg = { Holiday: "#eff6ff", Work: "#fffbeb", Injury: "#fef2f2", Other: "#f3f4f6" };
+                const catBord = { Holiday: "#bfdbfe", Work: "#fde68a", Injury: "#fca5a5", Other: "#e5e7eb" };
+
+                function saveAbsences(newList) {
+                  const updated = members.map(m => m.id === me.id ? { ...m, absences: newList } : m);
+                  saveMembers(updated);
+                }
+
+                function addAbsence() {
+                  if (!absFrom || !absTo) { showToast("Please pick start and end dates"); return; }
+                  if (absTo < absFrom) { showToast("End date must be on or after start date"); return; }
+                  // Find conflicting sessions
+                  const conflicts = sessions.filter(s =>
+                    s.players.includes(me.name) &&
+                    s.date >= absFrom && s.date <= absTo
+                  );
+                  if (conflicts.length > 0) {
+                    setAbsConflicts({ from: absFrom, to: absTo, cat: absCat, note: absNote, sessions: conflicts });
+                    return; // show nudge
+                  }
+                  commitAbsence(absFrom, absTo, absCat, absNote, []);
+                }
+
+                function commitAbsence(from, to, cat, note, sessionsToRemove) {
+                  const newAbs = { id: uid(), from, to, category: cat, note: note.trim() };
+                  saveAbsences([...myAbsences, newAbs]);
+                  if (sessionsToRemove.length > 0) {
+                    const updated = sessions.map(s => sessionsToRemove.find(c => c.id === s.id)
+                      ? { ...s, players: s.players.filter(p => p !== me.name) } : s);
+                    saveSessions(updated);
+                  }
+                  setAbsFrom(""); setAbsTo(""); setAbsCat("Holiday"); setAbsNote("");
+                  setAbsConflicts(null);
+                  showToast(`Away period saved ✓${sessionsToRemove.length > 0 ? " · removed from " + sessionsToRemove.length + " session" + (sessionsToRemove.length > 1 ? "s" : "") : ""}`);
+                }
+
+                return (
+                  <div style={{
+                    background: G.white, border: `1.5px solid ${G.border}`,
+                    borderRadius: 12, padding: "14px 16px"
                   }}>
-                  Change
-                </button>
-              )}
-            </div>
-            {changingPin && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <FFld label="Current PIN">
-                  <input type="password" inputMode="numeric" maxLength={4}
-                    placeholder="••••" style={iSt({
-                      padding: "9px 12px", fontSize: 18,
-                      letterSpacing: 6, textAlign: "center"
-                    })}
-                    value={oldPin} onChange={e => setOldPin(e.target.value.replace(/\D/g, ""))} />
-                </FFld>
-                <FFld label="New PIN">
-                  <input type="password" inputMode="numeric" maxLength={4}
-                    placeholder="••••" style={iSt({
-                      padding: "9px 12px", fontSize: 18,
-                      letterSpacing: 6, textAlign: "center"
-                    })}
-                    value={newPin1} onChange={e => setNewPin1(e.target.value.replace(/\D/g, ""))} />
-                </FFld>
-                <FFld label="Confirm new PIN">
-                  <input type="password" inputMode="numeric" maxLength={4}
-                    placeholder="••••" style={iSt({
-                      padding: "9px 12px", fontSize: 18,
-                      letterSpacing: 6, textAlign: "center"
-                    })}
-                    value={newPin2} onChange={e => setNewPin2(e.target.value.replace(/\D/g, ""))} />
-                </FFld>
-                {pinMsg && <div style={{ color: "#dc2626", fontSize: 13, fontWeight: 700 }}>{pinMsg}</div>}
-                <div style={{ display: "flex", gap: 8 }}>
-                  <Btn bg={G.green} col={G.lime} full onClick={handleChangePin}>Update PIN</Btn>
-                  <Btn bg={G.cream} col={G.muted} onClick={() => {
-                    setChangingPin(false); setOldPin(""); setNewPin1(""); setNewPin2(""); setPinMsg("");
-                  }}>Cancel</Btn>
-                </div>
-              </div>
-            )}
-          </div>
+                    <div style={{
+                      fontWeight: 900, fontSize: 14, color: G.text, marginBottom: 12,
+                      display: "flex", alignItems: "center", gap: 8
+                    }}>
+                      ✈️ My Availability
+                    </div>
 
-          {/* ── My Availability ───────────────────────────────── */}
-          {(() => {
-            const myAbsences = (me.absences || []).sort((a, b) => a.from.localeCompare(b.from));
-            const ABS_CATS = ["Holiday", "Work", "Injury", "Other"];
-            const catColour = { Holiday: "#1e40af", Work: "#92400e", Injury: "#dc2626", Other: "#374151" };
-            const catBg = { Holiday: "#eff6ff", Work: "#fffbeb", Injury: "#fef2f2", Other: "#f3f4f6" };
-            const catBord = { Holiday: "#bfdbfe", Work: "#fde68a", Injury: "#fca5a5", Other: "#e5e7eb" };
+                    {/* Conflict nudge */}
+                    {absConflicts && (
+                      <div style={{
+                        background: "#fffbeb", border: "1.5px solid #fde68a",
+                        borderRadius: 10, padding: "12px 14px", marginBottom: 14
+                      }}>
+                        <div style={{ fontWeight: 800, fontSize: 13, color: "#92400e", marginBottom: 6 }}>
+                          ⚠️ You're signed up for {absConflicts.sessions.length} session{absConflicts.sessions.length > 1 ? "s" : ""} during this period
+                        </div>
+                        <div style={{ fontSize: 12, color: "#78350f", marginBottom: 10, lineHeight: 1.6 }}>
+                          {absConflicts.sessions.map(s => `${fmtShort(s.date)} ${s.from}–${s.to}${s.label ? " · " + s.label : ""}`).join("\n")}
+                        </div>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <button onClick={() => commitAbsence(absConflicts.from, absConflicts.to, absConflicts.cat, absConflicts.note, absConflicts.sessions)}
+                            style={{
+                              flex: 1, background: "#92400e", color: "#fff", border: "none",
+                              borderRadius: 9, padding: "9px 0", fontFamily: "inherit", fontWeight: 800,
+                              fontSize: 12, cursor: "pointer"
+                            }}>
+                            Save &amp; remove me from those sessions
+                          </button>
+                          <button onClick={() => commitAbsence(absConflicts.from, absConflicts.to, absConflicts.cat, absConflicts.note, [])}
+                            style={{
+                              flex: 1, background: G.cream, color: G.muted, border: `1px solid ${G.border}`,
+                              borderRadius: 9, padding: "9px 0", fontFamily: "inherit", fontWeight: 700,
+                              fontSize: 12, cursor: "pointer"
+                            }}>
+                            Save &amp; keep me in sessions
+                          </button>
+                        </div>
+                        <button onClick={() => setAbsConflicts(null)}
+                          style={{
+                            width: "100%", marginTop: 8, background: "none", border: "none",
+                            fontSize: 12, color: G.muted, cursor: "pointer", fontFamily: "inherit"
+                          }}>
+                          Cancel
+                        </button>
+                      </div>
+                    )}
 
-            function saveAbsences(newList) {
-              const updated = members.map(m => m.id === me.id ? { ...m, absences: newList } : m);
-              saveMembers(updated);
-            }
+                    {/* Existing absences */}
+                    {myAbsences.length > 0 && (
+                      <div style={{ marginBottom: 14, display: "flex", flexDirection: "column", gap: 6 }}>
+                        {myAbsences.map(a => (
+                          <div key={a.id} style={{
+                            display: "flex", alignItems: "center", gap: 10,
+                            padding: "9px 12px", borderRadius: 9,
+                            background: catBg[a.category] || "#f3f4f6",
+                            border: `1px solid ${catBord[a.category] || "#e5e7eb"}`
+                          }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{
+                                fontWeight: 700, fontSize: 13,
+                                color: catColour[a.category] || G.text
+                              }}>
+                                {a.category}
+                                {a.from === a.to
+                                  ? ` · ${fmtShort(a.from)}`
+                                  : ` · ${fmtShort(a.from)} – ${fmtShort(a.to)}`}
+                              </div>
+                              {a.note && <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>
+                                {a.note}
+                                <span style={{ fontStyle: "italic", opacity: .7 }}> (note visible to admins only)</span>
+                              </div>}
+                            </div>
+                            <button onClick={() => saveAbsences(myAbsences.filter(x => x.id !== a.id))}
+                              style={{
+                                background: "none", border: "none", color: G.red,
+                                fontSize: 18, cursor: "pointer", padding: "0 4px", lineHeight: 1
+                              }}>×</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
-            function addAbsence() {
-              if (!absFrom || !absTo) { showToast("Please pick start and end dates"); return; }
-              if (absTo < absFrom) { showToast("End date must be on or after start date"); return; }
-              // Find conflicting sessions
-              const conflicts = sessions.filter(s =>
-                s.players.includes(me.name) &&
-                s.date >= absFrom && s.date <= absTo
-              );
-              if (conflicts.length > 0) {
-                setAbsConflicts({ from: absFrom, to: absTo, cat: absCat, note: absNote, sessions: conflicts });
-                return; // show nudge
-              }
-              commitAbsence(absFrom, absTo, absCat, absNote, []);
-            }
+                    {/* Add new absence */}
+                    {!absConflicts && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <div style={{ flex: 1 }}>
+                            <label style={{
+                              fontSize: 10, fontWeight: 700, color: G.muted,
+                              display: "block", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1
+                            }}>
+                              From
+                            </label>
+                            <input type="date" value={absFrom}
+                              onChange={e => { setAbsFrom(e.target.value); if (!absTo || absTo < e.target.value) setAbsTo(e.target.value); }}
+                              min={todayStr()}
+                              style={iSt({ fontSize: 13, padding: "8px 10px", borderRadius: 8 })} />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <label style={{
+                              fontSize: 10, fontWeight: 700, color: G.muted,
+                              display: "block", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1
+                            }}>
+                              To
+                            </label>
+                            <input type="date" value={absTo}
+                              onChange={e => setAbsTo(e.target.value)}
+                              min={absFrom || todayStr()}
+                              style={iSt({ fontSize: 13, padding: "8px 10px", borderRadius: 8 })} />
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {ABS_CATS.map(c => (
+                            <button key={c} onClick={() => setAbsCat(c)}
+                              style={{
+                                padding: "5px 12px", borderRadius: 20, border: `1px solid ${absCat === c ? catBord[c] || G.green : "rgba(0,0,0,.1)"}`,
+                                background: absCat === c ? (catBg[c] || G.cream) : "transparent",
+                                color: absCat === c ? (catColour[c] || G.green) : G.muted,
+                                fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit"
+                              }}>
+                              {c}
+                            </button>
+                          ))}
+                        </div>
+                        {absCat === "Other" && (
+                          <input value={absNote} onChange={e => setAbsNote(e.target.value)}
+                            placeholder="Brief reason (visible to admins only)…"
+                            style={iSt({ fontSize: 13, padding: "8px 10px", borderRadius: 8 })} />
+                        )}
+                        <button onClick={addAbsence}
+                          disabled={!absFrom || !absTo}
+                          style={{
+                            background: absFrom && absTo ? G.green : "rgba(0,0,0,.1)",
+                            color: absFrom && absTo ? G.lime : G.muted, border: "none", borderRadius: 9,
+                            padding: "10px 0", fontFamily: "inherit", fontWeight: 800, fontSize: 13,
+                            cursor: absFrom && absTo ? "pointer" : "default", width: "100%"
+                          }}>
+                          + Mark as away
+                        </button>
+                      </div>
+                    )}
 
-            function commitAbsence(from, to, cat, note, sessionsToRemove) {
-              const newAbs = { id: uid(), from, to, category: cat, note: note.trim() };
-              saveAbsences([...myAbsences, newAbs]);
-              if (sessionsToRemove.length > 0) {
-                const updated = sessions.map(s => sessionsToRemove.find(c => c.id === s.id)
-                  ? { ...s, players: s.players.filter(p => p !== me.name) } : s);
-                saveSessions(updated);
-              }
-              setAbsFrom(""); setAbsTo(""); setAbsCat("Holiday"); setAbsNote("");
-              setAbsConflicts(null);
-              showToast(`Away period saved ✓${sessionsToRemove.length > 0 ? " · removed from " + sessionsToRemove.length + " session" + (sessionsToRemove.length > 1 ? "s" : "") : ""}`);
-            }
+                  </div>
+                );
+              })()}
 
-            return (
+              {/* ── Notifications ─────────────────────────────────── */}
               <div style={{
                 background: G.white, border: `1.5px solid ${G.border}`,
                 borderRadius: 12, padding: "14px 16px"
               }}>
-                <div style={{
-                  fontWeight: 900, fontSize: 14, color: G.text, marginBottom: 12,
-                  display: "flex", alignItems: "center", gap: 8
-                }}>
-                  ✈️ My Availability
+                <div style={{ fontWeight: 900, fontSize: 14, color: G.text, marginBottom: 12 }}>
+                  🔔 Notifications
                 </div>
-
-                {/* Conflict nudge */}
-                {absConflicts && (
+                {!me.email && (
                   <div style={{
-                    background: "#fffbeb", border: "1.5px solid #fde68a",
-                    borderRadius: 10, padding: "12px 14px", marginBottom: 14
+                    fontSize: 12, color: G.muted, marginBottom: 10, lineHeight: 1.5,
+                    background: G.cream, borderRadius: 8, padding: "8px 10px",
+                    border: `1px solid ${G.border}`
                   }}>
-                    <div style={{ fontWeight: 800, fontSize: 13, color: "#92400e", marginBottom: 6 }}>
-                      ⚠️ You're signed up for {absConflicts.sessions.length} session{absConflicts.sessions.length > 1 ? "s" : ""} during this period
-                    </div>
-                    <div style={{ fontSize: 12, color: "#78350f", marginBottom: 10, lineHeight: 1.6 }}>
-                      {absConflicts.sessions.map(s => `${fmtShort(s.date)} ${s.from}–${s.to}${s.label ? " · " + s.label : ""}`).join("\n")}
-                    </div>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <button onClick={() => commitAbsence(absConflicts.from, absConflicts.to, absConflicts.cat, absConflicts.note, absConflicts.sessions)}
-                        style={{
-                          flex: 1, background: "#92400e", color: "#fff", border: "none",
-                          borderRadius: 9, padding: "9px 0", fontFamily: "inherit", fontWeight: 800,
-                          fontSize: 12, cursor: "pointer"
-                        }}>
-                        Save &amp; remove me from those sessions
-                      </button>
-                      <button onClick={() => commitAbsence(absConflicts.from, absConflicts.to, absConflicts.cat, absConflicts.note, [])}
-                        style={{
-                          flex: 1, background: G.cream, color: G.muted, border: `1px solid ${G.border}`,
-                          borderRadius: 9, padding: "9px 0", fontFamily: "inherit", fontWeight: 700,
-                          fontSize: 12, cursor: "pointer"
-                        }}>
-                        Save &amp; keep me in sessions
-                      </button>
-                    </div>
-                    <button onClick={() => setAbsConflicts(null)}
+                    ℹ️ Add your email address to receive booking confirmations.
+                  </div>
+                )}
+                <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
+                  <div style={{ paddingTop: 1 }}>
+                    <button onClick={() => {
+                      const updated = members.map(m => m.id === me.id
+                        ? { ...m, emailBookingConfirm: !(me.emailBookingConfirm ?? true) } : m);
+                      saveMembers(updated);
+                      showToast((me.emailBookingConfirm ?? true)
+                        ? "Booking confirmations off" : "Booking confirmations on ✓");
+                    }}
                       style={{
-                        width: "100%", marginTop: 8, background: "none", border: "none",
-                        fontSize: 12, color: G.muted, cursor: "pointer", fontFamily: "inherit"
+                        width: 44, height: 24, borderRadius: 20, border: "none", cursor: "pointer",
+                        background: (me.emailBookingConfirm ?? true) && me.email ? G.green : "#d1d5db",
+                        transition: "background .2s", position: "relative", flexShrink: 0,
+                        display: "block"
                       }}>
-                      Cancel
+                      <span style={{
+                        position: "absolute", top: 2,
+                        left: (me.emailBookingConfirm ?? true) && me.email ? 22 : 2,
+                        width: 20, height: 20, borderRadius: "50%", background: "#fff",
+                        transition: "left .2s", display: "block"
+                      }} />
                     </button>
                   </div>
-                )}
-
-                {/* Existing absences */}
-                {myAbsences.length > 0 && (
-                  <div style={{ marginBottom: 14, display: "flex", flexDirection: "column", gap: 6 }}>
-                    {myAbsences.map(a => (
-                      <div key={a.id} style={{
-                        display: "flex", alignItems: "center", gap: 10,
-                        padding: "9px 12px", borderRadius: 9,
-                        background: catBg[a.category] || "#f3f4f6",
-                        border: `1px solid ${catBord[a.category] || "#e5e7eb"}`
-                      }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{
-                            fontWeight: 700, fontSize: 13,
-                            color: catColour[a.category] || G.text
-                          }}>
-                            {a.category}
-                            {a.from === a.to
-                              ? ` · ${fmtShort(a.from)}`
-                              : ` · ${fmtShort(a.from)} – ${fmtShort(a.to)}`}
-                          </div>
-                          {a.note && <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>
-                            {a.note}
-                            <span style={{ fontStyle: "italic", opacity: .7 }}> (note visible to admins only)</span>
-                          </div>}
-                        </div>
-                        <button onClick={() => saveAbsences(myAbsences.filter(x => x.id !== a.id))}
-                          style={{
-                            background: "none", border: "none", color: G.red,
-                            fontSize: 18, cursor: "pointer", padding: "0 4px", lineHeight: 1
-                          }}>×</button>
-                      </div>
-                    ))}
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: G.text }}>
+                      Booking confirmation emails
+                    </div>
+                    <div style={{ fontSize: 11, color: G.muted, marginTop: 2, lineHeight: 1.5 }}>
+                      Receive an email each time you join or book a session.
+                      {me.email
+                        ? ` Sent to ${maskEmail(me.email)}.`
+                        : " No email on file — add one in your profile."}
+                    </div>
                   </div>
-                )}
+                </label>
 
-                {/* Add new absence */}
-                {!absConflicts && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <div style={{ flex: 1 }}>
-                        <label style={{
-                          fontSize: 10, fontWeight: 700, color: G.muted,
-                          display: "block", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1
-                        }}>
-                          From
-                        </label>
-                        <input type="date" value={absFrom}
-                          onChange={e => { setAbsFrom(e.target.value); if (!absTo || absTo < e.target.value) setAbsTo(e.target.value); }}
-                          min={todayStr()}
-                          style={iSt({ fontSize: 13, padding: "8px 10px", borderRadius: 8 })} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <label style={{
-                          fontSize: 10, fontWeight: 700, color: G.muted,
-                          display: "block", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1
-                        }}>
-                          To
-                        </label>
-                        <input type="date" value={absTo}
-                          onChange={e => setAbsTo(e.target.value)}
-                          min={absFrom || todayStr()}
-                          style={iSt({ fontSize: 13, padding: "8px 10px", borderRadius: 8 })} />
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      {ABS_CATS.map(c => (
-                        <button key={c} onClick={() => setAbsCat(c)}
-                          style={{
-                            padding: "5px 12px", borderRadius: 20, border: `1px solid ${absCat === c ? catBord[c] || G.green : "rgba(0,0,0,.1)"}`,
-                            background: absCat === c ? (catBg[c] || G.cream) : "transparent",
-                            color: absCat === c ? (catColour[c] || G.green) : G.muted,
-                            fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit"
-                          }}>
-                          {c}
-                        </button>
-                      ))}
-                    </div>
-                    {absCat === "Other" && (
-                      <input value={absNote} onChange={e => setAbsNote(e.target.value)}
-                        placeholder="Brief reason (visible to admins only)…"
-                        style={iSt({ fontSize: 13, padding: "8px 10px", borderRadius: 8 })} />
-                    )}
-                    <button onClick={addAbsence}
-                      disabled={!absFrom || !absTo}
+                <div style={{ height: 1, background: G.border, margin: "10px 0" }} />
+
+                <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
+                  <div style={{ paddingTop: 1 }}>
+                    <button onClick={() => {
+                      const updated = members.map(m => m.id === me.id
+                        ? { ...m, emailDayBeforeReminder: !(me.emailDayBeforeReminder ?? true) } : m);
+                      saveMembers(updated);
+                      showToast((me.emailDayBeforeReminder ?? true)
+                        ? "Day-before reminders off" : "Day-before reminders on ✓");
+                    }}
                       style={{
-                        background: absFrom && absTo ? G.green : "rgba(0,0,0,.1)",
-                        color: absFrom && absTo ? G.lime : G.muted, border: "none", borderRadius: 9,
-                        padding: "10px 0", fontFamily: "inherit", fontWeight: 800, fontSize: 13,
-                        cursor: absFrom && absTo ? "pointer" : "default", width: "100%"
+                        width: 44, height: 24, borderRadius: 20, border: "none", cursor: "pointer",
+                        background: (me.emailDayBeforeReminder ?? true) && me.email ? G.green : "#d1d5db",
+                        transition: "background .2s", position: "relative", flexShrink: 0,
+                        display: "block"
                       }}>
-                      + Mark as away
+                      <span style={{
+                        position: "absolute", top: 2,
+                        left: (me.emailDayBeforeReminder ?? true) && me.email ? 22 : 2,
+                        width: 20, height: 20, borderRadius: "50%", background: "#fff",
+                        transition: "left .2s", display: "block"
+                      }} />
                     </button>
                   </div>
-                )}
-
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: G.text }}>
+                      Day-before reminders
+                    </div>
+                    <div style={{ fontSize: 11, color: G.muted, marginTop: 2, lineHeight: 1.5 }}>
+                      Get an email at 5pm the evening before any session you're booked into.
+                      Helps you not forget and plan transport in time.
+                    </div>
+                  </div>
+                </label>
               </div>
-            );
-          })()}
 
-          {/* ── Notifications ─────────────────────────────────── */}
-          <div style={{
-            background: G.white, border: `1.5px solid ${G.border}`,
-            borderRadius: 12, padding: "14px 16px"
-          }}>
-            <div style={{ fontWeight: 900, fontSize: 14, color: G.text, marginBottom: 12 }}>
-              🔔 Notifications
-            </div>
-            {!me.email && (
+              {/* Theme switcher */}
               <div style={{
-                fontSize: 12, color: G.muted, marginBottom: 10, lineHeight: 1.5,
-                background: G.cream, borderRadius: 8, padding: "8px 10px",
-                border: `1px solid ${G.border}`
+                background: G.white, borderRadius: 14, border: `1.5px solid ${G.border}`,
+                padding: "14px 16px"
               }}>
-                ℹ️ Add your email address to receive booking confirmations.
-              </div>
-            )}
-            <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
-              <div style={{ paddingTop: 1 }}>
-                <button onClick={() => {
-                  const updated = members.map(m => m.id === me.id
-                    ? { ...m, emailBookingConfirm: !(me.emailBookingConfirm ?? true) } : m);
-                  saveMembers(updated);
-                  showToast((me.emailBookingConfirm ?? true)
-                    ? "Booking confirmations off" : "Booking confirmations on ✓");
-                }}
-                  style={{
-                    width: 44, height: 24, borderRadius: 20, border: "none", cursor: "pointer",
-                    background: (me.emailBookingConfirm ?? true) && me.email ? G.green : "#d1d5db",
-                    transition: "background .2s", position: "relative", flexShrink: 0,
-                    display: "block"
-                  }}>
-                  <span style={{
-                    position: "absolute", top: 2,
-                    left: (me.emailBookingConfirm ?? true) && me.email ? 22 : 2,
-                    width: 20, height: 20, borderRadius: "50%", background: "#fff",
-                    transition: "left .2s", display: "block"
-                  }} />
-                </button>
-              </div>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 13, color: G.text }}>
-                  Booking confirmation emails
-                </div>
-                <div style={{ fontSize: 11, color: G.muted, marginTop: 2, lineHeight: 1.5 }}>
-                  Receive an email each time you join or book a session.
-                  {me.email
-                    ? ` Sent to ${maskEmail(me.email)}.`
-                    : " No email on file — add one in your profile."}
+                <div style={{
+                  fontSize: 11, fontWeight: 900, letterSpacing: 1.5, color: G.muted,
+                  textTransform: "uppercase", marginBottom: 12
+                }}>App Theme</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {THEME_KEYS.map(key => {
+                    const t = THEMES[key];
+                    const active = themeKey === key;
+                    return (
+                      <button key={key} onClick={() => applyTheme(key)}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 12,
+                          background: active ? t.headerBg : "transparent",
+                          border: `2px solid ${active ? t.headerBg : G.border}`,
+                          borderRadius: 10, padding: "10px 14px", cursor: "pointer",
+                          fontFamily: "inherit", transition: "all .15s"
+                        }}>
+                        <span style={{ fontSize: 20 }}>{t.emoji}</span>
+                        <span style={{
+                          fontSize: 14, fontWeight: 700,
+                          color: active ? "#fff" : G.text, flex: 1, textAlign: "left"
+                        }}>
+                          {t.label}
+                        </span>
+                        {active && <span style={{ fontSize: 12, color: "rgba(255,255,255,.7)", fontWeight: 700 }}>
+                          Active ✓
+                        </span>}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-            </label>
 
-            <div style={{ height: 1, background: G.border, margin: "10px 0" }} />
+              {/* Help & Contact */}
+              <button type="button" onClick={() => setView("help")}
+                style={{
+                  background: G.white, border: `1.5px solid ${G.border}`,
+                  borderRadius: 12, padding: "13px 16px", fontFamily: "inherit",
+                  fontWeight: 700, fontSize: 14, color: G.text, cursor: "pointer",
+                  width: "100%", display: "flex", alignItems: "center", gap: 10, textAlign: "left"
+                }}>
+                <span style={{ fontSize: 20 }}>💬</span>
+                <span style={{ flex: 1 }}>Help &amp; Contact Admin</span>
+                <span style={{ color: G.muted, fontSize: 16 }}>›</span>
+              </button>
 
-            <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
-              <div style={{ paddingTop: 1 }}>
-                <button onClick={() => {
-                  const updated = members.map(m => m.id === me.id
-                    ? { ...m, emailDayBeforeReminder: !(me.emailDayBeforeReminder ?? true) } : m);
-                  saveMembers(updated);
-                  showToast((me.emailDayBeforeReminder ?? true)
-                    ? "Day-before reminders off" : "Day-before reminders on ✓");
-                }}
-                  style={{
-                    width: 44, height: 24, borderRadius: 20, border: "none", cursor: "pointer",
-                    background: (me.emailDayBeforeReminder ?? true) && me.email ? G.green : "#d1d5db",
-                    transition: "background .2s", position: "relative", flexShrink: 0,
-                    display: "block"
-                  }}>
-                  <span style={{
-                    position: "absolute", top: 2,
-                    left: (me.emailDayBeforeReminder ?? true) && me.email ? 22 : 2,
-                    width: 20, height: 20, borderRadius: "50%", background: "#fff",
-                    transition: "left .2s", display: "block"
-                  }} />
-                </button>
-              </div>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 13, color: G.text }}>
-                  Day-before reminders
-                </div>
-                <div style={{ fontSize: 11, color: G.muted, marginTop: 2, lineHeight: 1.5 }}>
-                  Get an email at 5pm the evening before any session you're booked into.
-                  Helps you not forget and plan transport in time.
-                </div>
-              </div>
-            </label>
-          </div>
+              {/* Privacy & Data */}
+              <button type="button" onClick={() => setView("privacy")}
+                style={{
+                  background: G.white, border: `1.5px solid ${G.border}`,
+                  borderRadius: 12, padding: "13px 16px", fontFamily: "inherit",
+                  fontWeight: 700, fontSize: 14, color: G.text, cursor: "pointer",
+                  width: "100%", display: "flex", alignItems: "center", gap: 10, textAlign: "left"
+                }}>
+                <span style={{ fontSize: 20 }}>🔐</span>
+                <span style={{ flex: 1 }}>Privacy &amp; Your Data</span>
+                <span style={{ color: G.muted, fontSize: 16 }}>›</span>
+              </button>
 
-          {/* Theme switcher */}
-          <div style={{
-            background: G.white, borderRadius: 14, border: `1.5px solid ${G.border}`,
-            padding: "14px 16px"
-          }}>
-            <div style={{
-              fontSize: 11, fontWeight: 900, letterSpacing: 1.5, color: G.muted,
-              textTransform: "uppercase", marginBottom: 12
-            }}>App Theme</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {THEME_KEYS.map(key => {
-                const t = THEMES[key];
-                const active = themeKey === key;
-                return (
-                  <button key={key} onClick={() => applyTheme(key)}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 12,
-                      background: active ? t.headerBg : "transparent",
-                      border: `2px solid ${active ? t.headerBg : G.border}`,
-                      borderRadius: 10, padding: "10px 14px", cursor: "pointer",
-                      fontFamily: "inherit", transition: "all .15s"
-                    }}>
-                    <span style={{ fontSize: 20 }}>{t.emoji}</span>
-                    <span style={{
-                      fontSize: 14, fontWeight: 700,
-                      color: active ? "#fff" : G.text, flex: 1, textAlign: "left"
-                    }}>
-                      {t.label}
-                    </span>
-                    {active && <span style={{ fontSize: 12, color: "rgba(255,255,255,.7)", fontWeight: 700 }}>
-                      Active ✓
-                    </span>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Help & Contact */}
-          <button type="button" onClick={() => setView("help")}
-            style={{
-              background: G.white, border: `1.5px solid ${G.border}`,
-              borderRadius: 12, padding: "13px 16px", fontFamily: "inherit",
-              fontWeight: 700, fontSize: 14, color: G.text, cursor: "pointer",
-              width: "100%", display: "flex", alignItems: "center", gap: 10, textAlign: "left"
-            }}>
-            <span style={{ fontSize: 20 }}>💬</span>
-            <span style={{ flex: 1 }}>Help &amp; Contact Admin</span>
-            <span style={{ color: G.muted, fontSize: 16 }}>›</span>
-          </button>
-
-          {/* Privacy & Data */}
-          <button type="button" onClick={() => setView("privacy")}
-            style={{
-              background: G.white, border: `1.5px solid ${G.border}`,
-              borderRadius: 12, padding: "13px 16px", fontFamily: "inherit",
-              fontWeight: 700, fontSize: 14, color: G.text, cursor: "pointer",
-              width: "100%", display: "flex", alignItems: "center", gap: 10, textAlign: "left"
-            }}>
-            <span style={{ fontSize: 20 }}>🔐</span>
-            <span style={{ flex: 1 }}>Privacy &amp; Your Data</span>
-            <span style={{ color: G.muted, fontSize: 16 }}>›</span>
-          </button>
-
-          {/* Sign out */}
-          <button type="button" onClick={handleLogout}
-            style={{
-              background: "none", border: `1.5px solid ${G.border}`,
-              borderRadius: 12, padding: "13px", fontFamily: "inherit",
-              fontWeight: 800, fontSize: 14, color: G.muted, cursor: "pointer",
-              width: "100%"
-            }}>
-            Sign out
-          </button>
-          </>
+              {/* Sign out */}
+              <button type="button" onClick={handleLogout}
+                style={{
+                  background: "none", border: `1.5px solid ${G.border}`,
+                  borderRadius: 12, padding: "13px", fontFamily: "inherit",
+                  fontWeight: 800, fontSize: 14, color: G.muted, cursor: "pointer",
+                  width: "100%"
+                }}>
+                Sign out
+              </button>
+            </>
           )}
 
           {/* FAMILY TAB */}
           {profileTab === "family" && (
-            <FamilyManager 
+            <FamilyManager
               currentUser={currentUser}
               members={members}
               setMembers={setMembers}
@@ -11737,7 +11737,96 @@ export default function App() {
       </Shell>
     );
   }
+  // ─── FAMILY MANAGER COMPONENT ─────────────────────────────
+  const FamilyManager = ({ currentUser, members, setMembers, saveMembers, logAction, showToast }) => {
+    const [searchTerm, setSearchTerm] = useState("");
+    const [newChild, setNewChild] = useState({ name: "", dob: "" });
 
+    const myChildren = members.filter(m => currentUser.children?.includes(m.id));
+
+    const handleLinkExisting = async (child) => {
+      await linkChildToParent(currentUser.id, child.id);
+      const updated = members.map(m =>
+        m.id === currentUser.id ? { ...m, children: [...(m.children || []), child.id] } : m
+      );
+      saveMembers(updated);
+      logAction("family", `Linked ${child.name} to ${currentUser.name}`);
+      showToast(`✅ ${child.name.split(" ")[0]} linked!`);
+    };
+
+    const handleCreateAndLink = async () => {
+      if (!newChild.name || !newChild.dob) return;
+      const existing = findExistingChild(members, newChild.name, newChild.dob);
+      if (existing) return handleLinkExisting(existing);
+
+      const newId = "child-" + Date.now();
+      const newMember = {
+        id: newId,
+        name: newChild.name,
+        dob: newChild.dob,
+        memberType: "player",
+        teams: [],
+        children: [],
+        role: "member"
+      };
+      const updatedMembers = [...members, newMember];
+      saveMembers(updatedMembers);
+      await linkChildToParent(currentUser.id, newId);
+      setNewChild({ name: "", dob: "" });
+      showToast(`✅ ${newChild.name} created & linked`);
+    };
+
+    return (
+      <div style={{ padding: 20, background: G.white, borderRadius: 16, marginTop: 16 }}>
+        <h3 style={{ margin: 0, fontSize: 18, color: G.text }}>👨‍👧 My Family</h3>
+        <p style={{ fontSize: 13, color: G.muted, margin: "4px 0 16px" }}>Manage kids linked to your account</p>
+
+        {myChildren.length > 0 && myChildren.map(child => (
+          <div key={child.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px", background: G.bg, borderRadius: 12, marginBottom: 8 }}>
+            <div><strong>{child.name}</strong> <span style={{ fontSize: 12, color: G.muted }}>({child.dob})</span></div>
+            <button onClick={() => unlinkChild(currentUser.id, child.id)} style={{ color: G.red, fontSize: 13 }}>Unlink</button>
+          </div>
+        ))}
+
+        <div style={{ background: G.cream, padding: 16, borderRadius: 12 }}>
+          <input
+            placeholder="Search existing child by name or DOB"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            style={{ width: "100%", padding: 12, borderRadius: 8, marginBottom: 12, border: "1px solid " + G.border }}
+          />
+
+          {searchTerm && members.filter(m =>
+            m.memberType === "player" &&
+            (m.name.toLowerCase().includes(searchTerm.toLowerCase()) || m.dob?.includes(searchTerm))
+          ).map(child => (
+            <button key={child.id} onClick={() => handleLinkExisting(child)}
+              style={{ width: "100%", marginBottom: 8, background: G.green, color: G.lime, padding: 14, borderRadius: 10, fontWeight: 800 }}>
+              Link {child.name}
+            </button>
+          ))}
+
+          <div style={{ marginTop: 20, fontSize: 13, color: G.muted }}>Or create new child profile:</div>
+          <input
+            placeholder="Child full name"
+            value={newChild.name}
+            onChange={e => setNewChild({ ...newChild, name: e.target.value })}
+            style={{ width: "100%", padding: 12, borderRadius: 8, marginBottom: 8, border: "1px solid " + G.border }}
+          />
+          <input
+            type="date"
+            value={newChild.dob}
+            onChange={e => setNewChild({ ...newChild, dob: e.target.value })}
+            style={{ width: "100%", padding: 12, borderRadius: 8, marginBottom: 16, border: "1px solid " + G.border }}
+          />
+          <button onClick={handleCreateAndLink}
+            style={{ width: "100%", background: G.green, color: G.lime, padding: 16, borderRadius: 12, fontWeight: 800, fontSize: 15 }}>
+            Create + Link Child
+          </button>
+        </div>
+      </div>
+    );
+  };
   // Fallback
   return <Shell><div style={{ padding: 20, color: G.muted }}>Loading…</div></Shell>;
 }
