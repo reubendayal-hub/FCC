@@ -7502,12 +7502,15 @@ export default function App() {
     const myTeams = (me.teams || []);
     const { pct, needsReconfirm, isComplete, confirmedAt } = profileCompletion(me);
     const isReconfirm = pct === 100 && needsReconfirm;
+
     return (
       <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
         currentUser={currentUser} onLogout={handleLogout} teams={teams} />}>
         <AppHeader onBack={() => setView("schedule")}
           title="My Profile" sub={ROLE_META[me.role || "member"]?.label || "Member"} />
+
         <div style={{ padding: "20px 16px", display: "flex", flexDirection: "column", gap: 16 }}>
+
           {/* TAB SWITCHER */}
           <div style={{ display: "flex", background: G.cream, borderRadius: 12, padding: 4, marginBottom: 20 }}>
             <button
@@ -7526,66 +7529,66 @@ export default function App() {
             </button>
           </div>
 
+          {/* PLAYER PROFILE TAB */}
           {profileTab === "me" && (
-            <></>
-          {/* Avatar + name card */}
-          {(() => {
-            const isFemTeam = myTeams.some(t => TEAM_META[t]?.feminine);
-            const headerBg = isFemTeam
-              ? "linear-gradient(135deg,#9d174d,#be185d)"
-              : G.green;
-            const avatarBg = isFemTeam ? "#fbcfe8" : G.lime;
-            const avatarFg = isFemTeam ? "#9d174d" : G.green;
-            return (
-              <div style={{
-                background: headerBg, borderRadius: 16, padding: "20px",
-                display: "flex", alignItems: "center", gap: 16
-              }}>
-                {isFemTeam && <span style={{
-                  position: "absolute", fontSize: 16,
-                  top: 0, right: 8, opacity: .3, pointerEvents: "none"
-                }}>✨</span>}
-                <div style={{
-                  width: 60, height: 60, borderRadius: "50%",
-                  background: avatarBg, display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 22, fontWeight: 900, color: avatarFg, flexShrink: 0
-                }}>
-                  {me.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
-                </div>
-                <div style={{ flex: 1 }}>
+            <>
+              {/* Avatar + name card */}
+              {(() => {
+                const isFemTeam = myTeams.some(t => TEAM_META[t]?.feminine);
+                const headerBg = isFemTeam
+                  ? "linear-gradient(135deg,#9d174d,#be185d)"
+                  : G.green;
+                const avatarBg = isFemTeam ? "#fbcfe8" : G.lime;
+                const avatarFg = isFemTeam ? "#9d174d" : G.green;
+                return (
                   <div style={{
-                    fontFamily: "'Playfair Display',serif", fontWeight: 900,
-                    fontSize: 20, color: "#fff"
-                  }}>{me.name}</div>
-                  <div style={{ marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    <MemberRolePills member={me} teams={teams} />
-                    {getMemberRoleChips(me, teams).length === 0 && <RolePill role={me.role || "member"} />}
-                    {myTeams.map(t => <TeamPill key={t} team={t} sm />)}
-                    {myTeams.length === 0 && <TeamPill team="Unassigned" sm />}
-                  </div>
-                </div>
-                {/* Completion dial */}
-                {!isComplete && <ProfileDial pct={pct} />}
-                {isComplete && (
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 28 }}>✅</div>
+                    background: headerBg, borderRadius: 16, padding: "20px",
+                    display: "flex", alignItems: "center", gap: 16
+                  }}>
+                    {isFemTeam && <span style={{
+                      position: "absolute", fontSize: 16,
+                      top: 0, right: 8, opacity: .3, pointerEvents: "none"
+                    }}>✨</span>}
                     <div style={{
-                      fontSize: 10, color: "rgba(255,255,255,.6)", fontWeight: 700,
-                      letterSpacing: 1, textTransform: "uppercase", marginTop: 2
-                    }}>Complete</div>
+                      width: 60, height: 60, borderRadius: "50%",
+                      background: avatarBg, display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 22, fontWeight: 900, color: avatarFg, flexShrink: 0
+                    }}>
+                      {me.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{
+                        fontFamily: "'Playfair Display',serif", fontWeight: 900,
+                        fontSize: 20, color: "#fff"
+                      }}>{me.name}</div>
+                      <div style={{ marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <MemberRolePills member={me} teams={teams} />
+                        {getMemberRoleChips(me, teams).length === 0 && <RolePill role={me.role || "member"} />}
+                        {myTeams.map(t => <TeamPill key={t} team={t} sm />)}
+                        {myTeams.length === 0 && <TeamPill team="Unassigned" sm />}
+                      </div>
+                    </div>
+                    {!isComplete && <ProfileDial pct={pct} />}
+                    {isComplete && (
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 28 }}>✅</div>
+                        <div style={{
+                          fontSize: 10, color: "rgba(255,255,255,.6)", fontWeight: 700,
+                          letterSpacing: 1, textTransform: "uppercase", marginTop: 2
+                        }}>Complete</div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })()}
+                );
+              })()}
 
-          {/* Profile status card — only shown if incomplete or needs reconfirm */}
-          {!isComplete && (
-            <div style={{
-              background: isReconfirm ? "#fffbeb" : "#fef2f2",
-              border: `1.5px solid ${isReconfirm ? "#fcd34d" : "#fca5a5"}`,
-              borderRadius: 12, padding: "14px 16px",
-            }}>
+              {/* Profile status card */}
+              {!isComplete && (
+                <div style={{
+                  background: isReconfirm ? "#fffbeb" : "#fef2f2",
+                  border: `1.5px solid ${isReconfirm ? "#fcd34d" : "#fca5a5"}`,
+                  borderRadius: 12, padding: "14px 16px",
+                }}>
               <div style={{
                 fontWeight: 800, fontSize: 14,
                 color: isReconfirm ? "#92400e" : "#991b1b", marginBottom: 6
@@ -8297,10 +8300,12 @@ export default function App() {
             }}>
             Sign out
           </button>
+          </>
           )}
 
+          {/* FAMILY TAB */}
           {profileTab === "family" && (
-            <FamilyManager
+            <FamilyManager 
               currentUser={currentUser}
               members={members}
               setMembers={setMembers}
@@ -8309,6 +8314,7 @@ export default function App() {
               showToast={showToast}
             />
           )}
+
         </div>
         <BotNav view="profile" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r => r.status === "pending").length} currentUser={currentUser} teams={teams} />
         {toast && <Toast msg={toast} />}
