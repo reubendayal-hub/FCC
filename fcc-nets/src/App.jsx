@@ -2732,6 +2732,8 @@ export default function App() {
   const [joinRequests,  setJoinRequests]  = useState([]);
   // Superadmin-only audit log
   const [auditLog,      setAuditLog]      = useState([]);
+  // Reminder email logs
+  const [reminderLogs,  setReminderLogs]  = useState([]);
 
   // App view
   const [view,     setView]     = useState("schedule");
@@ -2810,7 +2812,7 @@ export default function App() {
   // Admin section collapse — true = open. Members+AddMember open by default, rest collapsed
   const [adminSec, setAdminSec] = useState({
     members:true, addmember:true, groups:false,
-    coaches:false, blocknets:false, recurring:false, auditlog:false
+    coaches:false, blocknets:false, recurring:false, auditlog:false, reminderlogs:false
   });
   const toggleAdminSec = k => setAdminSec(s=>({...s,[k]:!s[k]}));
   const [editingName, setEditingName] = useState(null); // {id, value}
@@ -2926,6 +2928,7 @@ export default function App() {
       invitecodes: doc(db,"fccnets","invitecodes"),
       joinrequests:doc(db,"fccnets",JOINREQS_KEY),
       auditlog:    doc(db,"fccnets",AUDITLOG_KEY),
+      reminderlogs:doc(db,"fccnets","reminderlogs"),
       seasonplans: doc(db,"fccnets","seasonplans"),
       attendance:  doc(db,"fccnets","attendance"),      // {sessionId: {playerId: true/false}}
       sessionnotes:doc(db,"fccnets","sessionnotes"),    // [{sessionId, playerId, text, coach, date}]
@@ -2934,7 +2937,7 @@ export default function App() {
     };
     (async()=>{
       try {
-        const [sr,mr,pr,tr,rr,br,ir,jr,ar,spr,attr,snr,ppr,cor] = await Promise.all([
+        const [sr,mr,pr,tr,rr,br,ir,jr,ar,rlr,spr,attr,snr,ppr,cor] = await Promise.all([
           getDoc(refs.sessions),
           getDoc(refs.members),
           getDoc(refs.pins),
@@ -2944,6 +2947,7 @@ export default function App() {
           getDoc(refs.invitecodes),
           getDoc(refs.joinrequests),
           getDoc(refs.auditlog),
+          getDoc(refs.reminderlogs),
           getDoc(refs.seasonplans),
           getDoc(refs.attendance),
           getDoc(refs.sessionnotes),
@@ -2978,6 +2982,7 @@ export default function App() {
         setInviteCodes( ir.exists() ? JSON.parse(ir.data().value) : {});
         setJoinRequests(jr.exists() ? JSON.parse(jr.data().value) : []);
         setAuditLog(    ar.exists() ? JSON.parse(ar.data().value) : []);
+        setReminderLogs(rlr.exists() && rlr.data().list ? rlr.data().list : []);
         setSeasonPlans( spr.exists() ? JSON.parse(spr.data().value) : {});
         // New: attendance, notes, progress, coach overrides
         setAllAttendance(  attr.exists() ? JSON.parse(attr.data().value) : {});
@@ -2985,7 +2990,7 @@ export default function App() {
         setPlayerProgress( ppr.exists() ? JSON.parse(ppr.data().value) : {});
         setCoachOverrides( cor.exists() ? JSON.parse(cor.data().value) : {});
       } catch(e) {
-        setMembers(SEED_MEMBERS.map(normMember)); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]); setBlockCals([]); setInviteCodes({}); setJoinRequests([]); setAuditLog([]);
+        setMembers(SEED_MEMBERS.map(normMember)); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]); setBlockCals([]); setInviteCodes({}); setJoinRequests([]); setAuditLog([]); setReminderLogs([]);
         setAllAttendance({}); setAllSessionNotes([]); setPlayerProgress({}); setCoachOverrides({});
       }
       setLoading(false);
@@ -3073,7 +3078,7 @@ export default function App() {
           toAdd.push({
             id:uid(), date:dateStr, from:slot.from, to:slot.to,
             label:slot.name, note:"", players:autoPlayers,
-            poll: [], // Poll is for custom options, not player names - players shown in WHO'S COMING
+            poll: PRESET_POLL.map(o => ({...o, votes: []})), // Include voting options
             restrictedTo: slot.restrictTeam ? slot.team : null,
             sessionTeams: slotTeams,
             coaches: slotCoaches,
@@ -3089,6 +3094,20 @@ export default function App() {
       const merged = [...liveSessions,...toAdd].sort((a,b)=>
         new Date(a.date)-new Date(b.date)||a.from.localeCompare(b.from));
       saveSessions(merged);
+    }
+    
+    // Migration: Add poll options to existing recurring sessions that don't have them
+    const needsPollUpdate = liveSessions.filter(s => 
+      s.recurringId && (!s.poll || s.poll.length === 0)
+    );
+    if(needsPollUpdate.length > 0) {
+      const updated = liveSessions.map(s => {
+        if(s.recurringId && (!s.poll || s.poll.length === 0)) {
+          return { ...s, poll: PRESET_POLL.map(o => ({...o, votes: []})) };
+        }
+        return s;
+      });
+      saveSessions(updated);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[loading, recurring]);
@@ -5791,42 +5810,74 @@ export default function App() {
           )}
 
           {(()=>{
-            const entries = Object.entries(pickGrouped);
+            // Build unique player list (no duplicates)
+            const allPlayers = members.filter(m => {
+              if(pFilter !== "All" && !(m.teams||[]).includes(pFilter)) return false;
+              const q = !pSearch || m.name.toLowerCase().includes(pSearch.toLowerCase());
+              return q;
+            });
+            
+            // Separate into "my teams" and "others" for display
             const myTeamsSet = new Set(myTeamsList);
-            const myEntries = entries.filter(([t])=>myTeamsSet.has(t));
-            const otherEntriesRaw = entries.filter(([t])=>!myTeamsSet.has(t));
+            const myTeamPlayers = allPlayers.filter(m => 
+              (m.teams||[]).some(t => myTeamsSet.has(t))
+            );
+            const otherPlayers = allPlayers.filter(m => 
+              !(m.teams||[]).some(t => myTeamsSet.has(t))
+            );
             
-            // Deduplicate: collect all player IDs shown in myEntries
-            const shownInMyTeams = new Set();
-            myEntries.forEach(([,list]) => list.forEach(m => shownInMyTeams.add(m.id)));
-            
-            // Filter otherEntries to exclude players already shown in myEntries
-            const otherEntries = otherEntriesRaw.map(([team, list]) => [
-              team,
-              list.filter(m => !shownInMyTeams.has(m.id))
-            ]).filter(([, list]) => list.length > 0);
-            
-            // Count how many players from other groups are already selected
-            const otherSelected = otherEntries.reduce((n,[,list])=>
-              n+list.filter(m=>selP.includes(m.name)).length, 0);
-            // If user has no team, show everything normally
             const hasTeam = myTeamsList.length > 0;
-            const showEntries = hasTeam ? myEntries : entries;
+            const showMyTeamPlayers = hasTeam ? myTeamPlayers : allPlayers;
+            const showOtherPlayers = hasTeam ? otherPlayers : [];
+            
+            // Count selected from others
+            const otherSelected = showOtherPlayers.filter(m => selP.includes(m.name)).length;
+            
             return (<>
-              {showEntries.map(([team,list])=>(
-                <div key={team} style={{marginBottom:14}}>
-                  <div style={{marginBottom:7,display:"flex",alignItems:"center",gap:7}}>
-                    <TeamPill team={team}/>
-                    {hasTeam&&<span style={{fontSize:10,fontWeight:800,color:G.green,
-                      background:"#dcfce7",borderRadius:99,padding:"1px 7px"}}>
-                      Your group
-                    </span>}
+              {/* My Teams - show as pills grouped by team */}
+              {hasTeam && myTeamsList.map(team => {
+                const teamPlayers = showMyTeamPlayers.filter(m => (m.teams||[]).includes(team));
+                if(teamPlayers.length === 0) return null;
+                return (
+                  <div key={team} style={{marginBottom:14}}>
+                    <div style={{marginBottom:7,display:"flex",alignItems:"center",gap:7}}>
+                      <TeamPill team={team}/>
+                      <span style={{fontSize:10,fontWeight:800,color:G.green,
+                        background:"#dcfce7",borderRadius:99,padding:"1px 7px"}}>
+                        Your group
+                      </span>
+                    </div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                      {teamPlayers.map(m => {
+                        const sel = selP.includes(m.name);
+                        const away = bDate && isAbsent(m, bDate);
+                        const abs = away ? (m.absences||[]).find(a=>a.from<=bDate&&a.to>=bDate) : null;
+                        return (
+                          <button key={m.id} type="button"
+                            onClick={()=>setSelP(ps=>sel?ps.filter(x=>x!==m.name):[...ps,m.name])}
+                            style={{background:sel?G.green:away?"#fffbeb":G.white,
+                              color:sel?G.lime:away?"#92400e":G.text,
+                              border:sel?`2px solid ${G.green}`:away?"1.5px solid #fde68a":`1.5px solid ${G.border}`,
+                              borderRadius:24,padding:"7px 14px",fontSize:13,fontWeight:700,
+                              cursor:"pointer",fontFamily:"inherit",transition:"all .1s"}}
+                            title={away?`Away: ${abs?.category||""} ${fmtShort(abs?.from)}–${fmtShort(abs?.to)}`:""}
+                          >
+                            {sel&&"✓ "}{m.name}{away&&" ✈️"}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
+                );
+              })}
+              
+              {/* If no team, show all as a flat list */}
+              {!hasTeam && showMyTeamPlayers.length > 0 && (
+                <div style={{marginBottom:14}}>
                   <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                    {list.map(m=>{
-                      const sel=selP.includes(m.name);
+                    {showMyTeamPlayers.map(m => {
+                      const sel = selP.includes(m.name);
                       const away = bDate && isAbsent(m, bDate);
-                      const abs = away ? (m.absences||[]).find(a=>a.from<=bDate&&a.to>=bDate) : null;
                       return (
                         <button key={m.id} type="button"
                           onClick={()=>setSelP(ps=>sel?ps.filter(x=>x!==m.name):[...ps,m.name])}
@@ -5834,18 +5885,17 @@ export default function App() {
                             color:sel?G.lime:away?"#92400e":G.text,
                             border:sel?`2px solid ${G.green}`:away?"1.5px solid #fde68a":`1.5px solid ${G.border}`,
                             borderRadius:24,padding:"7px 14px",fontSize:13,fontWeight:700,
-                            cursor:"pointer",fontFamily:"inherit",transition:"all .1s"}}
-                          title={away?`Away: ${abs?.category||""} ${fmtShort(abs?.from)}–${fmtShort(abs?.to)}`:""}
-                        >
+                            cursor:"pointer",fontFamily:"inherit",transition:"all .1s"}}>
                           {sel&&"✓ "}{m.name}{away&&" ✈️"}
                         </button>
                       );
                     })}
                   </div>
                 </div>
-              ))}
+              )}
 
-              {hasTeam&&otherEntries.length>0&&(
+              {/* Other Players - collapsible searchable list (NO DUPLICATES) */}
+              {hasTeam && showOtherPlayers.length > 0 && (
                 <div style={{marginBottom:14}}>
                   <button type="button"
                     onClick={()=>setOtherGroupsOpen(o=>!o)}
@@ -5853,11 +5903,7 @@ export default function App() {
                       borderRadius:10,padding:"9px 14px",cursor:"pointer",fontFamily:"inherit",
                       display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                     <span style={{fontSize:12,fontWeight:700,color:G.muted}}>
-                      {otherGroupsOpen?"▲":"▼"} Other Groups
-                      {" "}
-                      <span style={{color:G.text}}>
-                        ({otherEntries.reduce((n,[,l])=>n+l.length,0)} players)
-                      </span>
+                      {otherGroupsOpen?"▲":"▼"} Add Players from Other Groups
                     </span>
                     {otherSelected>0&&(
                       <span style={{background:G.green,color:G.lime,borderRadius:99,
@@ -5868,27 +5914,37 @@ export default function App() {
                   </button>
 
                   {otherGroupsOpen&&(
-                    <div style={{marginTop:10}}>
-                      {otherEntries.map(([team,list])=>(
-                        <div key={team} style={{marginBottom:14}}>
-                          <div style={{marginBottom:7}}><TeamPill team={team}/></div>
-                          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                            {list.map(m=>{
-                              const sel=selP.includes(m.name);
-                              return (
-                                <button key={m.id} type="button"
-                                  onClick={()=>setSelP(ps=>sel?ps.filter(x=>x!==m.name):[...ps,m.name])}
-                                  style={{background:sel?G.green:G.white,color:sel?G.lime:G.text,
-                                    border:sel?`2px solid ${G.green}`:`1.5px solid ${G.border}`,
-                                    borderRadius:24,padding:"7px 14px",fontSize:13,fontWeight:700,
-                                    cursor:"pointer",fontFamily:"inherit",transition:"all .1s"}}>
+                    <div style={{marginTop:10,background:G.white,border:`1.5px solid ${G.border}`,
+                      borderRadius:10,padding:12,maxHeight:300,overflowY:"auto"}}>
+                      {/* Search hint */}
+                      <div style={{fontSize:11,color:G.muted,marginBottom:10}}>
+                        Use the search bar above to filter. Showing {showOtherPlayers.length} player{showOtherPlayers.length!==1?"s":""}.
+                      </div>
+                      {/* Simple alphabetical list - no team grouping, no duplicates */}
+                      <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                        {showOtherPlayers
+                          .sort((a,b) => a.name.localeCompare(b.name))
+                          .map(m => {
+                            const sel = selP.includes(m.name);
+                            const teamStr = (m.teams||[]).join(", ") || "Unassigned";
+                            return (
+                              <button key={m.id} type="button"
+                                onClick={()=>setSelP(ps=>sel?ps.filter(x=>x!==m.name):[...ps,m.name])}
+                                style={{
+                                  display:"flex",alignItems:"center",justifyContent:"space-between",
+                                  background:sel?"#dcfce7":G.bg,
+                                  border:sel?`1.5px solid ${G.green}`:`1px solid ${G.border}`,
+                                  borderRadius:8,padding:"8px 12px",
+                                  cursor:"pointer",fontFamily:"inherit",textAlign:"left",
+                                }}>
+                                <span style={{fontWeight:700,fontSize:13,color:sel?G.green:G.text}}>
                                   {sel&&"✓ "}{m.name}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
+                                </span>
+                                <span style={{fontSize:10,color:G.muted}}>{teamStr}</span>
+                              </button>
+                            );
+                          })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -8837,6 +8893,7 @@ export default function App() {
             {label:"🚫 Block Nets", id:"sec-blocknets",  key:"blocknets"},
             {label:"🔁 Recurring",  id:"sec-recurring",  key:"recurring"},
             {label:"👑 Audit Log",  id:"sec-auditlog",   key:"auditlog"},
+            {label:"📧 Reminder Logs", id:"sec-reminderlogs", key:"reminderlogs"},
           ].map(({label,id,key})=>(
             <button key={id}
               onClick={()=>{
@@ -10354,6 +10411,130 @@ export default function App() {
                 )}
               </div>
             </>
+          );
+        })()}
+        </>}
+
+        {/* ══════════════════════════════════════════════════════════ */}
+        {/* REMINDER LOGS — Superadmin only                           */}
+        {/* ══════════════════════════════════════════════════════════ */}
+        {userRole==="superadmin"&&<>
+        <div id="sec-reminderlogs"/>
+        <button onClick={()=>toggleAdminSec("reminderlogs")}
+          style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
+            background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",
+            padding:"8px 0",marginBottom:adminSec.reminderlogs?8:14}}>
+          <span style={{fontWeight:900,fontSize:13,color:G.text}}>📧 Reminder Logs</span>
+          <span style={{fontSize:12,color:G.muted,fontWeight:700}}>
+            {adminSec.reminderlogs?"▲ collapse":"▼ show"}
+          </span>
+        </button>
+        {adminSec.reminderlogs&&(()=>{
+          function fmtTs(ts) {
+            if(!ts) return "—";
+            const d = new Date(ts);
+            return d.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})
+              +" "+d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+          }
+          function fmtShortDate(s) {
+            if(!s) return "—";
+            return new Date(s+"T00:00:00").toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"});
+          }
+          return (
+            <div style={{background:"#1e3a5f",borderRadius:14,overflow:"hidden",
+              border:"1.5px solid #2d4a6f",marginBottom:20}}>
+              
+              {/* Header */}
+              <div style={{padding:"14px 16px",borderBottom:"1px solid #2d4a6f"}}>
+                <div style={{color:"#fbbf24",fontWeight:900,fontSize:14,marginBottom:4}}>
+                  📧 Email Reminder Log
+                </div>
+                <div style={{color:"#94a3b8",fontSize:11}}>
+                  {reminderLogs.length} reminder run{reminderLogs.length!==1?"s":""} recorded
+                </div>
+              </div>
+              
+              {reminderLogs.length===0 ? (
+                <div style={{padding:"24px 16px",textAlign:"center",color:"#64748b",fontSize:13}}>
+                  No reminder logs yet. Logs will appear here after the cron job runs.
+                </div>
+              ) : (
+                <div style={{maxHeight:500,overflowY:"auto"}}>
+                  {reminderLogs.map((log, idx) => (
+                    <div key={idx} style={{
+                      padding:"14px 16px",
+                      borderBottom: idx < reminderLogs.length - 1 ? "1px solid #2d4a6f" : "none",
+                      background: idx % 2 === 0 ? "transparent" : "rgba(0,0,0,0.1)"
+                    }}>
+                      {/* Run timestamp + target date */}
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                        <div>
+                          <div style={{color:"#fff",fontWeight:700,fontSize:13}}>
+                            🗓️ For: {fmtShortDate(log.targetDate)}
+                          </div>
+                          <div style={{color:"#64748b",fontSize:10,marginTop:2}}>
+                            Run at: {fmtTs(log.timestamp)}
+                          </div>
+                        </div>
+                        <div style={{textAlign:"right"}}>
+                          <div style={{
+                            background: log.playersSent > 0 ? "#166534" : "#374151",
+                            color: log.playersSent > 0 ? "#86efac" : "#9ca3af",
+                            padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:700
+                          }}>
+                            {log.playersSent || 0} sent
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Stats row */}
+                      <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:10}}>
+                        <div style={{background:"rgba(255,255,255,0.1)",borderRadius:8,padding:"6px 10px"}}>
+                          <div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.5}}>Sessions</div>
+                          <div style={{fontSize:14,fontWeight:800,color:"#fff"}}>{log.sessionsFound || 0}</div>
+                        </div>
+                        <div style={{background:"rgba(255,255,255,0.1)",borderRadius:8,padding:"6px 10px"}}>
+                          <div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.5}}>Players</div>
+                          <div style={{fontSize:14,fontWeight:800,color:"#fff"}}>{log.totalPlayers || 0}</div>
+                        </div>
+                        <div style={{background:"rgba(255,255,255,0.1)",borderRadius:8,padding:"6px 10px"}}>
+                          <div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.5}}>Skipped</div>
+                          <div style={{fontSize:14,fontWeight:800,color:"#f59e0b"}}>{log.playersSkipped || 0}</div>
+                        </div>
+                        <div style={{background:"rgba(255,255,255,0.1)",borderRadius:8,padding:"6px 10px"}}>
+                          <div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.5}}>Leaders</div>
+                          <div style={{fontSize:14,fontWeight:800,color:"#60a5fa"}}>{log.leadersSent || 0}</div>
+                        </div>
+                      </div>
+                      
+                      {/* Sessions details */}
+                      {log.sessionsDetails && log.sessionsDetails.length > 0 && (
+                        <div style={{marginBottom:8}}>
+                          <div style={{fontSize:10,color:"#94a3b8",marginBottom:4,fontWeight:700}}>Sessions:</div>
+                          <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                            {log.sessionsDetails.map((s, i) => (
+                              <span key={i} style={{
+                                background:"#0c4a6e",color:"#7dd3fc",
+                                padding:"2px 8px",borderRadius:6,fontSize:10,fontWeight:600
+                              }}>
+                                {s.label} ({s.playerCount})
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Message if no sessions */}
+                      {log.message && (
+                        <div style={{color:"#94a3b8",fontSize:11,fontStyle:"italic"}}>
+                          {log.message}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           );
         })()}
         </>}
