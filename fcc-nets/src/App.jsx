@@ -2785,6 +2785,7 @@ export default function App() {
   const [carpoolFocus,setCarpoolFocus]= useState(false);  // auto-scroll to carpool on open
   const [notInExpanded,setNotInExpanded] = useState(false); // "not coming" section toggle
   const [notInSearch, setNotInSearch] = useState(""); // search filter for "not coming" list
+  const [editingLocation, setEditingLocation] = useState(false); // location editor modal
   const [carpoolSheetSess, setCarpoolSheetSess] = useState(null); // bottom sheet session
   const carpoolRef = useRef(null);
   const sessionsRef = useRef([]); // always holds latest sessions, avoids stale closure in recurring effect
@@ -6122,7 +6123,6 @@ export default function App() {
             const sessionLocation = selSess.location || defaultLocation;
             const isRelocated = sessionLocation !== defaultLocation;
             const canEditLocation = canOrCoach(userRole,"deleteSession",userMem,teams);
-            const [editingLoc, setEditingLoc] = React.useState(false);
             
             return (
               <>
@@ -6141,7 +6141,7 @@ export default function App() {
                       <div style={{fontSize:15,fontWeight:900,color:"#fff"}}>{sessionLocation}</div>
                     </div>
                     {canEditLocation && (
-                      <button onClick={()=>setEditingLoc(true)}
+                      <button onClick={()=>setEditingLocation(true)}
                         style={{background:"rgba(255,255,255,0.2)",border:"none",borderRadius:8,
                           padding:"6px 10px",color:"#fff",fontSize:11,fontWeight:700,
                           cursor:"pointer",fontFamily:"inherit"}}>
@@ -6153,7 +6153,7 @@ export default function App() {
                 
                 {/* Location edit button for admins when at default location */}
                 {!isRelocated && canEditLocation && (
-                  <button onClick={()=>setEditingLoc(true)}
+                  <button onClick={()=>setEditingLocation(true)}
                     style={{background:"#f8fafc",border:"1px dashed #cbd5e1",borderRadius:8,
                       padding:"8px 12px",marginBottom:14,width:"100%",
                       display:"flex",alignItems:"center",gap:8,
@@ -6164,67 +6164,70 @@ export default function App() {
                     </span>
                   </button>
                 )}
-                
-                {/* Location editor modal */}
-                {editingLoc && (
-                  <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",
-                    display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:20}}
-                    onClick={()=>setEditingLoc(false)}>
-                    <div onClick={e=>e.stopPropagation()}
-                      style={{background:"#fff",borderRadius:16,padding:20,width:"100%",maxWidth:340}}>
-                      <div style={{fontWeight:900,fontSize:16,marginBottom:16,color:G.text}}>
-                        📍 Change Location
-                      </div>
-                      <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                        {[
-                          {val:"Karlebo Cricket Ground", icon:"🏏", desc:"Default outdoor venue"},
-                          {val:"Egedalshallen (Indoor)", icon:"🏠", desc:"Indoor training hall"},
-                          {val:"Other", icon:"📍", desc:"Custom location"},
-                        ].map(loc=>(
-                          <button key={loc.val}
-                            onClick={()=>{
-                              const newLoc = loc.val === "Other" 
-                                ? prompt("Enter location:", sessionLocation)
-                                : loc.val;
-                              if(newLoc) {
-                                const updated = sessions.map(s=>
-                                  s.id===selSess.id ? {...s, location: newLoc} : s);
-                                saveSessions(updated);
-                                setSelSess({...selSess, location: newLoc});
-                                showToast(`Location changed to ${newLoc}`);
-                              }
-                              setEditingLoc(false);
-                            }}
-                            style={{
-                              display:"flex",alignItems:"center",gap:12,
-                              background: sessionLocation===loc.val ? "#f0fdf4" : "#f8fafc",
-                              border: sessionLocation===loc.val ? "2px solid #86efac" : "1.5px solid #e2e8f0",
-                              borderRadius:12,padding:"14px 16px",
-                              cursor:"pointer",fontFamily:"inherit",textAlign:"left"
-                            }}>
-                            <span style={{fontSize:24}}>{loc.icon}</span>
-                            <div>
-                              <div style={{fontWeight:700,fontSize:14,color:G.text}}>{loc.val}</div>
-                              <div style={{fontSize:11,color:G.muted}}>{loc.desc}</div>
-                            </div>
-                            {sessionLocation===loc.val && (
-                              <span style={{marginLeft:"auto",color:G.green,fontWeight:800}}>✓</span>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                      <button onClick={()=>setEditingLoc(false)}
-                        style={{marginTop:16,width:"100%",padding:12,background:"#f1f5f9",
-                          border:"none",borderRadius:10,fontSize:14,fontWeight:700,
-                          color:G.muted,cursor:"pointer",fontFamily:"inherit"}}>
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
               </>
             );
           })()}
+          
+          {/* Location editor modal */}
+          {editingLocation && (
+            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",
+              display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:20}}
+              onClick={()=>setEditingLocation(false)}>
+              <div onClick={e=>e.stopPropagation()}
+                style={{background:"#fff",borderRadius:16,padding:20,width:"100%",maxWidth:340}}>
+                <div style={{fontWeight:900,fontSize:16,marginBottom:16,color:G.text}}>
+                  📍 Change Location
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {[
+                    {val:"Karlebo Cricket Ground", icon:"🏏", desc:"Default outdoor venue"},
+                    {val:"Egedalshallen (Indoor)", icon:"🏠", desc:"Indoor training hall"},
+                    {val:"Other", icon:"📍", desc:"Custom location"},
+                  ].map(loc=>{
+                    const sessionLocation = selSess.location || "Karlebo Cricket Ground";
+                    return (
+                      <button key={loc.val}
+                        onClick={()=>{
+                          const newLoc = loc.val === "Other" 
+                            ? prompt("Enter location:", sessionLocation)
+                            : loc.val;
+                          if(newLoc) {
+                            const updated = sessions.map(s=>
+                              s.id===selSess.id ? {...s, location: newLoc} : s);
+                            saveSessions(updated);
+                            setSelSess({...selSess, location: newLoc});
+                            showToast(`Location changed to ${newLoc}`);
+                          }
+                          setEditingLocation(false);
+                        }}
+                        style={{
+                          display:"flex",alignItems:"center",gap:12,
+                          background: sessionLocation===loc.val ? "#f0fdf4" : "#f8fafc",
+                          border: sessionLocation===loc.val ? "2px solid #86efac" : "1.5px solid #e2e8f0",
+                          borderRadius:12,padding:"14px 16px",
+                          cursor:"pointer",fontFamily:"inherit",textAlign:"left"
+                        }}>
+                        <span style={{fontSize:24}}>{loc.icon}</span>
+                        <div>
+                          <div style={{fontWeight:700,fontSize:14,color:G.text}}>{loc.val}</div>
+                          <div style={{fontSize:11,color:G.muted}}>{loc.desc}</div>
+                        </div>
+                        {sessionLocation===loc.val && (
+                          <span style={{marginLeft:"auto",color:G.green,fontWeight:800}}>✓</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button onClick={()=>setEditingLocation(false)}
+                  style={{marginTop:16,width:"100%",padding:12,background:"#f1f5f9",
+                    border:"none",borderRadius:10,fontSize:14,fontWeight:700,
+                    color:G.muted,cursor:"pointer",fontFamily:"inherit"}}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
           
           {selSess.note&&(
             <div style={{background:"#fff8e1",border:"1.5px solid #ffe082",borderRadius:10,
