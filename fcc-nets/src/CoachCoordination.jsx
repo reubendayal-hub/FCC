@@ -211,6 +211,8 @@ export default function CoachCoordination({
   blockedDates = [], // Ground blocked dates from Admin Panel
   currentUser = null, // Current logged in user
   coachOverrides = {}, // {date_sessionId: {newCoach, oldCoach, assignedBy}}
+  recurring = [], // Recurring training slots from App.jsx
+  members = [], // Members for COACH_PLAYS_IN derivation
   onBack,
   onReassign, // Callback to save reassignment: (sessionId, date, newCoach, oldCoach) => void
 }) {
@@ -288,8 +290,65 @@ export default function CoachCoordination({
   
   const coaches = coachesWithTeams.map(c => c.name);
   
-  // Build sessions from templates, attaching coaches from teams data
+  // Build COACH_PLAYS_IN dynamically from members data
+  // Maps coach name -> array of divisions they play in
+  const coachPlaysIn = useMemo(() => {
+    const mapping = {};
+    // Find coaches from teams
+    const allCoaches = new Set();
+    teams.forEach(t => (t.coaches || []).forEach(c => c && allCoaches.add(c)));
+    
+    // For each coach, find which teams/divisions they play in (as a player)
+    allCoaches.forEach(coachName => {
+      const member = members.find(m => m.name === coachName);
+      if (member?.teams) {
+        // Map team names to divisions
+        const divs = member.teams.map(t => {
+          if (t.includes("Div") || t.includes("Division")) return t;
+          if (t === "Fredensborg 2") return "3. Div";
+          if (t === "Fredensborg 3") return "4. Div";
+          if (t.includes("T20")) return t;
+          if (t === "Legends" || t === "OB") return t;
+          return null;
+        }).filter(Boolean);
+        if (divs.length > 0) mapping[coachName] = divs;
+      }
+    });
+    
+    // Fallback to hardcoded if no members data
+    if (Object.keys(mapping).length === 0) {
+      return COACH_PLAYS_IN;
+    }
+    return mapping;
+  }, [teams, members]);
+  
+  // Build sessions from recurring slots (if available) or fallback to templates
   const sessions = useMemo(() => {
+    // If we have real recurring data, use it
+    if (recurring.length > 0) {
+      return recurring
+        .filter(slot => slot.enabled)
+        .map(slot => {
+          // Find the team to get its coaches
+          const teamName = slot.team || (slot.teams && slot.teams[0]);
+          const team = teams.find(t => t.name === teamName);
+          const teamCoaches = team?.coaches?.filter(c => c && c.trim() !== "") || [];
+          
+          return {
+            id: slot.id,
+            team: teamName,
+            day: slot.day, // 0=Sun, 1=Mon, etc - need to adjust if different
+            time: `${slot.from}–${slot.to}`,
+            venue: "Karlebo", // Default venue
+            coach: teamCoaches[0] || null,
+            coCoach: teamCoaches[1] || null,
+            coCoach2: teamCoaches[2] || null,
+            label: slot.name || `${teamName} Training`,
+          };
+        });
+    }
+    
+    // Fallback to hardcoded templates
     const templates = currentMode === "outdoor" ? SESSION_TEMPLATES_OUTDOOR : SESSION_TEMPLATES_INDOOR;
     
     return templates.map(template => {
@@ -305,7 +364,7 @@ export default function CoachCoordination({
         label: template.label || `${template.team} Training`,
       };
     });
-  }, [currentMode, teams]);
+  }, [currentMode, teams, recurring]);
   
   // Get effective coach for a session on a specific date (checking overrides)
   const getEffectiveCoach = (session, date) => {
@@ -347,9 +406,9 @@ export default function CoachCoordination({
     const coCoach = session.coCoach;
     const coCoach2 = session.coCoach2;
     
-    const playerDivs = COACH_PLAYS_IN[coach] || [];
-    const coPlayerDivs = coCoach ? (COACH_PLAYS_IN[coCoach] || []) : [];
-    const co2PlayerDivs = coCoach2 ? (COACH_PLAYS_IN[coCoach2] || []) : [];
+    const playerDivs = coachPlaysIn[coach] || [];
+    const coPlayerDivs = coCoach ? (coachPlaysIn[coCoach] || []) : [];
+    const co2PlayerDivs = coCoach2 ? (coachPlaysIn[coCoach2] || []) : [];
     
     return dayMatches.filter(m => {
       // Playing conflict: coach/co-coach plays in this division
