@@ -1,5 +1,6 @@
 // /api/send-reminders.js — 48hr advance reminder with deadline warning
-// Sends to all booked players + captain/VC notification for missing emails
+// Sends to all booked players + captain/VC (or coaches for youth teams) notification for missing emails
+// Logs all reminder runs to Firestore for audit trail
 import { createSign } from "node:crypto";
 
 function getAccessToken(clientEmail, privateKey) {
@@ -45,10 +46,28 @@ function parseVal(v) {
   }
   return null;
 }
+
 function parseDoc(doc) {
   const o = {};
   for(const [k,v] of Object.entries(doc.fields||{})) o[k] = parseVal(v);
   return o;
+}
+
+// Convert JS value to Firestore value format
+function toFirestoreValue(val) {
+  if (val === null || val === undefined) return { nullValue: null };
+  if (typeof val === "string") return { stringValue: val };
+  if (typeof val === "number") return Number.isInteger(val) 
+    ? { integerValue: String(val) } 
+    : { doubleValue: val };
+  if (typeof val === "boolean") return { booleanValue: val };
+  if (Array.isArray(val)) return { arrayValue: { values: val.map(toFirestoreValue) } };
+  if (typeof val === "object") {
+    const fields = {};
+    for (const [k, v] of Object.entries(val)) fields[k] = toFirestoreValue(v);
+    return { mapValue: { fields } };
+  }
+  return { stringValue: String(val) };
 }
 
 // Get date 2 days from now (48hr advance)
@@ -58,19 +77,18 @@ function getTargetDate() {
   return d.toISOString().slice(0, 10);
 }
 
-// Get tomorrow's date (for deadline reference)
-function getTomorrowDate() {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
-
 function fmtDate(s) {
   return new Date(s+"T00:00:00").toLocaleDateString("en-GB", {weekday:"long", day:"numeric", month:"long"});
 }
 
 function fmtShortDate(s) {
   return new Date(s+"T00:00:00").toLocaleDateString("en-GB", {weekday:"short", day:"numeric", month:"short"});
+}
+
+// Check if team is a youth team (U11-U18, Girls, Kvinder)
+function isYouthTeam(teamName) {
+  if (!teamName) return false;
+  return teamName.startsWith("U") || teamName.includes("Girls") || teamName.includes("Kvinder");
 }
 
 // Build player reminder email (48hr advance)
@@ -133,21 +151,23 @@ function buildPlayerHtml(name, sessions, sessionDate) {
     </div>`;
 }
 
-// Build captain/VC email with list of players missing emails
-function buildCaptainHtml(captainName, session, missingEmailPlayers, sessionDate) {
+// Build coach/captain email with list of players missing emails
+function buildLeaderHtml(leaderName, leaderRole, session, missingEmailPlayers, sessionDate) {
   const label = session.label || session.restrictedTo || "Training Session";
   const playerList = missingEmailPlayers.map(name => 
     `<li style="padding:4px 0;">${name}</li>`
   ).join("");
   
+  const roleLabel = leaderRole === "coach" ? "coach" : "captain/vice-captain";
+  
   return `
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto;">
       <div style="background:#1e3a5f;padding:24px;border-radius:10px 10px 0 0;">
         <h2 style="color:#fbbf24;margin:0;font-size:18px;">🏏 FCC Training App</h2>
-        <p style="color:rgba(255,255,255,.55);margin:4px 0 0;font-size:13px;">Captain notification</p>
+        <p style="color:rgba(255,255,255,.55);margin:4px 0 0;font-size:13px;">${leaderRole === "coach" ? "Coach" : "Captain"} notification</p>
       </div>
       <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;padding:28px 24px;border-radius:0 0 10px 10px;">
-        <p style="font-size:15px;color:#111827;margin:0 0 6px;">Hi ${captainName.split(" ")[0]} 👋</p>
+        <p style="font-size:15px;color:#111827;margin:0 0 6px;">Hi ${leaderName.split(" ")[0]} 👋</p>
         <p style="font-size:13px;color:#6b7280;margin:0 0 18px;">
           Quick heads up about <strong>${label}</strong> on <strong>${fmtDate(sessionDate)}</strong>.
         </p>
@@ -175,10 +195,41 @@ function buildCaptainHtml(captainName, session, missingEmailPlayers, sessionDate
         </a>
         <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;"/>
         <p style="font-size:11px;color:#d1d5db;margin:0;">
-          You're receiving this because you're captain or vice-captain of ${session.restrictedTo || "this team"}.
+          You're receiving this because you're ${roleLabel} of ${session.restrictedTo || "this team"}.
         </p>
       </div>
     </div>`;
+}
+
+// Save reminder log to Firestore
+async function saveReminderLog(base, headers, logEntry) {
+  try {
+    // First get existing log
+    const logRes = await fetch(`${base}/fccnets/reminderlogs`, { headers });
+    let logs = [];
+    if (logRes.ok) {
+      const doc = await logRes.json();
+      const parsed = parseDoc(doc);
+      logs = parsed.list || [];
+    }
+    
+    // Add new entry (keep last 100 logs)
+    logs.unshift(logEntry);
+    if (logs.length > 100) logs = logs.slice(0, 100);
+    
+    // Save back
+    await fetch(`${base}/fccnets/reminderlogs`, {
+      method: "PATCH",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fields: {
+          list: toFirestoreValue(logs)
+        }
+      })
+    });
+  } catch (e) {
+    console.error("Failed to save reminder log:", e.message);
+  }
 }
 
 export default async function handler(req, res) {
@@ -195,6 +246,8 @@ export default async function handler(req, res) {
   if(!projectId)   return res.status(500).json({error:"FIREBASE_PROJECT_ID not set"});
   if(!clientEmail) return res.status(500).json({error:"FIREBASE_CLIENT_EMAIL not set"});
   if(!privateKey)  return res.status(500).json({error:"FIREBASE_PRIVATE_KEY not set"});
+
+  const startTime = new Date().toISOString();
 
   try {
     const token      = await getAccessToken(clientEmail, privateKey);
@@ -214,8 +267,19 @@ export default async function handler(req, res) {
     const sessions = (parseDoc(await sRes.json()).list || []).filter(s => s.date === targetDate);
     const teams    = tRes.ok ? (parseDoc(await tRes.json()).list || []) : [];
 
-    if(sessions.length === 0)
+    if(sessions.length === 0) {
+      // Log even when no sessions
+      await saveReminderLog(base, headers, {
+        timestamp: startTime,
+        targetDate,
+        sessionsFound: 0,
+        playersSent: 0,
+        playersSkipped: 0,
+        leadersSent: 0,
+        message: "No sessions found for target date"
+      });
       return res.status(200).json({ok:true, sent:0, message:`No sessions on ${targetDate}`});
+    }
 
     // Group sessions by player
     const byPlayer = {};
@@ -224,7 +288,7 @@ export default async function handler(req, res) {
       byPlayer[name].push(s);
     }));
 
-    let sent = 0, skipped = 0, captainsSent = 0;
+    let sent = 0, skipped = 0, leadersSent = 0;
     const results = [];
 
     // 1. Send player reminders
@@ -249,7 +313,7 @@ export default async function handler(req, res) {
       } catch(e) { results.push({name, status:"error", error:e.message}); }
     }
 
-    // 2. For recurring/team sessions: notify captain/VC of players missing email
+    // 2. For team sessions: notify leaders (coaches for youth, captains for senior) of players missing email
     for(const session of sessions) {
       // Only for team sessions (has restrictedTo or recurringId)
       if(!session.restrictedTo && !session.recurringId) continue;
@@ -265,39 +329,84 @@ export default async function handler(req, res) {
       
       if(missingEmailPlayers.length === 0) continue;
       
-      // Find team captain and VC
+      // Find team
       const team = teams.find(t => t.name === teamName);
-      const captains = [];
-      if(team?.captain) captains.push(team.captain);
-      if(team?.viceCaptain) captains.push(team.viceCaptain);
+      if(!team) continue;
       
-      // Get unique captain emails
-      const captainEmails = [];
-      for(const capName of captains) {
-        const capMember = members.find(m => m.name === capName);
-        if(capMember?.email && !captainEmails.includes(capMember.email)) {
-          captainEmails.push({ name: capName, email: capMember.email });
+      // Determine who to notify: coaches for youth teams, captains for senior teams
+      const isYouth = isYouthTeam(teamName);
+      const leaders = [];
+      
+      if (isYouth) {
+        // Youth teams: notify coaches
+        const coaches = team.coaches || [];
+        coaches.forEach(coachName => {
+          leaders.push({ name: coachName, role: "coach" });
+        });
+      } else {
+        // Senior teams: notify captain and vice-captain
+        if(team.captain) leaders.push({ name: team.captain, role: "captain" });
+        if(team.viceCaptain) leaders.push({ name: team.viceCaptain, role: "vicecaptain" });
+      }
+      
+      // Get unique leader emails
+      const leaderEmails = [];
+      for(const leader of leaders) {
+        const leaderMember = members.find(m => m.name === leader.name);
+        if(leaderMember?.email && !leaderEmails.find(l => l.email === leaderMember.email)) {
+          leaderEmails.push({ 
+            name: leader.name, 
+            email: leaderMember.email,
+            role: leader.role
+          });
         }
       }
       
-      // Send captain notification
-      for(const cap of captainEmails) {
+      // Send leader notifications
+      for(const leader of leaderEmails) {
         try {
           const r = await fetch("https://api.resend.com/emails", {
             method: "POST",
             headers: {"Authorization":`Bearer ${apiKey}`, "Content-Type":"application/json"},
             body: JSON.stringify({
               from:    "FCC Training App <fcc_training_app@nordicanchor.dk>",
-              to:      [cap.email],
-              subject: `⚠️ ${missingEmailPlayers.length} player${missingEmailPlayers.length>1?"s":""} without email for ${fmtShortDate(targetDate)} session`,
-              html:    buildCaptainHtml(cap.name, session, missingEmailPlayers, targetDate),
+              to:      [leader.email],
+              subject: `⚠️ ${missingEmailPlayers.length} player${missingEmailPlayers.length>1?"s":""} without email for ${fmtShortDate(targetDate)} ${teamName} session`,
+              html:    buildLeaderHtml(leader.name, leader.role, session, missingEmailPlayers, targetDate),
             }),
           });
-          if(r.ok) { captainsSent++; results.push({name: cap.name, type:"captain", status:"sent"}); }
-          else { const e = await r.json(); results.push({name: cap.name, type:"captain", status:"failed", error:e}); }
-        } catch(e) { results.push({name: cap.name, type:"captain", status:"error", error:e.message}); }
+          if(r.ok) { 
+            leadersSent++; 
+            results.push({name: leader.name, type: leader.role, team: teamName, status:"sent"}); 
+          }
+          else { 
+            const e = await r.json(); 
+            results.push({name: leader.name, type: leader.role, team: teamName, status:"failed", error:e}); 
+          }
+        } catch(e) { 
+          results.push({name: leader.name, type: leader.role, team: teamName, status:"error", error:e.message}); 
+        }
       }
     }
+
+    // Save log entry
+    const endTime = new Date().toISOString();
+    await saveReminderLog(base, headers, {
+      timestamp: startTime,
+      completedAt: endTime,
+      targetDate,
+      sessionsFound: sessions.length,
+      sessionsDetails: sessions.map(s => ({
+        label: s.label || s.restrictedTo || "Session",
+        time: `${s.from}-${s.to}`,
+        playerCount: (s.players || []).length
+      })),
+      totalPlayers: Object.keys(byPlayer).length,
+      playersSent: sent,
+      playersSkipped: skipped,
+      leadersSent,
+      results: results.slice(0, 50) // Keep first 50 results for log
+    });
 
     return res.status(200).json({
       ok: true,
@@ -306,7 +415,7 @@ export default async function handler(req, res) {
       players: Object.keys(byPlayer).length,
       sent,
       skipped,
-      captainsSent,
+      leadersSent,
       results
     });
 
