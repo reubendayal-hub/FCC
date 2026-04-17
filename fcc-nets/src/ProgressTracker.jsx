@@ -793,7 +793,7 @@ function MarkAttendance({
                     {player.name}
                   </span>
                   {/* Batting/Bowling hand indicators */}
-                  {(player.battingHand || player.bowlingHand) && (
+                  {(player.battingHand || player.bowlingArm) && (
                     <span style={{
                       fontSize: 9,
                       color: PT.muted,
@@ -803,7 +803,7 @@ function MarkAttendance({
                       fontWeight: 600,
                     }}>
                       {player.battingHand === "left" ? "L" : "R"}
-                      {player.bowlingHand && `/${player.bowlingHand === "left" ? "L" : "R"}`}
+                      {player.bowlingArm && `/${player.bowlingArm === "left" ? "L" : "R"}`}
                     </span>
                   )}
                 </div>
@@ -1398,7 +1398,7 @@ function PlayerProgressCard({ player, snapshots, notes, currentPhase }) {
           <div>
             <div style={{ fontSize: 9, color: PT.muted, fontWeight: 600, textTransform: "uppercase" }}>Bowling</div>
             <div style={{ fontSize: 12, fontWeight: 700, color: PT.text }}>
-              {player.bowlingHand === "left" ? "Left-arm" : "Right-arm"}
+              {player.bowlingArm === "left" ? "Left-arm" : "Right-arm"}
               {player.bowlingStyle && ` ${player.bowlingStyle}`}
             </div>
           </div>
@@ -1655,9 +1655,18 @@ function PlayerDetailView({
   const [isEditing, setIsEditing] = useState(false);
   const [editAttrs, setEditAttrs] = useState({
     battingHand: player.battingHand || "right",
-    bowlingHand: player.bowlingHand || "right",
+    bowlingArm: player.bowlingArm || "right",
     bowlingStyle: player.bowlingStyle || "",
   });
+  
+  // IMPORTANT: Sync editAttrs when player prop changes (fixes refresh issue)
+  useEffect(() => {
+    setEditAttrs({
+      battingHand: player.battingHand || "right",
+      bowlingArm: player.bowlingArm || "right",
+      bowlingStyle: player.bowlingStyle || "",
+    });
+  }, [player.battingHand, player.bowlingArm, player.bowlingStyle]);
   
   // Skill editing state
   const [isEditingSkills, setIsEditingSkills] = useState(false);
@@ -1833,7 +1842,7 @@ function PlayerDetailView({
                   <div>
                     <div style={{ fontSize: 9, color: PT.muted, fontWeight: 600, textTransform: "uppercase" }}>Bowling</div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: PT.text }}>
-                      {player.bowlingHand === "left" ? "Left-arm" : "Right-arm"}
+                      {player.bowlingArm === "left" ? "Left-arm" : "Right-arm"}
                       {player.bowlingStyle && ` ${player.bowlingStyle}`}
                     </div>
                   </div>
@@ -1877,15 +1886,15 @@ function PlayerDetailView({
                     {["right", "left"].map(h => (
                       <button
                         key={h}
-                        onClick={() => setEditAttrs({ ...editAttrs, bowlingHand: h })}
+                        onClick={() => setEditAttrs({ ...editAttrs, bowlingArm: h })}
                         style={{
                           flex: 1,
                           padding: "10px",
                           fontSize: 12,
                           fontWeight: 600,
-                          background: editAttrs.bowlingHand === h ? PT.navy : PT.bg,
-                          color: editAttrs.bowlingHand === h ? PT.white : PT.text,
-                          border: `1px solid ${editAttrs.bowlingHand === h ? PT.navy : PT.border}`,
+                          background: editAttrs.bowlingArm === h ? PT.navy : PT.bg,
+                          color: editAttrs.bowlingArm === h ? PT.white : PT.text,
+                          border: `1px solid ${editAttrs.bowlingArm === h ? PT.navy : PT.border}`,
                           borderRadius: 8,
                           cursor: "pointer",
                           fontFamily: "inherit",
@@ -1947,18 +1956,19 @@ function PlayerDetailView({
                     }}
                     style={{
                       flex: 1,
-                      padding: "10px",
-                      fontSize: 12,
-                      fontWeight: 700,
-                      background: PT.navy,
+                      padding: "12px",
+                      fontSize: 13,
+                      fontWeight: 800,
+                      background: "linear-gradient(135deg, #D4A217 0%, #c9a84c 100%)",
                       border: "none",
-                      color: PT.white,
-                      borderRadius: 8,
+                      color: "#1B2A5C",
+                      borderRadius: 10,
                       cursor: "pointer",
                       fontFamily: "inherit",
+                      boxShadow: "0 2px 8px rgba(212, 162, 23, 0.4)",
                     }}
                   >
-                    Save Changes
+                    💾 Save Changes
                   </button>
                 </div>
               </div>
@@ -2203,15 +2213,16 @@ function PlayerDetailView({
                   }}
                   style={{
                     flex: 1,
-                    padding: "10px",
-                    fontSize: 12,
-                    fontWeight: 700,
-                    background: PT.navy,
+                    padding: "12px",
+                    fontSize: 13,
+                    fontWeight: 800,
+                    background: "linear-gradient(135deg, #D4A217 0%, #c9a84c 100%)",
                     border: "none",
-                    color: PT.white,
-                    borderRadius: 8,
+                    color: "#1B2A5C",
+                    borderRadius: 10,
                     cursor: "pointer",
                     fontFamily: "inherit",
+                    boxShadow: "0 2px 8px rgba(212, 162, 23, 0.4)",
                   }}
                 >
                   💾 Save Skills
