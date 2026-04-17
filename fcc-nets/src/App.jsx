@@ -4018,14 +4018,18 @@ export default function App() {
               </div>
               <div style={{marginTop:20,paddingTop:20,borderTop:`1px solid ${G.border}`}}>
                 <div style={{fontSize:12,color:G.muted,marginBottom:10}}>
-                  First time? Setting up your account?
+                  First time? Already registered with the club?
                 </div>
                 <button onClick={()=>{setVfStep("search");setVfSearch("");setVfMatch(null);setVfEmail("");setVfPhone("");setVfCode("");setVfError("");setVfConsent(false);setVfIsParent(false);setAuthView("verify");}}
                   style={{background:G.white,color:G.green,border:`1.5px solid ${G.green}`,
                     borderRadius:20,padding:"9px 22px",fontSize:13,fontWeight:800,
                     cursor:"pointer",fontFamily:"inherit"}}>
-                  ✅ Verify / Set up my account
+                  ✅ Find My Account
                 </button>
+                <div style={{fontSize:10,color:G.muted,marginTop:8,lineHeight:1.5}}>
+                  Have an <b>FCC-XXXX</b> code from your admin?<br/>
+                  Find your name first, then enter it.
+                </div>
               </div>
             </div>
           )}
@@ -5790,7 +5794,18 @@ export default function App() {
             const entries = Object.entries(pickGrouped);
             const myTeamsSet = new Set(myTeamsList);
             const myEntries = entries.filter(([t])=>myTeamsSet.has(t));
-            const otherEntries = entries.filter(([t])=>!myTeamsSet.has(t));
+            const otherEntriesRaw = entries.filter(([t])=>!myTeamsSet.has(t));
+            
+            // Deduplicate: collect all player IDs shown in myEntries
+            const shownInMyTeams = new Set();
+            myEntries.forEach(([,list]) => list.forEach(m => shownInMyTeams.add(m.id)));
+            
+            // Filter otherEntries to exclude players already shown in myEntries
+            const otherEntries = otherEntriesRaw.map(([team, list]) => [
+              team,
+              list.filter(m => !shownInMyTeams.has(m.id))
+            ]).filter(([, list]) => list.length > 0);
+            
             // Count how many players from other groups are already selected
             const otherSelected = otherEntries.reduce((n,[,list])=>
               n+list.filter(m=>selP.includes(m.name)).length, 0);
