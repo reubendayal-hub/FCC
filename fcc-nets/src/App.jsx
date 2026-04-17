@@ -2768,9 +2768,13 @@ export default function App() {
   const [allSessionNotes, setAllSessionNotes] = useState([]);   // [{sessionId, playerId, text, coach, date, pillar}]
   const [playerProgress, setPlayerProgress] = useState({});     // {playerId: {currentPhase, snapshots: {phase: {pillar: level}}}}
   const [coachOverrides, setCoachOverrides] = useState({});     // {"date-sessionId": {newCoach, oldCoach, assignedBy}}
+  const [cancelledSessions, setCancelledSessions] = useState([]); // [{date, label, reason, cancelledBy, cancelledAt, recurringId}]
 
   // Recurring slots
   const [recurring, setRecurring] = useState([]);
+  
+  // Cancellation modal
+  const [cancelModal, setCancelModal] = useState(null); // {session, slot} when cancelling
 
   // Add session form
   const [bDate,    setBDate]    = useState("");
@@ -2941,6 +2945,7 @@ export default function App() {
       joinrequests:doc(db,"fccnets",JOINREQS_KEY),
       auditlog:    doc(db,"fccnets",AUDITLOG_KEY),
       reminderlogs:doc(db,"fccnets","reminderlogs"),
+      cancelledsessions: doc(db,"fccnets","cancelledsessions"),
       seasonplans: doc(db,"fccnets","seasonplans"),
       attendance:  doc(db,"fccnets","attendance"),      // {sessionId: {playerId: true/false}}
       sessionnotes:doc(db,"fccnets","sessionnotes"),    // [{sessionId, playerId, text, coach, date}]
@@ -2949,7 +2954,7 @@ export default function App() {
     };
     (async()=>{
       try {
-        const [sr,mr,pr,tr,rr,br,ir,jr,ar,rlr,spr,attr,snr,ppr,cor] = await Promise.all([
+        const [sr,mr,pr,tr,rr,br,ir,jr,ar,rlr,csr,spr,attr,snr,ppr,cor] = await Promise.all([
           getDoc(refs.sessions),
           getDoc(refs.members),
           getDoc(refs.pins),
@@ -2960,6 +2965,7 @@ export default function App() {
           getDoc(refs.joinrequests),
           getDoc(refs.auditlog),
           getDoc(refs.reminderlogs),
+          getDoc(refs.cancelledsessions),
           getDoc(refs.seasonplans),
           getDoc(refs.attendance),
           getDoc(refs.sessionnotes),
@@ -2995,6 +3001,7 @@ export default function App() {
         setJoinRequests(jr.exists() ? JSON.parse(jr.data().value) : []);
         setAuditLog(    ar.exists() ? JSON.parse(ar.data().value) : []);
         setReminderLogs(rlr.exists() && rlr.data().list ? rlr.data().list : []);
+        setCancelledSessions(csr.exists() ? JSON.parse(csr.data().value) : []);
         setSeasonPlans( spr.exists() ? JSON.parse(spr.data().value) : {});
         // New: attendance, notes, progress, coach overrides
         setAllAttendance(  attr.exists() ? JSON.parse(attr.data().value) : {});
@@ -3002,7 +3009,7 @@ export default function App() {
         setPlayerProgress( ppr.exists() ? JSON.parse(ppr.data().value) : {});
         setCoachOverrides( cor.exists() ? JSON.parse(cor.data().value) : {});
       } catch(e) {
-        setMembers(SEED_MEMBERS.map(normMember)); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]); setBlockCals([]); setInviteCodes({}); setJoinRequests([]); setAuditLog([]); setReminderLogs([]);
+        setMembers(SEED_MEMBERS.map(normMember)); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]); setBlockCals([]); setInviteCodes({}); setJoinRequests([]); setAuditLog([]); setReminderLogs([]); setCancelledSessions([]);
         setAllAttendance({}); setAllSessionNotes([]); setPlayerProgress({}); setCoachOverrides({});
       }
       setLoading(false);
@@ -3022,6 +3029,7 @@ export default function App() {
   const saveTeams     = async u => { setTeams(u); teamsRef.current=u; await setDoc(doc(db,"fccnets","teams"),    {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveRecurring = async u => { setRecurring(u); await setDoc(doc(db,"fccnets",RECURRING_KEY),{value:JSON.stringify(u)}).catch(()=>{}); };
   const saveBlockCals   = async u => { setBlockCals(u);   await setDoc(doc(db,"fccnets","blockcals"),   {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveCancelledSessions = async u => { setCancelledSessions(u); await setDoc(doc(db,"fccnets","cancelledsessions"), {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveInviteCodes = async u => { setInviteCodes(u);  await setDoc(doc(db,"fccnets","invitecodes"), {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveJoinRequests= async u => { setJoinRequests(u); await setDoc(doc(db,"fccnets",JOINREQS_KEY),  {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveSeasonPlans = async u => { setSeasonPlans(u); await setDoc(doc(db,"fccnets","seasonplans"), {value:JSON.stringify(u)}).catch(()=>{}); };
@@ -5418,6 +5426,60 @@ export default function App() {
                 )}
               </>;
             })()}
+            
+            {/* Cancelled sessions — show upcoming ones with reason */}
+            {(()=>{
+              const today = new Date().toISOString().slice(0,10);
+              const upcomingCancelled = cancelledSessions
+                .filter(c => c.date >= today)
+                .sort((a,b) => a.date.localeCompare(b.date))
+                .slice(0, 5);
+              if(upcomingCancelled.length === 0) return null;
+              return (
+                <div style={{marginTop:8,marginBottom:12}}>
+                  <div style={{fontSize:10,fontWeight:900,letterSpacing:1.2,
+                    textTransform:"uppercase",color:"#dc2626",marginBottom:8,
+                    display:"flex",alignItems:"center",gap:6}}>
+                    <span>🚫</span> Cancelled
+                  </div>
+                  {upcomingCancelled.map(c=>(
+                    <div key={c.id} style={{
+                      background:"#fef2f2",
+                      border:"1.5px solid #fecaca",
+                      borderRadius:12,padding:"12px 14px",marginBottom:6,
+                    }}>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+                        marginBottom:4}}>
+                        <div style={{display:"flex",alignItems:"center",gap:6}}>
+                          <span style={{fontSize:13,fontWeight:800,color:"#991b1b"}}>
+                            {fmtShort(c.date)}
+                          </span>
+                          {c.team && (
+                            <span style={{background:"#fee2e2",color:"#991b1b",
+                              padding:"1px 8px",borderRadius:20,fontSize:10,fontWeight:700}}>
+                              {c.team}
+                            </span>
+                          )}
+                        </div>
+                        <span style={{fontSize:10,color:"#b91c1c",fontWeight:600}}>
+                          CANCELLED
+                        </span>
+                      </div>
+                      <div style={{fontSize:13,fontWeight:700,color:"#7f1d1d",marginBottom:4}}>
+                        {c.label}
+                      </div>
+                      <div style={{fontSize:12,color:"#991b1b",lineHeight:1.4}}>
+                        <b>Reason:</b> {c.reason}
+                      </div>
+                      <div style={{fontSize:10,color:"#b91c1c",marginTop:4}}>
+                        Cancelled by {c.cancelledBy?.split(" ")[0]} · {new Date(c.cancelledAt).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+            
             {filteredPast.length>0&&(()=>{
               const MAX_VISIBLE = 10;
               const visiblePast = showPastAll
@@ -7062,27 +7124,12 @@ export default function App() {
             if(!canDelete) return null;
             const slot = isRecurring ? recurring.find(r=>r.id===selSess.recurringId) : null;
             
-            // Handler for cancelling just this date (not the recurring slot)
-            const handleCancelThisDate = () => {
-              if(!slot) return;
-              // Add this date to the slot's cancelledDates
-              const updated = recurring.map(r => 
-                r.id === slot.id 
-                  ? { ...r, cancelledDates: [...(r.cancelledDates||[]), selSess.date] }
-                  : r
-              );
-              saveRecurring(updated);
-              // Delete the session
-              handleDeleteSess(selSess.id);
-              showToast(`Cancelled ${selSess.label || "session"} for ${fmtShort(selSess.date)}`);
-            };
-            
             return (
               <div style={{marginTop:22}}>
                 {isRecurring&&slot&&(
                   <>
-                    {/* Cancel just this date - primary action for recurring */}
-                    <button onClick={handleCancelThisDate}
+                    {/* Cancel just this date - opens confirmation modal */}
+                    <button onClick={()=>setCancelModal({session: selSess, slot})}
                       style={{display:"block",width:"100%",marginBottom:10,
                         background:"#fef3c7",border:"1.5px solid #f59e0b",color:"#92400e",
                         borderRadius:10,padding:"11px",fontSize:14,fontWeight:800,
@@ -7101,6 +7148,7 @@ export default function App() {
                         Or permanently delete the recurring slot:
                       </div>
                       <button onClick={()=>{
+                          if(!confirm(`Delete the entire "${slot.name}" recurring slot? This will stop ALL future sessions.`)) return;
                           deleteRecurringSlotSilent(slot.id);
                           handleDeleteSess(selSess.id);
                         }}
@@ -7131,6 +7179,167 @@ export default function App() {
                     </button>
                   </>
                 )}
+              </div>
+            );
+          })()}
+          
+          {/* Cancellation confirmation modal */}
+          {cancelModal && (()=>{
+            const {session, slot} = cancelModal;
+            const [reason, setReason] = React.useState("");
+            const presetReasons = [
+              "Weather conditions",
+              "Ground unavailable",
+              "Coach unavailable", 
+              "Relocated to indoor venue",
+              "Public holiday",
+              "Not enough players",
+              "Other",
+            ];
+            
+            const handleConfirmCancel = () => {
+              if(!reason.trim()) {
+                showToast("Please provide a reason for cancellation");
+                return;
+              }
+              
+              // 1. Add to cancelledSessions archive
+              const cancelRecord = {
+                id: uid(),
+                date: session.date,
+                label: session.label || slot?.name || "Training",
+                team: session.restrictedTo || session.sessionTeams?.[0] || "",
+                reason: reason.trim(),
+                cancelledBy: currentUser?.name,
+                cancelledAt: new Date().toISOString(),
+                recurringId: session.recurringId,
+                originalPlayers: session.players || [],
+              };
+              saveCancelledSessions([cancelRecord, ...cancelledSessions].slice(0, 200)); // Keep last 200
+              
+              // 2. Add date to recurring slot's cancelledDates
+              if(slot) {
+                const updated = recurring.map(r => 
+                  r.id === slot.id 
+                    ? { ...r, cancelledDates: [...(r.cancelledDates||[]), session.date] }
+                    : r
+                );
+                saveRecurring(updated);
+              }
+              
+              // 3. Delete the session
+              handleDeleteSess(session.id);
+              
+              // 4. Close modal and show confirmation
+              setCancelModal(null);
+              setSelSess(null);
+              setView("schedule");
+              showToast(`Cancelled: ${reason.trim()}`);
+            };
+            
+            return (
+              <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",
+                display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}}
+                onClick={()=>setCancelModal(null)}>
+                <div onClick={e=>e.stopPropagation()}
+                  style={{background:"#fff",borderRadius:16,padding:24,width:"100%",maxWidth:400,
+                    maxHeight:"85vh",overflowY:"auto"}}>
+                  
+                  {/* Header */}
+                  <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+                    <div style={{width:44,height:44,borderRadius:12,background:"#fef3c7",
+                      display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>
+                      🚫
+                    </div>
+                    <div>
+                      <div style={{fontWeight:900,fontSize:16,color:G.text}}>Cancel Training</div>
+                      <div style={{fontSize:12,color:G.muted}}>
+                        {session.label || "Session"} · {fmtShort(session.date)}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Warning */}
+                  <div style={{background:"#fef2f2",border:"1.5px solid #fecaca",borderRadius:10,
+                    padding:"12px 14px",marginBottom:16,fontSize:12,color:"#991b1b",lineHeight:1.5}}>
+                    <b>⚠️ This will notify booked players</b> that the session is cancelled. 
+                    Please provide a reason so everyone understands why.
+                  </div>
+                  
+                  {/* Affected players */}
+                  {session.players?.length > 0 && (
+                    <div style={{marginBottom:16}}>
+                      <div style={{fontSize:11,fontWeight:700,color:G.muted,marginBottom:6,
+                        textTransform:"uppercase",letterSpacing:0.5}}>
+                        {session.players.length} player{session.players.length!==1?"s":""} booked
+                      </div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                        {session.players.slice(0,10).map(p=>(
+                          <span key={p} style={{background:"#f1f5f9",borderRadius:20,
+                            padding:"2px 8px",fontSize:11,fontWeight:600,color:G.text}}>
+                            {p.split(" ")[0]}
+                          </span>
+                        ))}
+                        {session.players.length > 10 && (
+                          <span style={{fontSize:11,color:G.muted,padding:"2px 4px"}}>
+                            +{session.players.length - 10} more
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Reason selection */}
+                  <div style={{marginBottom:16}}>
+                    <div style={{fontSize:11,fontWeight:700,color:G.muted,marginBottom:8,
+                      textTransform:"uppercase",letterSpacing:0.5}}>
+                      Reason for cancellation *
+                    </div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
+                      {presetReasons.map(r=>(
+                        <button key={r}
+                          onClick={()=>setReason(r === "Other" ? "" : r)}
+                          style={{
+                            background: reason===r ? "#fef3c7" : "#f8fafc",
+                            border: reason===r ? "1.5px solid #f59e0b" : "1px solid #e2e8f0",
+                            borderRadius:20,padding:"6px 12px",fontSize:12,fontWeight:600,
+                            color: reason===r ? "#92400e" : G.text,
+                            cursor:"pointer",fontFamily:"inherit"
+                          }}>
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      value={reason}
+                      onChange={e=>setReason(e.target.value)}
+                      placeholder="Enter reason or add details..."
+                      style={{width:"100%",padding:"10px 12px",fontSize:13,
+                        border:`1.5px solid ${G.border}`,borderRadius:10,
+                        fontFamily:"inherit",resize:"vertical",minHeight:60}}
+                    />
+                  </div>
+                  
+                  {/* Actions */}
+                  <div style={{display:"flex",gap:10}}>
+                    <button onClick={()=>setCancelModal(null)}
+                      style={{flex:1,padding:"12px",background:"#f1f5f9",border:"none",
+                        borderRadius:10,fontSize:14,fontWeight:700,color:G.muted,
+                        cursor:"pointer",fontFamily:"inherit"}}>
+                      Go Back
+                    </button>
+                    <button onClick={handleConfirmCancel}
+                      disabled={!reason.trim()}
+                      style={{flex:1,padding:"12px",
+                        background: reason.trim() ? "#f59e0b" : "#e2e8f0",
+                        border:"none",borderRadius:10,fontSize:14,fontWeight:800,
+                        color: reason.trim() ? "#fff" : "#9ca3af",
+                        cursor: reason.trim() ? "pointer" : "not-allowed",
+                        fontFamily:"inherit"}}>
+                      Confirm Cancel
+                    </button>
+                  </div>
+                </div>
               </div>
             );
           })()}
