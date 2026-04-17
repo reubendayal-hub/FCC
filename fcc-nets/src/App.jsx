@@ -703,7 +703,7 @@ const NET_COLORS = {
 const PRIME_ZONES   = [{from:"17:00",to:"20:00"},{from:"09:00",to:"13:00"}];
 
 // ─── Car pool stops (Copenhagen → Karlebo corridor) ───────────
-const CARPOOL_STOPS = ["Nørrebro","Brønshøj","Nørreport","Lyngby St","Kokkedal St","Other"];
+const CARPOOL_STOPS = ["Nørrebro","Brønshøj","Nørreport","Lyngby St","Kokkedal School (Egedaleshallen)","Other"];
 
 // Normalise lift data — handles old string format & new object format
 function getLiftObj(d) {
