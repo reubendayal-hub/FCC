@@ -645,6 +645,21 @@ const fmtShort     = ds => new Date(ds).toLocaleDateString("en-GB",{weekday:"sho
 const fmtLong      = ds => new Date(ds).toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
 const isToday      = ds => ds === todayStr();
 const isFuture     = ds => { const d=new Date(ds); d.setHours(23,59,59); return d>=new Date(); };
+// Check if session has ended (date + end time)
+const isSessionPast = (s) => {
+  const now = new Date();
+  const sessionDate = new Date(s.date);
+  const today = new Date(); today.setHours(0,0,0,0);
+  sessionDate.setHours(0,0,0,0);
+  // If session date is before today, it's past
+  if(sessionDate < today) return true;
+  // If session date is after today, it's not past
+  if(sessionDate > today) return false;
+  // Same day — check end time
+  const [endH, endM] = (s.to || "23:59").split(":").map(Number);
+  const endTime = new Date(); endTime.setHours(endH, endM, 0, 0);
+  return now > endTime;
+};
 
 // ─── Weather constants ────────────────────────────────────────
 const FCC_LAT = 55.917762, FCC_LON = 12.415680;
@@ -2791,11 +2806,13 @@ export default function App() {
   const [notInSearch, setNotInSearch] = useState(""); // search filter for "not coming" list
   const [editingLocation, setEditingLocation] = useState(false); // location editor modal
   const [cancelReason, setCancelReason] = useState(""); // reason for cancelling a session
+  const [showCancelled, setShowCancelled] = useState(false); // collapsed by default
   const [carpoolSheetSess, setCarpoolSheetSess] = useState(null); // bottom sheet session
   const carpoolRef = useRef(null);
   const sessionsRef = useRef([]); // always holds latest sessions, avoids stale closure in recurring effect
   const membersRef  = useRef([]); // same for members
   const teamsRef    = useRef(DEFAULT_TEAMS); // same for teams
+  const recurringRef = useRef([]); // same for recurring slots
   const [bRestrictTeam, setBRestrictTeam] = useState("");
   const [selP,     setSelP]     = useState([]);
   const [pSearch,  setPSearch]  = useState("");
@@ -2996,7 +3013,9 @@ export default function App() {
         });
         setTeams(mergedTeams);
         teamsRef.current = mergedTeams;
-        setRecurring(   rr.exists() ? JSON.parse(rr.data().value) : []);
+        const initialRecurring = rr.exists() ? JSON.parse(rr.data().value) : [];
+        setRecurring(initialRecurring);
+        recurringRef.current = initialRecurring;
         setBlockCals(   br.exists() ? JSON.parse(br.data().value) : []);
         setInviteCodes( ir.exists() ? JSON.parse(ir.data().value) : {});
         setJoinRequests(jr.exists() ? JSON.parse(jr.data().value) : []);
@@ -3010,7 +3029,7 @@ export default function App() {
         setPlayerProgress( ppr.exists() ? JSON.parse(ppr.data().value) : {});
         setCoachOverrides( cor.exists() ? JSON.parse(cor.data().value) : {});
       } catch(e) {
-        setMembers(SEED_MEMBERS.map(normMember)); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]); setBlockCals([]); setInviteCodes({}); setJoinRequests([]); setAuditLog([]); setReminderLogs([]); setCancelledSessions([]);
+        setMembers(SEED_MEMBERS.map(normMember)); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]); recurringRef.current=[]; setBlockCals([]); setInviteCodes({}); setJoinRequests([]); setAuditLog([]); setReminderLogs([]); setCancelledSessions([]);
         setAllAttendance({}); setAllSessionNotes([]); setPlayerProgress({}); setCoachOverrides({});
       }
       setLoading(false);
@@ -3028,7 +3047,7 @@ export default function App() {
   const saveMembers   = async u => { setMembers(u); membersRef.current=u; await setDoc(doc(db,"fccnets","members"),  {value:JSON.stringify(u)}).catch(()=>{}); };
   const savePins      = async u => { setPins(u);      await setDoc(doc(db,"fccnets","pins"),     {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveTeams     = async u => { setTeams(u); teamsRef.current=u; await setDoc(doc(db,"fccnets","teams"),    {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveRecurring = async u => { setRecurring(u); await setDoc(doc(db,"fccnets",RECURRING_KEY),{value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveRecurring = async u => { setRecurring(u); recurringRef.current=u; await setDoc(doc(db,"fccnets",RECURRING_KEY),{value:JSON.stringify(u)}).catch(()=>{}); };
   const saveBlockCals   = async u => { setBlockCals(u);   await setDoc(doc(db,"fccnets","blockcals"),   {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveCancelledSessions = async u => { setCancelledSessions(u); await setDoc(doc(db,"fccnets","cancelledsessions"), {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveInviteCodes = async u => { setInviteCodes(u);  await setDoc(doc(db,"fccnets","invitecodes"), {value:JSON.stringify(u)}).catch(()=>{}); };
@@ -3070,18 +3089,29 @@ export default function App() {
     const liveSessions = sessionsRef.current;
     const liveMembers  = membersRef.current; // use ref to avoid stale closure
     const liveTeams    = teamsRef.current;
+    const liveRecurring = recurringRef.current; // use ref for latest cancelledDates
     const today = new Date(); today.setHours(0,0,0,0);
     const toAdd = [];
+    
+    // Build set of cancelled dates from cancelledSessions as backup check
+    const cancelledFromArchive = new Set(
+      cancelledSessions.map(c => `${c.recurringId}_${c.date}`)
+    );
+    
     recurring.forEach(slot=>{
       if(!slot.enabled) return;
-      const cancelledDates = slot.cancelledDates || [];
+      // Get cancelledDates from ref (most up-to-date) or fall back to state
+      const slotFromRef = liveRecurring.find(r => r.id === slot.id);
+      const cancelledDates = slotFromRef?.cancelledDates || slot.cancelledDates || [];
       for(let i=0; i<=21; i++){
         const d = new Date(today); d.setDate(today.getDate()+i);
         if(d.getDay() !== slot.day) continue;
         const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
         if(slot.activeFrom && dateStr < slot.activeFrom) continue;
         if(slot.activeTo   && dateStr > slot.activeTo)   continue;
-        if(cancelledDates.includes(dateStr)) continue; // Skip cancelled dates
+        if(cancelledDates.includes(dateStr)) continue; // Skip cancelled dates from slot
+        // Also check cancelledSessions archive as backup
+        if(cancelledFromArchive.has(`${slot.id}_${dateStr}`)) continue;
         const exists = liveSessions.find(s=>
           s.recurringId===slot.id && s.date===dateStr);
         if(!exists) {
@@ -3133,7 +3163,7 @@ export default function App() {
       saveSessions(updated);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[loading, recurring]);
+  },[loading, recurring, cancelledSessions]);
 
   // ── Invite code helpers ───────────────────────────────────────
   // Generate a short human-readable code: FCC-XXXX (letters+digits, no ambiguous chars)
@@ -3859,13 +3889,13 @@ export default function App() {
   }
 
   // ── Computed ──────────────────────────────────────────────────
-  const upcoming = [...sessions].filter(s=>isFuture(s.date))
+  const upcoming = [...sessions].filter(s=>!isSessionPast(s))
     .sort((a,b)=>new Date(a.date)-new Date(b.date)||a.from.localeCompare(b.from));
-  const past=[...sessions].filter(s=>!isFuture(s.date))
-    .sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const past=[...sessions].filter(s=>isSessionPast(s))
+    .sort((a,b)=>new Date(b.date)-new Date(a.date)||b.from.localeCompare(a.from));
 
-  const tomorrowSess=sessions.filter(s=>s.date===tomorrowStr()&&isFuture(s.date));
-  const todaySess   =sessions.filter(s=>s.date===todayStr()   &&isFuture(s.date));
+  const tomorrowSess=sessions.filter(s=>s.date===tomorrowStr()&&!isSessionPast(s));
+  const todaySess   =sessions.filter(s=>s.date===todayStr()   &&!isSessionPast(s));
 
   // Player picker — member appears under EACH of their teams
   const pickVisible = members.filter(m=>
@@ -5428,55 +5458,80 @@ export default function App() {
               </>;
             })()}
             
-            {/* Cancelled sessions — show upcoming ones with reason */}
+            {/* Cancelled sessions — collapsible, show upcoming ones with reason */}
             {(()=>{
               const today = new Date().toISOString().slice(0,10);
+              // Filter: only future/today dates, deduplicate by date+label
+              const seen = new Set();
               const upcomingCancelled = cancelledSessions
-                .filter(c => c.date >= today)
+                .filter(c => {
+                  if(c.date < today) return false; // Past dates go away
+                  const key = `${c.date}_${c.label}`;
+                  if(seen.has(key)) return false; // Deduplicate
+                  seen.add(key);
+                  return true;
+                })
                 .sort((a,b) => a.date.localeCompare(b.date))
-                .slice(0, 5);
+                .slice(0, 10);
               if(upcomingCancelled.length === 0) return null;
               return (
                 <div style={{marginTop:8,marginBottom:12}}>
-                  <div style={{fontSize:10,fontWeight:900,letterSpacing:1.2,
-                    textTransform:"uppercase",color:"#dc2626",marginBottom:8,
-                    display:"flex",alignItems:"center",gap:6}}>
-                    <span>🚫</span> Cancelled
-                  </div>
-                  {upcomingCancelled.map(c=>(
-                    <div key={c.id} style={{
-                      background:"#fef2f2",
-                      border:"1.5px solid #fecaca",
-                      borderRadius:12,padding:"12px 14px",marginBottom:6,
+                  <button 
+                    onClick={()=>setShowCancelled(v=>!v)}
+                    style={{
+                      width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
+                      background:"#fef2f2",border:"1.5px solid #fecaca",borderRadius:10,
+                      padding:"10px 14px",cursor:"pointer",fontFamily:"inherit",
                     }}>
-                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-                        marginBottom:4}}>
-                        <div style={{display:"flex",alignItems:"center",gap:6}}>
-                          <span style={{fontSize:13,fontWeight:800,color:"#991b1b"}}>
-                            {fmtShort(c.date)}
-                          </span>
-                          {c.team && (
-                            <span style={{background:"#fee2e2",color:"#991b1b",
-                              padding:"1px 8px",borderRadius:20,fontSize:10,fontWeight:700}}>
-                              {c.team}
-                            </span>
-                          )}
-                        </div>
-                        <span style={{fontSize:10,color:"#b91c1c",fontWeight:600}}>
-                          CANCELLED
-                        </span>
-                      </div>
-                      <div style={{fontSize:13,fontWeight:700,color:"#7f1d1d",marginBottom:4}}>
-                        {c.label}
-                      </div>
-                      <div style={{fontSize:12,color:"#991b1b",lineHeight:1.4}}>
-                        <b>Reason:</b> {c.reason}
-                      </div>
-                      <div style={{fontSize:10,color:"#b91c1c",marginTop:4}}>
-                        Cancelled by {c.cancelledBy?.split(" ")[0]} · {new Date(c.cancelledAt).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}
-                      </div>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:14}}>🚫</span>
+                      <span style={{fontSize:12,fontWeight:800,color:"#dc2626"}}>
+                        {upcomingCancelled.length} Cancelled Session{upcomingCancelled.length!==1?"s":""}
+                      </span>
                     </div>
-                  ))}
+                    <span style={{fontSize:11,color:"#b91c1c",fontWeight:600}}>
+                      {showCancelled ? "▲ hide" : "▼ show"}
+                    </span>
+                  </button>
+                  
+                  {showCancelled && (
+                    <div style={{marginTop:8}}>
+                      {upcomingCancelled.map(c=>(
+                        <div key={c.id} style={{
+                          background:"#fef2f2",
+                          border:"1.5px solid #fecaca",
+                          borderRadius:12,padding:"12px 14px",marginBottom:6,
+                        }}>
+                          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+                            marginBottom:4}}>
+                            <div style={{display:"flex",alignItems:"center",gap:6}}>
+                              <span style={{fontSize:13,fontWeight:800,color:"#991b1b"}}>
+                                {fmtShort(c.date)}
+                              </span>
+                              {c.team && (
+                                <span style={{background:"#fee2e2",color:"#991b1b",
+                                  padding:"1px 8px",borderRadius:20,fontSize:10,fontWeight:700}}>
+                                  {c.team}
+                                </span>
+                              )}
+                            </div>
+                            <span style={{fontSize:10,color:"#b91c1c",fontWeight:600}}>
+                              CANCELLED
+                            </span>
+                          </div>
+                          <div style={{fontSize:13,fontWeight:700,color:"#7f1d1d",marginBottom:4}}>
+                            {c.label}
+                          </div>
+                          <div style={{fontSize:12,color:"#991b1b",lineHeight:1.4}}>
+                            <b>Reason:</b> {c.reason}
+                          </div>
+                          <div style={{fontSize:10,color:"#b91c1c",marginTop:4}}>
+                            Cancelled by {c.cancelledBy?.split(" ")[0]} · {new Date(c.cancelledAt).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -7227,28 +7282,38 @@ export default function App() {
                 return;
               }
               
-              // 1. Add to cancelledSessions archive
-              const cancelRecord = {
-                id: uid(),
-                date: session.date,
-                label: session.label || slot?.name || "Training",
-                team: session.restrictedTo || session.sessionTeams?.[0] || "",
-                reason: cancelReason.trim(),
-                cancelledBy: currentUser?.name,
-                cancelledAt: new Date().toISOString(),
-                recurringId: session.recurringId,
-                originalPlayers: session.players || [],
-              };
-              saveCancelledSessions([cancelRecord, ...cancelledSessions].slice(0, 200)); // Keep last 200
+              // Check if already cancelled (prevent duplicates)
+              const alreadyCancelled = cancelledSessions.some(
+                c => c.date === session.date && c.recurringId === session.recurringId
+              );
               
-              // 2. Add date to recurring slot's cancelledDates
+              if(!alreadyCancelled) {
+                // 1. Add to cancelledSessions archive
+                const cancelRecord = {
+                  id: uid(),
+                  date: session.date,
+                  label: session.label || slot?.name || "Training",
+                  team: session.restrictedTo || session.sessionTeams?.[0] || "",
+                  reason: cancelReason.trim(),
+                  cancelledBy: currentUser?.name,
+                  cancelledAt: new Date().toISOString(),
+                  recurringId: session.recurringId,
+                  originalPlayers: session.players || [],
+                };
+                saveCancelledSessions([cancelRecord, ...cancelledSessions].slice(0, 200)); // Keep last 200
+              }
+              
+              // 2. Add date to recurring slot's cancelledDates (ALWAYS do this to prevent regeneration)
               if(slot) {
-                const updated = recurring.map(r => 
-                  r.id === slot.id 
-                    ? { ...r, cancelledDates: [...(r.cancelledDates||[]), session.date] }
-                    : r
-                );
-                saveRecurring(updated);
+                const existingCancelled = slot.cancelledDates || [];
+                if(!existingCancelled.includes(session.date)) {
+                  const updated = recurring.map(r => 
+                    r.id === slot.id 
+                      ? { ...r, cancelledDates: [...existingCancelled, session.date] }
+                      : r
+                  );
+                  saveRecurring(updated);
+                }
               }
               
               // 3. Delete the session
