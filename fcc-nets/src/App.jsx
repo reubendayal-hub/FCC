@@ -2338,120 +2338,130 @@ function SessCard({s,members,teams,faded,onClick,onCarpoolClick}) {
       teams?.find(t=>t.name===tn)?.coaches||[]
     ))]
   ) : [];
+  
+  const isLocationChanged = s.location && s.location !== "Karlebo Cricket Ground";
+  const isIndoor = s.location?.toLowerCase().includes("indoor") || s.location?.toLowerCase().includes("egedal");
+  
+  // Carpool summary
+  const lifts = s.lifts || {};
+  const liftPeople = Object.keys(lifts);
+  const offering = liftPeople.filter(p => getLiftPref(lifts[p]) === "offer").length;
+  const needing = liftPeople.filter(p => getLiftPref(lifts[p]) === "need").length;
+  const hasCarpool = offering > 0 || needing > 0;
+  
+  // Net label text
+  const netLabel = s.net === "both" ? "Both Nets" : s.net ? `Net ${s.net}` : null;
+  
   return (
-    <div onClick={onClick} style={{background:isToday(s.date)?"#f7ffe8":G.white,
-      borderRadius:14,padding:"13px 15px",marginBottom:9,
-      border:isToday(s.date)?`2px solid ${G.lime}`:`1.5px solid ${G.border}`,
-      opacity:faded ? 0.48 : 1,cursor:"pointer",
-      display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-      <div style={{flex:1,minWidth:0}}>
-        {/* ── Date + time header — bordered ── */}
-        <div style={{background:isToday(s.date)?`${G.lime}22`:"rgba(0,0,0,.025)",
-          border:`1px solid ${isToday(s.date)?G.lime:G.border}`,
-          borderRadius:9,padding:"6px 10px",marginBottom:7}}>
-          {/* Row 1: date + chips */}
-          <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
-            <span style={{fontSize:13,fontWeight:800,color:G.green,letterSpacing:"-.2px"}}>
+    <div onClick={onClick} style={{
+      background: G.white,
+      borderRadius: 12,
+      marginBottom: 9,
+      border: isToday(s.date) ? `2px solid ${G.lime}` : `1px solid ${G.border}`,
+      opacity: faded ? 0.5 : 1,
+      cursor: "pointer",
+      overflow: "hidden",
+    }}>
+      
+      {/* Location banner — only shows when different from Karlebo */}
+      {isLocationChanged && (
+        <div style={{
+          background: "linear-gradient(135deg, #f3e8ff 0%, #ede9fe 100%)",
+          padding: "8px 14px",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          borderBottom: "1px solid #e9d5ff",
+        }}>
+          <span style={{fontSize: 13}}>{isIndoor ? "🏠" : "📍"}</span>
+          <span style={{fontSize: 12, fontWeight: 700, color: "#7c3aed"}}>{s.location}</span>
+        </div>
+      )}
+      
+      {/* Main content */}
+      <div style={{
+        padding: "12px 14px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+      }}>
+        <div style={{flex: 1, minWidth: 0}}>
+          {/* Row 1: Date + Team + Nets + Carpool + Today */}
+          <div style={{display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap"}}>
+            <span style={{fontSize: 14, fontWeight: 800, color: G.text}}>
               {fmtShort(s.date)}
             </span>
-            {isToday(s.date)&&<span style={{background:G.lime,color:G.green,borderRadius:20,
-              padding:"1px 7px",fontSize:9,fontWeight:900}}>TODAY</span>}
-            {s.restrictedTo&&<span style={{background:"#fef9c3",color:"#92400e",borderRadius:20,
-              padding:"1px 7px",fontSize:9,fontWeight:800}}>🔒 {s.restrictedTo}</span>}
-            {s.recurringId&&!s.restrictedTo&&<span style={{background:"#f0f9ff",color:"#0369a1",
-              borderRadius:20,padding:"1px 7px",fontSize:9,fontWeight:800}}>↻</span>}
-            {s.net&&<span style={{background:s.net==="both"?"#fef3c7":s.net==="2"?"#ede9fe":"#dcfce7",
-              color:s.net==="both"?"#92400e":s.net==="2"?"#5b21b6":"#166534",
-              borderRadius:20,padding:"1px 7px",fontSize:9,fontWeight:800,
-              display:"inline-flex",alignItems:"center",gap:3}}>
-              {s.net==="both"
-                ? <><BothNetsIcon color="#92400e" size={10}/> Both Nets</>
-                : <><NetIcon color={s.net==="2"?"#5b21b6":"#166534"} size={10}/> Net {s.net}</>}
-            </span>}
-            {/* Location change indicator — highlighted */}
-            {s.location && s.location !== "Karlebo Cricket Ground" && (
-              <span style={{background:"linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)",
-                color:"#fff",borderRadius:20,padding:"2px 8px",fontSize:9,fontWeight:800,
-                display:"inline-flex",alignItems:"center",gap:3,
-                boxShadow:"0 2px 4px rgba(124,58,237,0.3)"}}>
-                📍 {s.location.length > 15 ? s.location.slice(0,15)+"…" : s.location}
+            {s.restrictedTo && (
+              <span style={{
+                background: "#fef3c7", color: "#92400e",
+                padding: "1px 8px", borderRadius: 20,
+                fontSize: 10, fontWeight: 700,
+              }}>
+                {s.restrictedTo}
               </span>
             )}
+            {netLabel && (
+              <span style={{fontSize: 11, color: G.muted}}>{netLabel}</span>
+            )}
+            {hasCarpool && (
+              <span 
+                onClick={onCarpoolClick ? e => {e.stopPropagation(); onCarpoolClick();} : undefined}
+                style={{
+                  background: "#ecfdf5", color: "#047857",
+                  padding: "1px 8px", borderRadius: 20,
+                  fontSize: 10, fontWeight: 600,
+                  cursor: onCarpoolClick ? "pointer" : "default",
+                }}>
+                🚗 {offering > 0 ? `${offering} offer${offering > 1 ? "s" : ""}` : ""}{offering > 0 && needing > 0 ? " · " : ""}{needing > 0 ? `${needing} need${needing > 1 ? "s" : ""}` : ""}
+              </span>
+            )}
+            {isToday(s.date) && (
+              <span style={{
+                background: G.lime, color: G.green,
+                borderRadius: 20, padding: "1px 8px",
+                fontSize: 9, fontWeight: 800,
+              }}>TODAY</span>
+            )}
           </div>
-          {/* Session name — prominent, own line */}
-          {s.label&&(
-            <div style={{fontWeight:900,fontSize:14,color:G.text,
-              marginTop:3,letterSpacing:"-.1px",lineHeight:1.2}}>
+          
+          {/* Row 2: Title */}
+          {s.label && (
+            <div style={{
+              fontWeight: 700, fontSize: 14, color: G.text,
+              marginBottom: 5, lineHeight: 1.2,
+            }}>
               {s.label}
             </div>
           )}
-          {/* Row 2: time + coach */}
-          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:4}}>
-            <span style={{fontSize:12,color:G.green,fontWeight:800}}>{s.from} – {s.to}</span>
-          {/* Coach chips — max 3 visible, +N for rest */}
-          {s.restrictedTo&&sessionCoaches.length>0&&<>
-            <span style={{fontSize:10,color:G.muted,fontWeight:700,
-              letterSpacing:.3}}>Coach:</span>
-            {sessionCoaches.slice(0,3).map(name=>(
-              <span key={name} style={{fontSize:10,fontWeight:700,padding:"1px 7px",
-                borderRadius:20,background:"#fef9c3",color:"#92400e",
-                border:"0.5px solid #fde68a",display:"inline-flex",alignItems:"center",gap:2}}>
-                🧢 {name.split(" ")[0]}
-              </span>
-            ))}
-            {sessionCoaches.length>3&&(
-              <span style={{fontSize:10,fontWeight:700,color:"#92400e",padding:"1px 5px",
-                borderRadius:20,background:"#fef9c3",border:"0.5px solid #fde68a"}}>
-                +{sessionCoaches.length-3}
-              </span>
+          
+          {/* Row 3: Time + Coaches */}
+          <div style={{fontSize: 12, color: G.muted}}>
+            {s.from} – {s.to}
+            {sessionCoaches.length > 0 && (
+              <>
+                <span style={{margin: "0 4px"}}>·</span>
+                <span style={{color: G.text}}>Coach:</span>{" "}
+                <span style={{color: "#059669", fontWeight: 600}}>
+                  {sessionCoaches.slice(0, 3).map(c => c.split(" ")[0]).join(", ")}
+                  {sessionCoaches.length > 3 && ` +${sessionCoaches.length - 3}`}
+                </span>
+              </>
             )}
-          </>}
           </div>
-        </div>{/* end bordered header */}
-        {(()=>{
-          const lifts=s.lifts||{};
-          const liftPeople=Object.keys(lifts);
-          const offering=liftPeople.filter(p=>getLiftPref(lifts[p])==="offer").length;
-          const needing =liftPeople.filter(p=>getLiftPref(lifts[p])==="need").length;
-          const ownT    =liftPeople.filter(p=>getLiftPref(lifts[p])==="self").length;
-          if(!offering&&!needing&&!ownT) return null;
-          const parts=[];
-          if(offering) parts.push(`🚘 ${offering}`);
-          if(needing)  parts.push(`🙋 ${needing}`);
-          if(ownT)     parts.push(`🚀 ${ownT}`);
-          return (
-            <div style={{marginTop:4}}>
-              <span
-                onClick={onCarpoolClick ? e=>{e.stopPropagation();onCarpoolClick();} : undefined}
-                style={{fontSize:10,fontWeight:700,padding:"2px 9px",borderRadius:20,
-                  background:"#f0fdf4",color:"#166534",border:"0.5px solid #86efac",
-                  display:"inline-flex",alignItems:"center",gap:4,
-                  cursor:onCarpoolClick?"pointer":"default"}}>
-                {parts.join("  ")}
-                <span style={{fontWeight:500,opacity:.7}}>· car pool</span>
-              </span>
-            </div>
-          );
-        })()}
-        {/* Player name chips — compact */}
-        <div style={{marginTop:5,display:"flex",flexWrap:"wrap",gap:2}}>
-          {s.players.slice(0,12).map((p,i)=>{
-            const mem=members.find(m=>m.name===p);
-            const firstTeam=(mem?.teams||[])[0]||null;
-            const tm=getTeamMeta(firstTeam||"Unassigned");
-            return <span key={i} style={{background:tm.bg,color:tm.text,borderRadius:20,
-              padding:"0px 5px",fontSize:9,fontWeight:600,whiteSpace:"nowrap"}}>{p}</span>;
-          })}
-          {s.players.length>12&&<span style={{fontSize:9,color:G.muted,padding:"0 3px",
-            fontWeight:600}}>+{s.players.length-12}</span>}
         </div>
-      </div>
-      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,
-        marginLeft:10,flexShrink:0}}>
-        <GroupIcon color={G.green} size={20}/>
-        <span style={{fontWeight:900,fontSize:13,color:G.green,lineHeight:1}}>
-          {s.players.length}
-        </span>
+        
+        {/* Player count — right side */}
+        <div style={{
+          display: "flex", flexDirection: "column", alignItems: "center",
+          paddingLeft: 16, flexShrink: 0,
+        }}>
+          <div style={{fontSize: 22, fontWeight: 800, color: G.text, lineHeight: 1}}>
+            {s.players.length}
+          </div>
+          <div style={{fontSize: 9, color: G.muted, textTransform: "uppercase", letterSpacing: 0.3}}>
+            going
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -5498,35 +5508,45 @@ export default function App() {
                     <div style={{marginTop:8}}>
                       {upcomingCancelled.map(c=>(
                         <div key={c.id} style={{
-                          background:"#fef2f2",
-                          border:"1.5px solid #fecaca",
-                          borderRadius:12,padding:"12px 14px",marginBottom:6,
+                          background: G.white,
+                          borderRadius: 12,
+                          marginBottom: 8,
+                          border: "1px solid #fecaca",
+                          overflow: "hidden",
                         }}>
-                          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-                            marginBottom:4}}>
-                            <div style={{display:"flex",alignItems:"center",gap:6}}>
-                              <span style={{fontSize:13,fontWeight:800,color:"#991b1b"}}>
+                          {/* Cancelled banner */}
+                          <div style={{
+                            background: "linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)",
+                            padding: "8px 14px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            borderBottom: "1px solid #fecaca",
+                          }}>
+                            <span style={{fontSize: 13}}>🚫</span>
+                            <span style={{fontSize: 12, fontWeight: 700, color: "#dc2626"}}>Cancelled</span>
+                          </div>
+                          
+                          {/* Content */}
+                          <div style={{padding: "12px 14px"}}>
+                            <div style={{display: "flex", alignItems: "center", gap: 6, marginBottom: 4}}>
+                              <span style={{fontSize: 14, fontWeight: 800, color: G.text}}>
                                 {fmtShort(c.date)}
                               </span>
                               {c.team && (
-                                <span style={{background:"#fee2e2",color:"#991b1b",
-                                  padding:"1px 8px",borderRadius:20,fontSize:10,fontWeight:700}}>
-                                  {c.team}
-                                </span>
+                                <span style={{
+                                  background: "#fef3c7", color: "#92400e",
+                                  padding: "1px 8px", borderRadius: 20,
+                                  fontSize: 10, fontWeight: 700,
+                                }}>{c.team}</span>
                               )}
                             </div>
-                            <span style={{fontSize:10,color:"#b91c1c",fontWeight:600}}>
-                              CANCELLED
-                            </span>
-                          </div>
-                          <div style={{fontSize:13,fontWeight:700,color:"#7f1d1d",marginBottom:4}}>
-                            {c.label}
-                          </div>
-                          <div style={{fontSize:12,color:"#991b1b",lineHeight:1.4}}>
-                            <b>Reason:</b> {c.reason}
-                          </div>
-                          <div style={{fontSize:10,color:"#b91c1c",marginTop:4}}>
-                            Cancelled by {c.cancelledBy?.split(" ")[0]} · {new Date(c.cancelledAt).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}
+                            <div style={{fontSize: 14, fontWeight: 700, color: G.text, marginBottom: 5}}>
+                              {c.label}
+                            </div>
+                            <div style={{fontSize: 12, color: G.muted}}>
+                              {c.reason} · <span style={{color: "#b91c1c"}}>by {c.cancelledBy?.split(" ")[0]}</span>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -5590,7 +5610,7 @@ export default function App() {
           <div style={{marginTop:24,marginBottom:6}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
               marginBottom:8}}>
-              <SLbl mt={0}>🚫 Nets Blocked</SLbl>
+              <SLbl mt={0}>Blocked Dates</SLbl>
               {upcomingBlocks.length>3&&(
                 <button onClick={()=>setBlocksExpanded(e=>!e)}
                   style={{background:"none",border:"none",cursor:"pointer",
@@ -5603,13 +5623,39 @@ export default function App() {
               )}
             </div>
             {(blocksExpanded ? upcomingBlocks : upcomingBlocks.slice(0,3)).map(b=>(
-              <div key={b.id} style={{background:"#fff7ed",border:"1.5px solid #fed7aa",
-                borderRadius:10,padding:"10px 14px",marginBottom:6}}>
-                <div style={{fontWeight:800,fontSize:13,color:"#c2410c"}}>
-                  🏏 {b.label||"Nets Blocked"} — {fmtShort(b.date)}
+              <div key={b.id} style={{
+                background: G.white,
+                borderRadius: 12,
+                marginBottom: 8,
+                border: "1px solid #fed7aa",
+                overflow: "hidden",
+              }}>
+                {/* Blocked banner */}
+                <div style={{
+                  background: "linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)",
+                  padding: "8px 14px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  borderBottom: "1px solid #fed7aa",
+                }}>
+                  <span style={{fontSize: 13}}>🏏</span>
+                  <span style={{fontSize: 12, fontWeight: 700, color: "#c2410c"}}>Match Day — Nets Blocked</span>
                 </div>
-                <div style={{fontSize:12,color:"#9a3412",marginTop:2}}>
-                  {b.from} – {b.to} · Nets unavailable (match day)
+                
+                {/* Content */}
+                <div style={{padding: "12px 14px"}}>
+                  <div style={{display: "flex", alignItems: "center", gap: 6, marginBottom: 4}}>
+                    <span style={{fontSize: 14, fontWeight: 800, color: G.text}}>
+                      {fmtShort(b.date)}
+                    </span>
+                  </div>
+                  <div style={{fontSize: 14, fontWeight: 700, color: G.text, marginBottom: 5}}>
+                    {b.label || "Nets Unavailable"}
+                  </div>
+                  <div style={{fontSize: 12, color: G.muted}}>
+                    {b.from} – {b.to}
+                  </div>
                 </div>
               </div>
             ))}
