@@ -284,6 +284,48 @@ const TEAM_META = {
   "U11":         { bg:"#064e3b", text:"#6ee7b7" },
   "Unassigned":  { bg:"#374151", text:"#d1d5db" },
 };
+
+// Card accent colors for session cards (border, top bar, circle)
+const TEAM_CARD_COLORS = {
+  "U11":         { border:"#f59e0b", bg:"#fef3c7", text:"#92400e", badgeBg:"#fef3c7", badgeText:"#92400e" },
+  "U13":         { border:"#8b5cf6", bg:"#ede9fe", text:"#6d28d9", badgeBg:"#ede9fe", badgeText:"#6d28d9" },
+  "U15":         { border:"#8b5cf6", bg:"#ede9fe", text:"#6d28d9", badgeBg:"#ede9fe", badgeText:"#6d28d9" },
+  "U15 Girls":   { border:"#ec4899", bg:"#fce7f3", text:"#be185d", badgeBg:"#fce7f3", badgeText:"#be185d" },
+  "U18":         { border:"#8b5cf6", bg:"#ede9fe", text:"#6d28d9", badgeBg:"#ede9fe", badgeText:"#6d28d9" },
+  "Girls":       { border:"#ec4899", bg:"#fce7f3", text:"#be185d", badgeBg:"#fce7f3", badgeText:"#be185d" },
+  "Kvinder":     { border:"#ec4899", bg:"#fce7f3", text:"#be185d", badgeBg:"#fce7f3", badgeText:"#be185d" },
+  "Women's":     { border:"#ec4899", bg:"#fce7f3", text:"#be185d", badgeBg:"#fce7f3", badgeText:"#be185d" },
+  "2. Division": { border:"#3b82f6", bg:"#dbeafe", text:"#1d4ed8", badgeBg:"#dbeafe", badgeText:"#1d4ed8" },
+  "Div 2":       { border:"#3b82f6", bg:"#dbeafe", text:"#1d4ed8", badgeBg:"#dbeafe", badgeText:"#1d4ed8" },
+  "3. Division": { border:"#0d9488", bg:"#ccfbf1", text:"#0f766e", badgeBg:"#ccfbf1", badgeText:"#0f766e" },
+  "Div 3":       { border:"#0d9488", bg:"#ccfbf1", text:"#0f766e", badgeBg:"#ccfbf1", badgeText:"#0f766e" },
+  "4. Division": { border:"#f97316", bg:"#ffedd5", text:"#c2410c", badgeBg:"#ffedd5", badgeText:"#c2410c" },
+  "Div 4":       { border:"#f97316", bg:"#ffedd5", text:"#c2410c", badgeBg:"#ffedd5", badgeText:"#c2410c" },
+  "T20 Serie 4": { border:"#3b82f6", bg:"#dbeafe", text:"#1d4ed8", badgeBg:"#dbeafe", badgeText:"#1d4ed8" },
+  "T20 Serie 5": { border:"#0d9488", bg:"#ccfbf1", text:"#0f766e", badgeBg:"#ccfbf1", badgeText:"#0f766e" },
+  "OB":          { border:"#6b7280", bg:"#f3f4f6", text:"#374151", badgeBg:"#f3f4f6", badgeText:"#374151" },
+  "Legends":     { border:"#6b7280", bg:"#f3f4f6", text:"#374151", badgeBg:"#f3f4f6", badgeText:"#374151" },
+};
+const getTeamCardColors = name => {
+  if(!name) return { border:"#9ca3af", bg:"#f3f4f6", text:"#374151", badgeBg:"#f3f4f6", badgeText:"#374151" };
+  // Check exact match first
+  if(TEAM_CARD_COLORS[name]) return TEAM_CARD_COLORS[name];
+  // Check if name contains key patterns
+  const n = name.toLowerCase();
+  if(n.includes("u11")) return TEAM_CARD_COLORS["U11"];
+  if(n.includes("u13")) return TEAM_CARD_COLORS["U13"];
+  if(n.includes("u15") && (n.includes("girl") || n.includes("kvinde"))) return TEAM_CARD_COLORS["U15 Girls"];
+  if(n.includes("u15")) return TEAM_CARD_COLORS["U15"];
+  if(n.includes("u18")) return TEAM_CARD_COLORS["U18"];
+  if(n.includes("girl") || n.includes("kvinde") || n.includes("women")) return TEAM_CARD_COLORS["Girls"];
+  if(n.includes("2. div") || n.includes("div 2") || n.includes("2.div")) return TEAM_CARD_COLORS["2. Division"];
+  if(n.includes("3. div") || n.includes("div 3") || n.includes("3.div")) return TEAM_CARD_COLORS["3. Division"];
+  if(n.includes("4. div") || n.includes("div 4") || n.includes("4.div")) return TEAM_CARD_COLORS["4. Division"];
+  if(n.includes("t20")) return TEAM_CARD_COLORS["T20 Serie 4"];
+  if(n.includes("legend") || n.includes("ob")) return TEAM_CARD_COLORS["OB"];
+  // Default gray
+  return { border:"#9ca3af", bg:"#f3f4f6", text:"#374151", badgeBg:"#f3f4f6", badgeText:"#374151" };
+};
 // Fallback colour pool for dynamically added teams
 const EXTRA_COLORS = [
   {bg:"#1a3a2a",text:"#86efac"},{bg:"#7c3a00",text:"#fdba74"},
@@ -2352,29 +2394,35 @@ function SessCard({s,members,teams,faded,onClick,onCarpoolClick}) {
   // Net label text
   const netLabel = s.net === "both" ? "Both Nets" : s.net ? `Net ${s.net}` : null;
   
+  // Get team colors for card styling
+  const teamName = s.restrictedTo || s.sessionTeams?.[0] || null;
+  const tc = getTeamCardColors(teamName);
+  
   return (
     <div onClick={onClick} style={{
       background: G.white,
-      borderRadius: 12,
-      marginBottom: 9,
-      border: isToday(s.date) ? `2px solid ${G.lime}` : `1px solid ${G.border}`,
+      borderRadius: 10,
+      marginBottom: 8,
+      borderLeft: `4px solid ${tc.border}`,
       opacity: faded ? 0.5 : 1,
       cursor: "pointer",
       overflow: "hidden",
     }}>
+      {/* Top accent bar */}
+      <div style={{height: 3, background: tc.border}}/>
       
       {/* Location banner — only shows when different from Karlebo */}
       {isLocationChanged && (
         <div style={{
-          background: "linear-gradient(135deg, #f3e8ff 0%, #ede9fe 100%)",
-          padding: "8px 14px",
+          background: "#f3e8ff",
+          padding: "6px 14px",
           display: "flex",
           alignItems: "center",
           gap: 6,
           borderBottom: "1px solid #e9d5ff",
         }}>
-          <span style={{fontSize: 13}}>{isIndoor ? "🏠" : "📍"}</span>
-          <span style={{fontSize: 12, fontWeight: 700, color: "#7c3aed"}}>{s.location}</span>
+          <span style={{fontSize: 12}}>{isIndoor ? "🏠" : "📍"}</span>
+          <span style={{fontSize: 11, fontWeight: 700, color: "#7c3aed"}}>{s.location}</span>
         </div>
       )}
       
@@ -2391,13 +2439,13 @@ function SessCard({s,members,teams,faded,onClick,onCarpoolClick}) {
             <span style={{fontSize: 14, fontWeight: 800, color: G.text}}>
               {fmtShort(s.date)}
             </span>
-            {s.restrictedTo && (
+            {teamName && (
               <span style={{
-                background: "#fef3c7", color: "#92400e",
-                padding: "1px 8px", borderRadius: 20,
+                background: tc.badgeBg, color: tc.badgeText,
+                padding: "2px 10px", borderRadius: 20,
                 fontSize: 10, fontWeight: 700,
               }}>
-                {s.restrictedTo}
+                {teamName}
               </span>
             )}
             {netLabel && (
@@ -2450,16 +2498,19 @@ function SessCard({s,members,teams,faded,onClick,onCarpoolClick}) {
           </div>
         </div>
         
-        {/* Player count — right side */}
+        {/* Player count circle — team colored */}
         <div style={{
-          display: "flex", flexDirection: "column", alignItems: "center",
-          paddingLeft: 16, flexShrink: 0,
+          width: 48, height: 48, borderRadius: "50%",
+          background: tc.bg, border: `2px solid ${tc.border}`,
+          display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center",
+          flexShrink: 0, marginLeft: 12,
         }}>
-          <div style={{fontSize: 22, fontWeight: 800, color: G.text, lineHeight: 1}}>
+          <div style={{fontSize: 18, fontWeight: 800, color: tc.text, lineHeight: 1}}>
             {s.players.length}
           </div>
-          <div style={{fontSize: 9, color: G.muted, textTransform: "uppercase", letterSpacing: 0.3}}>
-            going
+          <div style={{fontSize: 7, color: tc.text, textTransform: "uppercase", fontWeight: 600, opacity: 0.8}}>
+            {faded ? "went" : "going"}
           </div>
         </div>
       </div>
@@ -5436,7 +5487,18 @@ export default function App() {
                 : filteredUpcoming.slice(0, UPCOMING_LIMIT);
               const hiddenCount = filteredUpcoming.length - UPCOMING_LIMIT;
               return <>
-                <SLbl mt={4}>Upcoming</SLbl>
+                {/* Upcoming Section Banner */}
+                <div style={{
+                  background: "#166534", color: "white",
+                  padding: "10px 14px", borderRadius: 10, marginBottom: 12, marginTop: 8,
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                }}>
+                  <div style={{display: "flex", alignItems: "center", gap: 8}}>
+                    <span style={{fontSize: 14}}>📅</span>
+                    <span style={{fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5}}>Upcoming</span>
+                  </div>
+                  <span style={{fontSize: 12, opacity: 0.85}}>{filteredUpcoming.length} session{filteredUpcoming.length !== 1 ? "s" : ""}</span>
+                </div>
                 {visibleUpcoming.map(s=><SessCard key={s.id} s={s} members={members} teams={teams}
                   onCarpoolClick={()=>{setLiftDraft(null);setCarpoolSheetSess(s);}}
                   onClick={()=>{
@@ -5468,7 +5530,7 @@ export default function App() {
               </>;
             })()}
             
-            {/* Cancelled sessions — collapsible, show upcoming ones with reason */}
+            {/* Cancelled sessions — show 1, collapse rest */}
             {(()=>{
               const today = new Date().toISOString().slice(0,10);
               // Filter: only future/today dates, deduplicate by date+label
@@ -5484,73 +5546,115 @@ export default function App() {
                 .sort((a,b) => a.date.localeCompare(b.date))
                 .slice(0, 10);
               if(upcomingCancelled.length === 0) return null;
+              
+              const tc = getTeamCardColors(upcomingCancelled[0]?.team);
+              
               return (
-                <div style={{marginTop:8,marginBottom:12}}>
-                  <button 
-                    onClick={()=>setShowCancelled(v=>!v)}
-                    style={{
-                      width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
-                      background:"#fef2f2",border:"1.5px solid #fecaca",borderRadius:10,
-                      padding:"10px 14px",cursor:"pointer",fontFamily:"inherit",
-                    }}>
-                    <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <span style={{fontSize:14}}>🚫</span>
-                      <span style={{fontSize:12,fontWeight:800,color:"#dc2626"}}>
-                        {upcomingCancelled.length} Cancelled Session{upcomingCancelled.length!==1?"s":""}
-                      </span>
+                <div style={{marginTop:16,marginBottom:12}}>
+                  {/* Cancelled Section Banner */}
+                  <div style={{
+                    background: "#dc2626", color: "white",
+                    padding: "10px 14px", borderRadius: 10, marginBottom: 12,
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                  }}>
+                    <div style={{display: "flex", alignItems: "center", gap: 8}}>
+                      <span style={{fontSize: 14}}>🚫</span>
+                      <span style={{fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5}}>Cancelled</span>
                     </div>
-                    <span style={{fontSize:11,color:"#b91c1c",fontWeight:600}}>
-                      {showCancelled ? "▲ hide" : "▼ show"}
-                    </span>
-                  </button>
+                    <span style={{fontSize: 12, opacity: 0.85}}>{upcomingCancelled.length} upcoming</span>
+                  </div>
                   
-                  {showCancelled && (
-                    <div style={{marginTop:8}}>
-                      {upcomingCancelled.map(c=>(
-                        <div key={c.id} style={{
-                          background: G.white,
-                          borderRadius: 12,
-                          marginBottom: 8,
-                          border: "1px solid #fecaca",
-                          overflow: "hidden",
-                        }}>
-                          {/* Cancelled banner */}
-                          <div style={{
-                            background: "linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)",
-                            padding: "8px 14px",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 6,
-                            borderBottom: "1px solid #fecaca",
-                          }}>
-                            <span style={{fontSize: 13}}>🚫</span>
-                            <span style={{fontSize: 12, fontWeight: 700, color: "#dc2626"}}>Cancelled</span>
-                          </div>
-                          
-                          {/* Content */}
-                          <div style={{padding: "12px 14px"}}>
-                            <div style={{display: "flex", alignItems: "center", gap: 6, marginBottom: 4}}>
-                              <span style={{fontSize: 14, fontWeight: 800, color: G.text}}>
-                                {fmtShort(c.date)}
-                              </span>
-                              {c.team && (
-                                <span style={{
-                                  background: "#fef3c7", color: "#92400e",
-                                  padding: "1px 8px", borderRadius: 20,
-                                  fontSize: 10, fontWeight: 700,
-                                }}>{c.team}</span>
-                              )}
-                            </div>
-                            <div style={{fontSize: 14, fontWeight: 700, color: G.text, marginBottom: 5}}>
-                              {c.label}
-                            </div>
-                            <div style={{fontSize: 12, color: G.muted}}>
-                              {c.reason} · <span style={{color: "#b91c1c"}}>by {c.cancelledBy?.split(" ")[0]}</span>
-                            </div>
-                          </div>
+                  {/* First cancelled - always visible */}
+                  {upcomingCancelled.slice(0, 1).map(c => {
+                    const ctc = getTeamCardColors(c.team);
+                    return (
+                      <div key={c.id} style={{
+                        background: "#fef2f2",
+                        borderRadius: 10,
+                        borderLeft: `4px solid #dc2626`,
+                        marginBottom: 8,
+                        padding: "12px 14px",
+                      }}>
+                        <div style={{display: "flex", alignItems: "center", gap: 6, marginBottom: 4}}>
+                          <span style={{fontSize: 14, fontWeight: 800, color: G.text}}>
+                            {fmtShort(c.date)}
+                          </span>
+                          {c.team && (
+                            <span style={{
+                              background: ctc.badgeBg, color: ctc.badgeText,
+                              padding: "2px 10px", borderRadius: 20,
+                              fontSize: 10, fontWeight: 700,
+                            }}>{c.team}</span>
+                          )}
                         </div>
-                      ))}
-                    </div>
+                        <div style={{fontSize: 14, fontWeight: 700, color: G.text, marginBottom: 4}}>
+                          {c.label}
+                        </div>
+                        <div style={{fontSize: 12, color: "#991b1b"}}>
+                          {c.reason} · by {c.cancelledBy?.split(" ")[0]}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  
+                  {/* Collapsed indicator for rest */}
+                  {upcomingCancelled.length > 1 && !showCancelled && (
+                    <button 
+                      onClick={()=>setShowCancelled(true)}
+                      style={{
+                        width: "100%", padding: "8px",
+                        background: "none", border: "1px dashed #fecaca",
+                        borderRadius: 8, fontSize: 12, fontWeight: 600,
+                        color: "#dc2626", cursor: "pointer", fontFamily: "inherit",
+                      }}>
+                      + {upcomingCancelled.length - 1} more cancelled session{upcomingCancelled.length > 2 ? "s" : ""}
+                    </button>
+                  )}
+                  
+                  {/* Rest of cancelled when expanded */}
+                  {showCancelled && upcomingCancelled.slice(1).map(c => {
+                    const ctc = getTeamCardColors(c.team);
+                    return (
+                      <div key={c.id} style={{
+                        background: "#fef2f2",
+                        borderRadius: 10,
+                        borderLeft: `4px solid #dc2626`,
+                        marginBottom: 8,
+                        padding: "12px 14px",
+                      }}>
+                        <div style={{display: "flex", alignItems: "center", gap: 6, marginBottom: 4}}>
+                          <span style={{fontSize: 14, fontWeight: 800, color: G.text}}>
+                            {fmtShort(c.date)}
+                          </span>
+                          {c.team && (
+                            <span style={{
+                              background: ctc.badgeBg, color: ctc.badgeText,
+                              padding: "2px 10px", borderRadius: 20,
+                              fontSize: 10, fontWeight: 700,
+                            }}>{c.team}</span>
+                          )}
+                        </div>
+                        <div style={{fontSize: 14, fontWeight: 700, color: G.text, marginBottom: 4}}>
+                          {c.label}
+                        </div>
+                        <div style={{fontSize: 12, color: "#991b1b"}}>
+                          {c.reason} · by {c.cancelledBy?.split(" ")[0]}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  
+                  {showCancelled && upcomingCancelled.length > 1 && (
+                    <button 
+                      onClick={()=>setShowCancelled(false)}
+                      style={{
+                        width: "100%", padding: "8px",
+                        background: "none", border: "1px dashed #fecaca",
+                        borderRadius: 8, fontSize: 12, fontWeight: 600,
+                        color: "#dc2626", cursor: "pointer", fontFamily: "inherit",
+                      }}>
+                      ▲ Show less
+                    </button>
                   )}
                 </div>
               );
@@ -5563,7 +5667,18 @@ export default function App() {
                 : filteredPast.slice(0, 1);
               const archived = filteredPast.slice(MAX_VISIBLE);
               return <>
-                <SLbl>Past</SLbl>
+                {/* Past Section Banner */}
+                <div style={{
+                  background: "#6b7280", color: "white",
+                  padding: "10px 14px", borderRadius: 10, marginBottom: 12, marginTop: 16,
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                }}>
+                  <div style={{display: "flex", alignItems: "center", gap: 8}}>
+                    <span style={{fontSize: 14}}>📋</span>
+                    <span style={{fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5}}>Past</span>
+                  </div>
+                  <span style={{fontSize: 12, opacity: 0.85}}>{filteredPast.length} session{filteredPast.length !== 1 ? "s" : ""}</span>
+                </div>
                 {visiblePast.map(s=><SessCard key={s.id} s={s} members={members} teams={teams} faded
                   onCarpoolClick={()=>{setLiftDraft(null);setCarpoolSheetSess(s);}}
                   onClick={()=>{
@@ -5605,69 +5720,77 @@ export default function App() {
           </>
         )}
 
-        {/* Nets Blocked — collapsed, shows 3 upcoming, expandable */}
+        {/* Nets Blocked — with section banner and reason chips */}
         {upcomingBlocks.length>0&&(
           <div style={{marginTop:24,marginBottom:6}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-              marginBottom:8}}>
-              <SLbl mt={0}>Blocked Dates</SLbl>
-              {upcomingBlocks.length>3&&(
-                <button onClick={()=>setBlocksExpanded(e=>!e)}
-                  style={{background:"none",border:"none",cursor:"pointer",
-                    fontSize:12,fontWeight:700,color:G.green,padding:"2px 0",
-                    fontFamily:"inherit"}}>
-                  {blocksExpanded
-                    ? "▲ Show less"
-                    : `▼ Show all ${upcomingBlocks.length}`}
-                </button>
-              )}
+            {/* Nets Blocked Section Banner */}
+            <div style={{
+              background: "#ea580c", color: "white",
+              padding: "10px 14px", borderRadius: 10, marginBottom: 12,
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+              <div style={{display: "flex", alignItems: "center", gap: 8}}>
+                <span style={{fontSize: 14}}>⛔</span>
+                <span style={{fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5}}>Nets Blocked</span>
+              </div>
+              <span style={{fontSize: 12, opacity: 0.85}}>{upcomingBlocks.length} date{upcomingBlocks.length !== 1 ? "s" : ""}</span>
             </div>
-            {(blocksExpanded ? upcomingBlocks : upcomingBlocks.slice(0,3)).map(b=>(
-              <div key={b.id} style={{
-                background: G.white,
-                borderRadius: 12,
-                marginBottom: 8,
-                border: "1px solid #fed7aa",
-                overflow: "hidden",
-              }}>
-                {/* Blocked banner */}
-                <div style={{
-                  background: "linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)",
-                  padding: "8px 14px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  borderBottom: "1px solid #fed7aa",
+            
+            {(blocksExpanded ? upcomingBlocks : upcomingBlocks.slice(0,3)).map(b=>{
+              // Determine reason chip based on label
+              const lbl = (b.label || "").toLowerCase();
+              let reasonIcon = "⛔";
+              let reasonText = "Blocked";
+              if(lbl.includes("match") || lbl.includes("vs") || lbl.includes("kamp")) {
+                reasonIcon = "🏏"; reasonText = "Match";
+              } else if(lbl.includes("maintenance") || lbl.includes("vedligehold")) {
+                reasonIcon = "🔧"; reasonText = "Maintenance";
+              } else if(lbl.includes("event") || lbl.includes("open day") || lbl.includes("åben")) {
+                reasonIcon = "🎉"; reasonText = "Event";
+              } else if(lbl.includes("tournament") || lbl.includes("turnering")) {
+                reasonIcon = "🏆"; reasonText = "Tournament";
+              }
+              
+              return (
+                <div key={b.id} style={{
+                  background: "#fff7ed",
+                  borderRadius: 10,
+                  borderLeft: "4px solid #ea580c",
+                  marginBottom: 8,
+                  padding: "12px 14px",
                 }}>
-                  <span style={{fontSize: 13}}>🏏</span>
-                  <span style={{fontSize: 12, fontWeight: 700, color: "#c2410c"}}>Match Day — Nets Blocked</span>
-                </div>
-                
-                {/* Content */}
-                <div style={{padding: "12px 14px"}}>
                   <div style={{display: "flex", alignItems: "center", gap: 6, marginBottom: 4}}>
                     <span style={{fontSize: 14, fontWeight: 800, color: G.text}}>
                       {fmtShort(b.date)}
                     </span>
+                    <span style={{
+                      background: "#fed7aa", color: "#c2410c",
+                      padding: "2px 10px", borderRadius: 20,
+                      fontSize: 10, fontWeight: 700,
+                    }}>{reasonIcon} {reasonText}</span>
                   </div>
-                  <div style={{fontSize: 14, fontWeight: 700, color: G.text, marginBottom: 5}}>
+                  <div style={{fontSize: 14, fontWeight: 700, color: G.text, marginBottom: 4}}>
                     {b.label || "Nets Unavailable"}
                   </div>
-                  <div style={{fontSize: 12, color: G.muted}}>
+                  <div style={{fontSize: 12, color: "#9a3412"}}>
                     {b.from} – {b.to}
                   </div>
                 </div>
-              </div>
-            ))}
-            {!blocksExpanded&&upcomingBlocks.length>3&&(
-              <div style={{textAlign:"center",paddingTop:2}}>
-                <button onClick={()=>setBlocksExpanded(true)}
-                  style={{background:"none",border:`1px dashed ${G.border}`,borderRadius:8,
-                    padding:"6px 18px",fontSize:12,fontWeight:700,color:G.muted,
-                    cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
-                  +{upcomingBlocks.length-3} more blocked dates
-                </button>
-              </div>
+              );
+            })}
+            
+            {upcomingBlocks.length>3&&(
+              <button onClick={()=>setBlocksExpanded(e=>!e)}
+                style={{
+                  width: "100%", padding: "8px",
+                  background: "none", border: "1px dashed #fed7aa",
+                  borderRadius: 8, fontSize: 12, fontWeight: 600,
+                  color: "#ea580c", cursor: "pointer", fontFamily: "inherit",
+                }}>
+                {blocksExpanded
+                  ? "▲ Show less"
+                  : `+ ${upcomingBlocks.length - 3} more blocked date${upcomingBlocks.length > 4 ? "s" : ""}`}
+              </button>
             )}
           </div>
         )}
