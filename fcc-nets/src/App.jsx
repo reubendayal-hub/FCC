@@ -9243,7 +9243,7 @@ export default function App() {
         msg += `${i + 1}. ${p}${role}\n`;
       });
       
-      msg += `\n📅 ${fmtDate(match.date)}\n`;
+      msg += `\n📅 ${fmtLong(match.date)}\n`;
       msg += `📍 ${venue ? venue.name : (match.home ? "Karlebo Cricket Ground" : "Away")}`;
       if (mapsLink) msg += ` — ${mapsLink}`;
       msg += `\n⏰ Match: ${match.label.includes("T20") ? "TBD" : "11:00"}`;
@@ -9381,7 +9381,7 @@ export default function App() {
                                 {m.label.replace(/^(Div \d|Women's|OB|T20 Serie \d) /i, "")}
                               </div>
                               <div style={{fontSize: 12, color: G.muted, marginTop: 2}}>
-                                {fmtDate(m.date)} · {m.home ? "Home" : "Away"}
+                                {fmtShort(m.date)} · {m.home ? "Home" : "Away"}
                               </div>
                               {hasSelection && (
                                 <div style={{fontSize: 11, color: G.green, marginTop: 4}}>
