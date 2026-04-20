@@ -9312,14 +9312,21 @@ export default function App() {
     const openSelectionModal = (match, division) => {
       const matchId = `${match.date}-${division}`;
       const existing = matchSelections[matchId];
+      
+      // Find the team for this division to get default captain/VC
+      const team = visibleTeams.find(t => teamToDivision[t.name] === division);
+      const defaultCaptain = team?.captain || null;
+      const defaultVC = team?.vicecaptain || null;
+      
       if (existing) {
         setXiSelection(existing.players || []);
         setXiRoles({ captain: existing.captain, vc: existing.vc, wk: existing.wk });
         setXiNote(existing.note || "");
         setXiReportTime(existing.reportTime || "");
       } else {
+        // For new selection, pre-assign captain and VC from team data
         setXiSelection([]);
-        setXiRoles({ captain: null, vc: null, wk: null });
+        setXiRoles({ captain: defaultCaptain, vc: defaultVC, wk: null });
         setXiNote("");
         setXiReportTime("");
       }
