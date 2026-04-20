@@ -236,32 +236,36 @@ const ALL_FIXTURES = [
   {date:"2026-09-20",label:"U11 Ministævne @ Ishøj",division:"U11",home:false},
 ]
 
-// Club venue addresses for Google Maps links
+// Club venue addresses for Google Maps links (verified from cricket.dk)
 const CLUB_VENUES = {
   // Home ground
-  "Fredensborg": { name: "Karlebo Cricket Ground", address: "Karlebovej 23, 3480 Fredensborg", lat: 55.9397, lng: 12.4147 },
-  "FCC": { name: "Karlebo Cricket Ground", address: "Karlebovej 23, 3480 Fredensborg", lat: 55.9397, lng: 12.4147 },
+  "Fredensborg": { name: "Fredensborg Cricket Club", address: "Karlebovej 23, 3480 Fredensborg" },
+  "FCC": { name: "Fredensborg Cricket Club", address: "Karlebovej 23, 3480 Fredensborg" },
   // Hovedstaden clubs
-  "KB": { name: "KB Cricket Ground", address: "Peter Bangs Vej 147, 2000 Frederiksberg", lat: 55.6797, lng: 12.5197 },
-  "AB": { name: "AB Cricket Ground", address: "Lundtoftegårdsvej 37, 2800 Kgs. Lyngby", lat: 55.7847, lng: 12.5097 },
-  "Copenhagen": { name: "Copenhagen Cricket Greens", address: "Terrasserne 30, 2700 Brønshøj", lat: 55.7147, lng: 12.5047 },
-  "APMM": { name: "Kløvermarken", address: "Kløvermarksvej 50, 2300 København S", lat: 55.6597, lng: 12.6097 },
-  "Maersk": { name: "Kløvermarken", address: "Kløvermarksvej 50, 2300 København S", lat: 55.6597, lng: 12.6097 },
-  "Glostrup": { name: "Solvangsparken", address: "Nørre Alle 41, 2600 Glostrup", lat: 55.6697, lng: 12.3997 },
-  "Hvidovre": { name: "Hvidovre Cricket Ground", address: "Bymuren 151, 2650 Hvidovre", lat: 55.6397, lng: 12.4697 },
-  "Frem": { name: "Valby Idrætspark", address: "Julius Andersens Vej 7, 2500 Valby", lat: 55.6497, lng: 12.5097 },
-  "Ishøj": { name: "Ishøj Cricket Ground", address: "Vejledalen 17, 2635 Ishøj", lat: 55.6147, lng: 12.3547 },
-  "Tåstrup": { name: "Tåstrup Cricket Ground", address: "Sydskellet 1, 2630 Taastrup", lat: 55.6547, lng: 12.2897 },
-  "Albertslund": { name: "Albertslund Cricket Ground", address: "Egelundsvej 2, 2620 Albertslund", lat: 55.6597, lng: 12.3497 },
-  "Bella": { name: "Copenhagen Cricket Greens", address: "Terrasserne 30, 2700 Brønshøj", lat: 55.7147, lng: 12.5047 },
-  "Nørrebro": { name: "Nørrebro Cricket Ground", address: "Lersø Parkallé 40, 2100 København Ø", lat: 55.7097, lng: 12.5697 },
-  "Himalaya": { name: "Himalaya Cricket Ground", address: "Lersø Parkallé 40, 2100 København Ø", lat: 55.7097, lng: 12.5697 },
-  "Svanholm": { name: "Svanholm Cricket Ground", address: "Skenkelsøvej 19, 3650 Ølstykke", lat: 55.7897, lng: 12.1697 },
-  "Tårnby": { name: "Tårnby Cricket Ground", address: "Løjtegårdsvej 55, 2770 Kastrup", lat: 55.6297, lng: 12.6297 },
-  "Køge": { name: "Køge Cricket Ground", address: "Ølbyvej 50, 4600 Køge", lat: 55.4597, lng: 12.1797 },
-  "Roskilde": { name: "Roskilde Cricket Ground", address: "Kildegården 1, 4000 Roskilde", lat: 55.6297, lng: 12.0797 },
-  "Soraner": { name: "Soraner Cricket Ground", address: "Sorø Akademi, 4180 Sorø", lat: 55.4297, lng: 11.5597 },
-  "Forty": { name: "Forty Cricket Ground", address: "Valby Idrætspark, 2500 Valby", lat: 55.6497, lng: 12.5097 },
+  "KB": { name: "Kjøbenhavns Boldklub", address: "Peter Bangs Vej 147, 2000 Frederiksberg" },
+  "AB": { name: "Akademisk Boldklub", address: "Skovdiget 1, 2880 Bagsværd" },
+  "Copenhagen": { name: "Copenhagen Cricket Greens", address: "Terrasserne 30, 2700 Brønshøj" },
+  "Bella": { name: "Copenhagen Cricket Greens", address: "Terrasserne 30, 2700 Brønshøj" },
+  "APMM": { name: "Kløvermarken", address: "Kløvermarksvej 50, 2300 København S" },
+  "Maersk": { name: "Kløvermarken", address: "Kløvermarksvej 50, 2300 København S" },
+  "Nørrebro": { name: "Kløvermarken", address: "Kløvermarksvej 50, 2300 København S" },
+  "Himalaya": { name: "Kløvermarken", address: "Kløvermarksvej 50, 2300 København S" },
+  "Himalayan": { name: "Kløvermarken", address: "Kløvermarksvej 50, 2300 København S" },
+  "Glostrup": { name: "Solvangsparken", address: "Nørre Alle, 2600 Glostrup" },
+  "Hvidovre": { name: "Enghøjskolens Sportsplads", address: "Bymuren 151, 2650 Hvidovre" },
+  "Frem": { name: "Valby Idrætspark", address: "Julius Andersens Vej 5, 2450 København SV" },
+  "Ishøj": { name: "Ishøj Idrætscenter", address: "Vejledalen 17, 2635 Ishøj" },
+  "Tåstrup": { name: "Hedehusene Idrætscenter", address: "Stenbuen 34, 2640 Hedehusene" },
+  "Albertslund": { name: "Albertslund Stadion", address: "Skallerne 14, 2620 Albertslund" },
+  "Svanholm": { name: "Svanholm Park", address: "Svanholm Alle 2, 2660 Brøndby Strand" },
+  "Soraner": { name: "Gentofte Sportspark", address: "Ved Stadion 6A, 2820 Gentofte" },
+  "Soranerne": { name: "Gentofte Sportspark", address: "Ved Stadion 6A, 2820 Gentofte" },
+  // Sjælland clubs
+  "Køge": { name: "Køge Stadion", address: "Ved Stadion 10, 4600 Køge" },
+  "Roskilde": { name: "Roskilde Cricket", address: "Poppelgårdsvej 4, 4000 Roskilde" },
+  "Sorø": { name: "Sorø Akademi", address: "Søgade 18 C, 4180 Sorø" },
+  // OB/Forty matches often at Valby or other grounds
+  "Forty": { name: "Valby Idrætspark", address: "Julius Andersens Vej 5, 2450 København SV" },
 };
 
 // Get venue for a match (extracts club name from label)
@@ -9229,10 +9233,6 @@ export default function App() {
       const venue = getMatchVenue(match.label, match.home);
       const opponent = match.label.replace(/^(Div \d|Women's|OB|T20 Serie \d) (vs |@ )/i, "").replace(/\s*\d+$/, "");
       
-      const mapsLink = venue 
-        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venue.address)}`
-        : "";
-      
       let msg = `Dear Team,\n\nPlaying XI for our match against ${opponent}:\n\n`;
       
       players.forEach((p, i) => {
@@ -9244,9 +9244,8 @@ export default function App() {
       });
       
       msg += `\n📅 ${fmtLong(match.date)}\n`;
-      msg += `📍 ${venue ? venue.name : (match.home ? "Karlebo Cricket Ground" : "Away")}`;
-      if (mapsLink) msg += ` — ${mapsLink}`;
-      msg += `\n⏰ Match: ${match.label.includes("T20") ? "TBD" : "11:00"}`;
+      msg += `📍 ${venue ? `${venue.name}, ${venue.address}` : (match.home ? "Karlebo Cricket Ground, Karlebovej 23, 3480 Fredensborg" : "Away")}\n`;
+      msg += `⏰ Match: ${match.label.includes("T20") ? "TBD" : "11:00"}`;
       if (reportTime) msg += ` · Report: ${reportTime}`;
       msg += `\n`;
       
