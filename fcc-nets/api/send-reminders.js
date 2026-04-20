@@ -148,8 +148,14 @@ export default async function handler(req, res) {
     if(!mRes.ok) throw new Error(`Members fetch ${mRes.status}: ${await mRes.text()}`);
     if(!sRes.ok) throw new Error(`Sessions fetch ${sRes.status}: ${await sRes.text()}`);
 
-    // Members stored as {list: [...]}
-    const members  = parseDoc(await mRes.json()).list  || [];
+    // Members stored as {value: JSON.stringify([...])} — need to parse the JSON string
+    const membersDoc = parseDoc(await mRes.json());
+    let members = [];
+    if(membersDoc.value) {
+      try { members = JSON.parse(membersDoc.value); } catch(e) { members = []; }
+    } else if(membersDoc.list) {
+      members = membersDoc.list; // Fallback if stored as list
+    }
     
     // Sessions stored as {value: JSON.stringify([...])} — need to parse the JSON string
     const sessionsDoc = parseDoc(await sRes.json());
