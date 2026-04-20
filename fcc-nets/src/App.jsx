@@ -8663,13 +8663,23 @@ export default function App() {
           {/* ══════════════════════════════════════════════════════════ */}
           {myTeams.length > 0 && (()=>{
             const today = new Date().toISOString().slice(0, 10);
-            // Map team names to fixture divisions
-            const teamToDivs = {
-              "Div 2": ["Div 2"], "Div 3": ["Div 3"], "Div 4": ["Div 4"],
-              "T20 Serie 4": ["T20 Serie 4"], "T20 Serie 5": ["T20 Serie 5"],
-              "Women's": ["Women's"], "OB": ["OB"], "Legends": ["Legends"],
+            // Map team names to fixture divisions - flexible matching
+            const getMyDivisions = (teams) => {
+              const divs = [];
+              teams.forEach(t => {
+                const tl = t.toLowerCase();
+                if(tl.includes("div 2") || tl === "div 2") divs.push("Div 2");
+                if(tl.includes("div 3") || tl === "div 3") divs.push("Div 3");
+                if(tl.includes("div 4") || tl === "div 4") divs.push("Div 4");
+                if(tl.includes("t20") && tl.includes("4")) divs.push("T20 Serie 4");
+                if(tl.includes("t20") && tl.includes("5")) divs.push("T20 Serie 5");
+                if(tl.includes("women") || tl.includes("kvinde")) divs.push("Women's");
+                if(tl === "ob" || tl.includes("oldboy")) divs.push("OB");
+                if(tl.includes("legend")) divs.push("Legends");
+              });
+              return [...new Set(divs)];
             };
-            const myDivisions = myTeams.flatMap(t => teamToDivs[t] || []);
+            const myDivisions = getMyDivisions(myTeams);
             const myMatches = ALL_FIXTURES
               .filter(f => f.date >= today && myDivisions.includes(f.division))
               .sort((a, b) => a.date.localeCompare(b.date))
@@ -8748,11 +8758,11 @@ export default function App() {
                   </div>
                 </div>
                 
-                <button onClick={() => setView("teamavail")}
+                <button onClick={() => setView("availability")}
                   style={{width: "100%", marginTop: 12, padding: "10px",
-                    background: "none", border: `1px dashed ${G.border}`,
-                    borderRadius: 8, fontSize: 12, fontWeight: 500,
-                    color: G.muted, cursor: "pointer", fontFamily: "inherit"}}>
+                    background: G.cream, border: `1.5px solid ${G.border}`,
+                    borderRadius: 8, fontSize: 12, fontWeight: 600,
+                    color: G.text, cursor: "pointer", fontFamily: "inherit"}}>
                   View full season fixtures →
                 </button>
               </div>
