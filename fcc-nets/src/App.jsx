@@ -303,8 +303,8 @@ const TEAM_CARD_COLORS = {
   "Div 4":       { border:"#f97316", bg:"#ffedd5", text:"#c2410c", badgeBg:"#ffedd5", badgeText:"#c2410c" },
   "T20 Serie 4": { border:"#3b82f6", bg:"#dbeafe", text:"#1d4ed8", badgeBg:"#dbeafe", badgeText:"#1d4ed8" },
   "T20 Serie 5": { border:"#0d9488", bg:"#ccfbf1", text:"#0f766e", badgeBg:"#ccfbf1", badgeText:"#0f766e" },
-  "OB":          { border:"#6b7280", bg:"#f3f4f6", text:"#374151", badgeBg:"#f3f4f6", badgeText:"#374151" },
-  "Legends":     { border:"#6b7280", bg:"#f3f4f6", text:"#374151", badgeBg:"#f3f4f6", badgeText:"#374151" },
+  "OB":          { border:"#1e3a5f", bg:"#e0e7ff", text:"#1e3a5f", badgeBg:"#e0e7ff", badgeText:"#1e3a5f" },
+  "Legends":     { border:"#1e3a5f", bg:"#e0e7ff", text:"#1e3a5f", badgeBg:"#e0e7ff", badgeText:"#1e3a5f" },
 };
 const getTeamCardColors = name => {
   if(!name) return { border:"#9ca3af", bg:"#f3f4f6", text:"#374151", badgeBg:"#f3f4f6", badgeText:"#374151" };
@@ -8730,7 +8730,7 @@ export default function App() {
                               background: tc.badgeBg, color: tc.badgeText,
                               padding: "1px 8px", borderRadius: 12,
                               fontSize: 9, fontWeight: 700,
-                            }}>{f.division}</span>
+                            }}>{f.division === "OB" ? "OB - Legends" : f.division}</span>
                           </div>
                           <div style={{fontSize: 14, fontWeight: 500, color: G.text, marginBottom: 2}}>
                             {f.label.replace(/^(Div \d|Women's|OB|T20 Serie \d) (vs |@ )/i, "")}
