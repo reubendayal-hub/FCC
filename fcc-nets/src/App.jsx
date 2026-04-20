@@ -2946,6 +2946,7 @@ export default function App() {
 
   // ── Profile tabs for player-parent hybrid ────────────────────
   const [profileTab, setProfileTab] = useState("profile"); // profile|family
+  const [showAllMatches, setShowAllMatches] = useState(false); // for My Matches in profile
 
   // ── Self-service verify/onboarding flow ────────────────────
   const [vfStep,      setVfStep]      = useState("search");   // search|found|notfound|code|parent|done
@@ -8674,18 +8675,25 @@ export default function App() {
                 if(tl.includes("t20") && tl.includes("4")) divs.push("T20 Serie 4");
                 if(tl.includes("t20") && tl.includes("5")) divs.push("T20 Serie 5");
                 if(tl.includes("women") || tl.includes("kvinde")) divs.push("Women's");
-                if(tl === "ob" || tl.includes("oldboy")) divs.push("OB");
-                if(tl.includes("legend")) divs.push("Legends");
+                // Legends team plays in OB division
+                if(tl === "ob" || tl.includes("oldboy") || tl.includes("legend")) divs.push("OB");
               });
               return [...new Set(divs)];
             };
             const myDivisions = getMyDivisions(myTeams);
-            const myMatches = ALL_FIXTURES
-              .filter(f => f.date >= today && myDivisions.includes(f.division))
-              .sort((a, b) => a.date.localeCompare(b.date))
-              .slice(0, 6);
             
-            if(myMatches.length === 0) return null;
+            // Check if user can access full availability view
+            const canAccessAvailability = can(userRole, "accessMembers") || 
+              isCoachMember(currentUser?.name, teams) ||
+              teams.some(t => (t.captain === me.name || t.viceCaptain === me.name));
+            
+            const allMyMatches = ALL_FIXTURES
+              .filter(f => f.date >= today && myDivisions.includes(f.division))
+              .sort((a, b) => a.date.localeCompare(b.date));
+            
+            const myMatches = showAllMatches ? allMyMatches : allMyMatches.slice(0, 6);
+            
+            if(allMyMatches.length === 0) return null;
             
             return (
               <div style={{background: G.white, border: `1.5px solid ${G.border}`,
@@ -8696,7 +8704,7 @@ export default function App() {
                     <span style={{fontSize: 16}}>🏏</span>
                     <span style={{fontWeight: 800, fontSize: 14, color: G.text}}>My Upcoming Matches</span>
                   </div>
-                  <span style={{fontSize: 12, color: G.muted}}>{myMatches.length} match{myMatches.length !== 1 ? "es" : ""}</span>
+                  <span style={{fontSize: 12, color: G.muted}}>{allMyMatches.length} match{allMyMatches.length !== 1 ? "es" : ""}</span>
                 </div>
                 
                 <div style={{display: "flex", flexDirection: "column", gap: 8}}>
@@ -8740,31 +8748,38 @@ export default function App() {
                 <div style={{display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 14}}>
                   <div style={{background: G.cream, borderRadius: 8, padding: "10px", textAlign: "center"}}>
                     <div style={{fontSize: 18, fontWeight: 500, color: G.text}}>
-                      {ALL_FIXTURES.filter(f => f.date >= today && myDivisions.includes(f.division)).length}
+                      {allMyMatches.length}
                     </div>
                     <div style={{fontSize: 9, color: G.muted, textTransform: "uppercase"}}>Total remaining</div>
                   </div>
                   <div style={{background: G.cream, borderRadius: 8, padding: "10px", textAlign: "center"}}>
                     <div style={{fontSize: 18, fontWeight: 500, color: G.text}}>
-                      {ALL_FIXTURES.filter(f => f.date >= today && f.home && myDivisions.includes(f.division)).length}
+                      {allMyMatches.filter(f => f.home).length}
                     </div>
                     <div style={{fontSize: 9, color: G.muted, textTransform: "uppercase"}}>Home</div>
                   </div>
                   <div style={{background: G.cream, borderRadius: 8, padding: "10px", textAlign: "center"}}>
                     <div style={{fontSize: 18, fontWeight: 500, color: G.text}}>
-                      {ALL_FIXTURES.filter(f => f.date >= today && !f.home && myDivisions.includes(f.division)).length}
+                      {allMyMatches.filter(f => !f.home).length}
                     </div>
                     <div style={{fontSize: 9, color: G.muted, textTransform: "uppercase"}}>Away</div>
                   </div>
                 </div>
                 
-                <button onClick={() => setView("availability")}
-                  style={{width: "100%", marginTop: 12, padding: "10px",
-                    background: G.cream, border: `1.5px solid ${G.border}`,
-                    borderRadius: 8, fontSize: 12, fontWeight: 600,
-                    color: G.text, cursor: "pointer", fontFamily: "inherit"}}>
-                  View full season fixtures →
-                </button>
+                {/* Show more/less or link to availability */}
+                {allMyMatches.length > 6 && (
+                  <button onClick={() => canAccessAvailability ? setView("availability") : setShowAllMatches(v => !v)}
+                    style={{width: "100%", marginTop: 12, padding: "10px",
+                      background: G.cream, border: `1.5px solid ${G.border}`,
+                      borderRadius: 8, fontSize: 12, fontWeight: 600,
+                      color: G.text, cursor: "pointer", fontFamily: "inherit"}}>
+                    {canAccessAvailability 
+                      ? "View full season fixtures →"
+                      : showAllMatches 
+                        ? "▲ Show less" 
+                        : `▼ Show all ${allMyMatches.length} matches`}
+                  </button>
+                )}
               </div>
             );
           })()}
