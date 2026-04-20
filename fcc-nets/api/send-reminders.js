@@ -178,11 +178,20 @@ export default async function handler(req, res) {
 
     let sent=0, skipped=0;
     const results=[];
+    const skipReasons = [];
 
     for(const [name, playerSess] of Object.entries(byPlayer)) {
       const member = members.find(m=>m.name===name);
-      if(!member?.email)                         { skipped++; continue; }
-      if(!(member.emailDayBeforeReminder??true)) { skipped++; continue; }
+      if(!member?.email) { 
+        skipped++; 
+        skipReasons.push({name, reason: "no_email"}); 
+        continue; 
+      }
+      if(!(member.emailDayBeforeReminder??true)) { 
+        skipped++; 
+        skipReasons.push({name, reason: "reminders_disabled"}); 
+        continue; 
+      }
 
       try {
         const r = await fetch("https://api.resend.com/emails",{
@@ -202,7 +211,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ok:true, date:targetDate,
       sessions:sessions.length, players:Object.keys(byPlayer).length,
-      sent, skipped, results});
+      sent, skipped, skipReasons, results});
 
   } catch(err) {
     return res.status(500).json({error:err.message});
