@@ -9286,8 +9286,8 @@ export default function App() {
       window.open(`https://wa.me/?text=${encoded}`, "_blank");
     };
     
-    // Save selection
-    const handleSaveSelection = (matchId) => {
+    // Save selection (draft or finalized)
+    const handleSaveSelection = (matchId, finalized = false) => {
       const selection = {
         players: xiSelection,
         captain: xiRoles.captain,
@@ -9297,6 +9297,7 @@ export default function App() {
         reportTime: xiReportTime,
         savedAt: new Date().toISOString(),
         savedBy: currentUser?.name,
+        finalized: finalized,
       };
       const updated = { ...matchSelections, [matchId]: selection };
       saveMatchSelections(updated);
@@ -9328,6 +9329,30 @@ export default function App() {
     return (
       <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole} currentUser={currentUser} onLogout={handleLogout} teams={teams}/>}>
         <AppHeader title="Captain's XI" sub="Select your playing eleven" onBack={()=>setView("schedule")}/>
+        
+        {/* Superadmin reset button */}
+        {userRole === "superadmin" && Object.keys(matchSelections).length > 0 && (
+          <div style={{padding: "0 16px", marginBottom: 8}}>
+            <button 
+              onClick={() => {
+                if (confirm(`Reset all ${Object.keys(matchSelections).length} match selection(s)? This cannot be undone.`)) {
+                  saveMatchSelections({});
+                  alert("All selections cleared.");
+                }
+              }}
+              style={{
+                width: "100%", padding: "10px 16px",
+                background: "#fef2f2", border: "1.5px solid #fecaca",
+                borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                fontSize: 13, fontWeight: 600, color: "#b91c1c"
+              }}
+            >
+              <span>🗑️</span>
+              Reset All Selections ({Object.keys(matchSelections).length})
+            </button>
+          </div>
+        )}
         
         <div style={{padding:"16px",paddingBottom:120}}>
           {visibleTeams.length === 0 ? (
@@ -9369,6 +9394,8 @@ export default function App() {
                       const matchId = `${m.date}-${m.division}`;
                       const hasSelection = !!matchSelections[matchId];
                       const sel = matchSelections[matchId];
+                      const isDraft = hasSelection && !sel.finalized;
+                      const isFinalized = hasSelection && sel.finalized;
                       
                       return (
                         <div key={i} style={{
@@ -9384,22 +9411,38 @@ export default function App() {
                                 {fmtShort(m.date)} · {m.home ? "Home" : "Away"}
                               </div>
                               {hasSelection && (
-                                <div style={{fontSize: 11, color: G.green, marginTop: 4}}>
-                                  ✓ XI selected ({sel.players?.length || 0} players)
+                                <div style={{
+                                  fontSize: 11, 
+                                  color: isFinalized ? G.green : "#f59e0b", 
+                                  marginTop: 4,
+                                  display: "flex", alignItems: "center", gap: 4
+                                }}>
+                                  {isFinalized ? "✓" : "📝"} 
+                                  {sel.players?.length || 0} players
+                                  {isDraft && <span style={{
+                                    background: "#fef3c7", color: "#92400e",
+                                    padding: "1px 6px", borderRadius: 4,
+                                    fontSize: 10, fontWeight: 700, marginLeft: 4
+                                  }}>DRAFT</span>}
+                                  {isFinalized && <span style={{
+                                    background: "#dcfce7", color: "#166534",
+                                    padding: "1px 6px", borderRadius: 4,
+                                    fontSize: 10, fontWeight: 700, marginLeft: 4
+                                  }}>SENT</span>}
                                 </div>
                               )}
                             </div>
                             <button 
                               onClick={() => openSelectionModal(m, m.division)}
                               style={{
-                                background: hasSelection ? G.green : tc.border,
+                                background: isFinalized ? G.green : isDraft ? "#f59e0b" : tc.border,
                                 color: "#fff", border: "none", borderRadius: 8,
                                 padding: "8px 14px", fontSize: 12, fontWeight: 700,
                                 cursor: "pointer", fontFamily: "inherit",
                                 whiteSpace: "nowrap"
                               }}
                             >
-                              {hasSelection ? "Edit XI" : "Select XI"}
+                              {isFinalized ? "Edit XI" : isDraft ? "Continue" : "Select XI"}
                             </button>
                           </div>
                         </div>
@@ -9553,7 +9596,7 @@ export default function App() {
                 {/* Report time & Note */}
                 <div style={{padding: "12px 16px", borderTop: `1px solid ${G.border}`}}>
                   <div style={{display: "flex", gap: 12, marginBottom: 10}}>
-                    <div style={{flex: 1}}>
+                    <div style={{width: 100, flexShrink: 0}}>
                       <label style={{fontSize: 11, fontWeight: 700, color: G.muted, display: "block", marginBottom: 4}}>
                         REPORT TIME
                       </label>
@@ -9567,21 +9610,23 @@ export default function App() {
                         }}
                       />
                     </div>
-                    <div style={{flex: 2}}>
-                      <label style={{fontSize: 11, fontWeight: 700, color: G.muted, display: "block", marginBottom: 4}}>
-                        CAPTAIN'S NOTE
-                      </label>
-                      <input 
-                        type="text"
-                        value={xiNote}
-                        onChange={e => setXiNote(e.target.value)}
-                        placeholder="e.g. Bring whites, stay hydrated"
-                        style={{
-                          width: "100%", padding: "8px 10px", borderRadius: 8,
-                          border: `1px solid ${G.border}`, fontSize: 14, fontFamily: "inherit"
-                        }}
-                      />
-                    </div>
+                  </div>
+                  
+                  <div style={{marginBottom: 10}}>
+                    <label style={{fontSize: 11, fontWeight: 700, color: G.muted, display: "block", marginBottom: 4}}>
+                      CAPTAIN'S NOTE
+                    </label>
+                    <textarea 
+                      value={xiNote}
+                      onChange={e => setXiNote(e.target.value)}
+                      placeholder="e.g. Arrive 30 mins early for warm-up. Stay hydrated and bring snacks."
+                      rows={3}
+                      style={{
+                        width: "100%", padding: "10px 12px", borderRadius: 8,
+                        border: `1px solid ${G.border}`, fontSize: 14, fontFamily: "inherit",
+                        resize: "vertical", minHeight: 70
+                      }}
+                    />
                   </div>
                   
                   {/* Venue info */}
@@ -9595,44 +9640,68 @@ export default function App() {
                 {/* Action buttons */}
                 <div style={{
                   padding: "12px 16px", paddingBottom: "max(16px, env(safe-area-inset-bottom))",
-                  borderTop: `1px solid ${G.border}`, display: "flex", gap: 10
+                  borderTop: `1px solid ${G.border}`
                 }}>
+                  {/* Top row: Save Draft */}
                   <button onClick={() => {
-                    handleSaveSelection(matchId);
+                    handleSaveSelection(matchId, false);
                   }} style={{
-                    flex: 1, padding: "12px", borderRadius: 10,
-                    background: G.green, color: "#fff", border: "none",
-                    fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit"
+                    width: "100%", padding: "12px", borderRadius: 10, marginBottom: 10,
+                    background: G.cream, color: G.text, border: `1.5px solid ${G.border}`,
+                    fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6
                   }}>
-                    Save Selection
+                    <span>📝</span> Save Draft ({xiSelection.length} players)
                   </button>
                   
-                  {xiSelection.length === 11 && (
-                    <button onClick={() => {
-                      const sel = {
-                        players: xiSelection,
-                        captain: xiRoles.captain,
-                        vc: xiRoles.vc,
-                        wk: xiRoles.wk,
-                        note: xiNote,
-                        reportTime: xiReportTime,
-                      };
-                      const msg = generateWhatsAppMessage(match, sel);
-                      // Check if mobile
-                      if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
-                        openWhatsApp(msg);
-                      } else {
-                        copyToClipboard(msg);
-                      }
-                    }} style={{
-                      flex: 1, padding: "12px", borderRadius: 10,
-                      background: "#25D366", color: "#fff", border: "none",
-                      fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
-                      display: "flex", alignItems: "center", justifyContent: "center", gap: 6
-                    }}>
-                      <span>📲</span> WhatsApp
+                  {/* Bottom row: Finalize + WhatsApp */}
+                  <div style={{display: "flex", gap: 10}}>
+                    <button 
+                      onClick={() => handleSaveSelection(matchId, true)}
+                      disabled={xiSelection.length !== 11}
+                      style={{
+                        flex: 1, padding: "12px", borderRadius: 10,
+                        background: xiSelection.length === 11 ? G.green : G.border,
+                        color: "#fff", border: "none",
+                        fontWeight: 800, fontSize: 14, 
+                        cursor: xiSelection.length === 11 ? "pointer" : "not-allowed", 
+                        fontFamily: "inherit",
+                        opacity: xiSelection.length === 11 ? 1 : 0.6
+                      }}
+                    >
+                      {xiSelection.length === 11 ? "✓ Finalize XI" : `Need ${11 - xiSelection.length} more`}
                     </button>
-                  )}
+                    
+                    {xiSelection.length === 11 && (
+                      <button onClick={() => {
+                        // Save as finalized first
+                        handleSaveSelection(matchId, true);
+                        // Then share
+                        const sel = {
+                          players: xiSelection,
+                          captain: xiRoles.captain,
+                          vc: xiRoles.vc,
+                          wk: xiRoles.wk,
+                          note: xiNote,
+                          reportTime: xiReportTime,
+                        };
+                        const msg = generateWhatsAppMessage(match, sel);
+                        // Check if mobile
+                        if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
+                          openWhatsApp(msg);
+                        } else {
+                          copyToClipboard(msg);
+                        }
+                      }} style={{
+                        flex: 1, padding: "12px", borderRadius: 10,
+                        background: "#25D366", color: "#fff", border: "none",
+                        fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 6
+                      }}>
+                        <span>📲</span> WhatsApp
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
