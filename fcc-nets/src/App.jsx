@@ -236,6 +236,46 @@ const ALL_FIXTURES = [
   {date:"2026-09-20",label:"U11 Ministævne @ Ishøj",division:"U11",home:false},
 ]
 
+// Club venue addresses for Google Maps links
+const CLUB_VENUES = {
+  // Home ground
+  "Fredensborg": { name: "Karlebo Cricket Ground", address: "Karlebovej 23, 3480 Fredensborg", lat: 55.9397, lng: 12.4147 },
+  "FCC": { name: "Karlebo Cricket Ground", address: "Karlebovej 23, 3480 Fredensborg", lat: 55.9397, lng: 12.4147 },
+  // Hovedstaden clubs
+  "KB": { name: "KB Cricket Ground", address: "Peter Bangs Vej 147, 2000 Frederiksberg", lat: 55.6797, lng: 12.5197 },
+  "AB": { name: "AB Cricket Ground", address: "Lundtoftegårdsvej 37, 2800 Kgs. Lyngby", lat: 55.7847, lng: 12.5097 },
+  "Copenhagen": { name: "Copenhagen Cricket Greens", address: "Terrasserne 30, 2700 Brønshøj", lat: 55.7147, lng: 12.5047 },
+  "APMM": { name: "Kløvermarken", address: "Kløvermarksvej 50, 2300 København S", lat: 55.6597, lng: 12.6097 },
+  "Maersk": { name: "Kløvermarken", address: "Kløvermarksvej 50, 2300 København S", lat: 55.6597, lng: 12.6097 },
+  "Glostrup": { name: "Solvangsparken", address: "Nørre Alle 41, 2600 Glostrup", lat: 55.6697, lng: 12.3997 },
+  "Hvidovre": { name: "Hvidovre Cricket Ground", address: "Bymuren 151, 2650 Hvidovre", lat: 55.6397, lng: 12.4697 },
+  "Frem": { name: "Valby Idrætspark", address: "Julius Andersens Vej 7, 2500 Valby", lat: 55.6497, lng: 12.5097 },
+  "Ishøj": { name: "Ishøj Cricket Ground", address: "Vejledalen 17, 2635 Ishøj", lat: 55.6147, lng: 12.3547 },
+  "Tåstrup": { name: "Tåstrup Cricket Ground", address: "Sydskellet 1, 2630 Taastrup", lat: 55.6547, lng: 12.2897 },
+  "Albertslund": { name: "Albertslund Cricket Ground", address: "Egelundsvej 2, 2620 Albertslund", lat: 55.6597, lng: 12.3497 },
+  "Bella": { name: "Copenhagen Cricket Greens", address: "Terrasserne 30, 2700 Brønshøj", lat: 55.7147, lng: 12.5047 },
+  "Nørrebro": { name: "Nørrebro Cricket Ground", address: "Lersø Parkallé 40, 2100 København Ø", lat: 55.7097, lng: 12.5697 },
+  "Himalaya": { name: "Himalaya Cricket Ground", address: "Lersø Parkallé 40, 2100 København Ø", lat: 55.7097, lng: 12.5697 },
+  "Svanholm": { name: "Svanholm Cricket Ground", address: "Skenkelsøvej 19, 3650 Ølstykke", lat: 55.7897, lng: 12.1697 },
+  "Tårnby": { name: "Tårnby Cricket Ground", address: "Løjtegårdsvej 55, 2770 Kastrup", lat: 55.6297, lng: 12.6297 },
+  "Køge": { name: "Køge Cricket Ground", address: "Ølbyvej 50, 4600 Køge", lat: 55.4597, lng: 12.1797 },
+  "Roskilde": { name: "Roskilde Cricket Ground", address: "Kildegården 1, 4000 Roskilde", lat: 55.6297, lng: 12.0797 },
+  "Soraner": { name: "Soraner Cricket Ground", address: "Sorø Akademi, 4180 Sorø", lat: 55.4297, lng: 11.5597 },
+  "Forty": { name: "Forty Cricket Ground", address: "Valby Idrætspark, 2500 Valby", lat: 55.6497, lng: 12.5097 },
+};
+
+// Get venue for a match (extracts club name from label)
+const getMatchVenue = (label, isHome) => {
+  if (isHome) return CLUB_VENUES["Fredensborg"];
+  // Extract opponent from label like "Div 3 @ Hvidovre 2" or "OB vs Køge OB"
+  const match = label.match(/[@vs]\s*([A-Za-zÆØÅæøå]+)/i);
+  if (match) {
+    const opponent = match[1];
+    return CLUB_VENUES[opponent] || null;
+  }
+  return null;
+};
+
 // Division → app team name mapping for filtering
 const DIVISION_TO_TEAM = {
   "Div 2":"Div 2","Div 3":"Div 3","Div 4":"Div 4",
@@ -2522,7 +2562,9 @@ function SessCard({s,members,teams,faded,onClick,onCarpoolClick}) {
 function BotNav({view,setView,userRole,pendingCount=0,currentUser=null,teams=[]}) {
   const isAdmin = can(userRole,"accessMembers");
   const isCoach = isAdmin || isCoachMember(currentUser?.name, teams);
-  const active = view==="session"?"schedule":view==="roleAdmin"?"admin":view==="coachhq"?"coachhq":view;
+  // Captain/VC of any senior team
+  const isCaptain = teams.some(t => t.senior && (t.captain === currentUser?.name || t.vicecaptain === currentUser?.name));
+  const active = view==="session"?"schedule":view==="roleAdmin"?"admin":view==="coachhq"?"coachhq":view==="captainxi"?"captainxi":view;
 
   const IconSchedule = ({on}) => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill={on?"currentColor":"none"} stroke="currentColor"
@@ -2564,6 +2606,17 @@ function BotNav({view,setView,userRole,pendingCount=0,currentUser=null,teams=[]}
       <path d="M12 2L2 7l10 5 10-5-10-5z"/>
       <path d="M2 17l10 5 10-5"/>
       <path d="M2 12l10 5 10-5"/>
+    </svg>
+  );
+  const IconCaptain = ({on}) => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={on?2.5:1.8} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="5"/>
+      <path d="M12 3v2"/>
+      <path d="M12 13v8"/>
+      <path d="M9 18h6"/>
+      <path d="M7 8h1"/>
+      <path d="M16 8h1"/>
     </svg>
   );
 
@@ -2628,6 +2681,9 @@ function BotNav({view,setView,userRole,pendingCount=0,currentUser=null,teams=[]}
     </svg>
   );
 
+  // Calculate number of tabs: Schedule + Book + Profile = 3 base, + Coach HQ, + Captain XI, + Admin
+  const tabCount = 3 + (isCoach ? 1 : 0) + (isCaptain ? 1 : 0) + (isAdmin ? 1 : 0);
+  
   return (
     <div className="fcc-mobile-only" style={{
       position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)",
@@ -2637,7 +2693,7 @@ function BotNav({view,setView,userRole,pendingCount=0,currentUser=null,teams=[]}
       borderTop:"1px solid rgba(0,0,0,0.06)",
       boxShadow:"0 -6px 32px rgba(0,0,0,0.10), 0 -1px 0 rgba(0,0,0,0.04)",
       display:"grid",
-      gridTemplateColumns: isAdmin && isCoach ? "1fr 1fr 1fr 1fr 1fr" : isAdmin || isCoach ? "1fr 1fr 1fr 1fr" : "1fr 1fr 1fr",
+      gridTemplateColumns: `repeat(${tabCount}, 1fr)`,
       alignItems:"center",
       padding:"6px 8px",
       paddingBottom:"max(10px, env(safe-area-inset-bottom))",
@@ -2685,6 +2741,9 @@ function BotNav({view,setView,userRole,pendingCount=0,currentUser=null,teams=[]}
       {isCoach && (
         <Tab id="coachhq" icon={<IconCoach on={active==="coachhq"}/>} label="Coach HQ"/>
       )}
+      {isCaptain && (
+        <Tab id="captainxi" icon={<IconCaptain on={active==="captainxi"}/>} label="Captain"/>
+      )}
       {isAdmin && (
         <Tab id="admin" icon={<IconMembers on={active==="admin"}/>} label="Admin" badge={pendingCount}/>
       )}
@@ -2696,6 +2755,7 @@ function BotNav({view,setView,userRole,pendingCount=0,currentUser=null,teams=[]}
 // ─── Desktop Sidebar Nav ──────────────────────────────────────
 function SidebarNav({view, setView, userRole, currentUser, onLogout, teams=[]}) {
   const isAdmin = can(userRole,"accessMembers");
+  const isCaptain = teams.some(t => t.senior && (t.captain === currentUser?.name || t.vicecaptain === currentUser?.name));
   const active = view==="session"?"schedule":view==="roleAdmin"?"admin":view;
 
   const navBtn = (v, icon, label) => (
@@ -2720,6 +2780,7 @@ function SidebarNav({view, setView, userRole, currentUser, onLogout, teams=[]}) 
         {navBtn("schedule","📅","Schedule")}
         {navBtn("add","＋","Book / Join")}
         {(isAdmin || isCoachMember(currentUser?.name,teams)) && navBtn("coachhq","🧢","Coach HQ")}
+        {isCaptain && navBtn("captainxi","⚓","Captain's XI")}
         {isAdmin && navBtn("admin","👥","Admin Panel")}
         {(isAdmin || isCoachMember(currentUser?.name,[])) && navBtn("availability","📊","Team Availability")}
         {navBtn("profile","👤","My Profile")}
@@ -2904,6 +2965,13 @@ export default function App() {
   const [newTSenior,setNewTSenior]= useState(false);
   const [editingTeam,setEditingTeam]= useState(null);
   const [coachSearch, setCoachSearch] = useState({}); // {teamId: searchString}
+  // Captain's Playing XI state
+  const [matchSelections, setMatchSelections] = useState({}); // {matchId: {players:[], captain, vc, wk, note, reportTime}}
+  const [captainXIModal, setCaptainXIModal] = useState(null); // {match, division} or null
+  const [xiSelection, setXiSelection] = useState([]); // array of player names
+  const [xiRoles, setXiRoles] = useState({ captain: null, vc: null, wk: null }); // special roles
+  const [xiNote, setXiNote] = useState("");
+  const [xiReportTime, setXiReportTime] = useState("");
   // Admin section collapse — true = open. Members+AddMember open by default, rest collapsed
   const [adminSec, setAdminSec] = useState({
     members:true, addmember:true, groups:false,
@@ -3031,10 +3099,11 @@ export default function App() {
       sessionnotes:doc(db,"fccnets","sessionnotes"),    // [{sessionId, playerId, text, coach, date}]
       playerprogress:doc(db,"fccnets","playerprogress"),// {playerId: {snapshots, currentPhase}}
       coachoverrides:doc(db,"fccnets","coachoverrides"),// {date-sessionId: {newCoach, oldCoach}}
+      matchselections:doc(db,"fccnets","matchselections"),// {matchId: {players, captain, vc, wk, note, reportTime}}
     };
     (async()=>{
       try {
-        const [sr,mr,pr,tr,rr,br,ir,jr,ar,rlr,csr,spr,attr,snr,ppr,cor] = await Promise.all([
+        const [sr,mr,pr,tr,rr,br,ir,jr,ar,rlr,csr,spr,attr,snr,ppr,cor,msr] = await Promise.all([
           getDoc(refs.sessions),
           getDoc(refs.members),
           getDoc(refs.pins),
@@ -3051,6 +3120,7 @@ export default function App() {
           getDoc(refs.sessionnotes),
           getDoc(refs.playerprogress),
           getDoc(refs.coachoverrides),
+          getDoc(refs.matchselections),
         ]);
         // Sessions MUST be loaded before setLoading(false) so sessionsRef is
         // populated before the recurring useEffect runs — prevents lifts being wiped
@@ -3090,9 +3160,10 @@ export default function App() {
         setAllSessionNotes(snr.exists() ? JSON.parse(snr.data().value) : []);
         setPlayerProgress( ppr.exists() ? JSON.parse(ppr.data().value) : {});
         setCoachOverrides( cor.exists() ? JSON.parse(cor.data().value) : {});
+        setMatchSelections(msr.exists() ? JSON.parse(msr.data().value) : {});
       } catch(e) {
         setMembers(SEED_MEMBERS.map(normMember)); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]); recurringRef.current=[]; setBlockCals([]); setInviteCodes({}); setJoinRequests([]); setAuditLog([]); setReminderLogs([]); setCancelledSessions([]);
-        setAllAttendance({}); setAllSessionNotes([]); setPlayerProgress({}); setCoachOverrides({});
+        setAllAttendance({}); setAllSessionNotes([]); setPlayerProgress({}); setCoachOverrides({}); setMatchSelections({});
       }
       setLoading(false);
     })();
@@ -3120,6 +3191,7 @@ export default function App() {
   const saveAllSessionNotes = async u => { setAllSessionNotes(u); await setDoc(doc(db,"fccnets","sessionnotes"),   {value:JSON.stringify(u)}).catch(()=>{}); };
   const savePlayerProgress  = async u => { setPlayerProgress(u);  await setDoc(doc(db,"fccnets","playerprogress"), {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveCoachOverrides  = async u => { setCoachOverrides(u);  await setDoc(doc(db,"fccnets","coachoverrides"), {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveMatchSelections = async u => { setMatchSelections(u); await setDoc(doc(db,"fccnets","matchselections"), {value:JSON.stringify(u)}).catch(()=>{}); };
 
   // ── Audit log ─────────────────────────────────────────────────
   // Cap at 500 entries; newest first. Only superadmin can read.
@@ -9114,6 +9186,465 @@ export default function App() {
   }
 
   // ════════════════════════════════════════════════════════════
+  // RENDER: Captain's Playing XI
+  // ════════════════════════════════════════════════════════════
+  if(view==="captainxi") {
+    const isAdmin = can(userRole,"accessMembers");
+    // Get teams where user is captain or VC
+    const myCaptainTeams = teams.filter(t => 
+      t.senior && (t.captain === currentUser?.name || t.vicecaptain === currentUser?.name)
+    );
+    
+    // If admin viewing via shortcut, show all senior teams
+    const visibleTeams = isAdmin ? teams.filter(t => t.senior) : myCaptainTeams;
+    
+    const today = new Date().toISOString().slice(0, 10);
+    
+    // Map team names to fixture divisions
+    const teamToDivision = {
+      "Div 2": "Div 2", "Div 3": "Div 3", "Div 4": "Div 4",
+      "T20 Serie 4": "T20 Serie 4", "T20 Serie 5": "T20 Serie 5",
+      "Women's": "Women's", "OB": "OB",
+    };
+    
+    // Get upcoming matches for visible teams
+    const getUpcomingMatches = (teamName) => {
+      const div = teamToDivision[teamName];
+      if (!div) return [];
+      return ALL_FIXTURES
+        .filter(f => f.division === div && f.date >= today)
+        .sort((a, b) => a.date.localeCompare(b.date));
+    };
+    
+    // Get roster for a team
+    const getTeamRoster = (teamName) => {
+      return members
+        .filter(m => (m.teams || []).includes(teamName))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    };
+    
+    // Generate WhatsApp message
+    const generateWhatsAppMessage = (match, selection) => {
+      const { players, captain, vc, wk, note, reportTime } = selection;
+      const venue = getMatchVenue(match.label, match.home);
+      const opponent = match.label.replace(/^(Div \d|Women's|OB|T20 Serie \d) (vs |@ )/i, "").replace(/\s*\d+$/, "");
+      
+      const mapsLink = venue 
+        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venue.address)}`
+        : "";
+      
+      let msg = `Dear Team,\n\nPlaying XI for our match against ${opponent}:\n\n`;
+      
+      players.forEach((p, i) => {
+        let role = "";
+        if (p === captain) role = " (C)";
+        else if (p === vc) role = " (VC)";
+        if (p === wk) role += role ? " (WK)" : " (WK)";
+        msg += `${i + 1}. ${p}${role}\n`;
+      });
+      
+      msg += `\n📅 ${fmtDate(match.date)}\n`;
+      msg += `📍 ${venue ? venue.name : (match.home ? "Karlebo Cricket Ground" : "Away")}`;
+      if (mapsLink) msg += ` — ${mapsLink}`;
+      msg += `\n⏰ Match: ${match.label.includes("T20") ? "TBD" : "11:00"}`;
+      if (reportTime) msg += ` · Report: ${reportTime}`;
+      msg += `\n`;
+      
+      if (note) {
+        msg += `\n${note}\n`;
+      }
+      
+      const team = visibleTeams.find(t => teamToDivision[t.name] === match.division);
+      const captainName = team?.captain || currentUser?.name;
+      const vcName = team?.vicecaptain;
+      
+      msg += `\nRegards,\n${captainName}${vcName ? ` & ${vcName}` : ""}`;
+      
+      return msg;
+    };
+    
+    // Copy to clipboard
+    const copyToClipboard = async (text) => {
+      try {
+        await navigator.clipboard.writeText(text);
+        alert("Copied to clipboard! Paste in WhatsApp.");
+      } catch (e) {
+        // Fallback
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        alert("Copied to clipboard! Paste in WhatsApp.");
+      }
+    };
+    
+    // Open WhatsApp (mobile)
+    const openWhatsApp = (text) => {
+      const encoded = encodeURIComponent(text);
+      window.open(`https://wa.me/?text=${encoded}`, "_blank");
+    };
+    
+    // Save selection
+    const handleSaveSelection = (matchId) => {
+      const selection = {
+        players: xiSelection,
+        captain: xiRoles.captain,
+        vc: xiRoles.vc,
+        wk: xiRoles.wk,
+        note: xiNote,
+        reportTime: xiReportTime,
+        savedAt: new Date().toISOString(),
+        savedBy: currentUser?.name,
+      };
+      const updated = { ...matchSelections, [matchId]: selection };
+      saveMatchSelections(updated);
+      setCaptainXIModal(null);
+      setXiSelection([]);
+      setXiRoles({ captain: null, vc: null, wk: null });
+      setXiNote("");
+      setXiReportTime("");
+    };
+    
+    // Open modal with existing selection if any
+    const openSelectionModal = (match, division) => {
+      const matchId = `${match.date}-${division}`;
+      const existing = matchSelections[matchId];
+      if (existing) {
+        setXiSelection(existing.players || []);
+        setXiRoles({ captain: existing.captain, vc: existing.vc, wk: existing.wk });
+        setXiNote(existing.note || "");
+        setXiReportTime(existing.reportTime || "");
+      } else {
+        setXiSelection([]);
+        setXiRoles({ captain: null, vc: null, wk: null });
+        setXiNote("");
+        setXiReportTime("");
+      }
+      setCaptainXIModal({ match, division });
+    };
+    
+    return (
+      <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole} currentUser={currentUser} onLogout={handleLogout} teams={teams}/>}>
+        <AppHeader title="Captain's XI" sub="Select your playing eleven" onBack={()=>setView("schedule")}/>
+        
+        <div style={{padding:"16px",paddingBottom:120}}>
+          {visibleTeams.length === 0 ? (
+            <div style={{textAlign:"center",padding:40,color:G.muted}}>
+              <div style={{fontSize:48,marginBottom:16}}>⚓</div>
+              <div style={{fontWeight:700}}>No Captain Role</div>
+              <div style={{fontSize:13,marginTop:8}}>You're not assigned as captain or vice-captain for any senior team.</div>
+            </div>
+          ) : (
+            visibleTeams.map(team => {
+              const matches = getUpcomingMatches(team.name);
+              const roster = getTeamRoster(team.name);
+              const tc = getTeamCardColors(team.name);
+              
+              if (matches.length === 0) return null;
+              
+              return (
+                <div key={team.id} style={{marginBottom: 24}}>
+                  {/* Team header */}
+                  <div style={{
+                    background: tc.border, color: "#fff",
+                    padding: "12px 16px", borderRadius: "12px 12px 0 0",
+                    display: "flex", alignItems: "center", justifyContent: "space-between"
+                  }}>
+                    <div>
+                      <div style={{fontWeight: 800, fontSize: 16}}>{team.name}</div>
+                      <div style={{fontSize: 11, opacity: 0.8}}>
+                        {team.captain && `C: ${team.captain}`}
+                        {team.captain && team.vicecaptain && " · "}
+                        {team.vicecaptain && `VC: ${team.vicecaptain}`}
+                      </div>
+                    </div>
+                    <div style={{fontSize: 11, opacity: 0.7}}>{matches.length} upcoming</div>
+                  </div>
+                  
+                  {/* Matches list */}
+                  <div style={{background: G.white, border: `1px solid ${G.border}`, borderTop: "none", borderRadius: "0 0 12px 12px"}}>
+                    {matches.slice(0, 5).map((m, i) => {
+                      const matchId = `${m.date}-${m.division}`;
+                      const hasSelection = !!matchSelections[matchId];
+                      const sel = matchSelections[matchId];
+                      
+                      return (
+                        <div key={i} style={{
+                          padding: "14px 16px",
+                          borderBottom: i < matches.length - 1 ? `1px solid ${G.border}` : "none",
+                        }}>
+                          <div style={{display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12}}>
+                            <div style={{flex: 1}}>
+                              <div style={{fontSize: 13, fontWeight: 600, color: G.text}}>
+                                {m.label.replace(/^(Div \d|Women's|OB|T20 Serie \d) /i, "")}
+                              </div>
+                              <div style={{fontSize: 12, color: G.muted, marginTop: 2}}>
+                                {fmtDate(m.date)} · {m.home ? "Home" : "Away"}
+                              </div>
+                              {hasSelection && (
+                                <div style={{fontSize: 11, color: G.green, marginTop: 4}}>
+                                  ✓ XI selected ({sel.players?.length || 0} players)
+                                </div>
+                              )}
+                            </div>
+                            <button 
+                              onClick={() => openSelectionModal(m, m.division)}
+                              style={{
+                                background: hasSelection ? G.green : tc.border,
+                                color: "#fff", border: "none", borderRadius: 8,
+                                padding: "8px 14px", fontSize: 12, fontWeight: 700,
+                                cursor: "pointer", fontFamily: "inherit",
+                                whiteSpace: "nowrap"
+                              }}
+                            >
+                              {hasSelection ? "Edit XI" : "Select XI"}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {matches.length > 5 && (
+                      <div style={{padding: "10px 16px", textAlign: "center", fontSize: 12, color: G.muted}}>
+                        +{matches.length - 5} more matches
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+        
+        {/* Selection Modal */}
+        {captainXIModal && (()=>{
+          const { match, division } = captainXIModal;
+          const matchId = `${match.date}-${division}`;
+          const team = visibleTeams.find(t => teamToDivision[t.name] === division);
+          const roster = getTeamRoster(team?.name);
+          const tc = getTeamCardColors(division);
+          const venue = getMatchVenue(match.label, match.home);
+          
+          const togglePlayer = (name) => {
+            if (xiSelection.includes(name)) {
+              setXiSelection(xiSelection.filter(n => n !== name));
+              // Clear roles if removed
+              if (xiRoles.captain === name) setXiRoles(r => ({...r, captain: null}));
+              if (xiRoles.vc === name) setXiRoles(r => ({...r, vc: null}));
+              if (xiRoles.wk === name) setXiRoles(r => ({...r, wk: null}));
+            } else if (xiSelection.length < 11) {
+              setXiSelection([...xiSelection, name]);
+            }
+          };
+          
+          const setRole = (role, name) => {
+            setXiRoles(r => ({...r, [role]: r[role] === name ? null : name}));
+          };
+          
+          return (
+            <div style={{
+              position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+              zIndex: 1000, display: "flex", alignItems: "flex-end", justifyContent: "center"
+            }} onClick={() => setCaptainXIModal(null)}>
+              <div style={{
+                background: G.white, borderRadius: "20px 20px 0 0", width: "100%", maxWidth: 500,
+                maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column"
+              }} onClick={e => e.stopPropagation()}>
+                
+                {/* Modal header */}
+                <div style={{
+                  background: tc.border, color: "#fff", padding: "16px 20px",
+                  display: "flex", alignItems: "center", justifyContent: "space-between"
+                }}>
+                  <div>
+                    <div style={{fontWeight: 800, fontSize: 15}}>Select Playing XI</div>
+                    <div style={{fontSize: 12, opacity: 0.85, marginTop: 2}}>
+                      {match.label.replace(/^(Div \d|Women's|OB|T20 Serie \d) /i, "")} · {fmtShort(match.date)}
+                    </div>
+                  </div>
+                  <button onClick={() => setCaptainXIModal(null)} style={{
+                    background: "rgba(255,255,255,0.2)", border: "none", borderRadius: "50%",
+                    width: 32, height: 32, cursor: "pointer", color: "#fff", fontSize: 18
+                  }}>×</button>
+                </div>
+                
+                {/* Selection count */}
+                <div style={{
+                  padding: "12px 20px", background: G.cream, borderBottom: `1px solid ${G.border}`,
+                  display: "flex", alignItems: "center", justifyContent: "space-between"
+                }}>
+                  <span style={{fontSize: 13, fontWeight: 700, color: G.text}}>
+                    {xiSelection.length}/11 selected
+                  </span>
+                  {xiSelection.length === 11 && (
+                    <span style={{fontSize: 12, color: G.green, fontWeight: 600}}>✓ Team complete</span>
+                  )}
+                </div>
+                
+                {/* Player list */}
+                <div style={{flex: 1, overflow: "auto", padding: "8px 16px"}}>
+                  {roster.length === 0 ? (
+                    <div style={{padding: 20, textAlign: "center", color: G.muted}}>
+                      No players assigned to this team yet
+                    </div>
+                  ) : (
+                    roster.map(player => {
+                      const selected = xiSelection.includes(player.name);
+                      const idx = xiSelection.indexOf(player.name);
+                      const isC = xiRoles.captain === player.name;
+                      const isVC = xiRoles.vc === player.name;
+                      const isWK = xiRoles.wk === player.name;
+                      
+                      return (
+                        <div key={player.id} style={{
+                          display: "flex", alignItems: "center", gap: 10,
+                          padding: "10px 12px", marginBottom: 6,
+                          background: selected ? tc.bg : G.white,
+                          border: `1.5px solid ${selected ? tc.border : G.border}`,
+                          borderRadius: 10, cursor: "pointer",
+                          transition: "all 0.15s"
+                        }} onClick={() => togglePlayer(player.name)}>
+                          {/* Selection indicator */}
+                          <div style={{
+                            width: 28, height: 28, borderRadius: "50%",
+                            background: selected ? tc.border : G.cream,
+                            color: selected ? "#fff" : G.muted,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 12, fontWeight: 800, flexShrink: 0
+                          }}>
+                            {selected ? idx + 1 : ""}
+                          </div>
+                          
+                          {/* Player name */}
+                          <div style={{flex: 1, fontWeight: 600, fontSize: 14, color: G.text}}>
+                            {player.name}
+                          </div>
+                          
+                          {/* Role buttons (only if selected) */}
+                          {selected && (
+                            <div style={{display: "flex", gap: 4}} onClick={e => e.stopPropagation()}>
+                              <button onClick={() => setRole("captain", player.name)} style={{
+                                width: 28, height: 28, borderRadius: 6,
+                                background: isC ? "#14532d" : G.cream,
+                                color: isC ? "#fff" : G.muted,
+                                border: "none", fontSize: 10, fontWeight: 800, cursor: "pointer"
+                              }}>C</button>
+                              <button onClick={() => setRole("vc", player.name)} style={{
+                                width: 28, height: 28, borderRadius: 6,
+                                background: isVC ? "#1e3a5f" : G.cream,
+                                color: isVC ? "#fff" : G.muted,
+                                border: "none", fontSize: 10, fontWeight: 800, cursor: "pointer"
+                              }}>VC</button>
+                              <button onClick={() => setRole("wk", player.name)} style={{
+                                width: 28, height: 28, borderRadius: 6,
+                                background: isWK ? "#7c2d12" : G.cream,
+                                color: isWK ? "#fff" : G.muted,
+                                border: "none", fontSize: 10, fontWeight: 800, cursor: "pointer"
+                              }}>WK</button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+                
+                {/* Report time & Note */}
+                <div style={{padding: "12px 16px", borderTop: `1px solid ${G.border}`}}>
+                  <div style={{display: "flex", gap: 12, marginBottom: 10}}>
+                    <div style={{flex: 1}}>
+                      <label style={{fontSize: 11, fontWeight: 700, color: G.muted, display: "block", marginBottom: 4}}>
+                        REPORT TIME
+                      </label>
+                      <input 
+                        type="time" 
+                        value={xiReportTime}
+                        onChange={e => setXiReportTime(e.target.value)}
+                        style={{
+                          width: "100%", padding: "8px 10px", borderRadius: 8,
+                          border: `1px solid ${G.border}`, fontSize: 14, fontFamily: "inherit"
+                        }}
+                      />
+                    </div>
+                    <div style={{flex: 2}}>
+                      <label style={{fontSize: 11, fontWeight: 700, color: G.muted, display: "block", marginBottom: 4}}>
+                        CAPTAIN'S NOTE
+                      </label>
+                      <input 
+                        type="text"
+                        value={xiNote}
+                        onChange={e => setXiNote(e.target.value)}
+                        placeholder="e.g. Bring whites, stay hydrated"
+                        style={{
+                          width: "100%", padding: "8px 10px", borderRadius: 8,
+                          border: `1px solid ${G.border}`, fontSize: 14, fontFamily: "inherit"
+                        }}
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Venue info */}
+                  {venue && (
+                    <div style={{fontSize: 12, color: G.muted, marginBottom: 10}}>
+                      📍 {venue.name} — {venue.address}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Action buttons */}
+                <div style={{
+                  padding: "12px 16px", paddingBottom: "max(16px, env(safe-area-inset-bottom))",
+                  borderTop: `1px solid ${G.border}`, display: "flex", gap: 10
+                }}>
+                  <button onClick={() => {
+                    handleSaveSelection(matchId);
+                  }} style={{
+                    flex: 1, padding: "12px", borderRadius: 10,
+                    background: G.green, color: "#fff", border: "none",
+                    fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit"
+                  }}>
+                    Save Selection
+                  </button>
+                  
+                  {xiSelection.length === 11 && (
+                    <button onClick={() => {
+                      const sel = {
+                        players: xiSelection,
+                        captain: xiRoles.captain,
+                        vc: xiRoles.vc,
+                        wk: xiRoles.wk,
+                        note: xiNote,
+                        reportTime: xiReportTime,
+                      };
+                      const msg = generateWhatsAppMessage(match, sel);
+                      // Check if mobile
+                      if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
+                        openWhatsApp(msg);
+                      } else {
+                        copyToClipboard(msg);
+                      }
+                    }} style={{
+                      flex: 1, padding: "12px", borderRadius: 10,
+                      background: "#25D366", color: "#fff", border: "none",
+                      fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 6
+                    }}>
+                      <span>📲</span> WhatsApp
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+        
+        <BotNav view={view} setView={setView} userRole={userRole} pendingCount={joinRequests.length} currentUser={currentUser} teams={teams}/>
+      </Shell>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════
   // RENDER: Team Availability
   // ════════════════════════════════════════════════════════════
   if(view==="availability") {
@@ -10098,6 +10629,24 @@ export default function App() {
         {adminSec.coaches&&<>
           <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
             padding:14,marginBottom:16}}>
+            {/* Quick link to Captain's XI */}
+            <button onClick={()=>setView("captainxi")} style={{
+              width:"100%", padding:"12px 16px", marginBottom:14,
+              background:"linear-gradient(135deg, #14532d 0%, #166534 100%)",
+              border:"none", borderRadius:10, cursor:"pointer",
+              display:"flex", alignItems:"center", justifyContent:"space-between",
+              fontFamily:"inherit"
+            }}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <span style={{fontSize:18}}>⚓</span>
+                <div style={{textAlign:"left"}}>
+                  <div style={{fontWeight:800,fontSize:14,color:"#fff"}}>Captain's Playing XI</div>
+                  <div style={{fontSize:11,color:"rgba(255,255,255,0.7)"}}>Select lineups & share to WhatsApp</div>
+                </div>
+              </div>
+              <span style={{color:"rgba(255,255,255,0.6)",fontSize:16}}>→</span>
+            </button>
+            
             <div style={{fontSize:12,color:G.muted,marginBottom:12,lineHeight:1.5}}>
               Assign coaches, captains and vice captains per team. Each person's role is team-specific — someone can be captain in Div 3 and VC in T20 Serie 4 at the same time.
             </div>
