@@ -8658,6 +8658,107 @@ export default function App() {
             </label>
           </div>
 
+          {/* ══════════════════════════════════════════════════════════ */}
+          {/* MY UPCOMING MATCHES — only for players with teams */}
+          {/* ══════════════════════════════════════════════════════════ */}
+          {myTeams.length > 0 && (()=>{
+            const today = new Date().toISOString().slice(0, 10);
+            // Map team names to fixture divisions
+            const teamToDivs = {
+              "Div 2": ["Div 2"], "Div 3": ["Div 3"], "Div 4": ["Div 4"],
+              "T20 Serie 4": ["T20 Serie 4"], "T20 Serie 5": ["T20 Serie 5"],
+              "Women's": ["Women's"], "OB": ["OB"], "Legends": ["Legends"],
+            };
+            const myDivisions = myTeams.flatMap(t => teamToDivs[t] || []);
+            const myMatches = ALL_FIXTURES
+              .filter(f => f.date >= today && myDivisions.includes(f.division))
+              .sort((a, b) => a.date.localeCompare(b.date))
+              .slice(0, 6);
+            
+            if(myMatches.length === 0) return null;
+            
+            return (
+              <div style={{background: G.white, border: `1.5px solid ${G.border}`,
+                borderRadius: 14, padding: "18px 16px", overflow: "hidden"}}>
+                <div style={{display: "flex", alignItems: "center", justifyContent: "space-between",
+                  marginBottom: 14}}>
+                  <div style={{display: "flex", alignItems: "center", gap: 8}}>
+                    <span style={{fontSize: 16}}>🏏</span>
+                    <span style={{fontWeight: 800, fontSize: 14, color: G.text}}>My Upcoming Matches</span>
+                  </div>
+                  <span style={{fontSize: 12, color: G.muted}}>{myMatches.length} match{myMatches.length !== 1 ? "es" : ""}</span>
+                </div>
+                
+                <div style={{display: "flex", flexDirection: "column", gap: 8}}>
+                  {myMatches.map((f, i) => {
+                    const tc = getTeamCardColors(f.division);
+                    return (
+                      <div key={i} style={{
+                        background: G.white,
+                        borderRadius: 10,
+                        borderLeft: `4px solid ${tc.border}`,
+                        border: `0.5px solid ${G.border}`,
+                        borderLeftWidth: 4,
+                        borderLeftColor: tc.border,
+                        overflow: "hidden",
+                      }}>
+                        <div style={{height: 3, background: tc.border}}/>
+                        <div style={{padding: "10px 12px"}}>
+                          <div style={{display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap"}}>
+                            <span style={{fontSize: 13, fontWeight: 500, color: G.text}}>
+                              {fmtShort(f.date)}
+                            </span>
+                            <span style={{
+                              background: tc.badgeBg, color: tc.badgeText,
+                              padding: "1px 8px", borderRadius: 12,
+                              fontSize: 9, fontWeight: 700,
+                            }}>{f.division}</span>
+                          </div>
+                          <div style={{fontSize: 14, fontWeight: 500, color: G.text, marginBottom: 2}}>
+                            {f.label.replace(/^(Div \d|Women's|OB|T20 Serie \d) (vs |@ )/i, "")}
+                          </div>
+                          <div style={{fontSize: 11, color: G.muted}}>
+                            {f.home ? "Home" : "Away"}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                {/* Stats row */}
+                <div style={{display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 14}}>
+                  <div style={{background: G.cream, borderRadius: 8, padding: "10px", textAlign: "center"}}>
+                    <div style={{fontSize: 18, fontWeight: 500, color: G.text}}>
+                      {ALL_FIXTURES.filter(f => f.date >= today && myDivisions.includes(f.division)).length}
+                    </div>
+                    <div style={{fontSize: 9, color: G.muted, textTransform: "uppercase"}}>Total remaining</div>
+                  </div>
+                  <div style={{background: G.cream, borderRadius: 8, padding: "10px", textAlign: "center"}}>
+                    <div style={{fontSize: 18, fontWeight: 500, color: G.text}}>
+                      {ALL_FIXTURES.filter(f => f.date >= today && f.home && myDivisions.includes(f.division)).length}
+                    </div>
+                    <div style={{fontSize: 9, color: G.muted, textTransform: "uppercase"}}>Home</div>
+                  </div>
+                  <div style={{background: G.cream, borderRadius: 8, padding: "10px", textAlign: "center"}}>
+                    <div style={{fontSize: 18, fontWeight: 500, color: G.text}}>
+                      {ALL_FIXTURES.filter(f => f.date >= today && !f.home && myDivisions.includes(f.division)).length}
+                    </div>
+                    <div style={{fontSize: 9, color: G.muted, textTransform: "uppercase"}}>Away</div>
+                  </div>
+                </div>
+                
+                <button onClick={() => setView("teamavail")}
+                  style={{width: "100%", marginTop: 12, padding: "10px",
+                    background: "none", border: `1px dashed ${G.border}`,
+                    borderRadius: 8, fontSize: 12, fontWeight: 500,
+                    color: G.muted, cursor: "pointer", fontFamily: "inherit"}}>
+                  View full season fixtures →
+                </button>
+              </div>
+            );
+          })()}
+
           {/* Theme switcher */}
           <div style={{background:G.white,borderRadius:14,border:`1.5px solid ${G.border}`,
             padding:"14px 16px"}}>
