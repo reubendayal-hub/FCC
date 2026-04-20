@@ -89,14 +89,22 @@ function buildHtml(name, sessions) {
       <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;padding:28px 24px;border-radius:0 0 10px 10px;">
         <p style="font-size:15px;color:#111827;margin:0 0 6px;">Hi ${name.split(" ")[0]} 👋</p>
         <p style="font-size:13px;color:#6b7280;margin:0 0 18px;">
-          Just a reminder — you're booked in for
+          Just a reminder — you're signed up for
           <strong>${sessions.length>1?"these sessions":"this session"}</strong>
           tomorrow at Karlebo Cricket Ground.
         </p>
         ${rows}
+        <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;margin:16px 0;">
+          <p style="font-size:13px;color:#1e40af;margin:0;line-height:1.6;font-weight:600;">
+            ✅ You are signed in by default
+          </p>
+          <p style="font-size:12px;color:#1e40af;margin:6px 0 0;line-height:1.5;">
+            The coaches, captain, and team members expect you to attend. Please make sure you're there!
+          </p>
+        </div>
         <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;margin:16px 0;">
           <p style="font-size:12px;color:#92400e;margin:0;line-height:1.6;">
-            🔒 Can't make it? Sign out before <strong>9pm tonight</strong> so others know.
+            ⚠️ <strong>Can't make it?</strong> It is your responsibility to sign out before <strong>9pm tonight</strong> so coaches can plan accordingly and others know.
           </p>
         </div>
         <a href="https://fcc-training.vercel.app"
