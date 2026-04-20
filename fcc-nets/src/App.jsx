@@ -8677,6 +8677,12 @@ export default function App() {
                 if(tl.includes("women") || tl.includes("kvinde")) divs.push("Women's");
                 // Legends team plays in OB division
                 if(tl === "ob" || tl.includes("oldboy") || tl.includes("legend")) divs.push("OB");
+                // Junior teams
+                if(tl.includes("u11")) divs.push("U11");
+                if(tl.includes("u13")) divs.push("U13");
+                if(tl.includes("u15")) divs.push("U15");
+                if(tl.includes("u16")) divs.push("U16");
+                if(tl.includes("u18") || tl.includes("u19")) divs.push("U18");
               });
               return [...new Set(divs)];
             };
