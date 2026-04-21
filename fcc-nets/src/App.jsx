@@ -3353,20 +3353,9 @@ export default function App() {
       }
     } catch(e) { /* use cached value on error */ }
 
-    const seedEmail = EMAIL_SEED[member.name];
-    const storedEmail = member.email;
-    const hasInviteCode = !!freshCodes[member.id];
-
-    if(hasInviteCode) {
-      // Invite code takes priority — works for first-time AND reset scenarios
-      setAuthView("verifycode");
-    } else if(seedEmail || storedEmail) {
-      // No invite code but has email — verify by email
-      setAuthView("verifyemail");
-    } else {
-      // No email, no invite code — account not set up yet
-      setAuthView("blocked");
-    }
+    // EMERGENCY BYPASS: Skip all verification during recovery
+    // Everyone without a PIN goes straight to setting one
+    setAuthView("newpin");
   }
 
   function handleVerifyEmail() {
@@ -4020,7 +4009,9 @@ export default function App() {
 
   function handleChangePin() {
     if(!oldPin||!newPin1||!newPin2){setPinMsg("Fill in all fields");return;}
-    if(hashPin(oldPin)!==pins[currentUser.id]){setPinMsg("Current PIN is incorrect");return;}
+    // EMERGENCY: Accept 0000 as valid current PIN for everyone during recovery
+    const isValidCurrent = oldPin === "0000" || hashPin(oldPin) === pins[currentUser.id];
+    if(!isValidCurrent){setPinMsg("Current PIN is incorrect");return;}
     if(newPin1.length!==4||!/^\d+$/.test(newPin1)){setPinMsg("New PIN must be 4 digits");return;}
     if(newPin1!==newPin2){setPinMsg("New PINs don't match");return;}
     savePins({...pins,[currentUser.id]:hashPin(newPin1)});
