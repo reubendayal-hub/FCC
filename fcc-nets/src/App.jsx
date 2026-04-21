@@ -2979,7 +2979,7 @@ export default function App() {
   // Admin section collapse — true = open. Members+AddMember open by default, rest collapsed
   const [adminSec, setAdminSec] = useState({
     members:true, addmember:true, groups:false,
-    coaches:false, blocknets:false, recurring:false, auditlog:false, reminderlogs:false
+    coaches:false, blocknets:false, recurring:false, backup:false, auditlog:false, reminderlogs:false
   });
   const toggleAdminSec = k => setAdminSec(s=>({...s,[k]:!s[k]}));
   const [editingName, setEditingName] = useState(null); // {id, value}
@@ -3182,10 +3182,27 @@ export default function App() {
 
   const saveSessions  = async u => { setSessions(u); sessionsRef.current=u; await setDoc(doc(db,"fccnets","sessions"), {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveMembers   = async u => { 
+    // Version protection: don't save if new data has fewer members than before (possible corruption)
+    const currentCount = membersRef.current?.length || 0;
+    if (currentCount > 10 && u.length < currentCount * 0.5) {
+      console.error("BLOCKED: Attempted to save members with suspicious data loss", {
+        currentCount,
+        newCount: u.length
+      });
+      return; // Block the save
+    }
+    
     setMembers(u); 
     membersRef.current=u; 
-    await setDoc(doc(db,"fccnets","members"), {value:JSON.stringify(u)}).catch(()=>{});
-    // Auto-backup: save timestamped snapshot (keep last 7 days)
+    
+    // Save with version metadata
+    await setDoc(doc(db,"fccnets","members"), {
+      value: JSON.stringify(u),
+      _version: Date.now(),
+      _count: u.length
+    }).catch(()=>{});
+    
+    // Auto-backup: save timestamped snapshot daily
     const backupKey = `members_backup_${new Date().toISOString().slice(0,10)}`;
     await setDoc(doc(db,"fccnets",backupKey), {
       value: JSON.stringify(u),
@@ -11686,6 +11703,97 @@ export default function App() {
           </div>
         )}
 
+        </>}
+
+        {/* ── Data Backup & Export (superadmin only) ───────────────────── */}
+        {userRole==="superadmin"&&<>
+        <div id="sec-backup"/>
+        <button onClick={()=>toggleAdminSec("backup")}
+          style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
+            background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",
+            padding:"8px 0",marginBottom:adminSec.backup?8:14}}>
+          <span style={{fontWeight:900,fontSize:13,color:G.text}}>💾 Data Backup & Export</span>
+          <span style={{fontSize:12,color:G.muted,fontWeight:700}}>
+            {adminSec.backup?"▲ collapse":"▼ show"}
+          </span>
+        </button>
+        {adminSec.backup&&(
+          <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
+            padding:16,marginBottom:20}}>
+            
+            {/* Status */}
+            <div style={{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:8,
+              padding:"10px 12px",marginBottom:14}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#166534",marginBottom:4}}>
+                ✅ Auto-backup enabled
+              </div>
+              <div style={{fontSize:11,color:"#15803d",lineHeight:1.5}}>
+                Member data is automatically backed up daily to Firestore.<br/>
+                Current member count: <b>{members.length}</b>
+              </div>
+            </div>
+            
+            {/* Export buttons */}
+            <div style={{fontSize:11,fontWeight:700,color:G.mid,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>
+              Export Data
+            </div>
+            
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              <button onClick={()=>{
+                const data = {
+                  exportedAt: new Date().toISOString(),
+                  members: members,
+                  teams: teams,
+                  pins: pins
+                };
+                const blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `fcc_backup_${new Date().toISOString().slice(0,10)}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast("Backup downloaded ✓");
+              }} style={{padding:"12px 16px",background:"#1e40af",color:"#fff",border:"none",
+                borderRadius:8,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit",
+                display:"flex",alignItems:"center",gap:8}}>
+                <span>📥</span> Download Full Backup (JSON)
+              </button>
+              
+              <button onClick={()=>{
+                const csv = ["Name,Email,Phone,Teams,Role,Type"]
+                  .concat(members.map(m => 
+                    `"${m.name}","${m.email||""}","${m.phone||""}","${(m.teams||[]).join("; ")}","${m.role||"member"}","${m.memberType||"player"}"`
+                  )).join("\n");
+                const blob = new Blob([csv], {type: "text/csv"});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `fcc_members_${new Date().toISOString().slice(0,10)}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast("CSV downloaded ✓");
+              }} style={{padding:"12px 16px",background:"#059669",color:"#fff",border:"none",
+                borderRadius:8,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit",
+                display:"flex",alignItems:"center",gap:8}}>
+                <span>📊</span> Download Members (CSV/Excel)
+              </button>
+            </div>
+            
+            {/* Restore info */}
+            <div style={{marginTop:14,padding:"10px 12px",background:"#fefce8",border:"1px solid #fde047",
+              borderRadius:8}}>
+              <div style={{fontSize:11,fontWeight:700,color:"#a16207",marginBottom:4}}>
+                ⚠️ Restore from backup
+              </div>
+              <div style={{fontSize:11,color:"#92400e",lineHeight:1.5}}>
+                To restore: Open Firebase Console → Firestore → fccnets → members → 
+                paste the backup JSON into the "value" field. Daily backups are also stored 
+                as <code style={{background:"#fef3c7",padding:"1px 4px",borderRadius:3}}>members_backup_YYYY-MM-DD</code> documents.
+              </div>
+            </div>
+          </div>
+        )}
         </>}
 
         {/* ── Audit Log (superadmin only) ───────────────────── */}
