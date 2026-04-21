@@ -145,7 +145,8 @@ export default async function handler(req, res) {
 
   try {
     const token    = await getAccessToken(clientEmail, privateKey);
-    const tomorrow = getTomorrow();
+    // Allow ?date=YYYY-MM-DD for testing, otherwise use tomorrow
+    const targetDate = req.query.date || getTomorrow();
     const base     = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
     const headers  = { Authorization:`Bearer ${token}` };
 
@@ -163,10 +164,10 @@ export default async function handler(req, res) {
     // Parse the JSON strings
     const members  = mDoc.value ? JSON.parse(mDoc.value) : [];
     const allSessions = sDoc.value ? JSON.parse(sDoc.value) : [];
-    const sessions = allSessions.filter(s => s.date === tomorrow);
+    const sessions = allSessions.filter(s => s.date === targetDate);
 
     if(sessions.length===0)
-      return res.status(200).json({ok:true, sent:0, message:`No sessions on ${tomorrow}`});
+      return res.status(200).json({ok:true, sent:0, message:`No sessions on ${targetDate}`});
 
     // Group sessions by player
     const byPlayer = {};
@@ -177,6 +178,9 @@ export default async function handler(req, res) {
 
     let sent=0, skipped=0;
     const results=[];
+    
+    // Helper to add delay between emails (Resend allows 5/sec, we do 3/sec to be safe)
+    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     for(const [name, playerSess] of Object.entries(byPlayer)) {
       const member = members.find(m=>m.name===name);
@@ -190,16 +194,19 @@ export default async function handler(req, res) {
           body: JSON.stringify({
             from:    "FCC Training App <fcc_training_app@nordicanchor.dk>",
             to:      [member.email],
-            subject: `🏏 Reminder: You're booked in tomorrow — ${fmtDate(tomorrow)}`,
+            subject: `🏏 Reminder: You're booked in tomorrow — ${fmtDate(targetDate)}`,
             html:    buildHtml(name, playerSess),
           }),
         });
         if(r.ok){ sent++; results.push({name,status:"sent"}); }
         else { const e=await r.json(); results.push({name,status:"failed",error:e}); }
       } catch(e){ results.push({name,status:"error",error:e.message}); }
+      
+      // Delay 350ms between emails to stay under Resend's 5/sec rate limit
+      await delay(350);
     }
 
-    return res.status(200).json({ok:true, date:tomorrow,
+    return res.status(200).json({ok:true, date:targetDate,
       sessions:sessions.length, players:Object.keys(byPlayer).length,
       sent, skipped, results});
 
