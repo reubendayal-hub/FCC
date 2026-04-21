@@ -81,49 +81,57 @@ function buildHtml(name, sessions) {
   }).join("");
 
   return `
-    <div style="font-family:sans-serif;max-width:480px;margin:0 auto;">
-      <div style="background:#1e3a5f;padding:24px;border-radius:10px 10px 0 0;">
-        <h2 style="color:#fbbf24;margin:0;font-size:18px;">🏏 FCC Training App</h2>
-        <p style="color:rgba(255,255,255,.55);margin:4px 0 0;font-size:13px;">Session reminder — tomorrow</p>
+<!DOCTYPE html>
+<html>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:#f1f5f9;padding:24px;">
+  <div style="max-width:480px;margin:0 auto;">
+    <div style="background:#0f172a;color:#fff;padding:20px;border-radius:14px 14px 0 0;text-align:center;">
+      <div style="font-size:28px;margin-bottom:6px;">🏏</div>
+      <div style="font-size:20px;font-weight:900;">Training Reminder</div>
+      <div style="font-size:13px;color:#94a3b8;">Fredensborg Cricket Club</div>
+    </div>
+    <div style="background:#fff;padding:20px;border-radius:0 0 14px 14px;">
+      <div style="font-size:15px;color:#334155;margin-bottom:16px;">
+        Hi <b>${name.split(" ")[0]}</b>, you're booked in for tomorrow:
       </div>
-      <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;padding:28px 24px;border-radius:0 0 10px 10px;">
-        <p style="font-size:15px;color:#111827;margin:0 0 6px;">Hi ${name.split(" ")[0]} 👋</p>
-        <p style="font-size:13px;color:#6b7280;margin:0 0 18px;">
-          Just a reminder — you're signed up for
-          <strong>${sessions.length>1?"these sessions":"this session"}</strong>
-          tomorrow at Karlebo Cricket Ground.
-        </p>
-        ${rows}
-        <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;margin:16px 0;">
-          <p style="font-size:13px;color:#1e40af;margin:0;line-height:1.6;font-weight:600;">
-            ✅ You are signed in by default
-          </p>
-          <p style="font-size:12px;color:#1e40af;margin:6px 0 0;line-height:1.5;">
-            The coaches, captain, and team members expect you to attend. Please make sure you're there!
-          </p>
+      ${rows}
+      
+      <!-- Blue info box: signed in by default -->
+      <div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:10px;padding:12px 14px;margin-bottom:12px;">
+        <div style="font-size:13px;color:#1e40af;line-height:1.5;">
+          ✅ <b>You are signed in by default</b> — The coaches, captain, and team members expect you to attend.
         </div>
-        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;margin:16px 0;">
-          <p style="font-size:12px;color:#92400e;margin:0;line-height:1.6;">
-            ⚠️ <strong>Can't make it?</strong> It is your responsibility to sign out before <strong>9pm tonight</strong> so coaches can plan accordingly and others know.
-          </p>
+      </div>
+      
+      <!-- Amber warning box -->
+      <div style="background:#fef3c7;border:1.5px solid #fbbf24;border-radius:10px;padding:12px 14px;">
+        <div style="font-size:13px;color:#92400e;line-height:1.5;">
+          ⚠️ <b>Can't make it?</b> It is your responsibility to sign out before 9pm tonight so coaches can plan accordingly and others know.
         </div>
+      </div>
+      
+      <div style="margin-top:20px;text-align:center;">
         <a href="https://fcc-training.vercel.app"
-          style="display:inline-block;background:#1e3a5f;color:#fbbf24;text-decoration:none;
-            padding:10px 22px;border-radius:20px;font-size:13px;font-weight:700;">
-          Open App →
+          style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;
+            padding:12px 28px;border-radius:99px;font-weight:700;font-size:14px;">
+          Open FCC Training App
         </a>
-        <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;"/>
-        <p style="font-size:11px;color:#d1d5db;margin:0;">
-          To turn off reminders go to Profile → Notifications in the FCC Training app.
-        </p>
       </div>
-    </div>`;
+    </div>
+    <div style="text-align:center;margin-top:16px;font-size:11px;color:#94a3b8;">
+      Fredensborg Cricket Club · Benediktevej 15 · 3480 Fredensborg
+    </div>
+  </div>
+</body>
+</html>`;
 }
 
 export default async function handler(req, res) {
-  const secret   = process.env.CRON_SECRET;
-  const provided = req.headers?.["x-cron-secret"] || req.query?.secret;
-  if(secret && provided !== secret) return res.status(401).json({error:"Unauthorised"});
+  // Check cron secret
+  const secret = req.query.secret || req.headers["x-cron-secret"];
+  if(secret !== process.env.CRON_SECRET)
+    return res.status(401).json({error:"Unauthorized"});
 
   const apiKey      = process.env.RESEND_API_KEY;
   const projectId   = process.env.FIREBASE_PROJECT_ID;
@@ -137,15 +145,7 @@ export default async function handler(req, res) {
 
   try {
     const token    = await getAccessToken(clientEmail, privateKey);
-    
-    // Allow date override via query param: ?date=2026-04-21
-    // If not provided, defaults to tomorrow
-    const targetDate = req.query?.date || getTomorrow();
-    // Validate date format
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
-      return res.status(400).json({error:"Invalid date format. Use YYYY-MM-DD"});
-    }
-    
+    const tomorrow = getTomorrow();
     const base     = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
     const headers  = { Authorization:`Bearer ${token}` };
 
@@ -156,32 +156,17 @@ export default async function handler(req, res) {
     if(!mRes.ok) throw new Error(`Members fetch ${mRes.status}: ${await mRes.text()}`);
     if(!sRes.ok) throw new Error(`Sessions fetch ${sRes.status}: ${await sRes.text()}`);
 
-    // Members stored as {value: JSON.stringify([...])} — need to parse the JSON string
-    const membersDoc = parseDoc(await mRes.json());
-    let members = [];
-    if(membersDoc.value) {
-      try { members = JSON.parse(membersDoc.value); } catch(e) { members = []; }
-    } else if(membersDoc.list) {
-      members = membersDoc.list; // Fallback if stored as list
-    }
+    // Parse Firestore documents - data is stored as JSON string in .value field
+    const mDoc = parseDoc(await mRes.json());
+    const sDoc = parseDoc(await sRes.json());
     
-    // Sessions stored as {value: JSON.stringify([...])} — need to parse the JSON string
-    const sessionsDoc = parseDoc(await sRes.json());
-    let allSessions = [];
-    if(sessionsDoc.value) {
-      try { allSessions = JSON.parse(sessionsDoc.value); } catch(e) { allSessions = []; }
-    } else if(sessionsDoc.list) {
-      allSessions = sessionsDoc.list; // Fallback if stored as list
-    }
-    
-    const sessions = allSessions.filter(s=>s.date===targetDate);
+    // Parse the JSON strings
+    const members  = mDoc.value ? JSON.parse(mDoc.value) : [];
+    const allSessions = sDoc.value ? JSON.parse(sDoc.value) : [];
+    const sessions = allSessions.filter(s => s.date === tomorrow);
 
     if(sessions.length===0)
-      return res.status(200).json({
-        ok:true, sent:0, 
-        message:`No sessions on ${targetDate}`,
-        debug: { totalSessions: allSessions.length, targetDate, sessionDates: allSessions.slice(0,10).map(s=>s.date) }
-      });
+      return res.status(200).json({ok:true, sent:0, message:`No sessions on ${tomorrow}`});
 
     // Group sessions by player
     const byPlayer = {};
@@ -192,20 +177,11 @@ export default async function handler(req, res) {
 
     let sent=0, skipped=0;
     const results=[];
-    const skipReasons = [];
 
     for(const [name, playerSess] of Object.entries(byPlayer)) {
       const member = members.find(m=>m.name===name);
-      if(!member?.email) { 
-        skipped++; 
-        skipReasons.push({name, reason: "no_email"}); 
-        continue; 
-      }
-      if(!(member.emailDayBeforeReminder??true)) { 
-        skipped++; 
-        skipReasons.push({name, reason: "reminders_disabled"}); 
-        continue; 
-      }
+      if(!member?.email)                         { skipped++; continue; }
+      if(!(member.emailDayBeforeReminder??true)) { skipped++; continue; }
 
       try {
         const r = await fetch("https://api.resend.com/emails",{
@@ -214,7 +190,7 @@ export default async function handler(req, res) {
           body: JSON.stringify({
             from:    "FCC Training App <fcc_training_app@nordicanchor.dk>",
             to:      [member.email],
-            subject: `🏏 Reminder: You're booked in — ${fmtDate(targetDate)}`,
+            subject: `🏏 Reminder: You're booked in tomorrow — ${fmtDate(tomorrow)}`,
             html:    buildHtml(name, playerSess),
           }),
         });
@@ -223,9 +199,9 @@ export default async function handler(req, res) {
       } catch(e){ results.push({name,status:"error",error:e.message}); }
     }
 
-    return res.status(200).json({ok:true, date:targetDate,
+    return res.status(200).json({ok:true, date:tomorrow,
       sessions:sessions.length, players:Object.keys(byPlayer).length,
-      sent, skipped, skipReasons, results});
+      sent, skipped, results});
 
   } catch(err) {
     return res.status(500).json({error:err.message});
