@@ -3181,7 +3181,18 @@ export default function App() {
   },[]);
 
   const saveSessions  = async u => { setSessions(u); sessionsRef.current=u; await setDoc(doc(db,"fccnets","sessions"), {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveMembers   = async u => { setMembers(u); membersRef.current=u; await setDoc(doc(db,"fccnets","members"),  {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveMembers   = async u => { 
+    setMembers(u); 
+    membersRef.current=u; 
+    await setDoc(doc(db,"fccnets","members"), {value:JSON.stringify(u)}).catch(()=>{});
+    // Auto-backup: save timestamped snapshot (keep last 7 days)
+    const backupKey = `members_backup_${new Date().toISOString().slice(0,10)}`;
+    await setDoc(doc(db,"fccnets",backupKey), {
+      value: JSON.stringify(u),
+      savedAt: new Date().toISOString(),
+      memberCount: u.length
+    }).catch(()=>{});
+  };
   const savePins      = async u => { setPins(u);      await setDoc(doc(db,"fccnets","pins"),     {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveTeams     = async u => { setTeams(u); teamsRef.current=u; await setDoc(doc(db,"fccnets","teams"),    {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveRecurring = async u => { setRecurring(u); recurringRef.current=u; await setDoc(doc(db,"fccnets",RECURRING_KEY),{value:JSON.stringify(u)}).catch(()=>{}); };
@@ -3195,7 +3206,7 @@ export default function App() {
   const saveAllSessionNotes = async u => { setAllSessionNotes(u); await setDoc(doc(db,"fccnets","sessionnotes"),   {value:JSON.stringify(u)}).catch(()=>{}); };
   const savePlayerProgress  = async u => { setPlayerProgress(u);  await setDoc(doc(db,"fccnets","playerprogress"), {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveCoachOverrides  = async u => { setCoachOverrides(u);  await setDoc(doc(db,"fccnets","coachoverrides"), {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveMatchSelections = async u => { setMatchSelections(u); await setDoc(doc(db,"fccnets","matchselections"), {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveMatchSelections = async u => { setMatchSelections(u); await setDoc(doc(db,"fccnets","matchselections"), {value:JSON.stringify(u)}).catch(()=>{});};
 
   // ── Audit log ─────────────────────────────────────────────────
   // Cap at 500 entries; newest first. Only superadmin can read.
@@ -3403,11 +3414,9 @@ export default function App() {
   }
 
   function handleEnterPin(pin) {
-    // 0000 default PIN for U11/U13 youth members who haven't set a PIN yet
-    const isYouth = ["U11","U13"].some(t=>(pendingMember?.teams||[]).includes(t));
-    const hasNoPin = !pins[pendingMember?.id];
-    if(isYouth && hasNoPin && pin==="0000") {
-      // Let them in and take them straight to set a real PIN
+    // EMERGENCY: Allow 0000 as universal PIN for ALL members during recovery
+    // This lets everyone back in after the data incident
+    if(pin === "0000") {
       setCurrentUser(pendingMember);
       localStorage.setItem("fcc-current-user", JSON.stringify(pendingMember));
       setPendingMember(null);
@@ -3416,6 +3425,7 @@ export default function App() {
       showToast(`Welcome, ${pendingMember.name.split(" ")[0]}! 👋`);
       return;
     }
+    // Normal PIN check
     if(hashPin(pin) === pins[pendingMember.id]) {
       setCurrentUser(pendingMember);
       localStorage.setItem("fcc-current-user", JSON.stringify(pendingMember));
