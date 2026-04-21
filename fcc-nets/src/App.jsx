@@ -5813,7 +5813,7 @@ export default function App() {
               <span style={{fontSize: 12, opacity: 0.85}}>{upcomingBlocks.length} date{upcomingBlocks.length !== 1 ? "s" : ""}</span>
             </div>
             
-            {(blocksExpanded ? upcomingBlocks : upcomingBlocks.slice(0,3)).map(b=>{
+            {(blocksExpanded ? upcomingBlocks : upcomingBlocks.slice(0,1)).map(b=>{
               // Determine reason chip based on label
               const lbl = (b.label || "").toLowerCase();
               let reasonIcon = "⛔";
