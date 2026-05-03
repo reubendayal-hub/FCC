@@ -171,6 +171,11 @@ const SESSION_TEMPLATES_INDOOR = [
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DAY_NAMES_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
+// Sunday-first arrays used for direct lookup from JavaScript's Date.getDay()
+// (which returns 0=Sun, 1=Mon, ..., 6=Sat). The Mon-first arrays above are used
+// where the app's own day index is 0=Mon (recurring slot day numbers, week-grid loops).
+const DAY_NAMES_FULL_SUNFIRST = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
 // ───────────────────────────────────────────────────────────────────────────────
 // DATE HELPERS
 // ───────────────────────────────────────────────────────────────────────────────
@@ -195,7 +200,7 @@ function fmtDate(d) {
 }
 
 function fmtDateFull(d) {
-  return `${DAY_NAMES_FULL[d.getDay()]}, ${fmtDate(d)}`;
+  return `${DAY_NAMES_FULL_SUNFIRST[d.getDay()]}, ${fmtDate(d)}`;
 }
 
 function toDateStr(d) {
