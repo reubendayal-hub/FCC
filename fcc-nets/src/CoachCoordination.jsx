@@ -171,11 +171,6 @@ const SESSION_TEMPLATES_INDOOR = [
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DAY_NAMES_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-// Sunday-first arrays used for direct lookup from JavaScript's Date.getDay()
-// (which returns 0=Sun, 1=Mon, ..., 6=Sat). The Mon-first arrays above are used
-// where the app's own day index is 0=Mon (recurring slot day numbers, week-grid loops).
-const DAY_NAMES_FULL_SUNFIRST = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
 // ───────────────────────────────────────────────────────────────────────────────
 // DATE HELPERS
 // ───────────────────────────────────────────────────────────────────────────────
@@ -200,7 +195,11 @@ function fmtDate(d) {
 }
 
 function fmtDateFull(d) {
-  return `${DAY_NAMES_FULL_SUNFIRST[d.getDay()]}, ${fmtDate(d)}`;
+  // Note: DAY_NAMES_FULL is Monday-first but Date.getDay() returns 0=Sunday.
+  // Convert Sun-first → Mon-first index.
+  const sunFirst = d.getDay();
+  const monFirst = sunFirst === 0 ? 6 : sunFirst - 1;
+  return `${DAY_NAMES_FULL[monFirst]}, ${fmtDate(d)}`;
 }
 
 function toDateStr(d) {
@@ -338,11 +337,17 @@ export default function CoachCoordination({
           const teamName = slot.team || (slot.teams && slot.teams[0]);
           const team = teams.find(t => t.name === teamName);
           const teamCoaches = team?.coaches?.filter(c => c && c.trim() !== "") || [];
-          
+
+          // slot.day is stored Sunday-first (0=Sun, matching JS Date.getDay()).
+          // The week grid in this component is Monday-first (Mon=0, Tue=1, ..., Sun=6).
+          // Convert before exposing as session.day so filtering by `s.day === dayIdx` works.
+          const sunFirst = typeof slot.day === "number" ? slot.day : 0;
+          const monFirstDay = sunFirst === 0 ? 6 : sunFirst - 1;
+
           return {
             id: slot.id,
             team: teamName,
-            day: slot.day, // 0=Sun, 1=Mon, etc - need to adjust if different
+            day: monFirstDay,
             time: `${slot.from}–${slot.to}`,
             venue: "Karlebo", // Default venue
             coach: teamCoaches[0] || null,
