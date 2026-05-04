@@ -2956,8 +2956,9 @@ export default function App() {
   const [newTeam,  setNewTeam]  = useState("Unassigned");
   const [newEmail, setNewEmail] = useState("");
   const [newPhone, setNewPhone] = useState("");
-  const [newMemberType, setNewMemberType] = useState("player"); // player | parent
+  const [newMemberType, setNewMemberType] = useState("player"); // player | parent | child
   const [newLinkParent, setNewLinkParent] = useState(""); // parent member id to link child to
+  const [newGenCode,   setNewGenCode]   = useState(false); // generate invite code after adding
   const [aSearch,  setASearch]  = useState("");
   const [aFilter,  setAFilter]  = useState("All");
   const [adminListMode, setAdminListMode] = useState("flat"); // "teams" | "flat" — flat by default
@@ -3848,31 +3849,39 @@ export default function App() {
     const newMember = normMember({
       id: newId, 
       name: newName.trim(),
-      teams: newTeam==="Unassigned"?[]:[newTeam],
+      // Parents get no team; children and players get the selected team
+      teams: (newMemberType==="parent"||newTeam==="Unassigned") ? [] : [newTeam],
       role: "member",
-      memberType: newMemberType,
+      memberType: newMemberType==="child" ? "player" : newMemberType, // children are stored as players with a parentId
       email: newEmail.trim()||null,
       phone: newPhone.trim()||null,
       children: [],
-      parentId: newLinkParent || null,
-      parentName: newLinkParent ? members.find(m=>m.id===newLinkParent)?.name : null,
+      parentId: newMemberType==="child" ? (newLinkParent||null) : null,
+      parentName: newMemberType==="child" && newLinkParent ? members.find(m=>m.id===newLinkParent)?.name : null,
     });
     
-    // If linking to a parent, also update the parent's children array
+    // If linking child to a parent, also update the parent's children array
     let updatedMembers = [...members, newMember];
-    if (newLinkParent) {
+    if (newMemberType==="child" && newLinkParent) {
       updatedMembers = updatedMembers.map(m => 
         m.id === newLinkParent 
-          ? { ...m, children: [...(m.children||[]), newId] }
+          ? { ...m, children: [...(m.children||[]), newId], memberType: "parent" }
           : m
       );
     }
     
     saveMembers(updatedMembers);
-    const linkInfo = newLinkParent ? ` · Linked to ${members.find(m=>m.id===newLinkParent)?.name}` : "";
+    const linkInfo = (newMemberType==="child"&&newLinkParent) ? ` · Linked to ${members.find(m=>m.id===newLinkParent)?.name}` : "";
     logAction("member", `Added member: ${newName.trim()} (${teamLabel})${newEmail?" · "+newEmail:""}${linkInfo}`);
-    setNewName(""); setNewEmail(""); setNewPhone(""); setNewMemberType("player"); setNewLinkParent("");
-    showToast("Member added ✓");
+
+    // Auto-generate invite code if requested (useful for members without email)
+    if(newGenCode) {
+      const code = generateInviteCode(newId);
+      setCodeModal({name: newName.trim(), code});
+    }
+
+    setNewName(""); setNewEmail(""); setNewPhone(""); setNewMemberType("player"); setNewLinkParent(""); setNewGenCode(false);
+    if(!newGenCode) showToast("Member added ✓");
   }
 
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -10759,63 +10768,91 @@ export default function App() {
         {adminSec.addmember&&<>
           <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,
             padding:"10px 14px",marginBottom:10,fontSize:12,color:"#1e40af",lineHeight:1.5}}>
-            💡 New members can also self-register at login — tap <b>"Verify / Set up my account"</b> on the login screen. Use the form below for admin-initiated additions only.
+            💡 New members can also self-register via <b>"Join Fredensborg CC"</b> on the login screen. Use the form below for admin-initiated additions only.
           </div>
           <form onSubmit={addMember} style={{background:G.white,borderRadius:12,
             border:`1.5px solid ${G.border}`,padding:14,marginBottom:20,
             display:"flex",flexDirection:"column",gap:10}}>
             
-            {/* Member Type Toggle */}
+            {/* Member Type Toggle — now 3 options */}
             <div>
               <label style={{fontWeight:700,fontSize:12,color:G.mid,marginBottom:6,display:"block"}}>
                 Member Type
               </label>
               <div style={{display:"flex",gap:6}}>
                 <button type="button" onClick={()=>{setNewMemberType("player");setNewLinkParent("");}}
-                  style={{flex:1,padding:"10px",borderRadius:8,border:"none",
+                  style={{flex:1,padding:"9px 6px",borderRadius:8,border:"none",
                     background:newMemberType==="player"?"#dcfce7":"#f1f5f9",
                     color:newMemberType==="player"?"#166534":"#64748b",
-                    fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+                    fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
                   🏏 Player
                 </button>
+                <button type="button" onClick={()=>{setNewMemberType("parent");setNewLinkParent("");}}
+                  style={{flex:1,padding:"9px 6px",borderRadius:8,border:"none",
+                    background:newMemberType==="parent"?"#fef9c3":"#f1f5f9",
+                    color:newMemberType==="parent"?"#854d0e":"#64748b",
+                    fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+                  👨‍👧 Parent
+                </button>
                 <button type="button" onClick={()=>setNewMemberType("child")}
-                  style={{flex:1,padding:"10px",borderRadius:8,border:"none",
+                  style={{flex:1,padding:"9px 6px",borderRadius:8,border:"none",
                     background:newMemberType==="child"?"#dbeafe":"#f1f5f9",
                     color:newMemberType==="child"?"#1e40af":"#64748b",
-                    fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
-                  👶 Child (link to parent)
+                    fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+                  👶 Child
                 </button>
+              </div>
+              {/* Contextual hint per type */}
+              <div style={{fontSize:11,color:G.muted,marginTop:5,lineHeight:1.5}}>
+                {newMemberType==="player"&&"A playing member. Assign to a team below."}
+                {newMemberType==="parent"&&"A non-playing parent/guardian account. No team needed."}
+                {newMemberType==="child"&&"A junior player. Link to their parent account if it already exists."}
               </div>
             </div>
             
             <FFld label="Full Name">
-              <input style={iSt()} placeholder="e.g. Arjun Sharma"
+              <input style={iSt()} placeholder={newMemberType==="parent"?"e.g. Priya Sharma (parent)":"e.g. Arjun Sharma"}
                 value={newName} onChange={e=>setNewName(e.target.value)} required/>
             </FFld>
-            <FFld label="Group / Team">
-              <select style={iSt()} value={newTeam} onChange={e=>setNewTeam(e.target.value)}>
-                {ALL_TEAMS.map(t=><option key={t} value={t}>{t}</option>)}
-              </select>
-            </FFld>
+
+            {/* Team only shown for players and children — parents have no team */}
+            {newMemberType!=="parent"&&(
+              <FFld label="Group / Team">
+                <select style={iSt()} value={newTeam} onChange={e=>setNewTeam(e.target.value)}>
+                  {ALL_TEAMS.map(t=><option key={t} value={t}>{t}</option>)}
+                </select>
+              </FFld>
+            )}
             
-            {/* Parent Selector - only show when adding a child */}
+            {/* Parent Selector — only for children, with improved filter and empty state */}
             {newMemberType==="child"&&(
               <FFld label="Link to Parent Account">
-                <select style={iSt()} value={newLinkParent} onChange={e=>setNewLinkParent(e.target.value)}>
-                  <option value="">Select parent (optional)...</option>
-                  {members
-                    .filter(m => !(m.teams||[]).some(t => t.startsWith("U") || t.includes("Girls") || t.includes("Kvinder"))) // Exclude junior players
-                    .sort((a,b) => a.name.localeCompare(b.name))
-                    .map(m => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}{(m.children||[]).length > 0 ? ` (${(m.children||[]).length} child${(m.children||[]).length>1?"ren":""})` : ""}
-                      </option>
-                    ))
-                  }
-                </select>
-                <div style={{fontSize:11,color:G.muted,marginTop:4}}>
-                  Parent will see this child in their "My Family" tab
-                </div>
+                {(()=>{
+                  const parentOptions = members.filter(m =>
+                    m.memberType==="parent" ||
+                    (!((m.teams||[]).some(t => t.startsWith("U") || t.includes("Girls") || t.includes("Kvinder"))) && m.memberType!=="child")
+                  ).sort((a,b)=>a.name.localeCompare(b.name));
+                  return parentOptions.length===0 ? (
+                    <div style={{fontSize:12,color:"#b45309",background:"#fef3c7",
+                      border:"1px solid #fcd34d",borderRadius:8,padding:"9px 12px",lineHeight:1.5}}>
+                      ⚠️ No parent accounts found. Add the parent first using the <b>👨‍👧 Parent</b> type above, then come back to add the child.
+                    </div>
+                  ) : (
+                    <>
+                      <select style={iSt()} value={newLinkParent} onChange={e=>setNewLinkParent(e.target.value)}>
+                        <option value="">— Not linked yet (can link later) —</option>
+                        {parentOptions.map(m=>(
+                          <option key={m.id} value={m.id}>
+                            {m.name}{(m.children||[]).length>0?` (${(m.children||[]).length} child${(m.children||[]).length>1?"ren":""} already linked)`:""}
+                          </option>
+                        ))}
+                      </select>
+                      <div style={{fontSize:11,color:G.muted,marginTop:4}}>
+                        Parent will see this child in their "My Family" tab.
+                      </div>
+                    </>
+                  );
+                })()}
               </FFld>
             )}
             
@@ -10827,6 +10864,18 @@ export default function App() {
               <input type="tel" style={iSt()} placeholder="+45 XX XX XX XX"
                 value={newPhone} onChange={e=>setNewPhone(e.target.value)}/>
             </FFld>
+
+            {/* Generate invite code checkbox — useful when no email */}
+            <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",
+              background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:8,padding:"9px 12px"}}>
+              <input type="checkbox" checked={newGenCode} onChange={e=>setNewGenCode(e.target.checked)}
+                style={{width:16,height:16,cursor:"pointer",accentColor:G.green}}/>
+              <span style={{fontSize:12,color:"#166534",lineHeight:1.4}}>
+                <b>Generate invite code after adding</b><br/>
+                <span style={{fontWeight:400}}>Useful if the member has no email. Code will appear in a popup to share via WhatsApp.</span>
+              </span>
+            </label>
+
             <Btn type="submit" bg={G.green} col={G.lime} full>+ Add Member</Btn>
           </form>
         </>}{/* end adminSec.addmember */}
