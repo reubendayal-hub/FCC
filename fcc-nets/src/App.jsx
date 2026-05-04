@@ -4246,18 +4246,36 @@ export default function App() {
                 <span style={{fontWeight:700,color:G.text}}>Start typing</span> to find your name
               </div>
               <div style={{marginTop:20,paddingTop:20,borderTop:`1px solid ${G.border}`}}>
-                <div style={{fontSize:12,color:G.muted,marginBottom:10}}>
-                  First time? Already registered with the club?
-                </div>
-                <button onClick={()=>{setVfStep("search");setVfSearch("");setVfMatch(null);setVfEmail("");setVfPhone("");setVfCode("");setVfError("");setVfConsent(false);setVfIsParent(false);setAuthView("verify");}}
-                  style={{background:G.white,color:G.green,border:`1.5px solid ${G.green}`,
-                    borderRadius:20,padding:"9px 22px",fontSize:13,fontWeight:800,
-                    cursor:"pointer",fontFamily:"inherit"}}>
-                  ✅ Find My Account
-                </button>
-                <div style={{fontSize:10,color:G.muted,marginTop:8,lineHeight:1.5}}>
-                  Have an <b>FCC-XXXX</b> code from your admin?<br/>
-                  Find your name first, then enter it.
+                {/* Two-button row: existing members + new members */}
+                <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  <div style={{fontSize:12,color:G.muted,marginBottom:2}}>
+                    Already a member?
+                  </div>
+                  <button onClick={()=>{setVfStep("search");setVfSearch("");setVfMatch(null);setVfEmail("");setVfPhone("");setVfCode("");setVfError("");setVfConsent(false);setVfIsParent(false);setAuthView("verify");}}
+                    style={{background:G.white,color:G.green,border:`1.5px solid ${G.green}`,
+                      borderRadius:20,padding:"9px 22px",fontSize:13,fontWeight:800,
+                      cursor:"pointer",fontFamily:"inherit"}}>
+                    ✅ Find My Account
+                  </button>
+                  <div style={{fontSize:10,color:G.muted,lineHeight:1.5}}>
+                    Have an <b>FCC-XXXX</b> code from your admin?<br/>
+                    Find your name first, then enter it.
+                  </div>
+                  <div style={{height:1,background:G.border,margin:"4px 0"}}/>
+                  <div style={{fontSize:12,color:G.muted,marginBottom:2}}>
+                    New to Fredensborg CC?
+                  </div>
+                  <button onClick={()=>{
+                      setJrName(""); setJrTeam(""); setJrContact(""); setJrPhone("");
+                      setJrForChild(false); setJrChildName(""); setJrChildTeam("");
+                      setAuthView("joinrequest");
+                    }}
+                    style={{background:G.green,color:G.lime,border:"none",
+                      borderRadius:20,padding:"9px 22px",fontSize:13,fontWeight:800,
+                      cursor:"pointer",fontFamily:"inherit",
+                      boxShadow:"0 3px 12px rgba(20,83,45,.25)"}}>
+                    ✋ Join Fredensborg CC
+                  </button>
                 </div>
               </div>
             </div>
