@@ -10687,11 +10687,33 @@ export default function App() {
             }
             saveJoinRequests(joinRequests.map(r=>r.id===req.id ? {...r,status:"approved"} : r));
             logAction("request", `Approved join request: ${req.playerName}${req.playerTeam?" → "+req.playerTeam:""}${req.forChild&&req.parentName?" (parent: "+req.parentName+")":""}`);
+            // Notify the member by email if we have their address
+            if(req.email) {
+              fetch("/api/notify", {
+                method:"POST",
+                headers:{"Content-Type":"application/json"},
+                body: JSON.stringify({
+                  type: "approved",
+                  data: { name: req.playerName, email: req.email, playerTeam },
+                }),
+              }).catch(()=>{});
+            }
             showToast(`${req.playerName} added ✓`);
           }
           function declineRequest(req) {
             saveJoinRequests(joinRequests.map(r=>r.id===req.id ? {...r,status:"declined"} : r));
             logAction("request", `Declined join request: ${req.playerName}`);
+            // Notify the member by email if we have their address
+            if(req.email) {
+              fetch("/api/notify", {
+                method:"POST",
+                headers:{"Content-Type":"application/json"},
+                body: JSON.stringify({
+                  type: "declined",
+                  data: { name: req.playerName, email: req.email },
+                }),
+              }).catch(()=>{});
+            }
             showToast("Request declined");
           }
           return (
