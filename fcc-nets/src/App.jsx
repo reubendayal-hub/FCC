@@ -2614,6 +2614,8 @@ export default function App() {
   const [xiRoles, setXiRoles] = useState({ captain: null, vc: null, wk: null }); // special roles
   const [xiNote, setXiNote] = useState("");
   const [xiReportTime, setXiReportTime] = useState("");
+  const [xiMatchTime, setXiMatchTime] = useState("");
+  const [xiReportTimeUserTouched, setXiReportTimeUserTouched] = useState(false);
   // Admin section collapse — true = open. Members+AddMember open by default, rest collapsed
   const [adminSec, setAdminSec] = useState({
     members:true, addmember:true, groups:false,
@@ -9128,9 +9130,18 @@ export default function App() {
         .sort((a, b) => a.name.localeCompare(b.name));
     };
     
+    // Subtract 60 minutes from a "HH:MM" string. Returns "" if input invalid or result negative.
+    const minusOneHour = (hhmm) => {
+      if (!hhmm || !/^\d{2}:\d{2}$/.test(hhmm)) return "";
+      const [h, m] = hhmm.split(":").map(Number);
+      const total = h * 60 + m - 60;
+      if (total < 0) return "";
+      return `${String(Math.floor(total / 60)).padStart(2,"0")}:${String(total % 60).padStart(2,"0")}`;
+    };
+
     // Generate WhatsApp message
     const generateWhatsAppMessage = (match, selection) => {
-      const { players, captain, vc, wk, note, reportTime } = selection;
+      const { players, captain, vc, wk, note, reportTime, matchTime } = selection;
       const venue = getMatchVenue(match.label, match.home);
       const opponent = match.label.replace(/^(Div \d|Women's|OB|T20 Serie \d) (vs |@ )/i, "").replace(/\s*\d+$/, "");
       
@@ -9146,7 +9157,8 @@ export default function App() {
       
       msg += `\n📅 ${fmtLong(match.date)}\n`;
       msg += `📍 ${venue ? `${venue.name}, ${venue.address}` : (match.home ? "Karlebo Cricket Ground, Karlebovej 23, 3480 Fredensborg" : "Away")}\n`;
-      msg += `⏰ Match: ${match.label.includes("T20") ? "TBD" : "11:00"}`;
+      const displayMatchTime = matchTime || (match.label.includes("T20") ? "TBD" : "11:00");
+      msg += `⏰ Match: ${displayMatchTime}`;
       if (reportTime) msg += ` · Report: ${reportTime}`;
       msg += `\n`;
       
@@ -9195,6 +9207,7 @@ export default function App() {
         wk: xiRoles.wk,
         note: xiNote,
         reportTime: xiReportTime,
+        matchTime: xiMatchTime,
         savedAt: new Date().toISOString(),
         savedBy: currentUser?.name,
         finalized: finalized,
@@ -9206,6 +9219,8 @@ export default function App() {
       setXiRoles({ captain: null, vc: null, wk: null });
       setXiNote("");
       setXiReportTime("");
+      setXiMatchTime("");
+      setXiReportTimeUserTouched(false);
     };
     
     // Open modal with existing selection if any
@@ -9218,17 +9233,26 @@ export default function App() {
       const defaultCaptain = team?.captain || null;
       const defaultVC = team?.vicecaptain || null;
       
+      const defaultMatchTime = match.label.includes("T20") ? "" : "11:00";
       if (existing) {
         setXiSelection(existing.players || []);
         setXiRoles({ captain: existing.captain, vc: existing.vc, wk: existing.wk });
         setXiNote(existing.note || "");
-        setXiReportTime(existing.reportTime || "");
+        const savedMatch = existing.matchTime || defaultMatchTime;
+        const savedReport = existing.reportTime || "";
+        setXiMatchTime(savedMatch);
+        setXiReportTime(savedReport);
+        // Treat the saved report time as user-touched if it's not exactly 1hr before match time —
+        // protects custom values from being clobbered when match time changes.
+        setXiReportTimeUserTouched(savedReport !== "" && savedReport !== minusOneHour(savedMatch));
       } else {
         // For new selection, pre-assign captain and VC from team data
         setXiSelection([]);
         setXiRoles({ captain: defaultCaptain, vc: defaultVC, wk: null });
         setXiNote("");
-        setXiReportTime("");
+        setXiMatchTime(defaultMatchTime);
+        setXiReportTime(minusOneHour(defaultMatchTime));
+        setXiReportTimeUserTouched(false);
       }
       setCaptainXIModal({ match, division });
     };
@@ -9500,17 +9524,41 @@ export default function App() {
                   )}
                 </div>
                 
-                {/* Report time & Note */}
+                {/* Match time, Report time & Note */}
                 <div style={{padding: "12px 16px", borderTop: `1px solid ${G.border}`}}>
                   <div style={{display: "flex", gap: 12, marginBottom: 10}}>
                     <div style={{width: 100, flexShrink: 0}}>
                       <label style={{fontSize: 11, fontWeight: 700, color: G.muted, display: "block", marginBottom: 4}}>
+                        MATCH START
+                      </label>
+                      <input
+                        type="time"
+                        value={xiMatchTime}
+                        placeholder="TBD"
+                        onChange={e => {
+                          const newMatch = e.target.value;
+                          setXiMatchTime(newMatch);
+                          if (!xiReportTimeUserTouched) {
+                            setXiReportTime(minusOneHour(newMatch));
+                          }
+                        }}
+                        style={{
+                          width: "100%", padding: "8px 10px", borderRadius: 8,
+                          border: `1px solid ${G.border}`, fontSize: 14, fontFamily: "inherit"
+                        }}
+                      />
+                    </div>
+                    <div style={{width: 100, flexShrink: 0}}>
+                      <label style={{fontSize: 11, fontWeight: 700, color: G.muted, display: "block", marginBottom: 4}}>
                         REPORT TIME
                       </label>
-                      <input 
-                        type="time" 
+                      <input
+                        type="time"
                         value={xiReportTime}
-                        onChange={e => setXiReportTime(e.target.value)}
+                        onChange={e => {
+                          setXiReportTime(e.target.value);
+                          setXiReportTimeUserTouched(true);
+                        }}
                         style={{
                           width: "100%", padding: "8px 10px", borderRadius: 8,
                           border: `1px solid ${G.border}`, fontSize: 14, fontFamily: "inherit"
@@ -9591,6 +9639,7 @@ export default function App() {
                           wk: xiRoles.wk,
                           note: xiNote,
                           reportTime: xiReportTime,
+                          matchTime: xiMatchTime,
                         };
                         const msg = generateWhatsAppMessage(match, sel);
                         // Check if mobile
