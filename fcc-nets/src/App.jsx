@@ -9249,7 +9249,10 @@ export default function App() {
         // For new selection, pre-assign captain and VC from team data
         setXiSelection([]);
         setXiRoles({ captain: defaultCaptain, vc: defaultVC, wk: null });
-        setXiNote("");
+        // Home games get a starter note; away games stay blank.
+        setXiNote(match.home
+          ? "As this is a home game, we are responsible to be present ahead of time to prepare the ground."
+          : "");
         setXiMatchTime(defaultMatchTime);
         setXiReportTime(minusOneHour(defaultMatchTime));
         setXiReportTimeUserTouched(false);
