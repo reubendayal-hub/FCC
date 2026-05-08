@@ -9179,7 +9179,8 @@ export default function App() {
       const venue = getMatchVenue(match.label, match.home);
       const opponent = match.label.replace(/^(Div \d|Women's|OB|T20 Serie \d) (vs |@ )/i, "").replace(/\s*\d+$/, "");
       
-      let msg = `Dear Team,\n\nPlaying XI for our match against ${opponent}:\n\n`;
+      const division = match.label.match(/^(Div \d|T20 Serie \d|Women's|OB)/i)?.[1] || "";
+      let msg = `Dear Team,\n\nPlaying XI for our ${division ? division + " " : ""}match against ${opponent}:\n\n`;
       
       players.forEach((p, i) => {
         let role = "";
