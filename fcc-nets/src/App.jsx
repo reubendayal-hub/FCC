@@ -9472,7 +9472,26 @@ export default function App() {
           const setRole = (role, name) => {
             setXiRoles(r => ({...r, [role]: r[role] === name ? null : name}));
           };
-          
+
+          // Card styles for the 4 stacked sections
+          const cardStyle = {
+            background: G.white,
+            border: `1px solid ${G.border}`,
+            borderRadius: 12,
+            padding: 14,
+            marginBottom: 12,
+          };
+          const cardHeaderStyle = {
+            fontSize: 11, fontWeight: 800, letterSpacing: 0.5,
+            textTransform: "uppercase", color: G.muted,
+            marginBottom: 10,
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+          };
+          const initials = (name) => {
+            const parts = (name || "").split(/\s+/).filter(Boolean);
+            return parts.slice(0, 2).map(p => p[0]).join("").toUpperCase() || "?";
+          };
+
           return (
             <div style={{
               position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
@@ -9500,134 +9519,224 @@ export default function App() {
                   }}>×</button>
                 </div>
                 
-                {/* Selection count */}
-                <div style={{
-                  padding: "12px 20px", background: G.cream, borderBottom: `1px solid ${G.border}`,
-                  display: "flex", alignItems: "center", justifyContent: "space-between"
-                }}>
-                  <span style={{fontSize: 13, fontWeight: 700, color: G.text}}>
-                    {xiSelection.length}/11 selected
-                  </span>
-                  {xiSelection.length === 11 && (
-                    <span style={{fontSize: 12, color: G.green, fontWeight: 600}}>✓ Team complete</span>
-                  )}
-                </div>
-                
-                {/* Player list */}
-                <div style={{flex: 1, overflow: "auto", padding: "8px 16px"}}>
-                  {roster.length === 0 ? (
-                    <div style={{padding: 20, textAlign: "center", color: G.muted}}>
-                      No players assigned to this team yet
+                {/* Body — scrollable */}
+                <div style={{flex: 1, overflowY: "auto", padding: 14, background: G.cream}}>
+                  {/* CARD 1: Match details */}
+                  <div style={cardStyle}>
+                    <div style={cardHeaderStyle}>Match details</div>
+                    <div style={{fontSize: 13, color: G.text, marginBottom: 6, display: "flex", alignItems: "center", gap: 8}}>
+                      <span>📅</span><span>{fmtLong(match.date)}</span>
                     </div>
-                  ) : (
-                    roster.map(player => {
-                      const selected = xiSelection.includes(player.name);
-                      const idx = xiSelection.indexOf(player.name);
-                      const isC = xiRoles.captain === player.name;
-                      const isVC = xiRoles.vc === player.name;
-                      const isWK = xiRoles.wk === player.name;
-                      
-                      return (
-                        <div key={player.id} style={{
-                          display: "flex", alignItems: "center", gap: 10,
-                          padding: "10px 12px", marginBottom: 6,
-                          background: selected ? tc.bg : G.white,
-                          border: `1.5px solid ${selected ? tc.border : G.border}`,
-                          borderRadius: 10, cursor: "pointer",
-                          transition: "all 0.15s"
-                        }} onClick={() => togglePlayer(player.name)}>
-                          {/* Selection indicator */}
-                          <div style={{
-                            width: 28, height: 28, borderRadius: "50%",
-                            background: selected ? tc.border : G.cream,
-                            color: selected ? "#fff" : G.muted,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: 12, fontWeight: 800, flexShrink: 0
-                          }}>
-                            {selected ? idx + 1 : ""}
-                          </div>
-                          
-                          {/* Player name */}
-                          <div style={{flex: 1, fontWeight: 600, fontSize: 14, color: G.text}}>
-                            {player.name}
-                          </div>
-                          
-                          {/* Role buttons (only if selected) */}
-                          {selected && (
-                            <div style={{display: "flex", gap: 4}} onClick={e => e.stopPropagation()}>
-                              <button onClick={() => setRole("captain", player.name)} style={{
-                                width: 28, height: 28, borderRadius: 6,
-                                background: isC ? "#14532d" : G.cream,
-                                color: isC ? "#fff" : G.muted,
-                                border: "none", fontSize: 10, fontWeight: 800, cursor: "pointer"
-                              }}>C</button>
-                              <button onClick={() => setRole("vc", player.name)} style={{
-                                width: 28, height: 28, borderRadius: 6,
-                                background: isVC ? "#1e3a5f" : G.cream,
-                                color: isVC ? "#fff" : G.muted,
-                                border: "none", fontSize: 10, fontWeight: 800, cursor: "pointer"
-                              }}>VC</button>
-                              <button onClick={() => setRole("wk", player.name)} style={{
-                                width: 28, height: 28, borderRadius: 6,
-                                background: isWK ? "#7c2d12" : G.cream,
-                                color: isWK ? "#fff" : G.muted,
-                                border: "none", fontSize: 10, fontWeight: 800, cursor: "pointer"
-                              }}>WK</button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-                
-                {/* Match time, Report time & Note */}
-                <div style={{padding: "12px 16px", borderTop: `1px solid ${G.border}`}}>
-                  <div style={{display: "flex", gap: 12, marginBottom: 10}}>
-                    <div style={{width: 100, flexShrink: 0}}>
-                      <label style={{fontSize: 11, fontWeight: 700, color: G.muted, display: "block", marginBottom: 4}}>
-                        MATCH START
-                      </label>
-                      <input
-                        type="time"
-                        value={xiMatchTime}
-                        placeholder="TBD"
-                        onChange={e => {
-                          const newMatch = e.target.value;
-                          setXiMatchTime(newMatch);
-                          if (!xiReportTimeUserTouched) {
-                            setXiReportTime(minusOneHour(newMatch));
-                          }
-                        }}
-                        style={{
-                          width: "100%", padding: "8px 10px", borderRadius: 8,
-                          border: `1px solid ${G.border}`, fontSize: 14, fontFamily: "inherit"
-                        }}
-                      />
+                    <div style={{fontSize: 13, color: G.text, marginBottom: 12, display: "flex", alignItems: "flex-start", gap: 8}}>
+                      <span>📍</span>
+                      <span>
+                        {match.home ? "Home" : "Away"}
+                        {venue ? ` — ${venue.name}, ${venue.address}` : (match.home ? " — Karlebo Cricket Ground, Karlebovej 23, 3480 Fredensborg" : "")}
+                      </span>
                     </div>
-                    <div style={{width: 100, flexShrink: 0}}>
-                      <label style={{fontSize: 11, fontWeight: 700, color: G.muted, display: "block", marginBottom: 4}}>
-                        REPORT TIME
-                      </label>
-                      <input
-                        type="time"
-                        value={xiReportTime}
-                        onChange={e => {
-                          setXiReportTime(e.target.value);
-                          setXiReportTimeUserTouched(true);
-                        }}
-                        style={{
-                          width: "100%", padding: "8px 10px", borderRadius: 8,
-                          border: `1px solid ${G.border}`, fontSize: 14, fontFamily: "inherit"
-                        }}
-                      />
+                    <div style={{display: "flex", gap: 12}}>
+                      <div style={{width: 110, flexShrink: 0}}>
+                        <label style={{fontSize: 11, fontWeight: 700, color: G.muted, display: "block", marginBottom: 4}}>
+                          MATCH START
+                        </label>
+                        <input
+                          type="time"
+                          value={xiMatchTime}
+                          placeholder="TBD"
+                          onChange={e => {
+                            const newMatch = e.target.value;
+                            setXiMatchTime(newMatch);
+                            if (!xiReportTimeUserTouched) {
+                              setXiReportTime(minusOneHour(newMatch));
+                            }
+                          }}
+                          style={{
+                            width: "100%", padding: "8px 10px", borderRadius: 8,
+                            border: `1px solid ${G.border}`, fontSize: 14, fontFamily: "inherit",
+                            boxSizing: "border-box"
+                          }}
+                        />
+                      </div>
+                      <div style={{width: 110, flexShrink: 0}}>
+                        <label style={{fontSize: 11, fontWeight: 700, color: G.muted, display: "block", marginBottom: 4}}>
+                          REPORT TIME
+                        </label>
+                        <input
+                          type="time"
+                          value={xiReportTime}
+                          onChange={e => {
+                            setXiReportTime(e.target.value);
+                            setXiReportTimeUserTouched(true);
+                          }}
+                          style={{
+                            width: "100%", padding: "8px 10px", borderRadius: 8,
+                            border: `1px solid ${G.border}`, fontSize: 14, fontFamily: "inherit",
+                            boxSizing: "border-box"
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
-                  
-                  <div style={{marginBottom: 10}}>
-                    <label style={{fontSize: 11, fontWeight: 700, color: G.muted, display: "block", marginBottom: 4}}>
-                      CAPTAIN'S NOTE
-                    </label>
+
+                  {/* CARD 2: Squad */}
+                  <div style={cardStyle}>
+                    <div style={cardHeaderStyle}>
+                      <span>Squad</span>
+                      <span style={{textTransform: "none", letterSpacing: 0, fontSize: 12, fontWeight: 800}}>
+                        <span style={{color: tc.border}}>{xiSelection.length}</span>
+                        <span style={{color: G.muted, fontWeight: 600}}> of {roster.length} selected</span>
+                      </span>
+                    </div>
+                    {roster.length === 0 ? (
+                      <div style={{padding: 20, textAlign: "center", color: G.muted, fontSize: 13}}>
+                        No players assigned to this team yet
+                      </div>
+                    ) : (
+                      <div style={{position: "relative"}}>
+                        <div style={{
+                          position: "absolute", top: 0, left: 1, right: 1, height: 16,
+                          background: `linear-gradient(${tc.bg}, rgba(255,255,255,0))`,
+                          pointerEvents: "none", zIndex: 2,
+                          borderTopLeftRadius: 9, borderTopRightRadius: 9
+                        }}/>
+                        <div style={{
+                          maxHeight: "min(400px, 55vh)", overflowY: "auto",
+                          border: `1.5px solid ${tc.border}`,
+                          borderRadius: 10, background: tc.bg,
+                          scrollbarWidth: "thin",
+                          WebkitOverflowScrolling: "touch"
+                        }}>
+                          {roster.map((player, rowIdx) => {
+                            const selected = xiSelection.includes(player.name);
+                            const idx = xiSelection.indexOf(player.name);
+                            const isC = xiRoles.captain === player.name;
+                            const isVC = xiRoles.vc === player.name;
+                            const isWK = xiRoles.wk === player.name;
+                            const otherTeams = (player.teams || []).filter(t => t && t !== team?.name);
+                            const isLast = rowIdx === roster.length - 1;
+                            return (
+                              <div key={player.id} onClick={() => togglePlayer(player.name)} style={{
+                                display: "flex", alignItems: "center", gap: 10,
+                                minHeight: 44, padding: "8px 12px",
+                                background: selected ? "#dcfce7" : "#ffffff",
+                                borderLeft: selected ? `4px solid ${G.green}` : "4px solid transparent",
+                                borderBottom: isLast ? "none" : "1px solid rgba(0,0,0,0.06)",
+                                cursor: "pointer",
+                                transition: "background 0.12s"
+                              }}>
+                                <div style={{
+                                  width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
+                                  background: selected ? G.green : G.cream,
+                                  color: selected ? "#fff" : G.muted,
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  fontSize: 12, fontWeight: 800,
+                                }}>
+                                  {selected ? idx + 1 : initials(player.name)}
+                                </div>
+                                <div style={{flex: 1, minWidth: 0}}>
+                                  <div style={{
+                                    fontWeight: 600, fontSize: 14, color: G.text, lineHeight: 1.2,
+                                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
+                                  }}>
+                                    {player.name}
+                                  </div>
+                                  {otherTeams.length > 0 && (
+                                    <div style={{display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap"}}>
+                                      {otherTeams.slice(0, 3).map(otName => {
+                                        const oc = getTeamCardColors(otName);
+                                        return (
+                                          <span key={otName} style={{
+                                            background: oc.badgeBg, color: oc.badgeText,
+                                            fontSize: 9, fontWeight: 700, letterSpacing: 0.3,
+                                            padding: "1px 6px", borderRadius: 999,
+                                          }}>{otName}</span>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                                {selected && (
+                                  <div style={{display: "flex", gap: 4, flexShrink: 0}} onClick={e => e.stopPropagation()}>
+                                    <button onClick={() => setRole("captain", player.name)} style={{
+                                      width: 28, height: 28, borderRadius: 6,
+                                      background: isC ? "#14532d" : G.white,
+                                      color: isC ? "#fff" : G.muted,
+                                      border: `1px solid ${isC ? "#14532d" : G.border}`,
+                                      fontSize: 10, fontWeight: 800, cursor: "pointer", fontFamily: "inherit"
+                                    }}>C</button>
+                                    <button onClick={() => setRole("vc", player.name)} style={{
+                                      width: 28, height: 28, borderRadius: 6,
+                                      background: isVC ? "#1e3a5f" : G.white,
+                                      color: isVC ? "#fff" : G.muted,
+                                      border: `1px solid ${isVC ? "#1e3a5f" : G.border}`,
+                                      fontSize: 10, fontWeight: 800, cursor: "pointer", fontFamily: "inherit"
+                                    }}>VC</button>
+                                    <button onClick={() => setRole("wk", player.name)} style={{
+                                      width: 28, height: 28, borderRadius: 6,
+                                      background: isWK ? "#7c2d12" : G.white,
+                                      color: isWK ? "#fff" : G.muted,
+                                      border: `1px solid ${isWK ? "#7c2d12" : G.border}`,
+                                      fontSize: 10, fontWeight: 800, cursor: "pointer", fontFamily: "inherit"
+                                    }}>WK</button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div style={{
+                          position: "absolute", bottom: 0, left: 1, right: 1, height: 16,
+                          background: `linear-gradient(rgba(255,255,255,0), ${tc.bg})`,
+                          pointerEvents: "none", zIndex: 2,
+                          borderBottomLeftRadius: 9, borderBottomRightRadius: 9
+                        }}/>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* CARD 3: Roles */}
+                  <div style={cardStyle}>
+                    <div style={cardHeaderStyle}>Captain &amp; wicketkeeper</div>
+                    <div style={{display: "flex", flexDirection: "column", gap: 6}}>
+                      {[
+                        {key: "captain", label: "CAPTAIN",      color: "#14532d"},
+                        {key: "vc",      label: "VICE-CAPTAIN", color: "#1e3a5f"},
+                        {key: "wk",      label: "WICKETKEEPER", color: "#7c2d12"},
+                      ].map(r => {
+                        const name = xiRoles[r.key];
+                        return (
+                          <div key={r.key} style={{
+                            display: "flex", alignItems: "center", gap: 10,
+                            padding: "8px 10px", borderRadius: 8,
+                            background: name ? G.cream : "transparent",
+                            border: `1px solid ${name ? G.border : "transparent"}`,
+                          }}>
+                            <span style={{
+                              fontSize: 9, fontWeight: 800, letterSpacing: 0.5,
+                              padding: "3px 7px", borderRadius: 6,
+                              background: r.color, color: "#fff", flexShrink: 0,
+                            }}>{r.label}</span>
+                            <span style={{flex: 1, fontSize: 13, fontWeight: name ? 700 : 500, color: name ? G.text : G.muted}}>
+                              {name || "— not picked yet"}
+                            </span>
+                            {name && (
+                              <button onClick={() => setRole(r.key, name)} style={{
+                                background: "transparent", border: "none", cursor: "pointer",
+                                fontSize: 18, color: G.muted, padding: "0 4px", lineHeight: 1, fontFamily: "inherit"
+                              }} title="Clear">×</button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{fontSize: 11, color: G.muted, marginTop: 8, lineHeight: 1.4}}>
+                      Tap C / VC / WK on a selected player above to assign roles.
+                    </div>
+                  </div>
+
+                  {/* CARD 4: Notes */}
+                  <div style={cardStyle}>
+                    <div style={cardHeaderStyle}>Captain&apos;s note</div>
                     <textarea
                       value={xiNote}
                       onChange={e => setXiNote(e.target.value)}
@@ -9636,12 +9745,11 @@ export default function App() {
                       style={{
                         width: "100%", padding: "10px 12px", borderRadius: 8,
                         border: `1px solid ${G.border}`, fontSize: 14, fontFamily: "inherit",
-                        resize: "vertical", minHeight: 70
+                        resize: "vertical", minHeight: 70, boxSizing: "border-box"
                       }}
                     />
-                    {/* Use template picker */}
                     {noteTemplates.length > 0 && (
-                      <div style={{position: "relative", marginTop: 6}}>
+                      <div style={{position: "relative", marginTop: 8}}>
                         <button
                           onClick={() => setTemplatePickerOpen(o => !o)}
                           style={{
@@ -9684,21 +9792,14 @@ export default function App() {
                       </div>
                     )}
                   </div>
-                  
-                  {/* Venue info */}
-                  {venue && (
-                    <div style={{fontSize: 12, color: G.muted, marginBottom: 10}}>
-                      📍 {venue.name} — {venue.address}
-                    </div>
-                  )}
                 </div>
-                
-                {/* Action buttons */}
+
+                {/* Sticky footer with action buttons */}
                 <div style={{
-                  padding: "12px 16px", paddingBottom: "max(16px, env(safe-area-inset-bottom))",
-                  borderTop: `1px solid ${G.border}`
+                  borderTop: `1px solid ${G.border}`, background: G.white,
+                  padding: "14px 16px",
+                  paddingBottom: "max(14px, env(safe-area-inset-bottom))",
                 }}>
-                  {/* Top row: Save Draft */}
                   <button onClick={() => {
                     handleSaveSelection(matchId, false);
                   }} style={{
@@ -9709,30 +9810,25 @@ export default function App() {
                   }}>
                     <span>📝</span> Save Draft ({xiSelection.length} players)
                   </button>
-                  
-                  {/* Bottom row: Finalize + WhatsApp */}
                   <div style={{display: "flex", gap: 10}}>
-                    <button 
+                    <button
                       onClick={() => handleSaveSelection(matchId, true)}
                       disabled={xiSelection.length !== 11}
                       style={{
                         flex: 1, padding: "12px", borderRadius: 10,
                         background: xiSelection.length === 11 ? G.green : G.border,
                         color: "#fff", border: "none",
-                        fontWeight: 800, fontSize: 14, 
-                        cursor: xiSelection.length === 11 ? "pointer" : "not-allowed", 
+                        fontWeight: 800, fontSize: 14,
+                        cursor: xiSelection.length === 11 ? "pointer" : "not-allowed",
                         fontFamily: "inherit",
                         opacity: xiSelection.length === 11 ? 1 : 0.6
                       }}
                     >
                       {xiSelection.length === 11 ? "✓ Finalize XI" : `Need ${11 - xiSelection.length} more`}
                     </button>
-                    
                     {xiSelection.length === 11 && (
                       <button onClick={() => {
-                        // Save as finalized first
                         handleSaveSelection(matchId, true);
-                        // Then share
                         const sel = {
                           players: xiSelection,
                           captain: xiRoles.captain,
@@ -9743,7 +9839,6 @@ export default function App() {
                           matchTime: xiMatchTime,
                         };
                         const msg = generateWhatsAppMessage(match, sel);
-                        // Check if mobile
                         if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
                           openWhatsApp(msg);
                         } else {
