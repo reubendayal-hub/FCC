@@ -320,6 +320,15 @@ const PRESET_POLL = [
   {id:"mixed",    label:"⚡ Mixed"},
 ];
 
+// ─── Seed note templates (Captain XI shared club templates) ───
+const SEED_NOTE_TEMPLATES = [
+  "Please arrive at least 30 minutes before reporting time for warm-up and team talk.",
+  "Bowlers — please be ready for 10 minutes of bowling drills before the match.",
+  "Fielders — we'll do 15 minutes of catching practice before the toss. Don't be late.",
+  "Bring your full kit including helmet, pads, gloves, and box. Spare gear may not be available.",
+  "Lunch and water provided. Bring your own snacks if needed for between innings.",
+];
+
 // Roles available to assign based on team type — now uses dynamic seniorTeamNames inside component
 
 // ─── Seed members ─────────────────────────────────────────────
@@ -2322,7 +2331,7 @@ function BotNav({view,setView,userRole,pendingCount=0,currentUser=null,teams=[]}
   );
 
   // Calculate number of tabs: Schedule + Book + Profile = 3 base, + Coach HQ, + Captain XI, + Admin
-  const tabCount = 3 + (isCoach ? 1 : 0) + (isCaptain ? 1 : 0) + (isAdmin ? 1 : 0);
+  const tabCount = 3 + (isCoach ? 1 : 0) + ((isCaptain || isAdmin) ? 1 : 0) + (isAdmin ? 1 : 0);
   
   return (
     <div className="fcc-mobile-only" style={{
@@ -2381,7 +2390,7 @@ function BotNav({view,setView,userRole,pendingCount=0,currentUser=null,teams=[]}
       {isCoach && (
         <Tab id="coachhq" icon={<IconCoach on={active==="coachhq"}/>} label="Coach HQ"/>
       )}
-      {isCaptain && (
+      {(isCaptain || isAdmin) && (
         <Tab id="captainxi" icon={<IconCaptain on={active==="captainxi"}/>} label="Captain"/>
       )}
       {isAdmin && (
@@ -2420,7 +2429,7 @@ function SidebarNav({view, setView, userRole, currentUser, onLogout, teams=[]}) 
         {navBtn("schedule","📅","Schedule")}
         {navBtn("add","＋","Book / Join")}
         {(isAdmin || isCoachMember(currentUser?.name,teams)) && navBtn("coachhq","🧢","Coach HQ")}
-        {isCaptain && navBtn("captainxi","⚓","Captain's XI")}
+        {(isCaptain || isAdmin) && navBtn("captainxi","⚓","Captain's XI")}
         {isAdmin && navBtn("admin","👥","Admin Panel")}
         {(isAdmin || isCoachMember(currentUser?.name,[])) && navBtn("availability","📊","Team Availability")}
         {navBtn("profile","👤","My Profile")}
@@ -2616,6 +2625,13 @@ export default function App() {
   const [xiReportTime, setXiReportTime] = useState("");
   const [xiMatchTime, setXiMatchTime] = useState("");
   const [xiReportTimeUserTouched, setXiReportTimeUserTouched] = useState(false);
+  // Captain note templates (shared club-wide)
+  const [noteTemplates, setNoteTemplates] = useState([]);
+  const [templatesModalOpen, setTemplatesModalOpen] = useState(false);
+  const [templateEditingId, setTemplateEditingId] = useState(null);
+  const [templateEditingText, setTemplateEditingText] = useState("");
+  const [templateNewText, setTemplateNewText] = useState("");
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   // Admin section collapse — true = open. Members+AddMember open by default, rest collapsed
   const [adminSec, setAdminSec] = useState({
     members:true, addmember:true, groups:false,
@@ -2744,10 +2760,11 @@ export default function App() {
       playerprogress:doc(db,"fccnets","playerprogress"),// {playerId: {snapshots, currentPhase}}
       coachoverrides:doc(db,"fccnets","coachoverrides"),// {date-sessionId: {newCoach, oldCoach}}
       matchselections:doc(db,"fccnets","matchselections"),// {matchId: {players, captain, vc, wk, note, reportTime}}
+      notetemplates:doc(db,"fccnets","captainnotes_templates"), // [{id, text, createdBy, createdAt, updatedAt}]
     };
     (async()=>{
       try {
-        const [sr,mr,pr,tr,rr,br,ir,jr,ar,rlr,csr,spr,attr,snr,ppr,cor,msr] = await Promise.all([
+        const [sr,mr,pr,tr,rr,br,ir,jr,ar,rlr,csr,spr,attr,snr,ppr,cor,msr,ntr] = await Promise.all([
           getDoc(refs.sessions),
           getDoc(refs.members),
           getDoc(refs.pins),
@@ -2765,6 +2782,7 @@ export default function App() {
           getDoc(refs.playerprogress),
           getDoc(refs.coachoverrides),
           getDoc(refs.matchselections),
+          getDoc(refs.notetemplates),
         ]);
         // Sessions MUST be loaded before setLoading(false) so sessionsRef is
         // populated before the recurring useEffect runs — prevents lifts being wiped
@@ -2805,9 +2823,24 @@ export default function App() {
         setPlayerProgress( ppr.exists() ? JSON.parse(ppr.data().value) : {});
         setCoachOverrides( cor.exists() ? JSON.parse(cor.data().value) : {});
         setMatchSelections(msr.exists() ? JSON.parse(msr.data().value) : {});
+        // Note templates: seed Firestore on first load if doc is missing
+        if (ntr.exists()) {
+          setNoteTemplates(JSON.parse(ntr.data().value));
+        } else {
+          const nowIso = new Date().toISOString();
+          const seeded = SEED_NOTE_TEMPLATES.map((text, i) => ({
+            id: `seed-${i+1}`,
+            text,
+            createdBy: "system",
+            createdAt: nowIso,
+            updatedAt: nowIso,
+          }));
+          setNoteTemplates(seeded);
+          setDoc(doc(db,"fccnets","captainnotes_templates"), {value: JSON.stringify(seeded)}).catch(()=>{});
+        }
       } catch(e) {
         setMembers(SEED_MEMBERS.map(normMember)); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]); recurringRef.current=[]; setBlockCals([]); setInviteCodes({}); setJoinRequests([]); setAuditLog([]); setReminderLogs([]); setCancelledSessions([]);
-        setAllAttendance({}); setAllSessionNotes([]); setPlayerProgress({}); setCoachOverrides({}); setMatchSelections({});
+        setAllAttendance({}); setAllSessionNotes([]); setPlayerProgress({}); setCoachOverrides({}); setMatchSelections({}); setNoteTemplates([]);
       }
       setLoading(false);
     })();
@@ -2864,6 +2897,7 @@ export default function App() {
   const savePlayerProgress  = async u => { setPlayerProgress(u);  await setDoc(doc(db,"fccnets","playerprogress"), {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveCoachOverrides  = async u => { setCoachOverrides(u);  await setDoc(doc(db,"fccnets","coachoverrides"), {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveMatchSelections = async u => { setMatchSelections(u); await setDoc(doc(db,"fccnets","matchselections"), {value:JSON.stringify(u)}).catch(()=>{});};
+  const saveNoteTemplates   = async u => { setNoteTemplates(u);   await setDoc(doc(db,"fccnets","captainnotes_templates"), {value:JSON.stringify(u)}).catch(()=>{});};
 
   // ── Audit log ─────────────────────────────────────────────────
   // Cap at 500 entries; newest first. Only superadmin can read.
@@ -9289,6 +9323,21 @@ export default function App() {
         )}
         
         <div style={{padding:"16px",paddingBottom:120}}>
+          {/* Manage note templates */}
+          <div style={{marginBottom: 16}}>
+            <button
+              onClick={() => setTemplatesModalOpen(true)}
+              style={{
+                padding: "8px 14px", borderRadius: 999,
+                border: `1px solid ${G.border}`, background: G.white,
+                fontSize: 13, fontWeight: 700, color: G.text,
+                cursor: "pointer", fontFamily: "inherit",
+                display: "inline-flex", alignItems: "center", gap: 6,
+              }}
+            >
+              📝 Manage note templates
+            </button>
+          </div>
           {visibleTeams.length === 0 ? (
             <div style={{textAlign:"center",padding:40,color:G.muted}}>
               <div style={{fontSize:48,marginBottom:16}}>⚓</div>
@@ -9574,7 +9623,7 @@ export default function App() {
                     <label style={{fontSize: 11, fontWeight: 700, color: G.muted, display: "block", marginBottom: 4}}>
                       CAPTAIN'S NOTE
                     </label>
-                    <textarea 
+                    <textarea
                       value={xiNote}
                       onChange={e => setXiNote(e.target.value)}
                       placeholder="e.g. Arrive 30 mins early for warm-up. Stay hydrated and bring snacks."
@@ -9585,6 +9634,50 @@ export default function App() {
                         resize: "vertical", minHeight: 70
                       }}
                     />
+                    {/* Use template picker */}
+                    {noteTemplates.length > 0 && (
+                      <div style={{position: "relative", marginTop: 6}}>
+                        <button
+                          onClick={() => setTemplatePickerOpen(o => !o)}
+                          style={{
+                            padding: "5px 12px", borderRadius: 999,
+                            border: `1px solid ${G.border}`, background: G.white,
+                            fontSize: 12, fontWeight: 700, color: G.text,
+                            cursor: "pointer", fontFamily: "inherit",
+                          }}
+                        >
+                          Use template ▾
+                        </button>
+                        {templatePickerOpen && (
+                          <div style={{
+                            position: "absolute", top: "100%", left: 0, marginTop: 4,
+                            background: G.white, border: `1px solid ${G.border}`, borderRadius: 10,
+                            boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 10,
+                            maxHeight: 280, overflowY: "auto", minWidth: 260, maxWidth: "90vw",
+                          }}>
+                            {noteTemplates.map(t => (
+                              <button
+                                key={t.id}
+                                onClick={() => {
+                                  if (xiNote && !confirm("Replace current notes?")) return;
+                                  setXiNote(t.text);
+                                  setTemplatePickerOpen(false);
+                                }}
+                                style={{
+                                  display: "block", width: "100%", textAlign: "left",
+                                  padding: "10px 12px", border: "none",
+                                  borderBottom: `1px solid ${G.border}`,
+                                  background: G.white, cursor: "pointer", fontFamily: "inherit",
+                                  fontSize: 13, color: G.text, lineHeight: 1.4,
+                                }}
+                              >
+                                {t.text.length > 80 ? t.text.slice(0, 80) + "…" : t.text}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   
                   {/* Venue info */}
@@ -9666,7 +9759,174 @@ export default function App() {
             </div>
           );
         })()}
-        
+
+        {/* Note Templates Management Modal */}
+        {templatesModalOpen && (() => {
+          const truncate30 = s => (s.length > 30 ? s.slice(0,30) + "..." : s);
+          const handleAdd = () => {
+            const text = templateNewText.trim();
+            if (!text) return;
+            const nowIso = new Date().toISOString();
+            const t = {
+              id: uid(),
+              text,
+              createdBy: currentUser?.name || "unknown",
+              createdAt: nowIso,
+              updatedAt: nowIso,
+            };
+            saveNoteTemplates([...noteTemplates, t]);
+            logAction("template", `Added note template: "${truncate30(text)}"`);
+            setTemplateNewText("");
+          };
+          const handleEditSave = (id) => {
+            const text = templateEditingText.trim();
+            if (!text) return;
+            const updated = noteTemplates.map(t =>
+              t.id === id ? { ...t, text, updatedAt: new Date().toISOString() } : t
+            );
+            saveNoteTemplates(updated);
+            logAction("template", `Edited note template: "${truncate30(text)}"`);
+            setTemplateEditingId(null);
+            setTemplateEditingText("");
+          };
+          const handleDelete = (t) => {
+            if (!confirm(`Delete this template?\n\n"${truncate30(t.text)}"`)) return;
+            saveNoteTemplates(noteTemplates.filter(x => x.id !== t.id));
+            logAction("template", `Deleted note template: "${truncate30(t.text)}"`);
+          };
+          return (
+            <div style={{
+              position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+              zIndex: 1000, display: "flex", alignItems: "flex-end", justifyContent: "center"
+            }} onClick={() => { setTemplatesModalOpen(false); setTemplateEditingId(null); }}>
+              <div style={{
+                background: G.white, borderRadius: "20px 20px 0 0", width: "100%", maxWidth: 500,
+                maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column"
+              }} onClick={e => e.stopPropagation()}>
+                {/* Header */}
+                <div style={{
+                  background: G.green, color: "#fff", padding: "16px 20px",
+                  display: "flex", alignItems: "center", justifyContent: "space-between"
+                }}>
+                  <div>
+                    <div style={{fontWeight: 800, fontSize: 15}}>Note templates</div>
+                    <div style={{fontSize: 12, opacity: 0.85, marginTop: 2}}>Shared across all captains and VCs</div>
+                  </div>
+                  <button onClick={() => { setTemplatesModalOpen(false); setTemplateEditingId(null); }} style={{
+                    background: "rgba(255,255,255,0.2)", border: "none", borderRadius: "50%",
+                    width: 32, height: 32, cursor: "pointer", color: "#fff", fontSize: 18
+                  }}>×</button>
+                </div>
+
+                {/* Template list */}
+                <div style={{flex: 1, overflowY: "auto", padding: "12px 16px"}}>
+                  {noteTemplates.length === 0 ? (
+                    <div style={{textAlign: "center", padding: 20, color: G.muted, fontSize: 13}}>
+                      No templates yet.
+                    </div>
+                  ) : (
+                    noteTemplates.map(t => (
+                      <div key={t.id} style={{
+                        background: G.cream, border: `1px solid ${G.border}`, borderRadius: 10,
+                        padding: 12, marginBottom: 10,
+                      }}>
+                        {templateEditingId === t.id ? (
+                          <>
+                            <textarea
+                              value={templateEditingText}
+                              onChange={e => setTemplateEditingText(e.target.value)}
+                              rows={3}
+                              style={{
+                                width: "100%", padding: "8px 10px", borderRadius: 8,
+                                border: `1px solid ${G.border}`, fontSize: 13, fontFamily: "inherit",
+                                resize: "vertical", marginBottom: 8,
+                              }}
+                            />
+                            <div style={{display: "flex", gap: 8, justifyContent: "flex-end"}}>
+                              <button
+                                onClick={() => { setTemplateEditingId(null); setTemplateEditingText(""); }}
+                                style={{
+                                  padding: "6px 12px", borderRadius: 8,
+                                  border: `1px solid ${G.border}`, background: G.white,
+                                  fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                                }}
+                              >Cancel</button>
+                              <button
+                                onClick={() => handleEditSave(t.id)}
+                                disabled={!templateEditingText.trim()}
+                                style={{
+                                  padding: "6px 12px", borderRadius: 8,
+                                  border: "none", background: G.green, color: "#fff",
+                                  fontSize: 12, fontWeight: 700, fontFamily: "inherit",
+                                  cursor: templateEditingText.trim() ? "pointer" : "not-allowed",
+                                  opacity: templateEditingText.trim() ? 1 : 0.6,
+                                }}
+                              >Save</button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div style={{fontSize: 13, color: G.text, lineHeight: 1.5, marginBottom: 8, whiteSpace: "pre-wrap"}}>
+                              {t.text}
+                            </div>
+                            <div style={{display: "flex", gap: 8, justifyContent: "flex-end"}}>
+                              <button
+                                onClick={() => { setTemplateEditingId(t.id); setTemplateEditingText(t.text); }}
+                                style={{
+                                  padding: "5px 10px", borderRadius: 8,
+                                  border: `1px solid ${G.border}`, background: G.white,
+                                  fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                                }}
+                              >✏️ Edit</button>
+                              <button
+                                onClick={() => handleDelete(t)}
+                                style={{
+                                  padding: "5px 10px", borderRadius: 8,
+                                  border: "1px solid #fecaca", background: "#fef2f2", color: "#b91c1c",
+                                  fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                                }}
+                              >🗑️ Delete</button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Add new template */}
+                <div style={{borderTop: `1px solid ${G.border}`, padding: "12px 16px", background: G.white}}>
+                  <label style={{fontSize: 11, fontWeight: 700, color: G.muted, display: "block", marginBottom: 4}}>
+                    ADD NEW TEMPLATE
+                  </label>
+                  <textarea
+                    value={templateNewText}
+                    onChange={e => setTemplateNewText(e.target.value)}
+                    placeholder="e.g. Bring extra bottles of water — ground temperature can be high."
+                    rows={2}
+                    style={{
+                      width: "100%", padding: "8px 10px", borderRadius: 8,
+                      border: `1px solid ${G.border}`, fontSize: 13, fontFamily: "inherit",
+                      resize: "vertical", marginBottom: 8,
+                    }}
+                  />
+                  <button
+                    onClick={handleAdd}
+                    disabled={!templateNewText.trim()}
+                    style={{
+                      width: "100%", padding: "10px", borderRadius: 8,
+                      border: "none", background: G.green, color: "#fff",
+                      fontSize: 13, fontWeight: 800, fontFamily: "inherit",
+                      cursor: templateNewText.trim() ? "pointer" : "not-allowed",
+                      opacity: templateNewText.trim() ? 1 : 0.6,
+                    }}
+                  >+ Add template</button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         <BotNav view={view} setView={setView} userRole={userRole} pendingCount={joinRequests.length} currentUser={currentUser} teams={teams}/>
       </Shell>
     );
