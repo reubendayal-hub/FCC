@@ -9192,9 +9192,14 @@ export default function App() {
       msg += `\n📅 ${fmtLong(match.date)}\n`;
       msg += `📍 ${venue ? `${venue.name}, ${venue.address}` : (match.home ? "Karlebo Cricket Ground, Karlebovej 23, 3480 Fredensborg" : "Away")}\n`;
       const displayMatchTime = matchTime || (match.label.includes("T20") ? "TBD" : "11:00");
-      msg += `⏰ Match: ${displayMatchTime}`;
-      if (reportTime) msg += ` · Report: ${reportTime}`;
-      msg += `\n`;
+      if (reportTime) {
+        msg += `⏰ Reporting time: ${reportTime}\n`;
+        msg += `🏏 Match starts: ${displayMatchTime}\n`;
+      } else if (displayMatchTime !== "TBD") {
+        msg += `⏰ Match: ${displayMatchTime}\n`;
+      } else {
+        msg += `⏰ Match time: TBD\n`;
+      }
       
       if (note) {
         msg += `\n${note}\n`;
