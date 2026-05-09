@@ -27,6 +27,17 @@ import {
 } from "./utils/members";
 import { netAvailGauge } from "./utils/sessions";
 import { makeICS, waMsg } from "./utils/ics";
+// ─── Pass 2 modularisation: dumb UI components ────────────────
+import Btn from "./ui/Btn";
+import Toast from "./ui/Toast";
+import SLbl from "./ui/SLbl";
+import FFld from "./ui/FFld";
+import BackBtn from "./ui/BackBtn";
+import { GroupIcon, NetIcon, BothNetsIcon } from "./ui/icons";
+import { RolePill, TeamPill, MemberRolePills } from "./ui/pills";
+import ProfileDial from "./ui/ProfileDial";
+import AvailGauge from "./ui/AvailGauge";
+import PinPad from "./ui/PinPad";
 // ─── Club Logo ───────────────────────────────────────────────
 const FCC_LOGO = "data:image/png;base64,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";
 
@@ -608,34 +619,6 @@ const normMember = m => ({
 });
 
 // SVG arc dial
-function ProfileDial({ pct }) {
-  const r = 36, cx = 44, cy = 44, stroke = 7;
-  const circumference = Math.PI * r; // half circle
-  const arc = circumference * (pct / 100);
-  const color = pct === 100 ? "#16a34a" : pct >= 50 ? "#f59e0b" : "#ef4444";
-  return (
-    <svg width="88" height="54" viewBox="0 0 88 54">
-      {/* Track */}
-      <path d={`M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}`}
-        fill="none" stroke="#e5e7eb" strokeWidth={stroke} strokeLinecap="round"/>
-      {/* Fill */}
-      <path d={`M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}`}
-        fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
-        strokeDasharray={`${arc} ${circumference}`}/>
-      {/* % text */}
-      <text x={cx} y={cy-4} textAnchor="middle"
-        style={{fontSize:15,fontWeight:900,fontFamily:"'DM Sans',sans-serif",fill:color}}>
-        {pct}%
-      </text>
-      <text x={cx} y={cy+10} textAnchor="middle"
-        style={{fontSize:9,fontWeight:700,fontFamily:"'DM Sans',sans-serif",fill:"#94a3b8",
-          letterSpacing:1,textTransform:"uppercase"}}>
-        complete
-      </text>
-    </svg>
-  );
-}
-
 // ════════════════════════════════════════════════════════════
 // FamilyManager Component - Link/Unlink children to parent account
 // ════════════════════════════════════════════════════════════
@@ -855,172 +838,8 @@ const iSt = (extra={}) => ({
 });
 
 // ─── Atoms ────────────────────────────────────────────────────
-const RolePill = ({role}) => {
-  const m=ROLE_META[role]||ROLE_META.member;
-  return <span style={{background:m.bg,color:m.text,borderRadius:20,padding:"2px 9px",
-    fontSize:11,fontWeight:800}}>{m.icon} {m.label}</span>;
-};
-
-// MemberRolePills — renders all role chips for a member
-const MemberRolePills = ({member, teams, sm}) => {
-  const chips = getMemberRoleChips(member, teams);
-  if(!chips.length) return null;
-  return (<>
-    {chips.map(c=>(
-      <span key={c.key} style={{
-        background:c.bg, color:c.text, borderRadius:20,
-        padding:sm?"1px 6px":"2px 9px",
-        fontSize:sm?9:11, fontWeight:800,
-        display:"inline-flex", alignItems:"center", gap:3,
-        whiteSpace:"nowrap",
-      }}>
-        {c.icon} {c.label}
-      </span>
-    ))}
-  </>);
-};
-
-const TeamPill = ({team,sm}) => {
-  const m=getTeamMeta(team||"Unassigned");
-  return <span style={{background:m.bg,color:m.text,borderRadius:20,
-    padding:sm?"1px 7px":"2px 9px",fontSize:sm?10:11,fontWeight:800}}>{team||"Unassigned"}</span>;
-};
-
-const Toast = ({msg}) => (
-  <div style={{position:"fixed",bottom:88,left:"50%",transform:"translateX(-50%)",
-    background:G.green,color:G.lime,borderRadius:30,padding:"9px 22px",
-    fontSize:14,fontWeight:800,zIndex:9999,whiteSpace:"nowrap",
-    boxShadow:"0 6px 24px rgba(0,0,0,.22)"}}>
-    {msg}
-  </div>
-);
-
-const SLbl = ({children,mt=16}) => (
-  <div style={{fontSize:13,fontWeight:900,letterSpacing:.5,textTransform:"uppercase",
-    color:G.mid,marginBottom:8,marginTop:mt,display:"flex",alignItems:"center",gap:8}}>
-    <span style={{flex:1}}>{children}</span>
-    <span style={{display:"block",height:1,flex:1,background:G.border}}/>
-  </div>
-);
-
-const FFld = ({label,children,style}) => (
-  <div style={style}>
-    <div style={{fontSize:10,fontWeight:800,letterSpacing:1.5,textTransform:"uppercase",
-      color:G.mid,marginBottom:4}}>{label}</div>
-    {children}
-  </div>
-);
-
-const BackBtn = ({onClick}) => (
-  <button onClick={onClick} style={{background:"rgba(255,255,255,0.15)",border:"none",
-    borderRadius:8,color:"#fff",padding:"7px 14px",fontFamily:"inherit",
-    fontSize:14,fontWeight:800,cursor:"pointer",flexShrink:0}}>←</button>
-);
-
-const Btn = ({onClick,bg,col,children,full,sm,disabled,type="button"}) => (
-  <button type={type} onClick={onClick} disabled={disabled}
-    style={{background:disabled?"#ccc":bg,color:disabled?"#888":col,border:"none",
-      borderRadius:9,padding:sm?"6px 13px":"10px 18px",
-      fontFamily:"'DM Sans',sans-serif",fontWeight:800,fontSize:sm?12:14,
-      cursor:disabled?"not-allowed":"pointer",width:full?"100%":"auto",
-      opacity:disabled ? 0.7 : 1,transition:"opacity .15s"}}>
-    {children}
-  </button>
-);
-
-// ─── PIN pad ──────────────────────────────────────────────────
-function PinPad({ label, onDone, onCancel, error }) {
-  const [val, setVal] = useState("");
-  const inputRef = React.useRef(null);
-  const add = d => { if(val.length<4) setVal(v=>v+d); };
-  const del = () => setVal(v=>v.slice(0,-1));
-  useEffect(() => { if(val.length===4) onDone(val); }, [val]);
-
-  // Focus hidden input on mount so keyboard works immediately
-  useEffect(() => { inputRef.current?.focus(); }, []);
-
-  const handleKey = e => {
-    if(e.key>="0"&&e.key<="9") add(e.key);
-    else if(e.key==="Backspace") del();
-  };
-
-  return (
-    <div style={{textAlign:"center",padding:"60px 20px 24px"}}
-      onClick={()=>inputRef.current?.focus()}>
-      {/* Hidden input captures physical keyboard on mobile & desktop */}
-      <input ref={inputRef} type="tel" inputMode="numeric" pattern="[0-9]*"
-        value={val} readOnly
-        onKeyDown={handleKey}
-        style={{position:"absolute",opacity:0,width:1,height:1,pointerEvents:"none"}}/>
-      <div style={{fontSize:15,fontWeight:800,color:G.text,marginBottom:24}}>{label}</div>
-      {/* dots */}
-      <div style={{display:"flex",justifyContent:"center",gap:14,marginBottom:32}}>
-        {[0,1,2,3].map(i=>(
-          <div key={i} style={{width:18,height:18,borderRadius:"50%",
-            background: val.length>i ? G.green : G.border,
-            border:`2px solid ${val.length>i?G.green:G.muted}`,
-            transition:"background .15s"}}/>
-        ))}
-      </div>
-      {error && <div style={{color:G.red,fontSize:13,fontWeight:700,marginBottom:12}}>{error}</div>}
-      {/* keypad */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,maxWidth:220,margin:"0 auto"}}>
-        {[1,2,3,4,5,6,7,8,9,"",0,"⌫"].map((k,i)=>(
-          <button key={i} type="button"
-            onClick={()=>{ k==="⌫"?del():k!==""?add(String(k)):null; inputRef.current?.focus(); }}
-            style={{background: k===""?"transparent":G.white,
-              border: k===""?"none":`1.5px solid ${G.border}`,
-              borderRadius:12,padding:"16px 8px",fontSize:20,fontWeight:700,
-              cursor:k===""?"default":"pointer",color:G.text,fontFamily:"inherit",
-              boxShadow: k===""?"none":"0 1px 4px rgba(0,0,0,.07)"}}>
-            {k}
-          </button>
-        ))}
-      </div>
-      {onCancel && (
-        <button type="button" onClick={onCancel} style={{marginTop:20,background:"transparent",
-          border:"none",color:G.muted,fontSize:14,fontWeight:700,cursor:"pointer",
-          fontFamily:"inherit"}}>Cancel</button>
-      )}
-    </div>
-  );
-}
 
 // ─── Availability gauge (arc dial) ───────────────────────────
-function AvailGauge({gauge,active}) {
-  const r=7,cx=10,cy=10,circ=2*Math.PI*r;
-  const arcLen=circ*0.75, filled=arcLen*(gauge.pct/100);
-  return (
-    <svg width="20" height="20" viewBox="0 0 20 20">
-      <circle cx={cx} cy={cy} r={r} fill="none"
-        stroke={active?"rgba(255,255,255,.15)":"#e5e7eb"} strokeWidth="3"
-        strokeDasharray={`${arcLen} ${circ-arcLen}`}
-        strokeDashoffset={circ*0.125} strokeLinecap="round"
-        transform={`rotate(135 ${cx} ${cy})`}/>
-      <circle cx={cx} cy={cy} r={r} fill="none"
-        stroke={active?(gauge.pct===0?"rgba(163,230,53,.8)":gauge.color):gauge.color}
-        strokeWidth="3"
-        strokeDasharray={`${filled} ${circ-filled}`}
-        strokeDashoffset={circ*0.125} strokeLinecap="round"
-        transform={`rotate(135 ${cx} ${cy})`}/>
-    </svg>
-  );
-}
-
-// ─── Group-of-people icon (3 silhouettes) ─────────────────────
-function GroupIcon({color,size=18}) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 20" fill={color}>
-      <circle cx="7"  cy="5" r="3.2"/>
-      <path d="M7 10c-3.5 0-5.5 1.6-5.5 3v2h11v-2c0-1.4-2-3-5.5-3z"/>
-      <circle cx="25" cy="5" r="3.2"/>
-      <path d="M25 10c-3.5 0-5.5 1.6-5.5 3v2h11v-2c0-1.4-2-3-5.5-3z"/>
-      <circle cx="16" cy="4" r="3.8"/>
-      <path d="M16 9.5c-4 0-6.5 1.8-6.5 3.2v2.3h13v-2.3c0-1.4-2.5-3.2-6.5-3.2z"/>
-    </svg>
-  );
-}
-
 // ─── Nets Timeline Strip ──────────────────────────────────────
 function NetsTimeline({sessions,netsDate,setNetsDate,setView,setBDate,setBFrom,setBTo,setBNet,blockCals=[]}) {
   // Build 14-day window starting today
@@ -1616,56 +1435,6 @@ function WeatherPage({wx,setView}) {
         )}
       </div>
     </div>
-  );
-}
-
-// ─── Cricket net SVG icons ────────────────────────────────────
-function NetIcon({color="currentColor",size=18}) {
-  // Single cricket net: post + netting rectangle
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
-      {/* Post */}
-      <line x1="4" y1="3" x2="4" y2="20"/>
-      {/* Top rail */}
-      <line x1="4" y1="4" x2="20" y2="4"/>
-      {/* Net frame */}
-      <rect x="4" y="4" width="16" height="12" rx="0.5" strokeWidth="1.8"/>
-      {/* Net grid — vertical */}
-      <line x1="9"  y1="4" x2="9"  y2="16" strokeWidth="0.9" strokeDasharray="0"/>
-      <line x1="14" y1="4" x2="14" y2="16" strokeWidth="0.9"/>
-      <line x1="19" y1="4" x2="19" y2="16" strokeWidth="0.9"/>
-      {/* Net grid — horizontal */}
-      <line x1="4" y1="8"  x2="20" y2="8"  strokeWidth="0.9"/>
-      <line x1="4" y1="12" x2="20" y2="12" strokeWidth="0.9"/>
-      {/* Ground line */}
-      <line x1="2" y1="20" x2="22" y2="20" strokeWidth="1.4"/>
-    </svg>
-  );
-}
-
-function BothNetsIcon({color="currentColor",size=18}) {
-  // Two nets side by side
-  return (
-    <svg width={size*1.5} height={size} viewBox="0 0 36 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
-      {/* Net 1 */}
-      <line x1="2"  y1="3" x2="2"  y2="20"/>
-      <rect x="2"  y="4" width="13" height="11" rx="0.5" strokeWidth="1.6"/>
-      <line x1="6"  y1="4" x2="6"  y2="15" strokeWidth="0.8"/>
-      <line x1="10" y1="4" x2="10" y2="15" strokeWidth="0.8"/>
-      <line x1="14" y1="4" x2="14" y2="15" strokeWidth="0.8"/>
-      <line x1="2"  y1="8"  x2="15" y2="8"  strokeWidth="0.8"/>
-      <line x1="2"  y1="12" x2="15" y2="12" strokeWidth="0.8"/>
-      {/* Net 2 */}
-      <line x1="21" y1="3" x2="21" y2="20"/>
-      <rect x="21" y="4" width="13" height="11" rx="0.5" strokeWidth="1.6"/>
-      <line x1="25" y1="4" x2="25" y2="15" strokeWidth="0.8"/>
-      <line x1="29" y1="4" x2="29" y2="15" strokeWidth="0.8"/>
-      <line x1="33" y1="4" x2="33" y2="15" strokeWidth="0.8"/>
-      <line x1="21" y1="8"  x2="34" y2="8"  strokeWidth="0.8"/>
-      <line x1="21" y1="12" x2="34" y2="12" strokeWidth="0.8"/>
-      {/* Ground */}
-      <line x1="1" y1="20" x2="35" y2="20" strokeWidth="1.4"/>
-    </svg>
   );
 }
 
@@ -4050,25 +3819,25 @@ export default function App() {
           {/* Your name (always shown — either player or parent) */}
           <div style={{background:"#fff",border:`1.5px solid ${G.border}`,borderRadius:12,
             padding:"14px 16px",display:"flex",flexDirection:"column",gap:10}}>
-            <FFld label={jrForChild ? "Your Name (Parent / Guardian)" : "Your Full Name"}>
+            <FFld G={G} label={jrForChild ? "Your Name (Parent / Guardian)" : "Your Full Name"}>
               <input placeholder={jrForChild ? "e.g. Priya Sharma" : "e.g. Arjun Sharma"}
                 style={iSt()} value={jrName}
                 onChange={e=>setJrName(e.target.value)}/>
             </FFld>
             {!jrForChild&&(
-              <FFld label="Your Team / Group">
+              <FFld G={G} label="Your Team / Group">
                 <select style={iSt()} value={jrTeam} onChange={e=>setJrTeam(e.target.value)}>
                   <option value="">— Select your team —</option>
                   {teamOptions.map(t=><option key={t} value={t}>{t}</option>)}
                 </select>
               </FFld>
             )}
-            <FFld label="Your Email">
+            <FFld G={G} label="Your Email">
               <input type="email" placeholder="your@email.com"
                 style={iSt()} value={jrContact}
                 onChange={e=>setJrContact(e.target.value)}/>
             </FFld>
-            <FFld label="Your Phone (optional)">
+            <FFld G={G} label="Your Phone (optional)">
               <input type="tel" placeholder="+45 XX XX XX XX"
                 style={iSt()} value={jrPhone||""}
                 onChange={e=>setJrPhone?.(e.target.value)}/>
@@ -4083,12 +3852,12 @@ export default function App() {
                 color:"#be185d",textTransform:"uppercase",marginBottom:2}}>
                 👶 Child's Details
               </div>
-              <FFld label="Child's Full Name">
+              <FFld G={G} label="Child's Full Name">
                 <input placeholder="Child's full name"
                   style={iSt()} value={jrChildName}
                   onChange={e=>setJrChildName(e.target.value)}/>
               </FFld>
-              <FFld label="Child's Team / Group">
+              <FFld G={G} label="Child's Team / Group">
                 <select style={iSt()} value={jrChildTeam} onChange={e=>setJrChildTeam(e.target.value)}>
                   <option value="">— Select team —</option>
                   <option value="unsure">I'm not sure</option>
@@ -5592,7 +5361,7 @@ export default function App() {
 
       </div>
       <BotNav view="schedule" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams}/>
-      {toast&&<Toast msg={toast}/>}
+      {toast&&<Toast msg={toast} G={G}/>}
 
       {carpoolSheetSess&&<CarpoolSheet
         sess={carpoolSheetSess}
@@ -5663,15 +5432,15 @@ export default function App() {
           </div>
         )}
         <form onSubmit={handleAddSession} style={{padding:"14px 16px 20px"}}>
-          <SLbl mt={4}>When?</SLbl>
+          <SLbl mt={4} G={G}>When?</SLbl>
           <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
             padding:14,marginBottom:12}}>
-            <FFld label="Date">
+            <FFld G={G} label="Date">
               <input type="date" style={iSt({fontSize:14,padding:"9px 10px"})} value={bDate}
                 min={todayStr()} onChange={e=>setBDate(e.target.value)} required/>
             </FFld>
             <div style={{display:"flex",gap:8,marginTop:10}}>
-              <FFld label="From" style={{flex:1}}>
+              <FFld G={G} label="From" style={{flex:1}}>
                 <div style={{display:"flex",gap:4}}>
                   <select style={iSt({flex:1,fontSize:13,padding:"9px 4px",textAlign:"center"})}
                     value={bFrom.split(":")[0]}
@@ -5700,7 +5469,7 @@ export default function App() {
                   </select>
                 </div>
               </FFld>
-              <FFld label="Until" style={{flex:1}}>
+              <FFld G={G} label="Until" style={{flex:1}}>
                 <div style={{display:"flex",gap:4}}>
                   <select style={iSt({flex:1,fontSize:13,padding:"9px 4px",textAlign:"center"})}
                     value={bTo.split(":")[0]}
@@ -5731,7 +5500,7 @@ export default function App() {
                 </div>
               </FFld>
             </div>
-            <FFld label="Net" style={{marginTop:10}}>
+            <FFld G={G} label="Net" style={{marginTop:10}}>
               <div style={{display:"flex",gap:8}}>
                 {[
                   ["1",  <><NetIcon color={bNet==="1"?G.lime:G.text} size={16}/> Net 1</>],
@@ -5782,7 +5551,7 @@ export default function App() {
                 </div>
               );
             })()}
-            <FFld label="Note (optional)" style={{marginTop:10}}>
+            <FFld G={G} label="Note (optional)" style={{marginTop:10}}>
               <input style={iSt()} placeholder="e.g. Bring extra balls"
                 value={bNote} onChange={e=>setBNote(e.target.value)}/>
             </FFld>
@@ -5874,7 +5643,7 @@ export default function App() {
             </div>
           )}
 
-          <SLbl>Who's coming? {selP.length>0&&`(${selP.length} selected)`}</SLbl>
+          <SLbl G={G}>Who's coming? {selP.length>0&&`(${selP.length} selected)`}</SLbl>
           {(["superadmin","admin","captain","vicecaptain"].includes(userRole))&&bRestrictTeam&&(
             <div style={{background:"#eff6ff",border:"1.5px solid #bfdbfe",borderRadius:8,
               padding:"8px 12px",marginBottom:10,fontSize:12,color:"#1e40af",lineHeight:1.5}}>
@@ -6051,7 +5820,7 @@ export default function App() {
           {/* Lift preference — only shown when current user is in the session */}
           {selP.includes(currentUser?.name) && (
             <div style={{marginBottom:14}}>
-              <SLbl>Your lift preference <span style={{fontWeight:500,color:G.muted}}>(optional)</span></SLbl>
+              <SLbl G={G}>Your lift preference <span style={{fontWeight:500,color:G.muted}}>(optional)</span></SLbl>
               <div style={{display:"flex",gap:8}}>
                 {[
                   {val:"offer", label:"🚘 I can offer a lift", activeCol:"#14532d", activeTxt:"#a3e635"},
@@ -6075,7 +5844,7 @@ export default function App() {
             </div>
           )}
 
-          <SLbl>Session Poll <span style={{fontWeight:500,color:G.muted}}>(optional)</span></SLbl>          <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
+          <SLbl G={G}>Session Poll <span style={{fontWeight:500,color:G.muted}}>(optional)</span></SLbl>          <div style={{background:G.white,borderRadius:12,border:`1.5px solid ${G.border}`,
             padding:14,marginBottom:14}}>
             {/* Preset options */}
             <div style={{fontSize:11,fontWeight:700,color:G.muted,textTransform:"uppercase",
@@ -6151,7 +5920,7 @@ export default function App() {
           </p>
         </form>
         <BotNav view="add" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams}/>
-        {toast&&<Toast msg={toast}/>}
+        {toast&&<Toast msg={toast} G={G}/>}
       </Shell>
     );
   }
@@ -6970,7 +6739,7 @@ export default function App() {
             </>
           )}
 
-          <SLbl mt={4}>Players ({selSess.players.length})</SLbl>
+          <SLbl mt={4} G={G}>Players ({selSess.players.length})</SLbl>
           {/* ── Persistent carpool section ─────────────────── */}
           {(userInTeam || selSess.players.includes(currentUser?.name))&&(()=>{
             const lifts=selSess.lifts||{};
@@ -7115,7 +6884,7 @@ export default function App() {
             const maxVotes = Math.max(...poll.map(o=>(o.votes||[]).length), 1);
             return (
               <div style={{marginBottom:20}}>
-                <SLbl mt={4}>Session Poll</SLbl>
+                <SLbl mt={4} G={G}>Session Poll</SLbl>
                 <div style={{background:G.white,borderRadius:12,
                   border:`1.5px solid ${G.border}`,padding:14}}>
                   <div style={{fontSize:11,color:G.muted,fontWeight:700,marginBottom:12,
@@ -7618,7 +7387,7 @@ export default function App() {
           })()}
         </div>
         <BotNav view="session" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams}/>
-        {toast&&<Toast msg={toast}/>}
+        {toast&&<Toast msg={toast} G={G}/>}
         {carpoolSheetSess&&<CarpoolSheet
           sess={carpoolSheetSess}
           sessions={sessions}
@@ -8191,13 +7960,13 @@ export default function App() {
             </div>
             {profileEditing ? (
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                <FFld label="Email address">
+                <FFld G={G} label="Email address">
                   <input type="email" placeholder="your@email.com"
                     style={iSt({padding:"9px 12px",fontSize:14})}
                     value={profileEmail}
                     onChange={e=>setProfileEmail(e.target.value)}/>
                 </FFld>
-                <FFld label="Phone / Mobile">
+                <FFld G={G} label="Phone / Mobile">
                   <input type="tel" placeholder="+45 12 34 56 78"
                     style={iSt({padding:"9px 12px",fontSize:14})}
                     value={profilePhone}
@@ -8400,19 +8169,19 @@ export default function App() {
             </div>
             {changingPin&&(
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                <FFld label="Current PIN">
+                <FFld G={G} label="Current PIN">
                   <input type="password" inputMode="numeric" maxLength={4}
                     placeholder="••••" style={iSt({padding:"9px 12px",fontSize:18,
                     letterSpacing:6,textAlign:"center"})}
                     value={oldPin} onChange={e=>setOldPin(e.target.value.replace(/\D/g,""))}/>
                 </FFld>
-                <FFld label="New PIN">
+                <FFld G={G} label="New PIN">
                   <input type="password" inputMode="numeric" maxLength={4}
                     placeholder="••••" style={iSt({padding:"9px 12px",fontSize:18,
                     letterSpacing:6,textAlign:"center"})}
                     value={newPin1} onChange={e=>setNewPin1(e.target.value.replace(/\D/g,""))}/>
                 </FFld>
-                <FFld label="Confirm new PIN">
+                <FFld G={G} label="Confirm new PIN">
                   <input type="password" inputMode="numeric" maxLength={4}
                     placeholder="••••" style={iSt({padding:"9px 12px",fontSize:18,
                     letterSpacing:6,textAlign:"center"})}
@@ -8867,7 +8636,7 @@ export default function App() {
 
         </div>
         <BotNav view="profile" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams}/>
-        {toast&&<Toast msg={toast}/>}
+        {toast&&<Toast msg={toast} G={G}/>}
       </Shell>
     );
   }
@@ -9024,7 +8793,7 @@ export default function App() {
 
         </div>
         <BotNav view="profile" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams}/>
-        {toast&&<Toast msg={toast}/>}
+        {toast&&<Toast msg={toast} G={G}/>}
       </Shell>
     );
   }
@@ -9121,7 +8890,7 @@ export default function App() {
         </div>
         <BotNav view="profile" setView={setView} userRole={userRole}
           pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams}/>
-        {toast&&<Toast msg={toast}/>}
+        {toast&&<Toast msg={toast} G={G}/>}
       </Shell>
     );
   }
@@ -10417,7 +10186,7 @@ export default function App() {
         </div>
         <BotNav view="schedule" setView={setView} userRole={userRole}
           pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams}/>
-        {toast&&<Toast msg={toast}/>}
+        {toast&&<Toast msg={toast} G={G}/>}
       </Shell>
     );
   }
@@ -10430,7 +10199,7 @@ export default function App() {
         <WeatherPage wx={wxData} setView={setView}/>
         <BotNav view="schedule" setView={setView} userRole={userRole}
           pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams}/>
-        {toast&&<Toast msg={toast}/>}
+        {toast&&<Toast msg={toast} G={G}/>}
       </Shell>
     );
   }
@@ -10881,14 +10650,14 @@ export default function App() {
               </div>
             </div>
             
-            <FFld label="Full Name">
+            <FFld G={G} label="Full Name">
               <input style={iSt()} placeholder={newMemberType==="parent"?"e.g. Priya Sharma (parent)":"e.g. Arjun Sharma"}
                 value={newName} onChange={e=>setNewName(e.target.value)} required/>
             </FFld>
 
             {/* Team only shown for players and children — parents have no team */}
             {newMemberType!=="parent"&&(
-              <FFld label="Group / Team">
+              <FFld G={G} label="Group / Team">
                 <select style={iSt()} value={newTeam} onChange={e=>setNewTeam(e.target.value)}>
                   {ALL_TEAMS.map(t=><option key={t} value={t}>{t}</option>)}
                 </select>
@@ -10897,7 +10666,7 @@ export default function App() {
             
             {/* Parent Selector — only for children, with improved filter and empty state */}
             {newMemberType==="child"&&(
-              <FFld label="Link to Parent Account">
+              <FFld G={G} label="Link to Parent Account">
                 {(()=>{
                   const parentOptions = members.filter(m =>
                     m.memberType==="parent" ||
@@ -10927,11 +10696,11 @@ export default function App() {
               </FFld>
             )}
             
-            <FFld label="Email (optional)">
+            <FFld G={G} label="Email (optional)">
               <input type="email" style={iSt()} placeholder="their@email.com"
                 value={newEmail} onChange={e=>setNewEmail(e.target.value)}/>
             </FFld>
-            <FFld label="Phone (optional)">
+            <FFld G={G} label="Phone (optional)">
               <input type="tel" style={iSt()} placeholder="+45 XX XX XX XX"
                 value={newPhone} onChange={e=>setNewPhone(e.target.value)}/>
             </FFld>
@@ -11574,21 +11343,21 @@ export default function App() {
                     🚫 Add a Blocked Date
                   </div>
                   <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                    <FFld label="Reason / Event name">
+                    <FFld G={G} label="Reason / Event name">
                       <input placeholder="e.g. Div 3 Home Match vs Svanholm"
                         style={iSt({padding:"9px 12px",fontSize:13})}
                         value={bCalLabel} onChange={e=>setBCalLabel(e.target.value)}/>
                     </FFld>
-                    <FFld label="Date">
+                    <FFld G={G} label="Date">
                       <input type="date" style={iSt({padding:"9px 12px",fontSize:13})}
                         value={bCalDate} onChange={e=>setBCalDate(e.target.value)}/>
                     </FFld>
                     <div style={{display:"flex",gap:8}}>
-                      <FFld label="From" style={{flex:1}}>
+                      <FFld G={G} label="From" style={{flex:1}}>
                         <input type="time" style={iSt({padding:"9px 12px",fontSize:13})}
                           value={bCalFrom} onChange={e=>setBCalFrom(e.target.value)}/>
                       </FFld>
-                      <FFld label="To" style={{flex:1}}>
+                      <FFld G={G} label="To" style={{flex:1}}>
                         <input type="time" style={iSt({padding:"9px 12px",fontSize:13})}
                           value={bCalTo} onChange={e=>setBCalTo(e.target.value)}/>
                       </FFld>
@@ -11792,12 +11561,12 @@ export default function App() {
                         </div>
                       </div>
                       <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                        <FFld label="Active from">
+                        <FFld G={G} label="Active from">
                           <input type="date" style={iSt({padding:"7px 10px",fontSize:13})}
                             value={editingSlot.activeFrom||""}
                             onChange={e=>setEditingSlot({...editingSlot,activeFrom:e.target.value})}/>
                         </FFld>
-                        <FFld label="Active until (blank = forever)">
+                        <FFld G={G} label="Active until (blank = forever)">
                           <input type="date" style={iSt({padding:"7px 10px",fontSize:13})}
                             value={editingSlot.activeTo||""}
                             onChange={e=>setEditingSlot({...editingSlot,activeTo:e.target.value})}/>
@@ -11900,11 +11669,11 @@ export default function App() {
                   Restrict to this team only (others can view but not join)
                 </label>
                 <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                  <FFld label="Active from">
+                  <FFld G={G} label="Active from">
                     <input type="date" style={iSt({padding:"9px 10px",fontSize:13})}
                       value={rActiveFrom} onChange={e=>setRActiveFrom(e.target.value)}/>
                   </FFld>
-                  <FFld label="Active until (blank = forever)">
+                  <FFld G={G} label="Active until (blank = forever)">
                     <input type="date" style={iSt({padding:"9px 10px",fontSize:13})}
                       value={rActiveTo} onChange={e=>setRActiveTo(e.target.value)}/>
                   </FFld>
@@ -13090,7 +12859,7 @@ export default function App() {
         })}
       </div>
       <BotNav view="admin" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams}/>
-      {toast&&<Toast msg={toast}/>}
+      {toast&&<Toast msg={toast} G={G}/>}
 
       {/* ── Invite code modal ────────────────────────────── */}
       {codeModal&&(
