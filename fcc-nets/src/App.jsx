@@ -62,6 +62,8 @@ import { ALL_FIXTURES } from "./constants/fixtures";
 // ─── Pass 6 prerequisite: club logo + AppHeader extracted ─────
 import { FCC_LOGO } from "./constants/logo";
 import AppHeader from "./ui/AppHeader";
+// ─── Pass 6: view components ──────────────────────────────────
+import WeatherView from "./views/WeatherView";
 
 
 // Storage keys moved to src/hooks/useFirestore.js (Pass 4) — were
@@ -8252,19 +8254,7 @@ export default function App() {
       </Shell>
     );
   }
-  if(view==="weather") {
-    return (
-      <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
-          currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO}/>} G={G}>
-        <AppHeader title="Ground Forecast" sub="Karlebo · 55.918°N 12.416°E"
-          onBack={()=>setView("schedule")}/>
-        <WeatherPage wx={wxData} setView={setView} G={G}/>
-        <BotNav view="schedule" setView={setView} userRole={userRole}
-          pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams} G={G}/>
-        {toast&&<Toast msg={toast} G={G}/>}
-      </Shell>
-    );
-  }
+  if(view==="weather") return <WeatherView />;
 
   if(view==="admin"&&can(userRole,"accessMembers")) {
     const namesNeedFix = userRole==="superadmin"
