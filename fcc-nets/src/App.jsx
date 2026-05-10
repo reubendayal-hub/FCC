@@ -66,6 +66,7 @@ import AppHeader from "./ui/AppHeader";
 import WeatherView from "./views/WeatherView";
 import PrivacyView from "./views/PrivacyView";
 import HelpView from "./views/HelpView";
+import CoachCoordinationView from "./views/CoachCoordinationView";
 
 
 // Storage keys moved to src/hooks/useFirestore.js (Pass 4) — were
@@ -5555,40 +5556,7 @@ export default function App() {
   // ════════════════════════════════════════════════════════════
   // RENDER: Coach Coordination (from Coach HQ)
   // ════════════════════════════════════════════════════════════
-  if(view==="coach-coordination" && (can(userRole,"accessMembers") || isCoachMember(currentUser?.name, teams))) {
-    return (
-      <CoachCoordination
-        teams={teams}
-        allFixtures={ALL_FIXTURES}
-        currentUser={currentUser}
-        coachOverrides={coachOverrides}
-        recurring={recurring}
-        members={members}
-        blockedDates={blockCals.map(b => ({
-          date: b.date,
-          reason: b.label,
-          time: `${b.from}–${b.to}`,
-        }))}
-        onBack={() => setView("coachhq")}
-        onReassign={(sessionId, date, newCoach, oldCoach) => {
-          // Save to Firestore coachOverrides
-          const overrideKey = `${date}_${sessionId}`;
-          const updated = {
-            ...coachOverrides,
-            [overrideKey]: {
-              newCoach,
-              oldCoach,
-              assignedBy: currentUser?.name,
-              assignedAt: new Date().toISOString(),
-            },
-          };
-          setCoachOverrides(updated); // Update local state immediately
-          saveCoachOverrides(updated);
-          showToast(`Reassigned to ${newCoach.split(" ")[0]} ✓`);
-        }}
-      />
-    );
-  }
+  if(view==="coach-coordination" && (can(userRole,"accessMembers") || isCoachMember(currentUser?.name, teams))) return <CoachCoordinationView />;
 
   // ── ADMIN / MEMBERS ─────────────────────────────────────────
   // ════════════════════════════════════════════════════════════
