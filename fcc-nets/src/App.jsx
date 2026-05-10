@@ -48,18 +48,18 @@ import CarpoolSheet from "./ui/CarpoolSheet";
 import Shell from "./ui/Shell";
 import BotNav from "./ui/BotNav";
 import SidebarNav from "./ui/SidebarNav";
+// ─── Pass 4 modularisation: shared seeds + custom hooks ──────
+import {
+  PRESET_POLL, SEED_NOTE_TEMPLATES, SEED_MEMBERS, EMAIL_SEED,
+  uid, normMember,
+} from "./constants/seeds";
+import { useFirestore } from "./hooks/useFirestore";
 // ─── Club Logo ───────────────────────────────────────────────
 const FCC_LOGO = "data:image/png;base64,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";
 
 
-// ─── Keys ─────────────────────────────────────────────────────
-const SESSIONS_KEY   = "fcc-nets-sessions-v4";
-const MEMBERS_KEY    = "fcc-nets-members-v4";
-const PINS_KEY       = "fcc-nets-pins-v4";
-const RECURRING_KEY  = "recurring";
-const TEAMS_KEY      = "fcc-nets-teams-v4";
-const JOINREQS_KEY   = "joinrequests";
-const AUDITLOG_KEY   = "auditlog";
+// Storage keys moved to src/hooks/useFirestore.js (Pass 4) — were
+// only used inside the Firestore-loader effect and save functions.
 
 // ─── 2026 Home Match Fixtures (Fredensborg ground only) ───────
 // ─── Privacy notice (GDPR) ────────────────────────────────────
@@ -334,62 +334,7 @@ let _themeKey = "navy";
 try { _themeKey = localStorage.getItem("fcc-theme") || "navy"; } catch{}
 if(!THEMES[_themeKey]) _themeKey = "navy";
 
-const PRESET_POLL = [
-  {id:"batting",  label:"🏏 Batting Focus"},
-  {id:"bowling",  label:"🎯 Bowling Focus"},
-  {id:"fielding", label:"🧤 Fielding Focus"},
-  {id:"mixed",    label:"⚡ Mixed"},
-];
-
-// ─── Seed note templates (Captain XI shared club templates) ───
-const SEED_NOTE_TEMPLATES = [
-  "Please arrive at least 30 minutes before reporting time for warm-up and team talk.",
-  "Bowlers — please be ready for 10 minutes of bowling drills before the match.",
-  "Fielders — we'll do 15 minutes of catching practice before the toss. Don't be late.",
-  "Bring your full kit including helmet, pads, gloves, and box. Spare gear may not be available.",
-  "Lunch and water provided. Bring your own snacks if needed for between innings.",
-];
-
-// Roles available to assign based on team type — now uses dynamic seniorTeamNames inside component
-
-// ─── Seed members ─────────────────────────────────────────────
-const SEED_MEMBERS = [
-  "Aadya Kaul","Aarin Venkatesh","Abhinav Singh","Adam Pirzada",
-  "Adithya Manimaran","Adithya Vennickle","Advik Akar","Ahaan Sinha",
-  "Ahmed Nawaz","Akshay Bhardwaj","Amer Ramzan","Amit Yadav",
-  "Anagha Mahajan","Anant Mahajan","Anirudh Ram Sriram","Ansh Gupta",
-  "Anveshak Vujjini","Abhijit Guhagarkar",
-  "Arun Krishnamurthy","Arun Shankar","Ashwin Shankar","Ashwin Singh Tensingh",
-  "Balaji R","Charlie","Deepak Akar","Dhruv Shah",
-  "Durgesh","Gagan Sachdeva","Garghi Seenevas","Hasnain Ahmed",
-  "Ilayaraja Karuppasamy","Ishan Bordoloi","Jayashwanth J S","Jaya Nair",
-  "Kamal Jayalaksminarasimhan","Kian Kakoti","Mishka Gupta","Monesh Shantharam",
-  "Nimesh Rajamohanan","Nirmal Mohanan","Nitin Gupta","Nitin Jain",
-  "Pranavan Aananth","Prithvi Sagar","Pronit Lahiri","Pulin Dhar",
-  "Raghavendar Murali","Rajesh Ayyappan","Rajesh Muthukumar",
-  "Rajkumar Jeyaraman","Raju Dantuluri","Ramakrishnan Ravi",
-  "Reuben Dayal","Rewanth Punna","Rohind Muthuselvaraj",
-  "Rohith Arunkumar","Saatvik Dantuluri","Sahasra Dantuluri","Sagar Gupta",
-  "Sahil Gagneja","Samyak Jaggi Ram","Savir Gagneja","Senthil Gnanasambandan",
-  "Shardul Joshi","Sharmila C","Shashank Rastogi","Shreyas Gujjar",
-  "Stalin Natesan","Sumithra","Syed Hamza Kazmi",
-  "Taarush Jain","Talat Munshi","Trineth Arjun","Vihaan Rastogi",
-  "Vihaan Sundeep","Vijay Deepak","Vinay Arunkumar",
-  "Vinay Kumar","Virendra Pawar","Vishali Jain","Vivek Bhatnagar",
-  "Vivek Satyarthi","Xavier Ramzan","Yogismaan Kamal","Zachary Dayal","Zeb Pirzada",
-  "Junaid Khan","Muhammad Aun Zaheer",
-  "Bhoomi Joshi","Suneeti Bala","Nandini",
-].map((name, i) => ({
-  id: `m${i+1}`,
-  name,
-  team: name === "Zachary Dayal" ? "U11" : null,
-  teams: name === "Zachary Dayal" ? ["U11"]
-       : name === "Bhoomi Joshi"  ? ["U15 Girls"]
-       : name === "Nandini"       ? ["U15"]
-       : name === "Suneeti Bala"  ? ["Women's"]
-       : [],
-  role: name === "Reuben Dayal" ? "superadmin" : "member",
-}));
+// PRESET_POLL, SEED_NOTE_TEMPLATES and SEED_MEMBERS — moved to src/constants/seeds.js (Pass 4)
 
 // ─── Name fix map ─────────────────────────────────────────────
 // Maps first-name-only entries to their known full names.
@@ -540,84 +485,10 @@ const T20_SQUADS = {
   },
 };
 
-// ─── Email seed (from uniform order form) ────────────────────
-// Used to pre-populate member emails via admin "Seed Emails" button.
-// Also used for first-time login verification for members who have no email yet.
-const EMAIL_SEED = {
-  "Aarin Venkatesh":"aarin.venki@gmail.com",
-  "Abhijit Guhagarkar":"gabhijit@yahoo.com",
-  "Abhinav Singh":"vcefu1@gmail.com",
-  "Adam Pirzada":"pirzada.adam2@gmail.com",
-  "Adithya Manimaran":"aadi.manimaran@gmail.com",
-  "Advik Akar":"akar.advik@gmail.com",
-  "Ahmed Nawaz":"ahmednawaz86@hotmail.com",
-  "Amit Yadav":"amit230317@gmail.com",
-  "Anirudh Ram Sriram":"iamramsriram@gmail.com",
-  "Ansh Gupta":"6anshu1994@gmail.com",
-  "Arun Krishnamurthy":"kae.arunkumar@gmail.com",
-  "Arun Shankar":"arundynaero@gmail.com",
-  "Ashwin Shankar":"ashwin.thewall19@gmail.com",
-  "Ashwin Singh Tensingh":"ashwin_singh17@yahoo.com",
-  "Balaji R":"balajir136@gmail.com",
-  "Deepak Akar":"deepakakar@gmail.com",
-  "Dhruv Shah":"activities.dhruv@gmail.com",
-  "Durgesh":"durgece66@gmail.com",
-  "Gagan Sachdeva":"gagan78639@gmail.com",
-  "Garghi Seenevas":"s.garghi@gmail.com",
-  "Hasnain Ahmed":"ahmed.hasnain@hotmail.com",
-  "Ilayaraja Karuppasamy":"ilayarajak04@gmail.com",
-  "Jaya Nair":"jayasundeep@gmail.com",
-  "Kamal Jayalaksminarasimhan":"jlkamal@gmail.com",
-  "Monesh Shantharam":"ms403@snu.edu.in",
-  "Nimesh Rajamohanan":"nimesh.rajamohanan@gmail.com",
-  "Nirmal Mohanan":"1983.nirmal@gmail.com",
-  "Nitin Gupta":"kotanitin@gmail.com",
-  "Nitin Jain":"nitin.niec@gmail.com",
-  "Prithvi Sagar":"prithvisagar@gmail.com",
-  "Pronit Lahiri":"pronit.lahiri@gmail.com",
-  "Rajkumar Jeyaraman":"raj2618@gmail.com",
-  "Ramakrishnan Ravi":"ramakrishnan23@gmail.com",
-  "Reuben Dayal":"reuben.dayal@gmail.com",
-  "Rewanth Punna":"revanthpunna2304@gmail.com",
-  "Rohind Muthuselvaraj":"rohind.127@gmail.com",
-  "Saatvik Dantuluri":"saatvikvarma33@gmail.com",
-  "Sagar Gupta":"gksagar10@gmail.com",
-  "Sahil Gagneja":"gagneja808@gmail.com",
-  "Samyak Jaggi Ram":"dinesh.pro@gmail.com",
-  "Shardul Joshi":"spjoshi99@outlook.com",
-  "Shashank Rastogi":"ca.shashankrastogi@gmail.com",
-  "Shreyas Gujjar":"shreyasgujjar8@gmail.com",
-  "Stalin Natesan":"stalinnatesan@gmail.com",
-  "Syed Hamza Kazmi":"s.hamza.kazmi@gmail.com",
-  "Talat Munshi":"talatmunshi@gmail.com",
-  "Trineth Arjun":"madhanprabu@gmail.com",
-  "Vijay Deepak":"vijaydeepak33@gmail.com",
-  "Vinay Arunkumar":"kae.arunkumar@gmail.com",
-  "Vinay Kumar":"kumarvinay14@gmail.com",
-  "Virendra Pawar":"virendra23pawar@gmail.com",
-  "Vivek Bhatnagar":"vkbhatnagar@gmail.com",
-  "Vivek Satyarthi":"satyarthivivek@gmail.com",
-  "Xavier Ramzan":"xavier_ramzan@hotmail.com",
-  "Zeb Pirzada":"zpirzada@gmail.com",
-  // Added from uniform form — were missing from member list
-  "Junaid Khan":"junaidmuhammad395@gmail.com",
-  "Muhammad Aun Zaheer":"aunzaheer@hotmail.com",
-  "Bhoomi Joshi":"joshi.bhoomi013@gmail.com",
-  "Suneeti Bala":"suneeti.bala@gmail.com",
-  "Jayashwanth J S":"j.jaayshwaanth@gmail.com",
-};
-const uid          = () => Math.random().toString(36).slice(2,9);
+// EMAIL_SEED, uid, normMember — moved to src/constants/seeds.js (Pass 4)
+
 // ─── Weather constants ────────────────────────────────────────
 const FCC_LAT = 55.917762, FCC_LON = 12.415680;
-// Normalise member — migrate old single `team` field to `teams` array
-// Known coaches — isCoach:true seeded on these members
-// normMember — never stores isCoach; derived dynamically from team.coaches[]
-const normMember = m => ({
-  ...m,
-  teams: m.teams || (m.team ? [m.team] : []),
-  children: m.children || [],
-  memberType: m.memberType || ((m.teams||[]).length > 0 ? "player" : (m.children||[]).length > 0 ? "parent" : "player"),
-});
 
 // SVG arc dial
 const dlICS = s => {
@@ -642,10 +513,38 @@ const iSt = (extra={}) => ({
 // MAIN APP
 // ═══════════════════════════════════════════════════════════════
 export default function App() {
-  const [sessions, setSessions] = useState([]);
-  const [members,  setMembers]  = useState([]);
-  const [pins,     setPins]     = useState({});   // { memberId: hashedPin }
-  const [loading,  setLoading]  = useState(true);
+  // ── Pass 4: Firestore-backed state via custom hook ───────────
+  // currentUserRef is synced below (after auth state is declared) so
+  // logAction inside the hook can read the latest currentUser without
+  // creating a circular hook dependency.
+  const currentUserRef = useRef(null);
+  const firestoreState = useFirestore({ currentUserRef });
+  const {
+    sessions, setSessions, sessionsRef,
+    members, setMembers, membersRef,
+    pins, setPins,
+    teams, setTeams, teamsRef,
+    recurring, setRecurring, recurringRef,
+    blockCals, setBlockCals,
+    inviteCodes, setInviteCodes,
+    joinRequests, setJoinRequests,
+    auditLog, setAuditLog,
+    reminderLogs, setReminderLogs,
+    cancelledSessions, setCancelledSessions,
+    seasonPlans, setSeasonPlans,
+    allAttendance, setAllAttendance,
+    allSessionNotes, setAllSessionNotes,
+    playerProgress, setPlayerProgress,
+    coachOverrides, setCoachOverrides,
+    matchSelections, setMatchSelections,
+    noteTemplates, setNoteTemplates,
+    loading,
+    saveSessions, saveMembers, savePins, saveTeams, saveRecurring,
+    saveBlockCals, saveCancelledSessions, saveInviteCodes, saveJoinRequests,
+    saveSeasonPlans, saveAllAttendance, saveAllSessionNotes, savePlayerProgress,
+    saveCoachOverrides, saveMatchSelections, saveNoteTemplates, saveAuditLog,
+    logAction,
+  } = firestoreState;
 
   // Theme
   const [themeKey, setThemeKey] = useState(_themeKey);
@@ -661,20 +560,17 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(()=>{
     try { const s=localStorage.getItem("fcc-current-user"); return s?JSON.parse(s):null; } catch{ return null; }
   });
+  // Keep currentUserRef in sync each render so logAction (inside useFirestore)
+  // always sees the latest user. Synchronous mutation during render is safe here
+  // because the ref doesn't drive React rendering.
+  currentUserRef.current = currentUser;
   const [authView, setAuthView]       = useState("pick");
   const [pickSearch, setPickSearch]   = useState("");
   const [pinError,   setPinError]     = useState("");
   const [pendingMember, setPendingMember] = useState(null);
   const [emailInput,   setEmailInput]   = useState("");
   const [emailError,   setEmailError]   = useState("");
-  // Invite codes for members without email — { memberId: hashedCode }
-  const [inviteCodes,   setInviteCodes]   = useState({});
-  // Join requests from non-members
-  const [joinRequests,  setJoinRequests]  = useState([]);
-  // Superadmin-only audit log
-  const [auditLog,      setAuditLog]      = useState([]);
-  // Reminder email logs
-  const [reminderLogs,  setReminderLogs]  = useState([]);
+  // inviteCodes / joinRequests / auditLog / reminderLogs — moved to useFirestore (Pass 4)
 
   // App view
   const [view,     setView]     = useState("schedule");
@@ -686,24 +582,11 @@ export default function App() {
   const [sessNotes, setSessNotes] = useState([]); // [{playerId, playerName, text, date, pillar}]
   const [sessNotesDraft, setSessNotesDraft] = useState({}); // {playerId: "text"}
 
-  // Dynamic teams
-  const [teams, setTeams] = useState(DEFAULT_TEAMS);
+  // teams / seasonPlans / allAttendance / allSessionNotes / playerProgress /
+  // coachOverrides / cancelledSessions / recurring — moved to useFirestore (Pass 4)
   const seniorTeamNames = teams.filter(t=>t.senior).map(t=>t.name);
   const ALL_TEAMS = [...teams.map(t=>t.name), "Unassigned"];
 
-  // Season plans for Progress Tracker (per team)
-  const [seasonPlans, setSeasonPlans] = useState({});
-
-  // Attendance, notes, progress tracking (Firestore-backed)
-  const [allAttendance, setAllAttendance] = useState({});       // {sessionId: {playerId: true/false}}
-  const [allSessionNotes, setAllSessionNotes] = useState([]);   // [{sessionId, playerId, text, coach, date, pillar}]
-  const [playerProgress, setPlayerProgress] = useState({});     // {playerId: {currentPhase, snapshots: {phase: {pillar: level}}}}
-  const [coachOverrides, setCoachOverrides] = useState({});     // {"date-sessionId": {newCoach, oldCoach, assignedBy}}
-  const [cancelledSessions, setCancelledSessions] = useState([]); // [{date, label, reason, cancelledBy, cancelledAt, recurringId}]
-
-  // Recurring slots
-  const [recurring, setRecurring] = useState([]);
-  
   // Cancellation modal
   const [cancelModal, setCancelModal] = useState(null); // {session, slot} when cancelling
 
@@ -726,10 +609,7 @@ export default function App() {
   const [showCancelled, setShowCancelled] = useState(false); // collapsed by default
   const [carpoolSheetSess, setCarpoolSheetSess] = useState(null); // bottom sheet session
   const carpoolRef = useRef(null);
-  const sessionsRef = useRef([]); // always holds latest sessions, avoids stale closure in recurring effect
-  const membersRef  = useRef([]); // same for members
-  const teamsRef    = useRef(DEFAULT_TEAMS); // same for teams
-  const recurringRef = useRef([]); // same for recurring slots
+  // sessionsRef / membersRef / teamsRef / recurringRef — moved to useFirestore (Pass 4)
   const [bRestrictTeam, setBRestrictTeam] = useState("");
   const [selP,     setSelP]     = useState([]);
   const [pSearch,  setPSearch]  = useState("");
@@ -762,7 +642,7 @@ export default function App() {
   const [editingTeam,setEditingTeam]= useState(null);
   const [coachSearch, setCoachSearch] = useState({}); // {teamId: searchString}
   // Captain's Playing XI state
-  const [matchSelections, setMatchSelections] = useState({}); // {matchId: {players:[], captain, vc, wk, note, reportTime}}
+  // matchSelections — moved to useFirestore (Pass 4)
   const [captainXIModal, setCaptainXIModal] = useState(null); // {match, division} or null
   const [xiSelection, setXiSelection] = useState([]); // array of player names
   const [xiRoles, setXiRoles] = useState({ captain: null, vc: null, wk: null }); // special roles
@@ -771,7 +651,7 @@ export default function App() {
   const [xiMatchTime, setXiMatchTime] = useState("");
   const [xiReportTimeUserTouched, setXiReportTimeUserTouched] = useState(false);
   // Captain note templates (shared club-wide)
-  const [noteTemplates, setNoteTemplates] = useState([]);
+  // noteTemplates — moved to useFirestore (Pass 4)
   const [templatesModalOpen, setTemplatesModalOpen] = useState(false);
   const [templateEditingId, setTemplateEditingId] = useState(null);
   const [templateEditingText, setTemplateEditingText] = useState("");
@@ -888,270 +768,6 @@ export default function App() {
     }
   },[members]);
 
-  // ── Load + real-time sync via Firestore ──────────────────────
-  useEffect(()=>{
-    const refs = {
-      sessions:    doc(db,"fccnets","sessions"),
-      members:     doc(db,"fccnets","members"),
-      pins:        doc(db,"fccnets","pins"),
-      teams:       doc(db,"fccnets","teams"),
-      recurring:   doc(db,"fccnets",RECURRING_KEY),
-      blockcals:   doc(db,"fccnets","blockcals"),
-      invitecodes: doc(db,"fccnets","invitecodes"),
-      joinrequests:doc(db,"fccnets",JOINREQS_KEY),
-      auditlog:    doc(db,"fccnets",AUDITLOG_KEY),
-      reminderlogs:doc(db,"fccnets","reminderlogs"),
-      cancelledsessions: doc(db,"fccnets","cancelledsessions"),
-      seasonplans: doc(db,"fccnets","seasonplans"),
-      attendance:  doc(db,"fccnets","attendance"),      // {sessionId: {playerId: true/false}}
-      sessionnotes:doc(db,"fccnets","sessionnotes"),    // [{sessionId, playerId, text, coach, date}]
-      playerprogress:doc(db,"fccnets","playerprogress"),// {playerId: {snapshots, currentPhase}}
-      coachoverrides:doc(db,"fccnets","coachoverrides"),// {date-sessionId: {newCoach, oldCoach}}
-      matchselections:doc(db,"fccnets","matchselections"),// {matchId: {players, captain, vc, wk, note, reportTime}}
-      notetemplates:doc(db,"fccnets","captainnotes_templates"), // [{id, text, createdBy, createdAt, updatedAt}]
-    };
-    (async()=>{
-      try {
-        const [sr,mr,pr,tr,rr,br,ir,jr,ar,rlr,csr,spr,attr,snr,ppr,cor,msr,ntr] = await Promise.all([
-          getDoc(refs.sessions),
-          getDoc(refs.members),
-          getDoc(refs.pins),
-          getDoc(refs.teams),
-          getDoc(refs.recurring),
-          getDoc(refs.blockcals),
-          getDoc(refs.invitecodes),
-          getDoc(refs.joinrequests),
-          getDoc(refs.auditlog),
-          getDoc(refs.reminderlogs),
-          getDoc(refs.cancelledsessions),
-          getDoc(refs.seasonplans),
-          getDoc(refs.attendance),
-          getDoc(refs.sessionnotes),
-          getDoc(refs.playerprogress),
-          getDoc(refs.coachoverrides),
-          getDoc(refs.matchselections),
-          getDoc(refs.notetemplates),
-        ]);
-        // Sessions MUST be loaded before setLoading(false) so sessionsRef is
-        // populated before the recurring useEffect runs — prevents lifts being wiped
-        const initialSessions = sr.exists() ? JSON.parse(sr.data().value) : [];
-        setSessions(initialSessions);
-        sessionsRef.current = initialSessions;
-        const initialMembers = mr.exists() ? JSON.parse(mr.data().value).map(normMember) : SEED_MEMBERS.map(normMember);
-        setMembers(initialMembers);
-        membersRef.current = initialMembers;
-        setPins(        pr.exists() ? JSON.parse(pr.data().value) : {});
-        // Merge DEFAULT_TEAMS fields into stored teams (fixes missing senior/captain/vc/coaches)
-        const storedTeams = tr.exists() ? JSON.parse(tr.data().value) : DEFAULT_TEAMS;
-        const mergedTeams = storedTeams.map(t => {
-          const def = DEFAULT_TEAMS.find(d=>d.name===t.name);
-          return {
-            ...t,
-            coaches:    t.coaches    ?? def?.coaches    ?? [],
-            senior:     def?.senior  ?? t.senior        ?? false, // always trust DEFAULT_TEAMS for senior
-            captain:    t.captain    ?? def?.captain    ?? null,
-            vicecaptain:t.vicecaptain?? def?.vicecaptain?? null,
-          };
-        });
-        setTeams(mergedTeams);
-        teamsRef.current = mergedTeams;
-        const initialRecurring = rr.exists() ? JSON.parse(rr.data().value) : [];
-        setRecurring(initialRecurring);
-        recurringRef.current = initialRecurring;
-        setBlockCals(   br.exists() ? JSON.parse(br.data().value) : []);
-        setInviteCodes( ir.exists() ? JSON.parse(ir.data().value) : {});
-        setJoinRequests(jr.exists() ? JSON.parse(jr.data().value) : []);
-        setAuditLog(    ar.exists() ? JSON.parse(ar.data().value) : []);
-        setReminderLogs(rlr.exists() && rlr.data().list ? rlr.data().list : []);
-        setCancelledSessions(csr.exists() ? JSON.parse(csr.data().value) : []);
-        setSeasonPlans( spr.exists() ? JSON.parse(spr.data().value) : {});
-        // New: attendance, notes, progress, coach overrides
-        setAllAttendance(  attr.exists() ? JSON.parse(attr.data().value) : {});
-        setAllSessionNotes(snr.exists() ? JSON.parse(snr.data().value) : []);
-        setPlayerProgress( ppr.exists() ? JSON.parse(ppr.data().value) : {});
-        setCoachOverrides( cor.exists() ? JSON.parse(cor.data().value) : {});
-        setMatchSelections(msr.exists() ? JSON.parse(msr.data().value) : {});
-        // Note templates: seed Firestore on first load if doc is missing
-        if (ntr.exists()) {
-          setNoteTemplates(JSON.parse(ntr.data().value));
-        } else {
-          const nowIso = new Date().toISOString();
-          const seeded = SEED_NOTE_TEMPLATES.map((text, i) => ({
-            id: `seed-${i+1}`,
-            text,
-            createdBy: "system",
-            createdAt: nowIso,
-            updatedAt: nowIso,
-          }));
-          setNoteTemplates(seeded);
-          setDoc(doc(db,"fccnets","captainnotes_templates"), {value: JSON.stringify(seeded)}).catch(()=>{});
-        }
-      } catch(e) {
-        setMembers(SEED_MEMBERS.map(normMember)); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]); recurringRef.current=[]; setBlockCals([]); setInviteCodes({}); setJoinRequests([]); setAuditLog([]); setReminderLogs([]); setCancelledSessions([]);
-        setAllAttendance({}); setAllSessionNotes([]); setPlayerProgress({}); setCoachOverrides({}); setMatchSelections({}); setNoteTemplates([]);
-      }
-      setLoading(false);
-    })();
-    // onSnapshot keeps sessions live for real-time updates after initial load
-    const unsub = onSnapshot(refs.sessions, snap => {
-      const val = snap.exists() ? JSON.parse(snap.data().value) : [];
-      setSessions(val);
-      sessionsRef.current = val;
-    }, () => { setSessions([]); sessionsRef.current=[]; });
-    return () => unsub();
-  },[]);
-
-  const saveSessions  = async u => { setSessions(u); sessionsRef.current=u; await setDoc(doc(db,"fccnets","sessions"), {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveMembers   = async u => { 
-    // Version protection: don't save if new data has fewer members than before (possible corruption)
-    const currentCount = membersRef.current?.length || 0;
-    if (currentCount > 10 && u.length < currentCount * 0.5) {
-      console.error("BLOCKED: Attempted to save members with suspicious data loss", {
-        currentCount,
-        newCount: u.length
-      });
-      return; // Block the save
-    }
-    
-    setMembers(u); 
-    membersRef.current=u; 
-    
-    // Save with version metadata
-    await setDoc(doc(db,"fccnets","members"), {
-      value: JSON.stringify(u),
-      _version: Date.now(),
-      _count: u.length
-    }).catch(()=>{});
-    
-    // Auto-backup: save timestamped snapshot daily
-    const backupKey = `members_backup_${new Date().toISOString().slice(0,10)}`;
-    await setDoc(doc(db,"fccnets",backupKey), {
-      value: JSON.stringify(u),
-      savedAt: new Date().toISOString(),
-      memberCount: u.length
-    }).catch(()=>{});
-  };
-  const savePins      = async u => { setPins(u);      await setDoc(doc(db,"fccnets","pins"),     {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveTeams     = async u => { setTeams(u); teamsRef.current=u; await setDoc(doc(db,"fccnets","teams"),    {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveRecurring = async u => { setRecurring(u); recurringRef.current=u; await setDoc(doc(db,"fccnets",RECURRING_KEY),{value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveBlockCals   = async u => { setBlockCals(u);   await setDoc(doc(db,"fccnets","blockcals"),   {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveCancelledSessions = async u => { setCancelledSessions(u); await setDoc(doc(db,"fccnets","cancelledsessions"), {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveInviteCodes = async u => { setInviteCodes(u);  await setDoc(doc(db,"fccnets","invitecodes"), {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveJoinRequests= async u => { setJoinRequests(u); await setDoc(doc(db,"fccnets",JOINREQS_KEY),  {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveSeasonPlans = async u => { setSeasonPlans(u); await setDoc(doc(db,"fccnets","seasonplans"), {value:JSON.stringify(u)}).catch(()=>{}); };
-  // New save functions
-  const saveAllAttendance   = async u => { setAllAttendance(u);   await setDoc(doc(db,"fccnets","attendance"),     {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveAllSessionNotes = async u => { setAllSessionNotes(u); await setDoc(doc(db,"fccnets","sessionnotes"),   {value:JSON.stringify(u)}).catch(()=>{}); };
-  const savePlayerProgress  = async u => { setPlayerProgress(u);  await setDoc(doc(db,"fccnets","playerprogress"), {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveCoachOverrides  = async u => { setCoachOverrides(u);  await setDoc(doc(db,"fccnets","coachoverrides"), {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveMatchSelections = async u => { setMatchSelections(u); await setDoc(doc(db,"fccnets","matchselections"), {value:JSON.stringify(u)}).catch(()=>{});};
-  const saveNoteTemplates   = async u => { setNoteTemplates(u);   await setDoc(doc(db,"fccnets","captainnotes_templates"), {value:JSON.stringify(u)}).catch(()=>{});};
-
-  // ── Audit log ─────────────────────────────────────────────────
-  // Cap at 500 entries; newest first. Only superadmin can read.
-  const saveAuditLog = async u => {
-    setAuditLog(u);
-    await setDoc(doc(db,"fccnets",AUDITLOG_KEY), {value:JSON.stringify(u)}).catch(()=>{});
-  };
-  function logAction(category, detail) {
-    if(!currentUser) return;
-    const entry = {
-      id: uid(),
-      ts: new Date().toISOString(),
-      byId: currentUser.id,
-      byName: currentUser.name,
-      byRole: currentUser.role || "member",
-      category, // e.g. "member", "role", "team", "session", "pin", "request", "system"
-      detail,   // human-readable description
-    };
-    setAuditLog(prev => {
-      const next = [entry, ...prev].slice(0, 500);
-      setDoc(doc(db,"fccnets",AUDITLOG_KEY), {value:JSON.stringify(next)}).catch(()=>{});
-      return next;
-    });
-  }
-
-  // ── Auto-generate recurring sessions ─────────────────────────
-  useEffect(()=>{
-    if(loading || recurring.length===0) return;
-    const liveSessions = sessionsRef.current;
-    const liveMembers  = membersRef.current; // use ref to avoid stale closure
-    const liveTeams    = teamsRef.current;
-    const liveRecurring = recurringRef.current; // use ref for latest cancelledDates
-    const today = new Date(); today.setHours(0,0,0,0);
-    const toAdd = [];
-    
-    // Build set of cancelled dates from cancelledSessions as backup check
-    const cancelledFromArchive = new Set(
-      cancelledSessions.map(c => `${c.recurringId}_${c.date}`)
-    );
-    
-    recurring.forEach(slot=>{
-      if(!slot.enabled) return;
-      // Get cancelledDates from ref (most up-to-date) or fall back to state
-      const slotFromRef = liveRecurring.find(r => r.id === slot.id);
-      const cancelledDates = slotFromRef?.cancelledDates || slot.cancelledDates || [];
-      for(let i=0; i<=21; i++){
-        const d = new Date(today); d.setDate(today.getDate()+i);
-        if(d.getDay() !== slot.day) continue;
-        const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-        if(slot.activeFrom && dateStr < slot.activeFrom) continue;
-        if(slot.activeTo   && dateStr > slot.activeTo)   continue;
-        if(cancelledDates.includes(dateStr)) continue; // Skip cancelled dates from slot
-        // Also check cancelledSessions archive as backup
-        if(cancelledFromArchive.has(`${slot.id}_${dateStr}`)) continue;
-        const exists = liveSessions.find(s=>
-          s.recurringId===slot.id && s.date===dateStr);
-        if(!exists) {
-          // Auto-enroll members from the slot's teams
-          const slotTeams = slot.teams?.length ? slot.teams : (slot.team ? [slot.team] : []);
-          const autoPlayers = slotTeams.length
-            ? liveMembers.filter(m=>
-                (m.teams||[]).some(t=>slotTeams.includes(t)) &&
-                !isAbsent(m, dateStr) // skip members marked away
-              ).map(m=>m.name)
-            : [];
-          // Collect coaches from all slot teams
-          const slotCoaches = [...new Set(slotTeams.flatMap(tn=>{
-            const teamDef = (liveTeams||DEFAULT_TEAMS).find(t=>t.name===tn);
-            return teamDef?.coaches||[];
-          }))];
-          toAdd.push({
-            id:uid(), date:dateStr, from:slot.from, to:slot.to,
-            label:slot.name, note:"", players:autoPlayers,
-            poll: PRESET_POLL.map(o => ({...o, votes: []})), // Include voting options
-            restrictedTo: slot.restrictTeam ? slot.team : null,
-            sessionTeams: slotTeams,
-            coaches: slotCoaches,
-            recurringId: slot.id,
-            net: slot.net || "1",
-            lifts: {},
-            createdBy: "Recurring",
-          });
-        }
-      }
-    });
-    if(toAdd.length>0){
-      const merged = [...liveSessions,...toAdd].sort((a,b)=>
-        new Date(a.date)-new Date(b.date)||a.from.localeCompare(b.from));
-      saveSessions(merged);
-    }
-    
-    // Migration: Add poll options to existing recurring sessions that don't have them
-    const needsPollUpdate = liveSessions.filter(s => 
-      s.recurringId && (!s.poll || s.poll.length === 0)
-    );
-    if(needsPollUpdate.length > 0) {
-      const updated = liveSessions.map(s => {
-        if(s.recurringId && (!s.poll || s.poll.length === 0)) {
-          return { ...s, poll: PRESET_POLL.map(o => ({...o, votes: []})) };
-        }
-        return s;
-      });
-      saveSessions(updated);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[loading, recurring, cancelledSessions]);
 
   // ── Invite code helpers ───────────────────────────────────────
   // Generate a short human-readable code: FCC-XXXX (letters+digits, no ambiguous chars)
@@ -1726,7 +1342,7 @@ export default function App() {
   const [showMatches,    setShowMatches]    = useState(true); // match overlay toggle
   const [netsDate,       setNetsDate]       = useState(todayStr());
   const [wxData,         setWxData]         = useState(null); // weather data
-  const [blockCals,     setBlockCals]     = useState([]);    // [{id,date,from,to,label}]
+  // blockCals — moved to useFirestore (Pass 4)
   const [bCalDate,      setBCalDate]      = useState("");
   const [bCalFrom,      setBCalFrom]      = useState("10:00");
   const [bCalTo,        setBCalTo]        = useState("14:00");
