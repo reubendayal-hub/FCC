@@ -2402,6 +2402,9 @@ export default function App() {
   const [templateEditingText, setTemplateEditingText] = useState("");
   const [templateNewText, setTemplateNewText] = useState("");
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  // Selective XI reset (super admin only)
+  const [xiResetModalOpen, setXiResetModalOpen] = useState(false);
+  const [xiResetSelected, setXiResetSelected] = useState(() => new Set());
   // Admin section collapse — true = open. Members+AddMember open by default, rest collapsed
   const [adminSec, setAdminSec] = useState({
     members:true, addmember:true, groups:false,
@@ -9074,16 +9077,11 @@ export default function App() {
       <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole} currentUser={currentUser} onLogout={handleLogout} teams={teams}/>}>
         <AppHeader title="Captain's XI" sub="Select your playing eleven" onBack={()=>setView("schedule")}/>
         
-        {/* Superadmin reset button */}
+        {/* Superadmin selective reset button — opens modal to pick specific matches */}
         {userRole === "superadmin" && Object.keys(matchSelections).length > 0 && (
           <div style={{padding: "0 16px", marginBottom: 8}}>
-            <button 
-              onClick={() => {
-                if (confirm(`Reset all ${Object.keys(matchSelections).length} match selection(s)? This cannot be undone.`)) {
-                  saveMatchSelections({});
-                  alert("All selections cleared.");
-                }
-              }}
+            <button
+              onClick={() => { setXiResetSelected(new Set()); setXiResetModalOpen(true); }}
               style={{
                 width: "100%", padding: "10px 16px",
                 background: "#fef2f2", border: "1.5px solid #fecaca",
@@ -9093,7 +9091,7 @@ export default function App() {
               }}
             >
               <span>🗑️</span>
-              Reset All Selections ({Object.keys(matchSelections).length})
+              Reset Match XI ({Object.keys(matchSelections).length})
             </button>
           </div>
         )}
@@ -9798,7 +9796,158 @@ export default function App() {
           );
         })()}
 
+        {/* Selective XI reset modal — super admin only */}
+        {xiResetModalOpen && userRole === "superadmin" && (() => {
+          const entries = Object.keys(matchSelections).map(matchId => {
+            // matchId is `${date}-${division}` where date is YYYY-MM-DD (10 chars).
+            const date = matchId.slice(0, 10);
+            const division = matchId.slice(11);
+            const fixture = ALL_FIXTURES.find(f => f.date === date && f.division === division);
+            return {
+              matchId,
+              date,
+              division,
+              label: fixture?.label || `${division} · ${matchId}`,
+            };
+          }).sort((a, b) => a.date.localeCompare(b.date));
+
+          const allSelected = entries.length > 0 && entries.every(e => xiResetSelected.has(e.matchId));
+          const toggleOne = id => {
+            const next = new Set(xiResetSelected);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            setXiResetSelected(next);
+          };
+          const toggleAll = () => {
+            if (allSelected) setXiResetSelected(new Set());
+            else setXiResetSelected(new Set(entries.map(e => e.matchId)));
+          };
+          const closeModal = () => { setXiResetModalOpen(false); setXiResetSelected(new Set()); };
+          const confirmReset = () => {
+            const updated = { ...matchSelections };
+            xiResetSelected.forEach(id => { delete updated[id]; });
+            const n = xiResetSelected.size;
+            saveMatchSelections(updated);
+            showToast(`Reset ${n} match${n === 1 ? "" : "es"}`);
+            closeModal();
+          };
+
+          const selectedCount = xiResetSelected.size;
+
+          return (
+            <div style={{
+              position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+              zIndex: 1000, display: "flex", alignItems: "flex-end", justifyContent: "center"
+            }} onClick={closeModal}>
+              <div style={{
+                background: G.white, borderRadius: "20px 20px 0 0", width: "100%", maxWidth: 500,
+                maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column"
+              }} onClick={e => e.stopPropagation()}>
+                {/* Header */}
+                <div style={{
+                  background: G.green, color: "#fff", padding: "16px 20px",
+                  display: "flex", alignItems: "center", justifyContent: "space-between"
+                }}>
+                  <div>
+                    <div style={{fontWeight: 800, fontSize: 15}}>Reset Match XI</div>
+                    <div style={{fontSize: 12, opacity: 0.85, marginTop: 2}}>Pick the matches whose saved XI you want to clear</div>
+                  </div>
+                  <button onClick={closeModal} style={{
+                    background: "rgba(255,255,255,0.2)", border: "none", borderRadius: "50%",
+                    width: 32, height: 32, cursor: "pointer", color: "#fff", fontSize: 18
+                  }}>×</button>
+                </div>
+
+                {/* Select all toggle */}
+                <div style={{
+                  padding: "10px 16px", borderBottom: `1px solid ${G.border}`,
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  background: G.cream,
+                }}>
+                  <button
+                    onClick={toggleAll}
+                    style={{
+                      padding: "6px 12px", borderRadius: 8,
+                      border: `1px solid ${G.border}`, background: G.white,
+                      fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                      color: G.text,
+                    }}
+                  >{allSelected ? "Deselect all" : "Select all"}</button>
+                  <div style={{fontSize: 12, fontWeight: 700, color: G.muted}}>
+                    {selectedCount} of {entries.length} selected
+                  </div>
+                </div>
+
+                {/* Match list */}
+                <div style={{flex: 1, overflowY: "auto", padding: "12px 16px"}}>
+                  {entries.length === 0 ? (
+                    <div style={{textAlign: "center", padding: 20, color: G.muted, fontSize: 13}}>
+                      No saved match XIs.
+                    </div>
+                  ) : (
+                    entries.map(e => {
+                      const checked = xiResetSelected.has(e.matchId);
+                      return (
+                        <label key={e.matchId} style={{
+                          display: "flex", alignItems: "center", gap: 12,
+                          background: checked ? "#fef2f2" : G.cream,
+                          border: `1px solid ${checked ? "#fecaca" : G.border}`,
+                          borderRadius: 10, padding: 12, marginBottom: 8,
+                          cursor: "pointer",
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleOne(e.matchId)}
+                            style={{width: 18, height: 18, cursor: "pointer", accentColor: G.green}}
+                          />
+                          <div style={{flex: 1, minWidth: 0}}>
+                            <div style={{fontSize: 13, fontWeight: 700, color: G.text, marginBottom: 2}}>
+                              {e.label}
+                            </div>
+                            <div style={{fontSize: 11, color: G.muted, fontWeight: 600}}>
+                              {fmtLong(e.date)} · {e.division}
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Footer actions */}
+                <div style={{
+                  borderTop: `1px solid ${G.border}`, padding: "12px 16px",
+                  background: G.white, display: "flex", gap: 8,
+                }}>
+                  <button
+                    onClick={closeModal}
+                    style={{
+                      flex: 1, padding: "10px", borderRadius: 8,
+                      border: `1px solid ${G.border}`, background: G.white,
+                      fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                      color: G.text,
+                    }}
+                  >Cancel</button>
+                  <button
+                    onClick={confirmReset}
+                    disabled={selectedCount === 0}
+                    style={{
+                      flex: 2, padding: "10px", borderRadius: 8,
+                      border: "none",
+                      background: selectedCount > 0 ? "#dc2626" : "#fca5a5",
+                      color: "#fff",
+                      fontSize: 13, fontWeight: 800, fontFamily: "inherit",
+                      cursor: selectedCount > 0 ? "pointer" : "not-allowed",
+                    }}
+                  >Reset selected ({selectedCount})</button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         <BotNav view={view} setView={setView} userRole={userRole} pendingCount={joinRequests.length} currentUser={currentUser} teams={teams}/>
+        {toast&&<Toast msg={toast} G={G}/>}
       </Shell>
     );
   }
