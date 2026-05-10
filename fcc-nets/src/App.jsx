@@ -2099,8 +2099,9 @@ function BotNav({view,setView,userRole,pendingCount=0,currentUser=null,teams=[]}
     </svg>
   );
 
-  // Calculate number of tabs: Schedule + Book + Profile = 3 base, + Coach HQ, + Captain XI, + Admin
-  const tabCount = 3 + (isCoach ? 1 : 0) + ((isCaptain || isAdmin) ? 1 : 0) + (isAdmin ? 1 : 0);
+  // Calculate number of tabs: Schedule + Book + Profile = 3 base, + Coach HQ (only if not admin), + Captain XI, + Admin
+  // Admins reach Coach HQ via the desktop sidebar / Admin panel — hiding it on mobile keeps the bar at <=5 tabs so Profile stays visible.
+  const tabCount = 3 + (isCoach && !isAdmin ? 1 : 0) + ((isCaptain || isAdmin) ? 1 : 0) + (isAdmin ? 1 : 0);
   
   return (
     <div className="fcc-mobile-only" style={{
@@ -2156,7 +2157,7 @@ function BotNav({view,setView,userRole,pendingCount=0,currentUser=null,teams=[]}
         </div>
       </button>
 
-      {isCoach && (
+      {isCoach && !isAdmin && (
         <Tab id="coachhq" icon={<IconCoach on={active==="coachhq"}/>} label="Coach HQ"/>
       )}
       {(isCaptain || isAdmin) && (
