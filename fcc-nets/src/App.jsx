@@ -38,6 +38,16 @@ import { RolePill, TeamPill, MemberRolePills } from "./ui/pills";
 import ProfileDial from "./ui/ProfileDial";
 import AvailGauge from "./ui/AvailGauge";
 import PinPad from "./ui/PinPad";
+import WeatherBar from "./ui/WeatherBar";
+import WeatherPage from "./ui/WeatherPage";
+import SessCard from "./ui/SessCard";
+import NetsTimeline from "./ui/NetsTimeline";
+import FamilyManager from "./ui/FamilyManager";
+import PlayerGroup from "./ui/PlayerGroup";
+import CarpoolSheet from "./ui/CarpoolSheet";
+import Shell from "./ui/Shell";
+import BotNav from "./ui/BotNav";
+import SidebarNav from "./ui/SidebarNav";
 // ─── Club Logo ───────────────────────────────────────────────
 const FCC_LOGO = "data:image/png;base64,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";
 
@@ -599,15 +609,6 @@ const EMAIL_SEED = {
 const uid          = () => Math.random().toString(36).slice(2,9);
 // ─── Weather constants ────────────────────────────────────────
 const FCC_LAT = 55.917762, FCC_LON = 12.415680;
-// ─── Nets timeline helpers ────────────────────────────────────
-const NET_COLORS = {
-  "1": { bar:"#14532d", label:"#a3e635", barBg:"#f0fdf4", borderFree:"#bbf7d0", freeText:"#86efac" },
-  "2": { bar:"#1e3a8a", label:"#bfdbfe", barBg:"#eff6ff", borderFree:"#bfdbfe", freeText:"#93c5fd" },
-};
-
-// ─── Car pool stops (Copenhagen → Karlebo corridor) ───────────
-const CARPOOL_STOPS = ["Nørrebro", "Nørreport", "Lyngby St", "Kokkedal School (Egedalshallen)", "Other"];
-
 // Normalise member — migrate old single `team` field to `teams` array
 // Known coaches — isCoach:true seeded on these members
 // normMember — never stores isCoach; derived dynamically from team.coaches[]
@@ -619,208 +620,6 @@ const normMember = m => ({
 });
 
 // SVG arc dial
-// ════════════════════════════════════════════════════════════
-// FamilyManager Component - Link/Unlink children to parent account
-// ════════════════════════════════════════════════════════════
-function FamilyManager({ me, myChildren, availableChildren, members, onLink, onUnlink, onCreateChild, teams, juniorTeams }) {
-  const [searchTerm, setSearchTerm] = React.useState("");
-  const [showCreate, setShowCreate] = React.useState(false);
-  const [newChildName, setNewChildName] = React.useState("");
-  const [newChildTeam, setNewChildTeam] = React.useState("");
-  const [confirmUnlink, setConfirmUnlink] = React.useState(null);
-  
-  // Filter available children by search term
-  const filteredChildren = searchTerm.length >= 2
-    ? availableChildren.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()))
-    : [];
-  
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:16}}>
-      {/* Info card */}
-      <div style={{background:"#eff6ff",border:"1.5px solid #bfdbfe",borderRadius:12,padding:14}}>
-        <div style={{fontWeight:700,fontSize:14,color:"#1e40af",marginBottom:4}}>
-          👨‍👧 Family Account
-        </div>
-        <div style={{fontSize:13,color:"#3b82f6",lineHeight:1.5}}>
-          Link your children's profiles to your account to manage their bookings, 
-          view their progress, and receive notifications for their sessions.
-        </div>
-      </div>
-      
-      {/* Linked Children */}
-      {myChildren.length > 0 && (
-        <div>
-          <div style={{fontWeight:800,fontSize:12,color:"#64748b",textTransform:"uppercase",
-            letterSpacing:1,marginBottom:10}}>
-            Linked Children ({myChildren.length})
-          </div>
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {myChildren.map(child => (
-              <div key={child.id} style={{
-                background:"#fff",border:"1.5px solid #e2e8f0",borderRadius:12,
-                padding:"12px 14px",display:"flex",alignItems:"center",gap:12,
-              }}>
-                <div style={{width:40,height:40,borderRadius:"50%",
-                  background:"#dcfce7",display:"flex",alignItems:"center",justifyContent:"center",
-                  fontSize:14,fontWeight:900,color:"#166534",flexShrink:0}}>
-                  {child.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()}
-                </div>
-                <div style={{flex:1}}>
-                  <div style={{fontWeight:700,fontSize:14,color:"#0f172a"}}>{child.name}</div>
-                  <div style={{fontSize:12,color:"#64748b"}}>
-                    {(child.teams||[]).join(", ") || "No team assigned"}
-                  </div>
-                </div>
-                {confirmUnlink === child.id ? (
-                  <div style={{display:"flex",gap:6}}>
-                    <button onClick={() => { onUnlink(child.id); setConfirmUnlink(null); }}
-                      style={{background:"#dc2626",color:"#fff",border:"none",borderRadius:8,
-                        padding:"6px 10px",fontSize:12,fontWeight:700,cursor:"pointer"}}>
-                      Confirm
-                    </button>
-                    <button onClick={() => setConfirmUnlink(null)}
-                      style={{background:"#e2e8f0",color:"#64748b",border:"none",borderRadius:8,
-                        padding:"6px 10px",fontSize:12,fontWeight:700,cursor:"pointer"}}>
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <button onClick={() => setConfirmUnlink(child.id)}
-                    style={{background:"none",border:"1px solid #e2e8f0",borderRadius:8,
-                      padding:"6px 10px",fontSize:12,fontWeight:600,color:"#64748b",cursor:"pointer"}}>
-                    Unlink
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      
-      {/* Search & Link Existing Child */}
-      <div>
-        <div style={{fontWeight:800,fontSize:12,color:"#64748b",textTransform:"uppercase",
-          letterSpacing:1,marginBottom:10}}>
-          🔍 Link Existing Player
-        </div>
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-          placeholder="Search by child's name..."
-          style={{width:"100%",padding:"12px 14px",border:"1.5px solid #e2e8f0",
-            borderRadius:10,fontSize:14,fontFamily:"inherit",outline:"none",
-            boxSizing:"border-box"}}
-        />
-        {searchTerm.length >= 2 && (
-          <div style={{marginTop:8}}>
-            {filteredChildren.length === 0 ? (
-              <div style={{padding:"12px",background:"#fef3c7",borderRadius:10,
-                fontSize:13,color:"#92400e"}}>
-                No unlinked players found matching "{searchTerm}". 
-                You can create a new profile below.
-              </div>
-            ) : (
-              <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                {filteredChildren.slice(0,5).map(child => (
-                  <div key={child.id} style={{
-                    background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:10,
-                    padding:"10px 12px",display:"flex",alignItems:"center",gap:10,
-                  }}>
-                    <div style={{flex:1}}>
-                      <div style={{fontWeight:600,fontSize:13,color:"#0f172a"}}>{child.name}</div>
-                      <div style={{fontSize:11,color:"#64748b"}}>
-                        {(child.teams||[]).join(", ") || "No team"}
-                      </div>
-                    </div>
-                    <button onClick={() => { onLink(child.id); setSearchTerm(""); }}
-                      style={{background:"#16a34a",color:"#fff",border:"none",borderRadius:8,
-                        padding:"8px 12px",fontSize:12,fontWeight:700,cursor:"pointer"}}>
-                      Link
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-      
-      {/* Create New Child */}
-      <div>
-        <button onClick={() => setShowCreate(!showCreate)}
-          style={{width:"100%",padding:"12px",background:showCreate?"#f1f5f9":"#fff",
-            border:"1.5px dashed #cbd5e1",borderRadius:10,fontSize:14,fontWeight:700,
-            color:"#475569",cursor:"pointer",display:"flex",alignItems:"center",
-            justifyContent:"center",gap:8}}>
-          {showCreate ? "✕ Cancel" : "➕ Create New Child Profile"}
-        </button>
-        
-        {showCreate && (
-          <div style={{marginTop:12,padding:14,background:"#f8fafc",borderRadius:12,
-            display:"flex",flexDirection:"column",gap:12}}>
-            <div>
-              <label style={{fontWeight:600,fontSize:12,color:"#475569",marginBottom:4,display:"block"}}>
-                Child's Name
-              </label>
-              <input
-                type="text"
-                value={newChildName}
-                onChange={e => setNewChildName(e.target.value)}
-                placeholder="Full name"
-                style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e2e8f0",
-                  borderRadius:8,fontSize:14,fontFamily:"inherit",outline:"none",
-                  boxSizing:"border-box"}}
-              />
-            </div>
-            <div>
-              <label style={{fontWeight:600,fontSize:12,color:"#475569",marginBottom:4,display:"block"}}>
-                Team (optional)
-              </label>
-              <select
-                value={newChildTeam}
-                onChange={e => setNewChildTeam(e.target.value)}
-                style={{width:"100%",padding:"10px 12px",border:"1.5px solid #e2e8f0",
-                  borderRadius:8,fontSize:14,fontFamily:"inherit",outline:"none",
-                  background:"#fff",boxSizing:"border-box"}}>
-                <option value="">Select team...</option>
-                {juniorTeams.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-            <button
-              onClick={() => {
-                if (!newChildName.trim()) return;
-                onCreateChild(newChildName, newChildTeam);
-                setNewChildName("");
-                setNewChildTeam("");
-                setShowCreate(false);
-              }}
-              disabled={!newChildName.trim()}
-              style={{padding:"12px",background:newChildName.trim()?"#16a34a":"#cbd5e1",
-                color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:700,
-                cursor:newChildName.trim()?"pointer":"not-allowed"}}>
-              Create & Link Child
-            </button>
-          </div>
-        )}
-      </div>
-      
-      {/* Hybrid account info */}
-      {(me.teams||[]).length > 0 && (
-        <div style={{background:"#f0fdf4",border:"1.5px solid #bbf7d0",borderRadius:12,padding:14}}>
-          <div style={{fontWeight:700,fontSize:14,color:"#166534",marginBottom:4}}>
-            🏏 Hybrid Account
-          </div>
-          <div style={{fontSize:13,color:"#16a34a",lineHeight:1.5}}>
-            You're both a player ({(me.teams||[]).join(", ")}) and a parent. 
-            Your single login manages both your playing profile and your children's accounts.
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 const dlICS = s => {
   const a=document.createElement("a");
   a.href=URL.createObjectURL(new Blob([makeICS(s)],{type:"text/calendar"}));
@@ -838,1430 +637,6 @@ const iSt = (extra={}) => ({
 });
 
 // ─── Atoms ────────────────────────────────────────────────────
-
-// ─── Availability gauge (arc dial) ───────────────────────────
-// ─── Nets Timeline Strip ──────────────────────────────────────
-function NetsTimeline({sessions,netsDate,setNetsDate,setView,setBDate,setBFrom,setBTo,setBNet,blockCals=[]}) {
-  // Build 14-day window starting today
-  const today = new Date(); today.setHours(0,0,0,0);
-  const dates = Array.from({length:14},(_,i)=>{
-    const d=new Date(today); d.setDate(today.getDate()+i);
-    return localDateStr(d);
-  });
-  const fmtD = ds => {
-    const d=new Date(ds+"T12:00:00");
-    return {day:d.toLocaleDateString("en-GB",{weekday:"short"}),date:d.getDate()};
-  };
-
-  const daySessions = sessions.filter(s=>s.date===netsDate);
-
-  function handleBarClick(e,net,barEl) {
-    if(!barEl) return;
-    const rect=barEl.getBoundingClientRect();
-    const ratio=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
-    const raw=NET_DAY_START+ratio*NET_SPAN;
-    const snapped=Math.round(raw/15)*15;
-    // Is click on a booked block?
-    const isBooked=daySessions.some(s=>{
-      if(s.net!==net&&s.net!=="both") return false;
-      return snapped>=toMinsNet(s.from)&&snapped<toMinsNet(s.to);
-    });
-    if(isBooked) return;
-    const fromMins=Math.min(snapped,NET_DAY_END-60);
-    const prime=isPrimeTime(`${String(Math.floor(fromMins/60)).padStart(2,"0")}:${String(fromMins%60).padStart(2,"0")}`);
-    const durMins=prime?60:90;
-    const toMins2=Math.min(fromMins+durMins,NET_DAY_END);
-    const fmt=m=>`${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`;
-    setBDate(netsDate);
-    setBFrom(fmt(fromMins));
-    setBTo(fmt(toMins2));
-    setBNet(net);
-    setView("add");
-  }
-
-  const barRefs={};
-
-  return (
-    <div style={{
-      background:G.white,
-      borderRadius:14,
-      padding:"12px 13px",
-      border:`1.5px solid ${G.green}`,
-      marginBottom:12,
-      boxShadow:`0 4px 0 0 ${G.green}44, 0 6px 16px rgba(20,83,45,.12)`,
-      position:"relative",
-    }}>
-      {/* "Nets" label accent */}
-      <div style={{position:"absolute",top:-1,left:13,
-        background:G.green,borderRadius:"0 0 7px 7px",
-        padding:"1px 10px",fontSize:9,fontWeight:900,
-        color:G.lime,letterSpacing:1.2,textTransform:"uppercase"}}>
-        Nets Availability
-      </div>
-
-      {/* Date strip */}
-      <div style={{display:"flex",gap:5,marginBottom:10,overflowX:"auto",paddingBottom:2,marginTop:12}}>
-        {dates.map(d=>{
-          const f=fmtD(d), active=d===netsDate;
-          const gauge=netAvailGauge(sessions,d);
-          const dow=new Date(d+"T12:00:00").getDay(); // 0=Sun,6=Sat
-          const isWeekend=dow===0||dow===6;
-          const hasBlock=blockCals.some(b=>b.date===d);
-          return (
-            <button key={d} onClick={()=>setNetsDate(d)}
-              style={{flexShrink:0,position:"relative",
-                background:active?G.green:isWeekend?"#e8f5e9":"#f9fafb",
-                border:active?`2px solid ${G.green}`:isWeekend?`1.5px solid #c8e6c9`:`1.5px solid ${G.border}`,
-                borderRadius:10,padding:"6px 8px 5px",cursor:"pointer",fontFamily:"inherit",
-                minWidth:44,textAlign:"center",transition:"all .15s",
-                boxShadow:active
-                  ?"0 3px 0 rgba(20,83,45,.4), inset 0 1px 0 rgba(255,255,255,.2)"
-                  :"none",
-                transform:active?"translateY(-1px)":"none"}}>
-              {hasBlock&&<span style={{position:"absolute",top:2,right:2,fontSize:8,
-                opacity:active?0.9:0.6}}>🔒</span>}
-              <div style={{fontSize:8,fontWeight:700,
-                color:active?G.lime:isWeekend?G.green:G.muted,
-                textTransform:"uppercase"}}>{f.day}</div>
-              <div style={{fontSize:14,fontWeight:900,color:active?G.lime:G.text,
-                margin:"1px 0"}}>{f.date}</div>
-              <div style={{display:"flex",justifyContent:"center",marginTop:1}}>
-                <AvailGauge gauge={gauge} active={active}/>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Gauge legend */}
-      <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
-        {[["#22c55e","Free"],["#84cc16","Some Slots Booked"],["#f59e0b","Busy"],["#ef4444","Fully Booked"]].map(([c,l])=>(
-          <div key={l} style={{display:"flex",alignItems:"center",gap:3}}>
-            <div style={{width:6,height:6,borderRadius:"50%",background:c,flexShrink:0}}/>
-            <span style={{fontSize:9,color:G.muted,fontWeight:600,whiteSpace:"nowrap"}}>{l}</span>
-          </div>
-        ))}
-        <div style={{display:"flex",alignItems:"center",gap:3}}>
-          <span style={{fontSize:8}}>🔒</span>
-          <span style={{fontSize:9,color:G.muted,fontWeight:600,whiteSpace:"nowrap"}}>Blocked</span>
-        </div>
-      </div>
-
-      {/* Hour labels */}
-      <div style={{display:"flex",marginBottom:3}}>
-        <div style={{width:54,flexShrink:0}}/>
-        <div style={{flex:1,position:"relative",height:13}}>
-          {[8,10,12,14,16,18,20].map(h=>(
-            <span key={h} style={{position:"absolute",
-              left:`${netPct(h*60)}%`,transform:"translateX(-50%)",
-              fontSize:9,color:G.muted,fontWeight:600}}>{h}:00</span>
-          ))}
-        </div>
-      </div>
-
-      {/* Net bars */}
-      {["1","2"].map(net=>{
-        const nc=NET_COLORS[net];
-        const netSess=daySessions.filter(s=>s.net===net||s.net==="both")
-          .sort((a,b)=>toMinsNet(a.from)-toMinsNet(b.from));
-        const isFree=netSess.length===0;
-        const freeSlots=[]; let cur=NET_DAY_START;
-        netSess.forEach(s=>{
-          const sf=toMinsNet(s.from),st=toMinsNet(s.to);
-          if(sf>cur) freeSlots.push({from:cur,to:sf});
-          cur=Math.max(cur,st);
-        });
-        if(cur<NET_DAY_END) freeSlots.push({from:cur,to:NET_DAY_END});
-        return (
-          <div key={net} style={{display:"flex",alignItems:"center",gap:7,marginBottom:7}}>
-            <div style={{width:54,flexShrink:0,textAlign:"right"}}>
-              <span style={{background:nc.bar,color:nc.label,borderRadius:6,
-                padding:"3px 7px",fontSize:10,fontWeight:900,
-                boxShadow:"0 2px 0 rgba(0,0,0,.12)"}}>Net {net}</span>
-            </div>
-            <div ref={el=>{barRefs[net]=el;}}
-              onClick={e=>handleBarClick(e,net,barRefs[net])}
-              style={{flex:1,height:38,background:nc.barBg,borderRadius:8,
-                position:"relative",
-                border:`1.5px solid ${isFree?nc.borderFree:G.border}`,
-                boxShadow:"inset 0 2px 4px rgba(0,0,0,.06)",
-                overflow:"hidden",cursor:"crosshair"}}>
-              {/* Prime shading */}
-              {PRIME_ZONES.map((z,i)=>(
-                <div key={i} style={{position:"absolute",
-                  left:`${netPct(toMinsNet(z.from))}%`,
-                  width:`${netPct(toMinsNet(z.to))-netPct(toMinsNet(z.from))}%`,
-                  top:0,bottom:0,background:"rgba(250,204,21,.08)",
-                  borderLeft:"1px dashed rgba(250,204,21,.4)",
-                  borderRight:"1px dashed rgba(250,204,21,.4)",
-                  pointerEvents:"none"}}/>
-              ))}
-              {/* Grid lines */}
-              {[10,12,14,16,18,20].map(h=>(
-                <div key={h} style={{position:"absolute",left:`${netPct(h*60)}%`,
-                  top:0,bottom:0,width:1,background:"rgba(0,0,0,.05)",pointerEvents:"none"}}/>
-              ))}
-              {/* Free labels */}
-              {freeSlots.filter(f=>f.to-f.from>=90).map((f,i)=>(
-                <div key={i} style={{position:"absolute",left:`${netPct(f.from)}%`,
-                  width:`${netPct(f.to)-netPct(f.from)}%`,top:0,bottom:0,
-                  display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none"}}>
-                  <span style={{fontSize:8,color:nc.freeText,fontWeight:700}}>FREE · tap to book</span>
-                </div>
-              ))}
-              {/* Booked blocks */}
-              {netSess.map(s=>{
-                const tm=getTeamMeta(s.restrictedTo||"Unassigned");
-                const w=netPct(toMinsNet(s.to))-netPct(toMinsNet(s.from));
-                return (
-                  <div key={s.id} style={{position:"absolute",
-                    left:`${netPct(toMinsNet(s.from))}%`,width:`${w}%`,
-                    top:3,bottom:3,background:tm.bg,borderRadius:5,
-                    padding:"0 5px",overflow:"hidden",cursor:"default",
-                    display:"flex",alignItems:"center",
-                    boxShadow:"0 1px 3px rgba(0,0,0,.15)"}}>
-                    <span style={{color:tm.accent||tm.text,fontSize:9,fontWeight:800,
-                      whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
-                      {s.label||"Session"}{s.net==="both"?" ×2":""}
-                    </span>
-                  </div>
-                );
-              })}
-              {/* Blocked date overlay — lock icon + striped pattern */}
-              {blockCals.filter(b=>b.date===netsDate).map(b=>{
-                const bFrom=toMinsNet(b.from), bTo=toMinsNet(b.to);
-                const left=netPct(Math.max(bFrom,NET_DAY_START));
-                const right=netPct(Math.min(bTo,NET_DAY_END));
-                const w=right-left;
-                if(w<=0) return null;
-                return (
-                  <div key={b.id} style={{position:"absolute",
-                    left:`${left}%`,width:`${w}%`,
-                    top:0,bottom:0,
-                    background:"repeating-linear-gradient(135deg,rgba(100,116,139,.12),rgba(100,116,139,.12) 4px,transparent 4px,transparent 8px)",
-                    borderLeft:"2px solid rgba(100,116,139,.4)",
-                    borderRight:"2px solid rgba(100,116,139,.4)",
-                    display:"flex",alignItems:"center",justifyContent:"center",
-                    pointerEvents:"none",zIndex:5}}>
-                    <div style={{background:"rgba(100,116,139,.85)",borderRadius:4,
-                      padding:"2px 6px",display:"flex",alignItems:"center",gap:3}}>
-                      <span style={{fontSize:10}}>🔒</span>
-                      <span style={{fontSize:8,color:"#fff",fontWeight:700,
-                        whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",
-                        maxWidth:w>15?80:40}}>
-                        {b.label||"Blocked"}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─── Weather bar (schedule mini strip) ───────────────────────
-function WeatherBar({wx,setView}) {
-  if(!wx) return (
-    <div style={{background:`linear-gradient(135deg,#14532d,#1a6338)`,
-      border:"none",borderRadius:14,padding:"11px 14px",marginBottom:12,
-      display:"flex",alignItems:"center",gap:10,opacity:0.7}}>
-      <div style={{width:16,height:16,borderRadius:"50%",
-        border:"2px solid rgba(163,230,53,.4)",borderTopColor:G.lime,
-        animation:"spin 1s linear infinite",flexShrink:0}}/>
-      <span style={{fontSize:11,color:"rgba(255,255,255,.7)"}}>Fetching Karlebo ground forecast…</span>
-    </div>
-  );
-  if(wx.error) return (
-    <div style={{background:"#fef2f2",border:"1.5px solid #fca5a5",borderRadius:14,
-      padding:"11px 14px",marginBottom:12}}>
-      <span style={{fontSize:11,color:"#991b1b"}}>⚠️ Weather unavailable — check connection</span>
-    </div>
-  );
-  const today=wx.daily?.[0];
-  // Prefer live /current data; fall back to nearest hourly hour
-  const cur = wx.current || (()=>{
-    const nowHour = `${String(new Date().getHours()).padStart(2,"0")}:00`;
-    const idx = (wx.hourly?.time||[]).findIndex(t=>t.startsWith(wx.today)&&t.slice(11,16)===nowHour);
-    if(idx<0) return null;
-    return {
-      temp:  Math.round(wx.hourly.temperature_2m[idx]),
-      feels: Math.round(wx.hourly.apparent_temperature[idx]),
-      code:  wx.hourly.weathercode[idx],
-      wind:  Math.round(wx.hourly.windspeed_10m[idx]*10)/10,
-    };
-  })();
-  const w=wmo(cur?.code ?? today?.code);
-  const rainPeriods=calcRainPeriods(wx.hourly, wx.today);
-  const rainStr=rainPeriods.length>0
-    ? `Rain ${rainPeriods[0].from}–${rainPeriods[0].to}`
-    : "No rain";
-  const windStr=cur?.wind!=null ? `${cur.wind} m/s` : (today?.windMax!=null ? `${today.windMax} m/s` : "");
-  const isRainy = rainPeriods.length>0;
-  return (
-    <button onClick={()=>setView("weather")}
-      style={{width:"100%",
-        background:`linear-gradient(135deg, #14532d 0%, #1a5c35 60%, #1e3a8a 100%)`,
-        border:"none",borderRadius:14,padding:"0",marginBottom:12,
-        cursor:"pointer",fontFamily:"inherit",textAlign:"left",
-        boxSizing:"border-box",overflow:"hidden",
-        boxShadow:"0 3px 12px rgba(20,83,45,.25)"}}>
-      <div style={{display:"flex",alignItems:"stretch"}}>
-        {/* Left: weather info */}
-        <div style={{flex:1,padding:"9px 12px",display:"flex",alignItems:"center",gap:10}}>
-          <span style={{fontSize:24,flexShrink:0,lineHeight:1}}>{w.emoji}</span>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:1}}>
-              <span style={{fontSize:13,fontWeight:900,color:"#fff"}}>
-                {cur?.temp!=null?`${cur.temp}°C`:today?.max!=null?`${today.max}°C`:"--°C"}
-              </span>
-              <span style={{fontSize:12,color:"rgba(255,255,255,.75)",fontWeight:600}}>
-                · {w.label}
-              </span>
-            </div>
-            <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
-              <span style={{fontSize:10,color:isRainy?"#93c5fd":G.lime,fontWeight:700}}>
-                {isRainy?"🌧️ ":""}{rainStr}
-              </span>
-              {windStr&&<span style={{fontSize:10,color:"rgba(255,255,255,.55)"}}>· 💨 {windStr}</span>}
-              <span style={{fontSize:10,color:"rgba(255,255,255,.4)"}}>· Karlebo</span>
-            </div>
-          </div>
-        </div>
-        {/* Right: CTA panel */}
-        <div style={{background:"rgba(255,255,255,.1)",borderLeft:"1px solid rgba(255,255,255,.12)",
-          padding:"9px 13px",display:"flex",flexDirection:"column",
-          alignItems:"center",justifyContent:"center",gap:3,flexShrink:0,minWidth:90}}>
-          <span style={{fontSize:9,fontWeight:800,color:G.lime,
-            textTransform:"uppercase",letterSpacing:.8,textAlign:"center",
-            lineHeight:1.3}}>
-            Detailed<br/>Forecast
-          </span>
-          <div style={{display:"flex",alignItems:"center",gap:4}}>
-            <span style={{fontSize:13}}>📡</span>
-            <span style={{fontSize:15,color:G.lime,fontWeight:900,lineHeight:1}}>›</span>
-          </div>
-        </div>
-      </div>
-    </button>
-  );
-}
-
-// ─── Full weather page ────────────────────────────────────────
-function WeatherPage({wx,setView}) {
-  const [tab, setTab] = React.useState("today");
-
-  if(!wx || wx.error) return (
-    <div style={{padding:"40px 20px",textAlign:"center",color:G.muted}}>
-      <div style={{fontSize:40,marginBottom:12}}>🌡️</div>
-      <div style={{fontWeight:800,color:G.text,marginBottom:6}}>
-        {!wx ? "Loading forecast…" : "Forecast unavailable"}
-      </div>
-      <div style={{fontSize:13}}>Please check your connection and try again.</div>
-      <button onClick={()=>setView("schedule")} style={{marginTop:20,background:G.green,
-        color:G.lime,border:"none",borderRadius:10,padding:"10px 22px",
-        fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
-        ← Back
-      </button>
-    </div>
-  );
-
-  const {hourly, daily: dailyArr, today} = wx;
-  const todayDaily = dailyArr?.[0];
-
-  // Filter hourly for today
-  // Filter hourly for today (7:00–21:00)
-  const todayHrs = (hourly?.time||[]).reduce((acc,t,i)=>{
-    if(t.startsWith(wx.today)) acc.push({
-      time:t.slice(11,16),
-      temp:Math.round(hourly.temperature_2m[i]),
-      feels:Math.round(hourly.apparent_temperature[i]),
-      precip:+(hourly.precipitation[i]||0).toFixed(1),
-      prob:hourly.precipitation_probability[i]||0,
-      code:hourly.weathercode[i],
-      wind:+(hourly.windspeed_10m[i]||0).toFixed(1),
-      vis:hourly.visibility?.[i],
-      isDay:hourly.is_day?.[i],
-    });
-    return acc;
-  },[]).filter(h=>parseInt(h.time)>=7&&parseInt(h.time)<=21);
-
-  const rainPeriods = calcRainPeriods(hourly, wx.today);
-  const sunrise = todayDaily?.sunrise?.slice(11,16);
-  const sunset  = todayDaily?.sunset?.slice(11,16);
-
-  return (
-    <div style={{padding:"0 0 100px"}}>
-      {/* Hero card */}
-      <div style={{background:`linear-gradient(135deg, ${G.green} 0%, #1a4731 100%)`,
-        padding:"20px 18px 18px"}}>
-        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
-          <div>
-            <div style={{color:"rgba(255,255,255,.55)",fontSize:11,fontWeight:700,
-              textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>
-              📍 Karlebo Cricket Ground
-            </div>
-            <div style={{color:G.lime,fontWeight:900,fontSize:13,marginBottom:2}}>
-              {new Date(wx.today+"T12:00:00").toLocaleDateString("en-GB",
-                {weekday:"long",day:"numeric",month:"long"})}
-            </div>
-            <div style={{fontSize:46,fontWeight:900,color:"#fff",lineHeight:1,
-              marginBottom:4}}>
-              {wx.current?.temp!=null ? `${wx.current.temp}°` : todayDaily?.max!=null ? `${todayDaily.max}°` : "--°"}
-              <span style={{fontSize:18,fontWeight:400,color:"rgba(255,255,255,.6)",
-                marginLeft:4}}>C now</span>
-            </div>
-            <div style={{color:"rgba(255,255,255,.75)",fontSize:14,fontWeight:600,
-              marginBottom:2}}>
-              {wmo(wx.current?.code ?? todayDaily?.code ?? 0).label}
-            </div>
-            <div style={{color:"rgba(255,255,255,.5)",fontSize:12}}>
-              Feels like {wx.current?.feels??todayHrs[0]?.feels??todayDaily?.min}°C
-              · Low {todayDaily?.min}° High {todayDaily?.max}°
-            </div>
-          </div>
-          <div style={{fontSize:64,lineHeight:1}}>{wmo(todayDaily?.code||0).emoji}</div>
-        </div>
-
-        {/* Sunrise / sunset row */}
-        {sunrise&&sunset&&(
-          <div style={{display:"flex",gap:16,marginTop:14,
-            background:"rgba(255,255,255,.08)",borderRadius:10,padding:"9px 14px"}}>
-            <div style={{textAlign:"center"}}>
-              <div style={{fontSize:10,color:"rgba(255,255,255,.5)",fontWeight:700,
-                textTransform:"uppercase",letterSpacing:.8}}>Sunrise</div>
-              <div style={{fontSize:16,fontWeight:900,color:G.lime}}>🌅 {sunrise}</div>
-            </div>
-            <div style={{width:1,background:"rgba(255,255,255,.15)"}}/>
-            <div style={{textAlign:"center"}}>
-              <div style={{fontSize:10,color:"rgba(255,255,255,.5)",fontWeight:700,
-                textTransform:"uppercase",letterSpacing:.8}}>Sunset</div>
-              <div style={{fontSize:16,fontWeight:900,color:G.lime}}>🌇 {sunset}</div>
-            </div>
-            <div style={{width:1,background:"rgba(255,255,255,.15)"}}/>
-            <div style={{textAlign:"center",flex:1}}>
-              <div style={{fontSize:10,color:"rgba(255,255,255,.5)",fontWeight:700,
-                textTransform:"uppercase",letterSpacing:.8}}>Daylight</div>
-              <div style={{fontSize:16,fontWeight:900,color:G.lime}}>
-                {(()=>{
-                  if(!sunrise||!sunset) return "--";
-                  const [sh,sm]=sunrise.split(":").map(Number);
-                  const [eh,em]=sunset.split(":").map(Number);
-                  const mins=(eh*60+em)-(sh*60+sm);
-                  return `${Math.floor(mins/60)}h ${mins%60}m`;
-                })()}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Wind / humidity row */}
-        <div style={{display:"flex",gap:10,marginTop:10}}>
-          {[
-            ["💨","Wind",todayDaily?.windMax!=null?`${todayDaily.windMax} m/s`:"--"],
-            ["🌧️","Rain",todayDaily?.rainSum!=null?`${todayDaily.rainSum}mm`:"0mm"],
-            ["🎲","Rain%",todayDaily?.rainProb!=null?`${todayDaily.rainProb}%`:"--"],
-          ].map(([ico,lbl,val])=>(
-            <div key={lbl} style={{flex:1,background:"rgba(255,255,255,.08)",
-              borderRadius:9,padding:"8px 6px",textAlign:"center"}}>
-              <div style={{fontSize:14}}>{ico}</div>
-              <div style={{fontSize:9,color:"rgba(255,255,255,.45)",fontWeight:700,
-                textTransform:"uppercase",letterSpacing:.7,marginBottom:1}}>{lbl}</div>
-              <div style={{fontSize:13,fontWeight:800,color:"#fff"}}>{val}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div style={{padding:"14px 14px 0"}}>
-        {/* Tabs */}
-        <div style={{display:"flex",gap:6,marginBottom:14,
-          background:G.cream,borderRadius:10,padding:4}}>
-          {[["today","Today"],["week","7-Day"]].map(([k,l])=>(
-            <button key={k} onClick={()=>setTab(k)}
-              style={{flex:1,background:tab===k?G.green:"transparent",
-                color:tab===k?G.lime:G.muted,border:"none",
-                borderRadius:7,padding:"7px",fontSize:12,fontWeight:800,
-                cursor:"pointer",fontFamily:"inherit",transition:"all .12s"}}>
-              {l}
-            </button>
-          ))}
-        </div>
-
-        {tab==="today"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-
-            {/* Rain periods highlight */}
-            {rainPeriods.length>0 ? (
-              <div style={{background:"#eff6ff",border:"1.5px solid #bfdbfe",
-                borderRadius:12,padding:"12px 14px"}}>
-                <div style={{fontWeight:800,fontSize:12,color:"#1e3a8a",marginBottom:6}}>
-                  🌧️ Rain expected today
-                </div>
-                {rainPeriods.map((p,i)=>(
-                  <div key={i} style={{display:"flex",justifyContent:"space-between",
-                    alignItems:"center",padding:"5px 0",
-                    borderTop:i>0?"1px solid #dbeafe":"none"}}>
-                    <span style={{fontSize:12,color:"#1e40af",fontWeight:700}}>
-                      {p.from} – {p.to}
-                    </span>
-                    <span style={{background:"#1e3a8a",color:"#bfdbfe",borderRadius:20,
-                      padding:"2px 10px",fontSize:11,fontWeight:800}}>
-                      {p.mm} mm
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{background:"#f0fdf4",border:"1.5px solid #bbf7d0",
-                borderRadius:12,padding:"12px 14px",display:"flex",gap:10,
-                alignItems:"center"}}>
-                <span style={{fontSize:20}}>✅</span>
-                <span style={{fontSize:12,fontWeight:700,color:"#166534"}}>
-                  No rain expected today — great day for cricket!
-                </span>
-              </div>
-            )}
-
-            {/* Hourly strip */}
-            <div style={{background:G.white,border:`1.5px solid ${G.border}`,
-              borderRadius:12,padding:"12px 14px"}}>
-              <div style={{fontSize:11,fontWeight:900,color:G.muted,
-                textTransform:"uppercase",letterSpacing:1.2,marginBottom:10}}>
-                Hourly — Today
-              </div>
-              <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4}}>
-                {todayHrs.map(h=>{
-                  const w2=wmo(h.code);
-                  const isRainy=h.precip>0.05;
-                  return (
-                    <div key={h.time} style={{flexShrink:0,textAlign:"center",
-                      background:isRainy?"#eff6ff":h.isDay?"#f9fafb":"#1a2e1a",
-                      borderRadius:9,padding:"8px 6px",minWidth:46,
-                      border:isRainy?"1.5px solid #bfdbfe":`1px solid ${G.border}`}}>
-                      <div style={{fontSize:9,fontWeight:700,
-                        color:h.isDay?G.muted:"rgba(255,255,255,.5)",
-                        marginBottom:2}}>{h.time}</div>
-                      <div style={{fontSize:16,marginBottom:2}}>{w2.emoji}</div>
-                      <div style={{fontSize:12,fontWeight:900,
-                        color:h.isDay?G.text:"#fff"}}>{h.temp}°</div>
-                      {isRainy&&<div style={{fontSize:9,color:"#1e40af",
-                        fontWeight:700,marginTop:1}}>{h.precip}mm</div>}
-                      <div style={{fontSize:9,color:h.isDay?G.muted:"rgba(255,255,255,.4)",
-                        marginTop:2}}>{h.wind}m/s</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Visibility / wind detail */}
-            {todayHrs.length>0&&(
-              <div style={{background:G.white,border:`1.5px solid ${G.border}`,
-                borderRadius:12,padding:"12px 14px"}}>
-                <div style={{fontSize:11,fontWeight:900,color:G.muted,
-                  textTransform:"uppercase",letterSpacing:1.2,marginBottom:8}}>
-                  Conditions at training time (17:00–20:00)
-                </div>
-                {todayHrs.filter(h=>parseInt(h.time)>=17&&parseInt(h.time)<=20).map(h=>(
-                  <div key={h.time} style={{display:"flex",justifyContent:"space-between",
-                    alignItems:"center",padding:"5px 0",
-                    borderBottom:`1px solid ${G.border}`}}>
-                    <span style={{fontWeight:700,fontSize:12,color:G.text}}>{h.time}</span>
-                    <span style={{fontSize:12}}>{wmo(h.code).emoji} {wmo(h.code).label}</span>
-                    <span style={{fontSize:12,color:G.muted}}>{h.temp}° · {h.wind}m/s</span>
-                    {h.vis&&<span style={{fontSize:11,color:G.muted}}>
-                      {h.vis>=10000?"Excellent":h.vis>=5000?"Good":h.vis>=2000?"Moderate":"Poor"} vis.
-                    </span>}
-                  </div>
-                ))}
-                {todayHrs.filter(h=>parseInt(h.time)>=17&&parseInt(h.time)<=20).length===0&&(
-                  <div style={{fontSize:12,color:G.muted}}>Outside forecast window</div>
-                )}
-              </div>
-            )}
-
-            {/* Source note */}
-            <div style={{textAlign:"center",padding:"4px 0"}}>
-              <span style={{fontSize:10,color:G.muted}}>
-                📡 Data: Open-Meteo (ECMWF model) · Same source as YR.no &amp; DMI
-              </span>
-            </div>
-          </div>
-        )}
-
-        {tab==="week"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {(dailyArr||[]).map((d,i)=>{
-              const dw=wmo(d.code||0);
-              const dayStr=new Date(d.date+"T12:00:00").toLocaleDateString("en-GB",
-                {weekday:"short",day:"numeric",month:"short"});
-              return (
-                <div key={d.date} style={{background:G.white,
-                  border:`1.5px solid ${G.border}`,borderRadius:12,
-                  padding:"12px 14px",display:"flex",alignItems:"center",gap:12}}>
-                  <div style={{width:44,flexShrink:0}}>
-                    <div style={{fontSize:10,fontWeight:800,color:G.muted}}>{dayStr.split(" ")[0]}</div>
-                    <div style={{fontSize:13,fontWeight:900,color:G.text}}>
-                      {dayStr.split(" ").slice(1).join(" ")}
-                    </div>
-                  </div>
-                  <div style={{fontSize:26,flexShrink:0}}>{dw.emoji}</div>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:12,fontWeight:700,color:G.text,
-                      marginBottom:2}}>{dw.label}</div>
-                    <div style={{fontSize:11,color:G.muted}}>
-                      {d.rainSum>0?`🌧️ ${d.rainSum}mm`:"No rain"}
-                      {d.rainProb>0?` · ${d.rainProb}% chance`:""}
-                      · 💨 {d.windMax}m/s
-                    </div>
-                  </div>
-                  <div style={{textAlign:"right",flexShrink:0}}>
-                    <div style={{fontSize:13,fontWeight:900,color:G.text}}>{d.max}°</div>
-                    <div style={{fontSize:11,color:G.muted}}>{d.min}°</div>
-                  </div>
-                </div>
-              );
-            })}
-            <div style={{textAlign:"center",padding:"4px 0"}}>
-              <span style={{fontSize:10,color:G.muted}}>
-                📡 Data: Open-Meteo (ECMWF model) · Same source as YR.no &amp; DMI
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── PlayerGroup — collapsible team section in session detail ──
-function PlayerGroup({team,players,members,teams,lifts,selSess,isSelf,cutoff,canRemove,onRemove,onCarpoolEdit,onCarpoolSet,single}) {
-  const [open,setOpen]=React.useState(true); // default open
-  const tm=getTeamMeta(team);
-  const dispStop=d=>{const o=getLiftObj(d);if(!o.stop)return"";return o.stop==="Other"?(o.stopOther||"Other"):o.stop;};
-  return (
-    <div style={{marginBottom:10}}>
-      {/* Group header — hide toggle when only one group */}
-      {!single&&(
-        <button onClick={()=>setOpen(v=>!v)}
-          style={{width:"100%",display:"flex",alignItems:"center",gap:8,
-            padding:"7px 12px",borderRadius:10,border:"none",cursor:"pointer",
-            fontFamily:"inherit",marginBottom:4,
-            background:`${tm.bg}22`,}}>
-          <span style={{width:10,height:10,borderRadius:"50%",background:tm.bg,flexShrink:0}}/>
-          <span style={{fontWeight:800,fontSize:12,color:tm.bg,flex:1,textAlign:"left"}}>
-            {team}
-          </span>
-          <span style={{fontSize:11,color:G.muted,fontWeight:600}}>
-            {players.length} player{players.length!==1?"s":""}
-          </span>
-          <span style={{fontSize:12,color:G.muted}}>{open?"▲":"▼"}</span>
-        </button>
-      )}
-      {(open||single)&&players.map((p,i)=>{
-        const mem=members.find(m=>m.name===p);
-        const self=isSelf(p);
-        const liftObj=getLiftObj((lifts||{})[p]);
-        const liftPref=liftObj.pref;
-        const isO=liftPref==="offer",isN=liftPref==="need";
-        return (
-          <div key={p} style={{background:G.white,
-            border:`1.5px solid ${isO?"#86efac":isN?"#93c5fd":G.border}`,
-            borderRadius:10,padding:"10px 14px",marginBottom:6,
-            display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <div style={{display:"flex",alignItems:"flex-start",gap:10,flex:1,minWidth:0}}>
-              <div style={{width:36,height:36,background:`${G.green}18`,borderRadius:"50%",
-                display:"flex",alignItems:"center",justifyContent:"center",
-                fontWeight:900,fontSize:13,color:G.green,flexShrink:0,marginTop:1}}>
-                {p.split(" ").map(w=>w[0]).join("").slice(0,2)}
-              </div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontWeight:800,color:G.text,fontSize:15,
-                  display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                  {p}{self&&<span style={{color:G.muted,fontSize:12,fontWeight:500}}>(you)</span>}
-                  {isCoachMember(p, teams)&&<span style={{fontSize:12}} title="Coach">🧢</span>}
-                  {(()=>{
-                    if(!mem||!selSess?.date) return null;
-                    if(!isAbsent(mem, selSess.date)) return null;
-                    const abs=(mem.absences||[]).find(a=>a.from<=selSess.date&&a.to>=selSess.date);
-                    return (
-                      <span style={{fontSize:10,fontWeight:700,padding:"1px 7px",
-                        borderRadius:20,background:"#fffbeb",color:"#92400e",
-                        border:"1px solid #fde68a"}}>
-                        ✈️ Away{abs?.category&&` · ${abs.category}`}
-                      </span>
-                    );
-                  })()}
-                </div>
-                <div style={{display:"flex",gap:4,marginTop:2,flexWrap:"wrap"}}>
-                  {(mem?.teams||[]).map(t=><TeamPill key={t} team={t} sm/>)}
-                  <MemberRolePills member={mem} teams={teams} sm/>
-                </div>
-                {/* Lift inline badge */}
-                {liftPref&&(
-                  <div style={{display:"flex",alignItems:"center",gap:5,marginTop:5,flexWrap:"wrap"}}>
-                    <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20,
-                      background:isO?"#dcfce7":isN?"#dbeafe":"rgba(0,0,0,.05)",
-                      color:isO?"#166534":isN?"#1e3a5f":G.muted,
-                      border:`0.5px solid ${isO?"#86efac":isN?"#93c5fd":"rgba(0,0,0,.1)"}`}}>
-                      {isO?"🚘 Offering lift":isN?"🙋 Needs lift":"🚀 Own transport"}
-                    </span>
-                    {isO&&liftObj.seats>0&&<span style={{fontSize:11,color:G.muted}}>💺 {liftObj.seats} seat{liftObj.seats>1?"s":""}</span>}
-                    {dispStop(liftObj)&&<span style={{fontSize:11,color:G.muted}}>📍 {dispStop(liftObj)}</span>}
-                    {liftObj.note&&<span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>"{liftObj.note}"</span>}
-                    {self&&(
-                      <button onClick={()=>onCarpoolEdit(p)}
-                        style={{fontSize:11,background:"none",border:"none",color:G.muted,
-                          textDecoration:"underline",cursor:"pointer",fontFamily:"inherit",padding:0}}>
-                        Edit
-                      </button>
-                    )}
-                  </div>
-                )}
-                {!liftPref&&self&&(
-                  <button onClick={onCarpoolSet}
-                    style={{marginTop:5,fontSize:11,fontWeight:700,padding:"3px 10px",
-                      borderRadius:20,border:`1px solid ${G.border}`,background:G.cream,
-                      color:G.muted,cursor:"pointer",fontFamily:"inherit"}}>
-                    🚘 Set car pool preference
-                  </button>
-                )}
-              </div>
-            </div>
-            {canRemove ? (
-              <Btn onClick={()=>onRemove(p)} bg={G.redBg} col={G.red} sm>Remove</Btn>
-            ) : self ? (
-              cutoff
-                ? <span style={{fontSize:11,color:G.muted,fontWeight:700}}>🔒 Locked</span>
-                : <Btn onClick={()=>onRemove(p)} bg={G.redBg} col={G.red} sm>Leave</Btn>
-            ) : null}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─── Session card ─────────────────────────────────────────────
-// ─── Carpool Bottom Sheet ─────────────────────────────────────
-function CarpoolSheet({sess,sessions,myName,liftDraft,setLiftDraft,liftEditing,setLiftEditing,saveSessions,selSess,setSelSess,onClose}) {
-  const lifts = sess.lifts||{};
-  const myRaw = lifts[myName];
-  const myData = getLiftObj(myRaw);
-  const draft  = liftDraft || myData;
-  const isO=draft.pref==="offer", isN=draft.pref==="need", isSelf=draft.pref==="self";
-
-  const dispStop = d => {
-    const o=getLiftObj(d);
-    if(!o.stop) return "";
-    return o.stop==="Other"?(o.stopOther||"Other"):o.stop;
-  };
-
-  const offering = sess.players.filter(p=>getLiftPref(lifts[p])==="offer");
-  const needing  = sess.players.filter(p=>getLiftPref(lifts[p])==="need");
-  const ownT     = sess.players.filter(p=>getLiftPref(lifts[p])==="self");
-
-  function saveLift(obj) {
-    const newLifts = {...(sess.lifts||{})};
-    if(obj && obj.pref) newLifts[myName] = obj; else delete newLifts[myName];
-    const updatedSess = {...sess, lifts:newLifts};
-    const updated = sessions.map(s=>s.id===sess.id?updatedSess:s);
-    saveSessions(updated);
-    if(selSess?.id===sess.id) setSelSess(updatedSess);
-    // Update sheet's own sess so it re-renders showing saved state
-    // We do this by closing and the parent sees updated selSess/sessions
-    setLiftDraft(null);
-    setLiftEditing(false);
-    onClose(); // close sheet — saved state now visible in session detail carpool section
-  }
-
-  const PILL = (label,active,col,bg,bord,onClick) => (
-    <button onClick={onClick} style={{fontSize:12,fontWeight:700,padding:"7px 0",flex:1,
-      borderRadius:20,border:`1.5px solid ${active?bord:"rgba(0,0,0,.1)"}`,
-      background:active?bg:G.white,color:active?col:G.muted,
-      cursor:"pointer",fontFamily:"inherit",transition:"all .13s"}}>
-      {label}
-    </button>
-  );
-
-  return (
-    <>
-      {/* Backdrop */}
-      <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",
-        zIndex:300,animation:"fadeIn .2s ease"}}/>
-      {/* Sheet */}
-      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",
-        width:"100%",maxWidth:500,zIndex:301,background:G.white,
-        borderRadius:"20px 20px 0 0",boxShadow:"0 -8px 40px rgba(0,0,0,.18)",
-        animation:"slideUp .25s ease",maxHeight:"85vh",overflowY:"auto",
-        boxSizing:"border-box",paddingBottom:"max(20px,env(safe-area-inset-bottom))"}}>
-
-        {/* Handle */}
-        <div style={{display:"flex",justifyContent:"center",paddingTop:10,paddingBottom:4}}>
-          <div style={{width:36,height:4,borderRadius:20,background:G.border}}/>
-        </div>
-
-        {/* Header */}
-        <div style={{padding:"4px 16px 10px",borderBottom:`1px solid ${G.border}`,
-          display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
-          <div>
-            <div style={{fontWeight:900,fontSize:15,color:G.green}}>🚘 Car Pool Info</div>
-            <div style={{fontSize:12,color:G.muted,marginTop:1}}>
-              {fmtShort(sess.date)} · {sess.from}–{sess.to}{sess.label?" · "+sess.label:""}
-            </div>
-          </div>
-          <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,
-            color:G.muted,cursor:"pointer",padding:"0 0 0 8px",lineHeight:1}}>×</button>
-        </div>
-
-        <div style={{padding:"12px 16px"}}>
-
-          {/* Other players */}
-          {(offering.length>0||needing.length>0||ownT.length>0) ? (
-            <div style={{marginBottom:14}}>
-              {offering.map(name=>{
-                const obj=getLiftObj(lifts[name]);const loc=dispStop(lifts[name]);
-                return (
-                  <div key={name} style={{display:"flex",alignItems:"flex-start",gap:10,
-                    padding:"9px 12px",background:"#f0fdf4",borderRadius:10,marginBottom:7,
-                    border:"0.5px solid #86efac"}}>
-                    <div style={{width:32,height:32,borderRadius:"50%",background:"#14532d22",
-                      display:"flex",alignItems:"center",justifyContent:"center",
-                      fontSize:11,fontWeight:900,color:G.green,flexShrink:0}}>
-                      {name.split(" ").map(w=>w[0]).join("").slice(0,2)}
-                    </div>
-                    <div style={{flex:1}}>
-                      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:2}}>
-                        <span style={{fontWeight:800,fontSize:13,color:G.text}}>{name}</span>
-                        <span style={{fontSize:10,fontWeight:700,padding:"1px 8px",borderRadius:20,
-                          background:"#dcfce7",color:"#166534",border:"0.5px solid #86efac"}}>
-                          🚘 Offering
-                        </span>
-                      </div>
-                      <div style={{fontSize:11,color:G.muted,display:"flex",gap:6,flexWrap:"wrap"}}>
-                        {obj.seats>0&&<span>💺 {obj.seats} seat{obj.seats>1?"s":""}</span>}
-                        {loc&&<span>📍 {loc}</span>}
-                        {obj.note&&<span style={{fontStyle:"italic"}}>"{obj.note}"</span>}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-              {needing.map(name=>{
-                const obj=getLiftObj(lifts[name]);const loc=dispStop(lifts[name]);
-                return (
-                  <div key={name} style={{display:"flex",alignItems:"flex-start",gap:10,
-                    padding:"9px 12px",background:"#eff6ff",borderRadius:10,marginBottom:7,
-                    border:"0.5px solid #93c5fd"}}>
-                    <div style={{width:32,height:32,borderRadius:"50%",background:"#1e3a5f22",
-                      display:"flex",alignItems:"center",justifyContent:"center",
-                      fontSize:11,fontWeight:900,color:"#1e3a5f",flexShrink:0}}>
-                      {name.split(" ").map(w=>w[0]).join("").slice(0,2)}
-                    </div>
-                    <div style={{flex:1}}>
-                      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:2}}>
-                        <span style={{fontWeight:800,fontSize:13,color:G.text}}>{name}</span>
-                        <span style={{fontSize:10,fontWeight:700,padding:"1px 8px",borderRadius:20,
-                          background:"#dbeafe",color:"#1e3a5f",border:"0.5px solid #93c5fd"}}>
-                          🙋 Needs lift
-                        </span>
-                      </div>
-                      <div style={{fontSize:11,color:G.muted,display:"flex",gap:6,flexWrap:"wrap"}}>
-                        {loc&&<span>📍 {loc}</span>}
-                        {obj.note&&<span style={{fontStyle:"italic"}}>"{obj.note}"</span>}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-              {ownT.filter(n=>n!==myName).map(name=>(
-                <div key={name} style={{display:"flex",alignItems:"center",gap:10,
-                  padding:"8px 12px",background:G.cream,borderRadius:10,marginBottom:7,
-                  border:`0.5px solid ${G.border}`}}>
-                  <div style={{width:32,height:32,borderRadius:"50%",background:`${G.green}18`,
-                    display:"flex",alignItems:"center",justifyContent:"center",
-                    fontSize:11,fontWeight:900,color:G.green,flexShrink:0}}>
-                    {name.split(" ").map(w=>w[0]).join("").slice(0,2)}
-                  </div>
-                  <span style={{fontWeight:800,fontSize:13,color:G.text,flex:1}}>{name}</span>
-                  <span style={{fontSize:10,fontWeight:700,padding:"1px 8px",borderRadius:20,
-                    background:"rgba(0,0,0,.05)",color:G.muted,border:`0.5px solid ${G.border}`}}>
-                    🚀 Own transport
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div style={{fontSize:12,color:G.muted,fontStyle:"italic",textAlign:"center",
-              padding:"10px 0 14px"}}>
-              No one has set a preference yet — be the first!
-            </div>
-          )}
-
-          {/* My preference */}
-          <div style={{borderTop:`1px solid ${G.border}`,paddingTop:12}}>
-            <div style={{fontSize:11,fontWeight:800,color:G.muted,textTransform:"uppercase",
-              letterSpacing:1.1,marginBottom:8}}>Your preference</div>
-
-            {myData.pref && !liftEditing ? (
-              <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",
-                padding:"9px 12px",background:isO?"#f0fdf4":isN?"#eff6ff":"rgba(0,0,0,.03)",
-                borderRadius:10,border:`0.5px solid ${isO?"#86efac":isN?"#93c5fd":G.border}`}}>
-                <span style={{fontSize:12,fontWeight:700,color:isO?"#166534":isN?"#1e3a5f":G.muted}}>
-                  {isO?"🚘 Offering lift":isN?"🙋 Needs lift":"🚀 Own transport"}
-                </span>
-                {isO&&myData.seats>0&&<span style={{fontSize:11,color:G.muted}}>💺 {myData.seats} seat{myData.seats>1?"s":""}</span>}
-                {dispStop(myData)&&<span style={{fontSize:11,color:G.muted}}>📍 {dispStop(myData)}</span>}
-                {myData.note&&<span style={{fontSize:11,color:G.muted,fontStyle:"italic"}}>"{myData.note}"</span>}
-                <button onClick={()=>setLiftEditing(true)}
-                  style={{marginLeft:"auto",fontSize:11,background:"none",border:"none",
-                    color:G.muted,textDecoration:"underline",cursor:"pointer",
-                    fontFamily:"inherit",padding:0}}>Edit</button>
-              </div>
-            ) : (
-              <div>
-                <div style={{display:"flex",gap:7,marginBottom:draft.pref?10:0}}>
-                  {PILL("🚘 Offer lift",isO,"#166534","#f0fdf4","#86efac",
-                    ()=>setLiftDraft(d=>({...(d||{seats:1,stop:"",stopOther:"",note:""}),pref:isO?"":"offer"})))}
-                  {PILL("🙋 Need lift",isN,"#1e3a5f","#eff6ff","#93c5fd",
-                    ()=>setLiftDraft(d=>({...(d||{seats:1,stop:"",stopOther:"",note:""}),pref:isN?"":"need"})))}
-                  {PILL("🚀 Own",isSelf,G.muted,"rgba(0,0,0,.05)","rgba(0,0,0,.15)",
-                    ()=>setLiftDraft(d=>({...(d||{seats:0,stop:"",stopOther:"",note:""}),pref:isSelf?"":"self"})))}
-                </div>
-                {isSelf&&(
-                  <button onClick={()=>saveLift({...draft,saved:true})}
-                    style={{width:"100%",marginTop:8,padding:"10px 0",borderRadius:10,border:"none",
-                      fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer",
-                      background:G.muted,color:"#fff"}}>
-                    Done ✓
-                  </button>
-                )}
-                {(isO||isN)&&(
-                  <div style={{background:"#f8fdf9",border:`0.5px solid ${isO?"#c6f0d0":"#93c5fd"}`,
-                    borderRadius:10,padding:"11px 12px",marginTop:4}}>
-                    {isO&&(
-                      <div style={{marginBottom:10}}>
-                        <div style={{fontSize:10,fontWeight:700,color:G.muted,
-                          textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>Seats available</div>
-                        <div style={{display:"flex",gap:6}}>
-                          {[1,2,3,4].map(n=>{
-                            const on=(draft.seats||1)===n;
-                            return <button key={n} onClick={()=>setLiftDraft(d=>({...d,seats:n}))}
-                              style={{width:34,height:34,borderRadius:"50%",
-                                border:`1.5px solid ${on?G.green:"rgba(0,0,0,.12)"}`,
-                                background:on?G.green:G.white,color:on?G.lime:G.text,
-                                fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer",
-                                display:"flex",alignItems:"center",justifyContent:"center"}}>
-                              {n}
-                            </button>;
-                          })}
-                        </div>
-                      </div>
-                    )}
-                    <div style={{marginBottom:10}}>
-                      <div style={{fontSize:10,fontWeight:700,color:G.muted,
-                        textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>
-                        {isO?"Pickup stops":"Your stop"}
-                      </div>
-                      <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                        {CARPOOL_STOPS.map(st=>{
-                          const on=(draft.stop||"")===st;
-                          const ac=isO?"#166534":"#1e3a5f";
-                          const ab=isO?"#f0fdf4":"#eff6ff";
-                          const abord=isO?"#86efac":"#93c5fd";
-                          return <button key={st} onClick={()=>setLiftDraft(d=>({...d,stop:st}))}
-                            style={{fontSize:11,fontWeight:600,padding:"5px 11px",borderRadius:20,
-                              cursor:"pointer",fontFamily:"inherit",
-                              border:`1px solid ${on?abord:"rgba(0,0,0,.1)"}`,
-                              background:on?ab:G.white,color:on?ac:G.muted}}>
-                            {st}
-                          </button>;
-                        })}
-                      </div>
-                      {draft.stop==="Other"&&(
-                        <input value={draft.stopOther||""}
-                          onChange={e=>setLiftDraft(d=>({...d,stopOther:e.target.value}))}
-                          placeholder="Your location…"
-                          style={{marginTop:7,width:"100%",boxSizing:"border-box",
-                            padding:"7px 10px",borderRadius:8,fontSize:12,
-                            border:"0.5px solid rgba(0,0,0,.15)",fontFamily:"inherit",
-                            background:G.white,color:G.text}}/>
-                      )}
-                    </div>
-                    <div style={{marginBottom:10}}>
-                      <div style={{fontSize:10,fontWeight:700,color:G.muted,
-                        textTransform:"uppercase",letterSpacing:1,marginBottom:5}}>
-                        Note <span style={{fontWeight:400,textTransform:"none"}}>(optional)</span>
-                      </div>
-                      <textarea rows={2} value={draft.note||""}
-                        onChange={e=>setLiftDraft(d=>({...d,note:e.target.value}))}
-                        placeholder={isO?"e.g. Leaving 16:00, WhatsApp me":"e.g. At stop from 16:15"}
-                        style={{width:"100%",boxSizing:"border-box",padding:"7px 10px",
-                          borderRadius:8,fontSize:12,border:"0.5px solid rgba(0,0,0,.15)",
-                          fontFamily:"inherit",resize:"none",background:G.white,color:G.text}}/>
-                    </div>
-                    <button onClick={()=>saveLift({...draft,saved:true})}
-                      style={{width:"100%",padding:"10px 0",borderRadius:10,border:"none",
-                        fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer",
-                        background:isO?G.green:"#1e3a5f",color:isO?G.lime:"#bfdbfe"}}>
-                      Done ✓
-                    </button>
-                    {myData.pref&&(
-                      <button onClick={()=>saveLift(null)}
-                        style={{width:"100%",marginTop:8,padding:"8px 0",borderRadius:10,
-                          border:`1px solid ${G.border}`,background:"transparent",
-                          fontFamily:"inherit",fontSize:12,fontWeight:600,cursor:"pointer",
-                          color:G.muted}}>
-                        🗑 Remove my preference
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
-function SessCard({s,members,teams,faded,onClick,onCarpoolClick}) {
-  // Coaches: use stored s.coaches, or derive from sessionTeams/restrictedTo
-  const sessionCoaches = (s.restrictedTo||s.sessionTeams?.length) ? (
-    s.coaches ||
-    [...new Set((s.sessionTeams||[s.restrictedTo].filter(Boolean)).flatMap(tn=>
-      teams?.find(t=>t.name===tn)?.coaches||[]
-    ))]
-  ) : [];
-  
-  const isLocationChanged = s.location && s.location !== "Karlebo Cricket Ground";
-  const isIndoor = s.location?.toLowerCase().includes("indoor") || s.location?.toLowerCase().includes("egedal");
-  
-  // Carpool summary
-  const lifts = s.lifts || {};
-  const liftPeople = Object.keys(lifts);
-  const offering = liftPeople.filter(p => getLiftPref(lifts[p]) === "offer").length;
-  const needing = liftPeople.filter(p => getLiftPref(lifts[p]) === "need").length;
-  const hasCarpool = offering > 0 || needing > 0;
-  
-  // Net label text
-  const netLabel = s.net === "both" ? "Both Nets" : s.net ? `Net ${s.net}` : null;
-  
-  // Get team colors for card styling
-  const teamName = s.restrictedTo || s.sessionTeams?.[0] || null;
-  const tc = getTeamCardColors(teamName);
-  
-  return (
-    <div onClick={onClick} style={{
-      background: G.white,
-      borderRadius: 10,
-      marginBottom: 8,
-      borderLeft: `4px solid ${tc.border}`,
-      opacity: faded ? 0.5 : 1,
-      cursor: "pointer",
-      overflow: "hidden",
-    }}>
-      {/* Top accent bar */}
-      <div style={{height: 3, background: tc.border}}/>
-      
-      {/* Location banner — only shows when different from Karlebo */}
-      {isLocationChanged && (
-        <div style={{
-          background: "#f3e8ff",
-          padding: "6px 14px",
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          borderBottom: "1px solid #e9d5ff",
-        }}>
-          <span style={{fontSize: 12}}>{isIndoor ? "🏠" : "📍"}</span>
-          <span style={{fontSize: 11, fontWeight: 700, color: "#7c3aed"}}>{s.location}</span>
-        </div>
-      )}
-      
-      {/* Main content */}
-      <div style={{
-        padding: "12px 14px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-      }}>
-        <div style={{flex: 1, minWidth: 0}}>
-          {/* Row 1: Date + Team + Nets + Carpool + Today */}
-          <div style={{display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap"}}>
-            <span style={{fontSize: 14, fontWeight: 800, color: G.text}}>
-              {fmtShort(s.date)}
-            </span>
-            {teamName && (
-              <span style={{
-                background: tc.badgeBg, color: tc.badgeText,
-                padding: "2px 10px", borderRadius: 20,
-                fontSize: 10, fontWeight: 700,
-              }}>
-                {teamName}
-              </span>
-            )}
-            {netLabel && (
-              <span style={{fontSize: 11, color: G.muted}}>{netLabel}</span>
-            )}
-            {hasCarpool && (
-              <span 
-                onClick={onCarpoolClick ? e => {e.stopPropagation(); onCarpoolClick();} : undefined}
-                style={{
-                  background: "#ecfdf5", color: "#047857",
-                  padding: "1px 8px", borderRadius: 20,
-                  fontSize: 10, fontWeight: 600,
-                  cursor: onCarpoolClick ? "pointer" : "default",
-                }}>
-                🚗 {offering > 0 ? `${offering} offer${offering > 1 ? "s" : ""}` : ""}{offering > 0 && needing > 0 ? " · " : ""}{needing > 0 ? `${needing} need${needing > 1 ? "s" : ""}` : ""}
-              </span>
-            )}
-            {isToday(s.date) && (
-              <span style={{
-                background: G.lime, color: G.green,
-                borderRadius: 20, padding: "1px 8px",
-                fontSize: 9, fontWeight: 800,
-              }}>TODAY</span>
-            )}
-          </div>
-          
-          {/* Row 2: Title */}
-          {s.label && (
-            <div style={{
-              fontWeight: 700, fontSize: 14, color: G.text,
-              marginBottom: 5, lineHeight: 1.2,
-            }}>
-              {s.label}
-            </div>
-          )}
-          
-          {/* Row 3: Time + Coaches */}
-          <div style={{fontSize: 12, color: G.muted}}>
-            {s.from} – {s.to}
-            {sessionCoaches.length > 0 && (
-              <>
-                <span style={{margin: "0 4px"}}>·</span>
-                <span style={{color: G.text}}>Coach:</span>{" "}
-                <span style={{color: "#059669", fontWeight: 600}}>
-                  {sessionCoaches.slice(0, 3).map(c => c.split(" ")[0]).join(", ")}
-                  {sessionCoaches.length > 3 && ` +${sessionCoaches.length - 3}`}
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-        
-        {/* Player count circle — team colored */}
-        <div style={{
-          width: 48, height: 48, borderRadius: "50%",
-          background: tc.bg, border: `2px solid ${tc.border}`,
-          display: "flex", flexDirection: "column",
-          alignItems: "center", justifyContent: "center",
-          flexShrink: 0, marginLeft: 12,
-        }}>
-          <div style={{fontSize: 18, fontWeight: 800, color: tc.text, lineHeight: 1}}>
-            {s.players.length}
-          </div>
-          <div style={{fontSize: 7, color: tc.text, textTransform: "uppercase", fontWeight: 600, opacity: 0.8}}>
-            {faded ? "went" : "going"}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Bottom nav ───────────────────────────────────────────────
-function BotNav({view,setView,userRole,pendingCount=0,currentUser=null,teams=[]}) {
-  const isAdmin = can(userRole,"accessMembers");
-  const isCoach = isAdmin || isCoachMember(currentUser?.name, teams);
-  // Captain/VC of any senior team
-  const isCaptain = teams.some(t => t.senior && (t.captain === currentUser?.name || t.vicecaptain === currentUser?.name));
-  const active = view==="session"?"schedule":view==="roleAdmin"?"admin":view==="coachhq"?"coachhq":view==="captainxi"?"captainxi":view;
-
-  const IconSchedule = ({on}) => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill={on?"currentColor":"none"} stroke="currentColor"
-      strokeWidth={on?0:1.8} strokeLinecap="round" strokeLinejoin="round">
-      {on ? <>
-        <rect x="3" y="4" width="18" height="18" rx="2" fill={G.green} stroke="none"/>
-        <line x1="16" y1="2" x2="16" y2="6" stroke={G.green} strokeWidth="2.5"/>
-        <line x1="8" y1="2" x2="8" y2="6" stroke={G.green} strokeWidth="2.5"/>
-        <line x1="3" y1="10" x2="21" y2="10" stroke="white" strokeWidth="1.8"/>
-        <rect x="7" y="13" width="3" height="3" rx="0.5" fill="white"/>
-        <rect x="11" y="13" width="3" height="3" rx="0.5" fill="white"/>
-      </> : <>
-        <rect x="3" y="4" width="18" height="18" rx="2"/>
-        <line x1="16" y1="2" x2="16" y2="6"/>
-        <line x1="8" y1="2" x2="8" y2="6"/>
-        <line x1="3" y1="10" x2="21" y2="10"/>
-      </>}
-    </svg>
-  );
-  const IconMembers = ({on}) => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth={on?2.5:1.8} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-      <circle cx="9" cy="7" r="4"/>
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-    </svg>
-  );
-  const IconProfile = ({on}) => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth={on?2.5:1.8} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="8" r="4"/>
-      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
-    </svg>
-  );
-  const IconCoach = ({on}) => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth={on?2.5:1.8} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-      <path d="M2 17l10 5 10-5"/>
-      <path d="M2 12l10 5 10-5"/>
-    </svg>
-  );
-  const IconCaptain = ({on}) => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth={on?2.5:1.8} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="8" r="5"/>
-      <path d="M12 3v2"/>
-      <path d="M12 13v8"/>
-      <path d="M9 18h6"/>
-      <path d="M7 8h1"/>
-      <path d="M16 8h1"/>
-    </svg>
-  );
-
-  const Tab = ({id, icon, label, badge}) => {
-    const on = active===id;
-    return (
-      <button onClick={()=>setView(id)} style={{
-        background:"none", border:"none", cursor:"pointer",
-        fontFamily:"'DM Sans',sans-serif",
-        display:"flex", flexDirection:"column", alignItems:"center",
-        justifyContent:"center", gap:0, width:"100%", padding:"6px 4px 2px",
-        position:"relative",
-      }}>
-        <div style={{
-          display:"flex", flexDirection:"column", alignItems:"center", gap:3,
-          padding:"6px 14px 5px",
-          borderRadius:14,
-          background: on
-            ? `linear-gradient(175deg, #1a6b38 0%, #14532d 55%, #0f3d21 100%)`
-            : "transparent",
-          border: on
-            ? `1.5px solid rgba(255,255,255,0.12)`
-            : "1.5px solid transparent",
-          boxShadow: on
-            ? `0 2px 8px rgba(20,83,45,.45), inset 0 1px 0 rgba(255,255,255,.15), inset 0 -1px 0 rgba(0,0,0,.2)`
-            : "none",
-          transition:"all .18s",
-          position:"relative",
-        }}>
-          <div style={{
-            color: on ? G.lime : "#94a3b8",
-            transition:"color .15s",
-            position:"relative",
-            display:"flex", alignItems:"center", justifyContent:"center",
-          }}>
-            {icon}
-            {badge>0&&(
-              <span style={{position:"absolute",top:-5,right:-8,
-                background:"#ef4444",color:"#fff",borderRadius:99,
-                fontSize:9,fontWeight:900,minWidth:15,height:15,
-                display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px"}}>
-                {badge}
-              </span>
-            )}
-          </div>
-          <span style={{
-            fontSize:10, fontWeight: on?800:600, letterSpacing:.3,
-            color: on ? G.lime : "#94a3b8",
-            transition:"color .15s",
-          }}>{label}</span>
-        </div>
-      </button>
-    );
-  };
-
-  const IconBook = ({on}) => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth={on?2.5:1.8} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="9"/>
-      <line x1="12" y1="7" x2="12" y2="17"/>
-      <line x1="7" y1="12" x2="17" y2="12"/>
-    </svg>
-  );
-
-  // Calculate number of tabs: Schedule + Book + Profile = 3 base, + Coach HQ (only if not admin), + Captain XI, + Admin
-  // Admins reach Coach HQ via the desktop sidebar / Admin panel — hiding it on mobile keeps the bar at <=5 tabs so Profile stays visible.
-  const tabCount = 3 + (isCoach && !isAdmin ? 1 : 0) + ((isCaptain || isAdmin) ? 1 : 0) + (isAdmin ? 1 : 0);
-  
-  return (
-    <div className="fcc-mobile-only" style={{
-      position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)",
-      width:"100%", maxWidth:500, zIndex:200,
-      background:"rgba(255,255,255,0.98)",
-      backdropFilter:"blur(16px)", WebkitBackdropFilter:"blur(16px)",
-      borderTop:"1px solid rgba(0,0,0,0.06)",
-      boxShadow:"0 -6px 32px rgba(0,0,0,0.10), 0 -1px 0 rgba(0,0,0,0.04)",
-      display:"grid",
-      gridTemplateColumns: `repeat(${tabCount}, 1fr)`,
-      alignItems:"center",
-      padding:"6px 8px",
-      paddingBottom:"max(10px, env(safe-area-inset-bottom))",
-      gap:4,
-    }}>
-      <Tab id="schedule" icon={<IconSchedule on={active==="schedule"}/>} label="Schedule"/>
-
-      {/* Book */}
-      <button onClick={()=>setView("add")} style={{
-        background:"none", border:"none", cursor:"pointer",
-        fontFamily:"'DM Sans',sans-serif",
-        display:"flex", flexDirection:"column", alignItems:"center",
-        justifyContent:"center", width:"100%", padding:"6px 4px 2px",
-      }}>
-        <div style={{
-          display:"flex", flexDirection:"column", alignItems:"center", gap:3,
-          padding:"6px 14px 5px",
-          borderRadius:14,
-          background: active==="add"
-            ? `linear-gradient(175deg, #1a6b38 0%, #14532d 55%, #0f3d21 100%)`
-            : "transparent",
-          border: active==="add"
-            ? `1.5px solid rgba(255,255,255,0.12)`
-            : "1.5px solid transparent",
-          boxShadow: active==="add"
-            ? `0 2px 8px rgba(20,83,45,.45), inset 0 1px 0 rgba(255,255,255,.15), inset 0 -1px 0 rgba(0,0,0,.2)`
-            : "none",
-          transition:"all .18s",
-        }}>
-          <div style={{
-            color: active==="add" ? G.lime : "#94a3b8",
-            transition:"color .15s",
-            display:"flex", alignItems:"center", justifyContent:"center",
-          }}>
-            <IconBook on={active==="add"}/>
-          </div>
-          <span style={{
-            fontSize:10, fontWeight: active==="add"?800:600, letterSpacing:.3,
-            color: active==="add" ? G.lime : "#94a3b8",
-            transition:"color .15s",
-          }}>Book</span>
-        </div>
-      </button>
-
-      {isCoach && !isAdmin && (
-        <Tab id="coachhq" icon={<IconCoach on={active==="coachhq"}/>} label="Coach HQ"/>
-      )}
-      {(isCaptain || isAdmin) && (
-        <Tab id="captainxi" icon={<IconCaptain on={active==="captainxi"}/>} label="Captain"/>
-      )}
-      {isAdmin && (
-        <Tab id="admin" icon={<IconMembers on={active==="admin"}/>} label="Admin" badge={pendingCount}/>
-      )}
-      <Tab id="profile" icon={<IconProfile on={active==="profile"}/>} label="Profile"/>
-    </div>
-  );
-}
-
-// ─── Desktop Sidebar Nav ──────────────────────────────────────
-function SidebarNav({view, setView, userRole, currentUser, onLogout, teams=[]}) {
-  const isAdmin = can(userRole,"accessMembers");
-  const isCaptain = teams.some(t => t.senior && (t.captain === currentUser?.name || t.vicecaptain === currentUser?.name));
-  const active = view==="session"?"schedule":view==="roleAdmin"?"admin":view;
-
-  const navBtn = (v, icon, label) => (
-    <button key={v} onClick={()=>setView(v)} style={{
-      display:"flex",alignItems:"center",gap:12,width:"100%",
-      padding:"11px 14px",borderRadius:10,border:"none",cursor:"pointer",
-      fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:14,
-      background: active===v ? "rgba(255,255,255,.18)" : "transparent",
-      color: active===v ? "#fff" : "rgba(255,255,255,.6)",
-      transition:"all .15s",textAlign:"left",
-    }}>{icon} {label}</button>
-  );
-
-  return (
-    <div className="fcc-sidebar">
-      <img src={FCC_LOGO} alt="FCC" className="fcc-sidebar-logo"/>
-      <div>
-        <div className="fcc-sidebar-title">FCC Training</div>
-        <div className="fcc-sidebar-sub" style={{marginTop:4}}>Fredensborg CC</div>
-      </div>
-      <div className="fcc-sidebar-links">
-        {navBtn("schedule","📅","Schedule")}
-        {navBtn("add","＋","Book / Join")}
-        {(isAdmin || isCoachMember(currentUser?.name,teams)) && navBtn("coachhq","🧢","Coach HQ")}
-        {(isCaptain || isAdmin) && navBtn("captainxi","⚓","Captain's XI")}
-        {isAdmin && navBtn("admin","👥","Admin Panel")}
-        {(isAdmin || isCoachMember(currentUser?.name,[])) && navBtn("availability","📊","Team Availability")}
-        {navBtn("profile","👤","My Profile")}
-      </div>
-      <div style={{marginTop:"auto",width:"100%",paddingTop:24,
-        borderTop:"1px solid rgba(255,255,255,.15)"}}>
-        <div style={{color:"rgba(255,255,255,.7)",fontSize:13,fontWeight:700,
-          marginBottom:8,paddingLeft:4}}>{currentUser?.name}</div>
-        <button onClick={onLogout} style={{
-          width:"100%",padding:"9px 14px",borderRadius:10,border:"none",
-          background:"rgba(255,255,255,.12)",color:"rgba(255,255,255,.7)",
-          fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:13,
-          cursor:"pointer",textAlign:"left",
-        }}>Sign out</button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Shell ────────────────────────────────────────────────────
-function Shell({children, sidebar}) {
-  return (
-    <div style={{fontFamily:"'DM Sans',sans-serif",background:G.bg,minHeight:"100vh",
-      display:"flex",justifyContent:"center",alignItems:"flex-start"}}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;0,800;0,900;1,400&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet"/>
-      <style>{`
-        @keyframes spin{to{transform:rotate(360deg)}}
-        @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-        @keyframes slideUp{from{transform:translateX(-50%) translateY(100%)}to{transform:translateX(-50%) translateY(0)}}
-        @media(min-width:900px){
-          .fcc-sidebar{
-            display:flex!important;flex-direction:column;align-items:flex-start;
-            padding:40px 28px;width:240px;flex-shrink:0;
-            min-height:100vh;position:sticky;top:0;align-self:flex-start;
-            background:${G.green};gap:20px;
-          }
-          .fcc-sidebar-logo{width:72px;height:72px;border-radius:50%;object-fit:cover;
-            border:3px solid rgba(255,255,255,.3);display:block;}
-          .fcc-sidebar-title{font-family:'Playfair Display',serif;font-weight:900;
-            font-size:20px;color:#fff;line-height:1.2;}
-          .fcc-sidebar-sub{font-size:11px;color:rgba(255,255,255,.45);letter-spacing:2px;
-            text-transform:uppercase;margin-top:2px;}
-          .fcc-sidebar-links{display:flex;flex-direction:column;gap:4px;width:100%;margin-top:4px;}
-          .fcc-mobile-only{display:none!important;}
-          .fcc-app-pane{max-width:520px;width:100%;min-height:100vh;
-            border-left:1px solid ${G.border};border-right:1px solid ${G.border};}
-        }
-        @media(max-width:899px){
-          .fcc-sidebar{display:none!important;}
-          .fcc-app-pane{max-width:500px;width:100%;margin:0 auto;}
-          .fcc-header-logo{width:72px!important;height:72px!important;}
-        }
-      `}</style>
-      {/* Sidebar slot — only visible on desktop via CSS */}
-      {sidebar && <div className="fcc-sidebar">{sidebar}</div>}
-      {/* Main content pane */}
-      <div className="fcc-app-pane" style={{position:"relative",paddingBottom:90,background:G.bg}}>
-        {children}
-      </div>
-    </div>
-  );
-}
 
 // ═══════════════════════════════════════════════════════════════
 // MAIN APP
@@ -3570,7 +1945,7 @@ export default function App() {
   // RENDER: Loading
   // ════════════════════════════════════════════════════════════
   if(loading) return (
-    <Shell>
+    <Shell G={G}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh"}}>
         <div style={{textAlign:"center",color:G.mid}}>
           <div style={{fontSize:48,marginBottom:12}}>🏏</div>
@@ -3590,7 +1965,7 @@ export default function App() {
     const hasQuery = pickSearch.trim().length >= 1;
 
     return (
-      <Shell>
+      <Shell G={G}>
         {/* Header */}
         <div style={{background:G.green, padding:"36px 24px 32px", textAlign:"center"}}>
           <img src={FCC_LOGO} alt="FCC" style={{width:88,height:88,borderRadius:"50%",
@@ -3780,7 +2155,7 @@ export default function App() {
     }
 
     return (
-      <Shell>
+      <Shell G={G}>
         <div style={{background:G.green,padding:"20px 20px 16px",textAlign:"center"}}>
           <div style={{fontSize:26,marginBottom:4}}>✋</div>
           <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
@@ -4057,7 +2432,7 @@ export default function App() {
 
     // ── Step: done ────────────────────────────────────────────
     if(vfStep==="done") return (
-      <Shell>
+      <Shell G={G}>
         {hdr("All done! 🎉","FCC Training")}
         <div style={{padding:"32px 24px",textAlign:"center"}}>
           <div style={{fontSize:56,marginBottom:16}}>✅</div>
@@ -4088,7 +2463,7 @@ export default function App() {
 
     // ── Step: code verification ───────────────────────────────
     if(vfStep==="code") return (
-      <Shell>
+      <Shell G={G}>
         {hdr("Check your email","Enter the 6-digit code we sent you")}
         <div style={{padding:"24px 20px 40px"}}>
           <div style={{background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:12,
@@ -4129,7 +2504,7 @@ export default function App() {
     if(vfStep==="found" && vfMatch) {
       const hasEmail = !!(vfMatch.email||"").trim();
       return (
-        <Shell>
+        <Shell G={G}>
           {hdr(`Hi, ${vfMatch.name.split(" ")[0]}!`,"FCC Training — account setup")}
           <div style={{padding:"20px 20px 40px"}}>
             {/* Privacy notice */}
@@ -4201,7 +2576,7 @@ export default function App() {
 
     // ── Step: notfound — new member/parent ────────────────────
     if(vfStep==="notfound") return (
-      <Shell>
+      <Shell G={G}>
         {hdr("Join Fredensborg CC","Set up your account")}
         <div style={{padding:"20px 20px 40px"}}>
           {/* Privacy notice */}
@@ -4326,7 +2701,7 @@ export default function App() {
 
     // ── Step: search ──────────────────────────────────────────
     return (
-      <Shell>
+      <Shell G={G}>
         {hdr("Set up your account","Fredensborg Cricket Club")}
         <div style={{padding:"20px 20px 40px"}}>
           <div style={{fontSize:14,color:G.muted,marginBottom:20,lineHeight:1.6}}>
@@ -4405,7 +2780,7 @@ export default function App() {
   }
 
   if(!currentUser && authView==="joinrequestdone") return (
-    <Shell>
+    <Shell G={G}>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",
         justifyContent:"center",minHeight:"100vh",padding:"40px 28px",textAlign:"center"}}>
         <div style={{fontSize:64,marginBottom:16}}>🎉</div>
@@ -4472,7 +2847,7 @@ export default function App() {
     }
 
     return (
-      <Shell>
+      <Shell G={G}>
         <div style={{display:"flex",flexDirection:"column",minHeight:"100vh"}}>
           <div style={{background:G.green,padding:"22px 20px 18px",textAlign:"center"}}>
             <div style={{fontSize:28,marginBottom:6}}>📧</div>
@@ -4572,7 +2947,7 @@ export default function App() {
   // RENDER: Auth — verify invite code (no email, first-time)
   // ════════════════════════════════════════════════════════════
   if(!currentUser && authView==="verifycode") return (
-    <Shell>
+    <Shell G={G}>
       <div style={{display:"flex",flexDirection:"column",minHeight:"100vh"}}>
         <div style={{background:G.green,padding:"22px 20px 18px",textAlign:"center"}}>
           <div style={{fontSize:28,marginBottom:6}}>🔑</div>
@@ -4636,7 +3011,7 @@ export default function App() {
   // RENDER: Auth — blocked (no email, no invite code)
   // ════════════════════════════════════════════════════════════
   if(!currentUser && authView==="blocked") return (
-    <Shell>
+    <Shell G={G}>
       <div style={{display:"flex",flexDirection:"column",minHeight:"100vh"}}>
         <div style={{background:G.green,padding:"18px 20px 16px",textAlign:"center"}}>
           <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
@@ -4685,7 +3060,7 @@ export default function App() {
   // RENDER: Auth — set new PIN
   // ════════════════════════════════════════════════════════════
   if(!currentUser && authView==="newpin") return (
-    <Shell>
+    <Shell G={G}>
       <div style={{display:"flex",flexDirection:"column",minHeight:"100vh"}}>
         {/* Compact header at top */}
         <div style={{background:G.green,padding:"18px 20px 16px",textAlign:"center"}}>
@@ -4717,7 +3092,7 @@ export default function App() {
     const isYouthNoPinMember = ["U11","U13"].some(t=>(pendingMember?.teams||[]).includes(t))
       && !pins[pendingMember?.id];
     return (
-    <Shell>
+    <Shell G={G}>
       <div style={{display:"flex",flexDirection:"column",minHeight:"100vh"}}>
         <div style={{background:G.green,padding:"18px 20px 16px",textAlign:"center"}}>
           <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
@@ -4796,7 +3171,7 @@ export default function App() {
 
     return (
     <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
-        currentUser={currentUser} onLogout={handleLogout} teams={teams}/>}>
+        currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO}/>} G={G}>
       {/* ── Schedule header — B+D hybrid ── */}
       <div style={{background:G.green,position:"sticky",top:0,zIndex:100}}>
         {/* Compact single bar: logo · date+title · avatar */}
@@ -5017,7 +3392,7 @@ export default function App() {
         })()}
 
         {/* Weather bar */}
-        <WeatherBar wx={wxData} setView={setView}/>
+        <WeatherBar wx={wxData} setView={setView} G={G}/>
 
         {/* Nets timeline strip */}
         <NetsTimeline
@@ -5030,6 +3405,7 @@ export default function App() {
           setBTo={setBTo}
           setBNet={setBNet}
           blockCals={blockCals}
+          G={G}
         />
 
         {filteredUpcoming.length===0&&filteredPast.length===0?(
@@ -5067,7 +3443,7 @@ export default function App() {
                   </div>
                   <span style={{fontSize: 12, opacity: 0.85}}>{filteredUpcoming.length} session{filteredUpcoming.length !== 1 ? "s" : ""}</span>
                 </div>
-                {visibleUpcoming.map(s=><SessCard key={s.id} s={s} members={members} teams={teams}
+                {visibleUpcoming.map(s=><SessCard key={s.id} s={s} members={members} teams={teams} G={G}
                   onCarpoolClick={()=>{setLiftDraft(null);setCarpoolSheetSess(s);}}
                   onClick={()=>{
                     setSelSess(s);
@@ -5247,7 +3623,7 @@ export default function App() {
                   </div>
                   <span style={{fontSize: 12, opacity: 0.85}}>{filteredPast.length} session{filteredPast.length !== 1 ? "s" : ""}</span>
                 </div>
-                {visiblePast.map(s=><SessCard key={s.id} s={s} members={members} teams={teams} faded
+                {visiblePast.map(s=><SessCard key={s.id} s={s} members={members} teams={teams} faded G={G}
                   onCarpoolClick={()=>{setLiftDraft(null);setCarpoolSheetSess(s);}}
                   onClick={()=>{
                     setSelSess(s);
@@ -5364,7 +3740,7 @@ export default function App() {
         )}
 
       </div>
-      <BotNav view="schedule" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams}/>
+      <BotNav view="schedule" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams} G={G}/>
       {toast&&<Toast msg={toast} G={G}/>}
 
       {carpoolSheetSess&&<CarpoolSheet
@@ -5379,6 +3755,7 @@ export default function App() {
         selSess={selSess}
         setSelSess={setSelSess}
         onClose={()=>{setCarpoolSheetSess(null);setLiftDraft(null);setLiftEditing(false);}}
+        G={G}
       />}
     </Shell>
     );
@@ -5414,7 +3791,7 @@ export default function App() {
     // Either type of clash blocks submission
     const hasAnyClash = !exactMatch && (!!netClash || !!clashSess);
     return (
-      <Shell>
+      <Shell G={G}>
         <AppHeader onBack={()=>{setView("schedule");setSelP([]);}}
           title="Book a Session"
           sub={exactMatch?"Session exists at this time":"Create or join a training session"}/>
@@ -5923,7 +4300,7 @@ export default function App() {
             Existing session at same date & time? Players are auto-added.
           </p>
         </form>
-        <BotNav view="add" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams}/>
+        <BotNav view="add" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams} G={G}/>
         {toast&&<Toast msg={toast} G={G}/>}
       </Shell>
     );
@@ -5952,7 +4329,7 @@ export default function App() {
       ? members.filter(m=>(m.teams||[]).includes(relevantTeam) && !selSess.players.includes(m.name))
       : [];
     return (
-      <Shell>
+      <Shell G={G}>
         <AppHeader
           onBack={()=>{setView("schedule");setSelSess(null);}}
           title={<>{fmtShort(selSess.date)}{isToday(selSess.date)&&
@@ -6866,7 +5243,7 @@ export default function App() {
 
             return dedupedGroups.map(({team,players})=>(
               <PlayerGroup key={team} team={team} players={players} members={members}
-                teams={teams}
+                teams={teams} G={G}
                 lifts={lifts} selSess={selSess} isSelf={p=>currentUser?.name===p}
                 cutoff={cutoff} canRemove={canOrCoach(userRole,"removePlayer",userMem,teams)}
                 onRemove={p=>handleLeave(selSess.id,p)}
@@ -7390,7 +5767,7 @@ export default function App() {
             );
           })()}
         </div>
-        <BotNav view="session" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams}/>
+        <BotNav view="session" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams} G={G}/>
         {toast&&<Toast msg={toast} G={G}/>}
         {carpoolSheetSess&&<CarpoolSheet
           sess={carpoolSheetSess}
@@ -7404,6 +5781,7 @@ export default function App() {
           selSess={selSess}
           setSelSess={setSelSess}
           onClose={()=>{setCarpoolSheetSess(null);setLiftDraft(null);setLiftEditing(false);}}
+          G={G}
         />}
       </Shell>
     );
@@ -7424,7 +5802,7 @@ export default function App() {
     
     return (
       <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
-          currentUser={currentUser} onLogout={handleLogout} teams={teams}/>}>
+          currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO}/>} G={G}>
         <AppHeader onBack={()=>setView("schedule")}
           title="Coach HQ" sub="Tools for coaches"/>
         <div style={{padding:"16px"}}>
@@ -7546,7 +5924,7 @@ export default function App() {
           
         </div>
         <BotNav view="coachhq" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length}
-          currentUser={currentUser} teams={teams}/>
+          currentUser={currentUser} teams={teams} G={G}/>
       </Shell>
     );
   }
@@ -7770,7 +6148,7 @@ export default function App() {
     
     return (
       <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
-          currentUser={currentUser} onLogout={handleLogout} teams={teams}/>}>
+          currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO}/>} G={G}>
         <AppHeader onBack={()=>setView("schedule")}
           title={profileTab === "family" ? "My Family" : "My Profile"} 
           sub={profileTab === "family" ? "Manage linked children" : (ROLE_META[me.role||"member"]?.label||"Member")}/>
@@ -8639,7 +7017,7 @@ export default function App() {
           </button>
 
         </div>
-        <BotNav view="profile" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams}/>
+        <BotNav view="profile" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams} G={G}/>
         {toast&&<Toast msg={toast} G={G}/>}
       </Shell>
     );
@@ -8691,7 +7069,7 @@ export default function App() {
     ];
     return (
       <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
-          currentUser={currentUser} onLogout={handleLogout} teams={teams}/>}>
+          currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO}/>} G={G}>
         <AppHeader title="Help & Guide" sub="Everything you need to know"
           onBack={()=>setView("profile")}/>
         <div style={{padding:"16px 16px 100px",display:"flex",flexDirection:"column",gap:12}}>
@@ -8796,7 +7174,7 @@ export default function App() {
           </Btn>
 
         </div>
-        <BotNav view="profile" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams}/>
+        <BotNav view="profile" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams} G={G}/>
         {toast&&<Toast msg={toast} G={G}/>}
       </Shell>
     );
@@ -8811,7 +7189,7 @@ export default function App() {
     const isYouth = (me.teams||[]).some(t=>["U11","U13","U15","U15 Girls","U18","U16"].includes(t));
     return (
       <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
-          currentUser={currentUser} onLogout={handleLogout} teams={teams}/>}>
+          currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO}/>} G={G}>
         <AppHeader title="Privacy & Your Data" sub="How Fredensborg CC uses your information"
           onBack={()=>setView("profile")}/>
         <div style={{padding:"16px 16px 100px"}}>
@@ -8893,7 +7271,7 @@ export default function App() {
 
         </div>
         <BotNav view="profile" setView={setView} userRole={userRole}
-          pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams}/>
+          pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams} G={G}/>
         {toast&&<Toast msg={toast} G={G}/>}
       </Shell>
     );
@@ -9074,7 +7452,7 @@ export default function App() {
     };
     
     return (
-      <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole} currentUser={currentUser} onLogout={handleLogout} teams={teams}/>}>
+      <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole} currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO}/>} G={G}>
         <AppHeader title="Captain's XI" sub="Select your playing eleven" onBack={()=>setView("schedule")}/>
         
         {/* Superadmin selective reset button — opens modal to pick specific matches */}
@@ -9946,7 +8324,7 @@ export default function App() {
           );
         })()}
 
-        <BotNav view={view} setView={setView} userRole={userRole} pendingCount={joinRequests.length} currentUser={currentUser} teams={teams}/>
+        <BotNav view={view} setView={setView} userRole={userRole} pendingCount={joinRequests.length} currentUser={currentUser} teams={teams} G={G}/>
         {toast&&<Toast msg={toast} G={G}/>}
       </Shell>
     );
@@ -10012,7 +8390,7 @@ export default function App() {
 
     return (
       <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
-          currentUser={currentUser} onLogout={handleLogout} teams={teams}/>}>
+          currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO}/>} G={G}>
         <AppHeader title="Team Availability" sub="Full 2026 Season"
           onBack={()=>setView("schedule")}/>
         <div style={{padding:"14px 16px 100px"}}>
@@ -10335,7 +8713,7 @@ export default function App() {
           })}
         </div>
         <BotNav view="schedule" setView={setView} userRole={userRole}
-          pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams}/>
+          pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams} G={G}/>
         {toast&&<Toast msg={toast} G={G}/>}
       </Shell>
     );
@@ -10343,12 +8721,12 @@ export default function App() {
   if(view==="weather") {
     return (
       <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
-          currentUser={currentUser} onLogout={handleLogout} teams={teams}/>}>
+          currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO}/>} G={G}>
         <AppHeader title="Ground Forecast" sub="Karlebo · 55.918°N 12.416°E"
           onBack={()=>setView("schedule")}/>
-        <WeatherPage wx={wxData} setView={setView}/>
+        <WeatherPage wx={wxData} setView={setView} G={G}/>
         <BotNav view="schedule" setView={setView} userRole={userRole}
-          pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams}/>
+          pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams} G={G}/>
         {toast&&<Toast msg={toast} G={G}/>}
       </Shell>
     );
@@ -10492,7 +8870,7 @@ export default function App() {
 
     const t20Updates = userRole==="superadmin" ? computeT20Updates() : {};
     return (
-    <Shell>
+    <Shell G={G}>
       <AppHeader title="Manage Members"
         sub={`${members.length} members · ${teams.length} groups`}
         onBack={()=>setView("schedule")}/>
@@ -13008,7 +11386,7 @@ export default function App() {
           );
         })}
       </div>
-      <BotNav view="admin" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams}/>
+      <BotNav view="admin" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams} G={G}/>
       {toast&&<Toast msg={toast} G={G}/>}
 
       {/* ── Invite code modal ────────────────────────────── */}
@@ -13102,5 +11480,5 @@ export default function App() {
   }
 
   // Fallback
-  return <Shell><div style={{padding:20,color:G.muted}}>Loading…</div></Shell>;
+  return <Shell G={G}><div style={{padding:20,color:G.muted}}>Loading…</div></Shell>;
 }
