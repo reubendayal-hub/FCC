@@ -9,7 +9,8 @@ import CarpoolSheet from "../ui/CarpoolSheet";
 import AppHeader from "../ui/AppHeader";
 import { can } from "../constants/roles";
 import { isAfterCutoff, fmtShort, isToday } from "../utils/time";
-import { canOrCoach, isCoachMember } from "../utils/members";
+import { canOrCoach, isCoachMember, isAbsent } from "../utils/members";
+import { getLiftObj, getLiftPref } from "../utils/lifts";
 import { makeICS } from "../utils/ics";
 
 const dlICS = s => {
@@ -38,7 +39,7 @@ export default function SessionDetailView() {
     carpoolSheetSess, setCarpoolSheetSess, carpoolRef,
     commentText, setCommentText,
     showCancelled, setShowCancelled,
-    openWA, logAction, getLiftPref, setLiftPref,
+    openWA, logAction, setLiftPref,
     handlePostComment, handleDeleteComment, handleVote, handleLeave,
     handleJoinDetail, handleDeleteSess,
     joinRequests, toast,
