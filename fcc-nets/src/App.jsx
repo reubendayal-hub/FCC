@@ -619,6 +619,10 @@ export default function App() {
   function handleAddSession(e) {
     e.preventDefault();
     if(!bDate||selP.length===0){showToast("Pick a date & at least one player");return;}
+    if(bNet==="ground" && !bLabel.trim()){
+      showToast("📝 Ground/pitch sessions need a title");
+      return;
+    }
     const pollOptions = bPollOpts.map(o=>({...o, votes:[]}));
     const restrictedTo = bRestrictTeam || null;
     const isLeader = ["superadmin","admin","captain","vicecaptain","t20captain","t20vicecaptain"].includes(userRole)||!!getTeamRole(currentUser?.name,teams);
@@ -670,9 +674,12 @@ export default function App() {
         sendBookingConfirm(members.find(m=>m.name===currentUser?.name),
           {...ex,label:ex.label||bLabel}, merged);
     } else {
-      // Check 1: net conflict — same net at overlapping time
-      const netConflict = sessions.find(s=>
+      // Check 1: net conflict — same net at overlapping time.
+      // Ground sessions don't claim a net, so they skip this check
+      // and don't block other net bookings either.
+      const netConflict = bNet==="ground" ? null : sessions.find(s=>
         s.date===bDate &&
+        s.net!=="ground" &&
         timesOverlap(bFrom,bTo,s.from,s.to) &&
         (s.net==="both"||bNet==="both"||s.net===bNet)
       );

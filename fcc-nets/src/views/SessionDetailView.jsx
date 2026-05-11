@@ -80,7 +80,7 @@ export default function SessionDetailView() {
           title={<>{fmtShort(selSess.date)}{isToday(selSess.date)&&
             <span style={{background:G.lime,color:G.green,borderRadius:20,
               padding:"1px 8px",fontSize:11,fontWeight:900,marginLeft:8}}>TODAY</span>}</>}
-          sub={`${selSess.from} – ${selSess.to}${selSess.label?" · "+selSess.label:""}`}>
+          sub={`${selSess.from} – ${selSess.to}${selSess.label?" · "+selSess.label:""}${selSess.net==="ground"?" · 🌿 Ground / Full Pitch":""}`}>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             <Btn onClick={()=>dlICS(selSess)} bg="rgba(255,255,255,.15)" col={G.white} sm>
               📅 Save to Calendar

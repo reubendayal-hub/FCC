@@ -23,7 +23,9 @@ export default function SessCard({s,members,teams,faded,onClick,onCarpoolClick,G
   const hasCarpool = offering > 0 || needing > 0;
 
   // Net label text
-  const netLabel = s.net === "both" ? "Both Nets" : s.net ? `Net ${s.net}` : null;
+  const netLabel = s.net === "ground" ? "🌿 Ground"
+    : s.net === "both" ? "Both Nets"
+    : s.net ? `Net ${s.net}` : null;
 
   // Get team colors for card styling
   const teamName = s.restrictedTo || s.sessionTeams?.[0] || null;

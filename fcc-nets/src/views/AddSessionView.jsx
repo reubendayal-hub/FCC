@@ -16,7 +16,7 @@ export default function AddSessionView() {
   const {
     G, view, setView, userRole, currentUser, teams, members,
     sessions, bDate, setBDate, bFrom, setBFrom, bTo, setBTo,
-    bNote, setBNote, bNet, setBNet, bLift, setBLift,
+    bNote, setBNote, bLabel, setBLabel, bNet, setBNet, bLift, setBLift,
     bRestrictTeam, selP, setSelP, pSearch, setPSearch, pFilter,
     otherGroupsOpen, setOtherGroupsOpen,
     bPollOpts, setBPollOpts, bCustomOpt, setBCustomOpt,
@@ -34,8 +34,10 @@ export default function AddSessionView() {
   const exactMatch = sessions.find(s=>s.date===bDate&&s.from===bFrom&&s.to===bTo);
 
   // Helper: do two net values conflict?
+  // "ground" sessions don't claim a net — they coexist with any net booking.
   function netsConflict(a, b) {
     if(!a||!b) return false;
+    if(a==="ground"||b==="ground") return false;
     if(a==="both"||b==="both") return true; // "both" always conflicts
     return a===b; // same net conflicts
   }
@@ -58,6 +60,9 @@ export default function AddSessionView() {
 
   // Either type of clash blocks submission
   const hasAnyClash = !exactMatch && (!!netClash || !!clashSess);
+  // Ground sessions must have a title
+  const groundLabelMissing = bNet==="ground" && !bLabel.trim();
+  const submitBlocked = hasAnyClash || groundLabelMissing;
 
   return (
     <Shell G={G}>
@@ -150,15 +155,17 @@ export default function AddSessionView() {
               </div>
             </FFld>
           </div>
-          <FFld G={G} label="Net" style={{marginTop:10}}>
-            <div style={{display:"flex",gap:8}}>
+          <FFld G={G} label="Facility" style={{marginTop:10}}>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               {[
                 ["1",  <><NetIcon color={bNet==="1"?G.lime:G.text} size={16}/> Net 1</>],
                 ["2",  <><NetIcon color={bNet==="2"?G.lime:G.text} size={16}/> Net 2</>],
                 ["both",<><BothNetsIcon color={bNet==="both"?G.lime:G.text} size={16}/> Both</>],
+                ["ground", <>🌿 Ground / Pitch</>],
               ].map(([val,lbl])=>(
                 <button key={val} type="button" onClick={()=>setBNet(val)}
-                  style={{flex:1,background:bNet===val?G.green:G.white,
+                  style={{flex:val==="ground"?"1 0 100%":1,
+                    background:bNet===val?G.green:G.white,
                     color:bNet===val?G.lime:G.text,
                     border:bNet===val?`2px solid ${G.green}`:`1.5px solid ${G.border}`,
                     borderRadius:10,padding:"10px 6px",fontSize:13,fontWeight:700,
@@ -174,6 +181,23 @@ export default function AddSessionView() {
                 borderRadius:8,padding:"8px 11px",fontSize:12,color:"#92400e",lineHeight:1.5}}>
                 ⚠️ <b>Heads up:</b> You have fewer than 8 players. Consider booking just one net
                 so the other stays free for others.
+              </div>
+            )}
+            {bNet==="ground"&&(
+              <div style={{marginTop:8,background:"#f0fdf4",border:"1.5px solid #86efac",
+                borderRadius:8,padding:"10px 12px"}}>
+                <div style={{fontSize:11,fontWeight:800,color:"#14532d",
+                  textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>
+                  Session title (required)
+                </div>
+                <input style={iSt({fontSize:14,padding:"9px 11px",background:"#fff"})}
+                  placeholder="e.g. U11 fielding practice"
+                  value={bLabel}
+                  onChange={e=>setBLabel(e.target.value)}
+                  required/>
+                <div style={{marginTop:6,fontSize:11,color:"#166534",lineHeight:1.5}}>
+                  Add a title so others know what this session is for (e.g. "U11 fielding practice").
+                </div>
               </div>
             )}
           </FFld>
@@ -560,10 +584,14 @@ export default function AddSessionView() {
           )}
         </div>
 
-        <Btn type="submit" bg={hasAnyClash?G.muted:G.green} col={G.lime} full
-          disabled={hasAnyClash}
-          style={{opacity:hasAnyClash?0.5:1,cursor:hasAnyClash?"not-allowed":"pointer"}}>
-          {hasAnyClash?"🚫 Fix conflict above to continue":"🏏 Confirm Session"}
+        <Btn type="submit" bg={submitBlocked?G.muted:G.green} col={G.lime} full
+          disabled={submitBlocked}
+          style={{opacity:submitBlocked?0.5:1,cursor:submitBlocked?"not-allowed":"pointer"}}>
+          {hasAnyClash
+            ? "🚫 Fix conflict above to continue"
+            : groundLabelMissing
+            ? "📝 Add a session title to continue"
+            : "🏏 Confirm Session"}
         </Btn>
         <p style={{fontSize:11,color:G.muted,textAlign:"center",marginTop:8}}>
           Existing session at same date & time? Players are auto-added.
