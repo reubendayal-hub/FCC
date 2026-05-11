@@ -13,7 +13,7 @@ import { ROLES, ROLE_META, can } from "../constants/roles";
 import { TEAM_META, getTeamMeta } from "../constants/teams";
 import { fmtShort, todayStr, isFuture } from "../utils/time";
 import { getCoachTeams, getMemberRoleChips, maskEmail } from "../utils/members";
-import { EMAIL_SEED, SEED_MEMBERS, normMember, uid } from "../constants/seeds";
+import { EMAIL_SEED, normMember, uid } from "../constants/seeds";
 
 export default function AdminView() {
   const {
@@ -44,7 +44,6 @@ export default function AdminView() {
     rActiveFrom, setRActiveFrom, rActiveTo, setRActiveTo,
     rNet, setRNet,
     editingSlot, setEditingSlot,
-    dismissedMissing, setDismissedMissing,
     logFilter, setLogFilter, logOpen, setLogOpen,
     confirmDelete, setConfirmDelete,
     codeModal, setCodeModal,
@@ -86,35 +85,6 @@ export default function AdminView() {
       saveMembers(updated);
       logAction("system", `Seeded ${emailsToSeed.length} email${emailsToSeed.length>1?"s":""}: ${emailsToSeed.map(m=>m.name).join(", ")}`);
       showToast(`${emailsToSeed.length} email${emailsToSeed.length>1?"s":""} seeded ✓`);
-    }
-    // Members in SEED list but missing from live Firebase data (excluding dismissed)
-    const existingNames = new Set(members.map(m=>m.name.toLowerCase()));
-    const dismissedSet = new Set(dismissedMissing.map(n=>n.toLowerCase()));
-    const membersToImport = userRole==="superadmin"
-      ? SEED_MEMBERS.filter(m=>
-          !existingNames.has(m.name.toLowerCase()) &&
-          !dismissedSet.has(m.name.toLowerCase())
-        )
-      : [];
-    function dismissMissingMember(name) {
-      const updated=[...dismissedMissing, name];
-      setDismissedMissing(updated);
-      try{ localStorage.setItem("fcc-dismissed-missing",JSON.stringify(updated)); }catch{}
-    }
-    function dismissAllMissing() {
-      const updated=[...dismissedMissing,...membersToImport.map(m=>m.name)];
-      setDismissedMissing(updated);
-      try{ localStorage.setItem("fcc-dismissed-missing",JSON.stringify(updated)); }catch{}
-    }
-    function importMissingMembers() {
-      const toAdd = membersToImport.map(m=>normMember({
-        ...m,
-        id: uid(), // give fresh IDs to avoid collisions
-        email: EMAIL_SEED[m.name] || null,
-      }));
-      saveMembers([...members, ...toAdd]);
-      logAction("system", `Imported ${toAdd.length} missing member${toAdd.length>1?"s":""}: ${toAdd.map(m=>m.name).join(", ")}`);
-      showToast(`${toAdd.length} member${toAdd.length>1?"s":""} added ✓`);
     }
     // Members who have a division assignment in DIVISION_TEAMS but not yet that team in Firebase
     const divisionUpdates = userRole==="superadmin"
@@ -1625,51 +1595,6 @@ export default function AdminView() {
             <Btn bg="#1e3a5f" col="#93c5fd" onClick={seedAllEmails}>
               Import {emailsToSeed.length} Email{emailsToSeed.length>1?"s":""} from Uniform Form
             </Btn>
-          </div>
-        )}
-
-        {/* ── Missing Members (superadmin only) ────────────────── */}
-        {membersToImport.length > 0 && (
-          <div style={{background:"#f0fdf4",border:"1.5px solid #86efac",
-            borderRadius:12,padding:"14px 16px",marginBottom:16}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-              marginBottom:6}}>
-              <div style={{fontWeight:900,fontSize:13,color:"#14532d"}}>
-                👤 Members missing from app
-              </div>
-              <button onClick={dismissAllMissing}
-                style={{background:"none",border:"1px solid #86efac",borderRadius:7,
-                  padding:"3px 9px",fontSize:11,fontWeight:700,color:"#166534",
-                  cursor:"pointer",fontFamily:"inherit"}}>
-                Dismiss all
-              </button>
-            </div>
-            <div style={{fontSize:12,color:"#166534",marginBottom:10,lineHeight:1.5}}>
-              <b>{membersToImport.length}</b> member{membersToImport.length>1?"s":""} are in the master list but haven't been added to the app yet.
-              Tap a name to dismiss it permanently if they've left the club.
-            </div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:10}}>
-              {membersToImport.map(m=>(
-                <div key={m.name} style={{display:"flex",alignItems:"center",gap:0,
-                  background:"#14532d",borderRadius:20,overflow:"hidden"}}>
-                  <span style={{fontSize:11,color:"#4ade80",padding:"4px 10px",fontWeight:600}}>
-                    {m.name}
-                  </span>
-                  <button onClick={()=>dismissMissingMember(m.name)}
-                    title="Dismiss — this person has left the club"
-                    style={{background:"rgba(255,255,255,.1)",border:"none",borderLeft:"1px solid rgba(255,255,255,.15)",
-                      color:"#86efac",padding:"4px 8px",fontSize:12,fontWeight:900,
-                      cursor:"pointer",fontFamily:"inherit",lineHeight:1}}>
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-              <Btn bg="#14532d" col="#a3e635" onClick={importMissingMembers}>
-                Add {membersToImport.length} Missing Member{membersToImport.length>1?"s":""}
-              </Btn>
-            </div>
           </div>
         )}
 

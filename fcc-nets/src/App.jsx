@@ -368,11 +368,6 @@ export default function App() {
   const [rActiveTo,   setRActiveTo]  = useState("");
   const [rNet,        setRNet]       = useState("1"); // net for new recurring slot
   const [editingSlot, setEditingSlot]= useState(null);
-  // Permanently dismissed missing-member names (persisted in localStorage)
-  const [dismissedMissing, setDismissedMissing] = useState(()=>{
-    try { return JSON.parse(localStorage.getItem("fcc-dismissed-missing")||"[]"); } catch{ return []; }
-  });
-
   // Help / contact form
   const [helpMsg,  setHelpMsg]  = useState("");
   const [helpCat,  setHelpCat]  = useState("general");
@@ -1206,7 +1201,6 @@ export default function App() {
     rActiveFrom, setRActiveFrom, rActiveTo, setRActiveTo,
     rNet, setRNet,
     editingSlot, setEditingSlot,
-    dismissedMissing, setDismissedMissing,
     // ── help / audit log UI ────────────────────────────────────
     helpMsg, setHelpMsg, helpCat, setHelpCat,
     logFilter, setLogFilter, logOpen, setLogOpen,
