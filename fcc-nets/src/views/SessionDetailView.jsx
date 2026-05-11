@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAppContext } from "../context/AppContext";
 import Shell from "../ui/Shell";
 import BotNav from "../ui/BotNav";
@@ -52,6 +53,11 @@ export default function SessionDetailView() {
     fontWeight:500, background:G.cream, color:G.text,
     outline:"none", boxSizing:"border-box", ...extra,
   });
+
+  // Local UI state for the support-parent leaderboard / unlinked-name input.
+  // Kept local because they're only used inside this view.
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [unlinkedDraft, setUnlinkedDraft] = useState("");
 
     const userMem = members.find(m=>m.name===currentUser?.name);
     const isRestricted = !!selSess.restrictedTo;
@@ -306,8 +312,22 @@ export default function SessionDetailView() {
             );
           })()}
 
-          {/* ── Parent Duty (U11 only) ── */}
-          {selSess.restrictedTo === "U11" && (()=>{
+          {/* ── Parent Duty (U11 sessions + ad-hoc U11 ground sessions) ── */}
+          {(()=>{
+            const isU11 = selSess.restrictedTo === "U11";
+            const isU11Ground = selSess.net === "ground" &&
+              (selSess.restrictedTo === "U11" || /u11/i.test(selSess.label||""));
+            return isU11 || isU11Ground;
+          })() && (()=>{
+            // Minimum compulsory duties per parent for the season.
+            const MIN_DUTIES = 4;
+            const ord = n => {
+              const v = n % 100;
+              if(v>=11 && v<=13) return `${n}th`;
+              const s = ["th","st","nd","rd"][n%10>3?0:n%10];
+              return `${n}${s}`;
+            };
+
             // Who are the U11 parents? Any member whose children include a U11 player.
             const u11ChildIds = new Set(
               members.filter(m => (m.teams||[]).includes("U11")).map(m => m.id)
@@ -315,21 +335,47 @@ export default function SessionDetailView() {
             const u11Parents = members.filter(m =>
               (m.children||[]).some(cid => u11ChildIds.has(cid))
             );
-            // Season = all U11 sessions this year (including this one), past + future
+            // Season = all U11 sessions this year (including this one), past + future.
+            // Includes both restrictedTo==="U11" and ad-hoc ground sessions whose
+            // label/team identifies them as U11.
             const seasonYear = new Date(selSess.date).getFullYear();
-            const u11Sessions = sessions.filter(s =>
-              s.restrictedTo === "U11" &&
-              new Date(s.date).getFullYear() === seasonYear
-            );
-            // Count support-duty sessions per parent across the season
-            const dutyCount = {};
+            const isU11Session = s =>
+              new Date(s.date).getFullYear() === seasonYear &&
+              (s.restrictedTo === "U11" ||
+               (s.net === "ground" &&
+                (s.restrictedTo === "U11" || /u11/i.test(s.label||""))));
+            const u11Sessions = sessions.filter(isU11Session);
+            // Count support-duty sessions per parent across the season.
+            // Linked parents are keyed by memberId, unlinked by lowercase name.
+            // Known future improvement: when an unlinked parent eventually links
+            // their profile, their historical name-based counts won't migrate.
+            const dutyCount = {};                  // by memberId
+            const dutyCountByName = {};            // by name.toLowerCase()
             u11Parents.forEach(p => { dutyCount[p.id] = 0; });
+            // Track unlinked names with at least one duty so the leaderboard /
+            // fairness list can include them.
+            const unlinkedNames = {};              // lcName -> displayName
             u11Sessions.forEach(s => {
               const sp = s.supportParent;
-              if (sp && sp.memberId && dutyCount[sp.memberId] !== undefined) {
+              if (!sp) return;
+              if (sp.memberId && dutyCount[sp.memberId] !== undefined) {
                 dutyCount[sp.memberId] += 1;
               }
+              if (sp.memberName) {
+                const key = sp.memberName.trim().toLowerCase();
+                dutyCountByName[key] = (dutyCountByName[key]||0) + 1;
+                if (sp.unlinked && !unlinkedNames[key]) {
+                  unlinkedNames[key] = sp.memberName.trim();
+                }
+              }
             });
+            // For each linked parent, dedupe count with any name-based hits.
+            // We trust memberId-based counts as authoritative; name counts are
+            // only used for unlinked parents (where memberId is null).
+            const getDutyCount = p =>
+              p.unlinked
+                ? (dutyCountByName[p.name.toLowerCase()] || 0)
+                : (dutyCount[p.id] || 0);
 
             const support = selSess.supportParent || null;
             const meId = currentUser?.id;
@@ -339,20 +385,49 @@ export default function SessionDetailView() {
             const isCoachOrAdmin = canOrCoach(userRole,"addOtherPlayer",userMem,teams);
 
             // ── Mutations ──
-            const assignSupport = (memberId, memberName) => {
+            const sendDutyConfirm = (member, sess, parentName) => {
+              if (!member?.email) return;
+              fetch("/api/send-duty-confirm", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  email: member.email,
+                  name: parentName || member.name,
+                  date: sess.date,
+                  from: sess.from,
+                  to: sess.to,
+                  label: sess.label || "",
+                }),
+              }).catch(()=>{});
+            };
+            const assignSupport = (memberId, memberName, opts={}) => {
+              const unlinked = !!opts.unlinked;
               const updSess = {
                 ...selSess,
                 supportParent: {
-                  memberId,
+                  memberId: unlinked ? null : memberId,
                   memberName,
                   assignedBy: currentUser?.name || "unknown",
                   assignedAt: new Date().toISOString(),
+                  ...(unlinked ? { unlinked: true } : {}),
                 },
               };
               setSelSess(updSess);
               saveSessions(sessions.map(s => s.id===selSess.id ? updSess : s));
-              logAction("session", `Support parent set: ${memberName} for U11 ${selSess.date} (by ${currentUser?.name})`);
+              logAction("session", `Support parent set: ${memberName}${unlinked?" (unlinked)":""} for U11 ${selSess.date} (by ${currentUser?.name})`);
               showToast(`${memberName.split(" ")[0]} signed up as support parent ✓`);
+              // Confirmation email for linked parents only — we have no
+              // address for unlinked entries.
+              if (!unlinked) {
+                const target = members.find(m => m.id === memberId);
+                if (target) sendDutyConfirm(target, updSess, memberName);
+              }
+            };
+            const assignUnlinked = (typedName) => {
+              const name = (typedName||"").trim();
+              if (!name) { showToast("Type a parent name first"); return; }
+              assignSupport(null, name, { unlinked: true });
+              setUnlinkedDraft("");
             };
             const clearSupport = () => {
               const prev = support?.memberName || "";
@@ -363,10 +438,36 @@ export default function SessionDetailView() {
               showToast("Support parent slot cleared");
             };
 
-            // ── Sorted fairness list for coach/admin view ──
-            const fairness = u11Parents
-              .map(p => ({ id: p.id, name: p.name, count: dutyCount[p.id] || 0 }))
+            // ── Combined fairness list: linked parents + unlinked names ──
+            const linkedRows = u11Parents.map(p => ({
+              id: p.id, name: p.name, unlinked: false,
+              count: dutyCount[p.id] || 0,
+            }));
+            const linkedNameSet = new Set(linkedRows.map(r => r.name.toLowerCase()));
+            const unlinkedRows = Object.entries(unlinkedNames)
+              .filter(([lc]) => !linkedNameSet.has(lc))
+              .map(([lc, display]) => ({
+                id: `unlinked:${lc}`, name: display, unlinked: true,
+                count: dutyCountByName[lc] || 0,
+              }));
+            const allRows = [...linkedRows, ...unlinkedRows];
+
+            // Fairness (ascending — show who's behind first)
+            const fairness = [...allRows]
               .sort((a, b) => a.count - b.count || a.name.localeCompare(b.name));
+            // Leaderboard (descending — top performers first)
+            const leaderboard = [...allRows]
+              .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+            // Rank map: leaderboard position 1..N
+            const rankByKey = {};
+            leaderboard.forEach((r, i) => { rankByKey[r.id] = i + 1; });
+            const totalParents = allRows.length;
+
+            // Per-row progress bar colour against the 4-minimum target.
+            const progressColour = c =>
+              c >= MIN_DUTIES ? { bar:"#16a34a", bg:"#dcfce7", text:"#166534" } :
+              c >= 2          ? { bar:"#f59e0b", bg:"#fef3c7", text:"#92400e" } :
+                                { bar:"#dc2626", bg:"#fee2e2", text:"#991b1b" };
 
             const showAssignUI = assignOpen === selSess.id;
 
@@ -451,6 +552,81 @@ export default function SessionDetailView() {
                   );
                 })()}
 
+                {/* Public leaderboard — visible to everyone */}
+                {totalParents > 0 && (
+                  <div style={{marginTop:10,paddingTop:10,
+                    borderTop:"1px dashed #fcd34d"}}>
+                    <button onClick={()=>setLeaderboardOpen(o=>!o)}
+                      style={{width:"100%",background:"transparent",
+                        border:"1px dashed #d4a217",color:"#92400e",
+                        borderRadius:8,padding:"8px 10px",
+                        fontSize:12,fontWeight:700,cursor:"pointer",
+                        fontFamily:"inherit"}}>
+                      {leaderboardOpen ? "▲ Hide season leaderboard" : "🏆 Season leaderboard"}
+                    </button>
+                    {leaderboardOpen && (
+                      <div style={{marginTop:10}}>
+                        <div style={{fontSize:10,color:"#92400e",lineHeight:1.5,marginBottom:8,
+                          display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+                          <span><b>Minimum target:</b> {MIN_DUTIES} sessions each</span>
+                          <span style={{fontStyle:"italic"}}>
+                            {leaderboard.filter(p=>p.count>=MIN_DUTIES).length}/{totalParents} on target
+                          </span>
+                        </div>
+                        <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                          {leaderboard.map((p, i) => {
+                            const isMe = !p.unlinked && p.id === meId;
+                            const pc = progressColour(p.count);
+                            const pctOfMin = Math.min(100, Math.round((p.count / MIN_DUTIES) * 100));
+                            const statusIcon = p.count >= MIN_DUTIES ? "✅"
+                              : p.count === 0 ? "🔴"
+                              : null;
+                            return (
+                              <div key={p.id} style={{
+                                display:"flex",alignItems:"center",gap:8,
+                                background:isMe ? "#fef3c7" : "transparent",
+                                border:isMe ? "1.5px solid #fbbf24" : "0.5px solid transparent",
+                                borderRadius:8,padding:"5px 9px",
+                              }}>
+                                <span style={{fontSize:11,fontWeight:800,color:"#92400e",
+                                  width:22,textAlign:"center"}}>
+                                  {i+1}.
+                                </span>
+                                <span style={{flex:1,minWidth:0,display:"flex",
+                                  alignItems:"center",gap:5,fontSize:12,
+                                  fontWeight:isMe?800:600,color:"#0f1a3a"}}>
+                                  {statusIcon && <span>{statusIcon}</span>}
+                                  <span style={{overflow:"hidden",textOverflow:"ellipsis",
+                                    whiteSpace:"nowrap"}}>
+                                    {isMe ? "You" : p.name}
+                                  </span>
+                                  {p.unlinked && (
+                                    <span style={{fontSize:9,fontWeight:700,
+                                      background:"#f1f5f9",color:"#475569",
+                                      border:"0.5px solid #cbd5e1",
+                                      padding:"0 5px",borderRadius:10}}>
+                                      ⚠ not in app
+                                    </span>
+                                  )}
+                                </span>
+                                <div style={{width:80,height:5,borderRadius:10,
+                                  background:pc.bg,overflow:"hidden",flexShrink:0}}>
+                                  <div style={{width:`${pctOfMin}%`,height:"100%",
+                                    background:pc.bar,borderRadius:10}}/>
+                                </div>
+                                <span style={{fontSize:10,fontWeight:800,color:pc.text,
+                                  minWidth:18,textAlign:"right"}}>
+                                  {p.count}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Coach/admin fairness overview & assign UI */}
                 {isCoachOrAdmin && (
                   <div style={{marginTop:10,paddingTop:10,
@@ -478,44 +654,117 @@ export default function SessionDetailView() {
                               No U11 parents linked yet. Parents need to link their child in "My Family".
                             </div>
                           )}
-                          {fairness.map(p => (
-                            <div key={p.id} style={{
-                              display:"flex",alignItems:"center",gap:8,
-                              background:p.count===0?"#fef3c7":"transparent",
-                              border:p.count===0?"0.5px solid #fde68a":"0.5px solid transparent",
-                              borderRadius:8,padding:"4px 8px",
-                            }}>
-                              <span style={{fontSize:12,color:"#0f1a3a",flex:1,
-                                fontWeight:p.count===0?700:500}}>
-                                {p.name}
-                              </span>
-                              <span style={{fontSize:10,fontWeight:800,color:"#92400e",
-                                background:"#fef9c3",padding:"1px 7px",borderRadius:10,
-                                minWidth:22,textAlign:"center"}}>
-                                ×{p.count}
-                              </span>
-                              {!support && (
-                                <button onClick={()=>assignSupport(p.id, p.name)}
-                                  style={{background:"#d4a217",color:"#fff",border:"none",
-                                    borderRadius:6,padding:"3px 8px",fontSize:10,
-                                    fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
-                                  Assign
-                                </button>
-                              )}
-                              {support && support.memberId !== p.id && (
-                                <button onClick={()=>assignSupport(p.id, p.name)}
-                                  style={{background:"transparent",
-                                    color:"#92400e",border:"1px solid #d4a217",
-                                    borderRadius:6,padding:"3px 8px",fontSize:10,
-                                    fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
-                                  Swap
-                                </button>
-                              )}
-                            </div>
-                          ))}
+                          {fairness.map(p => {
+                            const pc = progressColour(p.count);
+                            const pctOfMin = Math.min(100, Math.round((p.count / MIN_DUTIES) * 100));
+                            const rank = rankByKey[p.id];
+                            const dutyLabel = p.count >= MIN_DUTIES
+                              ? `${p.count} ✓`
+                              : `${p.count} of ${MIN_DUTIES} minimum`;
+                            const disableAssign = p.unlinked && support; // can't swap to unlinked once someone is set
+                            return (
+                              <div key={p.id} style={{
+                                background:p.count===0?"#fef3c7":"transparent",
+                                border:p.count===0?"0.5px solid #fde68a":"0.5px solid transparent",
+                                borderRadius:8,padding:"6px 8px",
+                              }}>
+                                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                                  <span style={{fontSize:12,color:"#0f1a3a",flex:1,
+                                    fontWeight:p.count===0?700:500,
+                                    display:"flex",alignItems:"center",gap:6}}>
+                                    {p.name}
+                                    {p.unlinked && (
+                                      <span style={{fontSize:9,fontWeight:700,
+                                        background:"#f1f5f9",color:"#475569",
+                                        border:"0.5px solid #cbd5e1",
+                                        padding:"0 6px",borderRadius:10}}
+                                        title="Parent not yet linked to an app profile">
+                                        ⚠ not in app
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span style={{fontSize:9,color:"#92400e",fontWeight:600,
+                                    whiteSpace:"nowrap"}}>
+                                    {ord(rank)} of {totalParents}
+                                  </span>
+                                  {!support && !p.unlinked && (
+                                    <button onClick={()=>assignSupport(p.id, p.name)}
+                                      style={{background:"#d4a217",color:"#fff",border:"none",
+                                        borderRadius:6,padding:"3px 8px",fontSize:10,
+                                        fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+                                      Assign
+                                    </button>
+                                  )}
+                                  {!support && p.unlinked && (
+                                    <button onClick={()=>assignSupport(null, p.name, {unlinked:true})}
+                                      style={{background:"#64748b",color:"#fff",border:"none",
+                                        borderRadius:6,padding:"3px 8px",fontSize:10,
+                                        fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+                                      Assign
+                                    </button>
+                                  )}
+                                  {support && !disableAssign && support.memberId !== p.id && !p.unlinked && (
+                                    <button onClick={()=>assignSupport(p.id, p.name)}
+                                      style={{background:"transparent",
+                                        color:"#92400e",border:"1px solid #d4a217",
+                                        borderRadius:6,padding:"3px 8px",fontSize:10,
+                                        fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                                      Swap
+                                    </button>
+                                  )}
+                                </div>
+                                {/* Progress bar */}
+                                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                                  <div style={{flex:1,height:6,borderRadius:10,
+                                    background:pc.bg,overflow:"hidden"}}>
+                                    <div style={{width:`${pctOfMin}%`,height:"100%",
+                                      background:pc.bar,borderRadius:10,
+                                      transition:"width .2s"}}/>
+                                  </div>
+                                  <span style={{fontSize:10,fontWeight:800,color:pc.text,
+                                    whiteSpace:"nowrap",minWidth:80,textAlign:"right"}}>
+                                    {dutyLabel}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                        <div style={{fontSize:10,color:"#92400e",fontStyle:"italic",lineHeight:1.5}}>
+                        <div style={{fontSize:10,color:"#92400e",fontStyle:"italic",lineHeight:1.5,marginBottom:10}}>
                           💡 Parents in yellow haven't covered a session this season. Assign them if they've not stepped up themselves.
+                        </div>
+
+                        {/* Add unlisted parent (for parents not yet linked in the app) */}
+                        <div style={{paddingTop:10,borderTop:"1px dashed #fcd34d"}}>
+                          <div style={{fontSize:10,fontWeight:800,letterSpacing:0.8,
+                            textTransform:"uppercase",color:"#92400e",marginBottom:6}}>
+                            Add unlisted parent
+                          </div>
+                          <div style={{display:"flex",gap:6}}>
+                            <input
+                              value={unlinkedDraft}
+                              onChange={e=>setUnlinkedDraft(e.target.value)}
+                              placeholder="Parent's full name…"
+                              style={{flex:1,border:"1px solid #d4a217",borderRadius:7,
+                                padding:"6px 9px",fontSize:12,fontFamily:"inherit",
+                                background:"#fff"}}
+                              onKeyDown={e=>{
+                                if(e.key==="Enter"){e.preventDefault();assignUnlinked(unlinkedDraft);}
+                              }}/>
+                            <button onClick={()=>assignUnlinked(unlinkedDraft)}
+                              disabled={!unlinkedDraft.trim() || !!support}
+                              style={{background:unlinkedDraft.trim()&&!support?"#64748b":"#cbd5e1",
+                                color:"#fff",border:"none",borderRadius:7,
+                                padding:"6px 12px",fontSize:11,fontWeight:800,
+                                cursor:unlinkedDraft.trim()&&!support?"pointer":"not-allowed",
+                                fontFamily:"inherit"}}>
+                              Assign
+                            </button>
+                          </div>
+                          <div style={{fontSize:10,color:"#78350f",marginTop:5,lineHeight:1.4}}>
+                            Use this if a parent helps but hasn't linked their profile yet.
+                            Their duties will be tracked by name.
+                          </div>
                         </div>
                       </>
                     )}
