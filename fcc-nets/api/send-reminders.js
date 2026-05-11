@@ -50,6 +50,25 @@ function parseDoc(doc) {
   return o;
 }
 
+// JS value → Firestore REST API value format. Inverse of parseVal.
+// Used to write the reminder run log as a native Firestore array (the
+// app reads rlr.data().list directly, with no JSON.parse).
+function toFv(v) {
+  if(v === null || v === undefined) return { nullValue: null };
+  if(typeof v === "boolean") return { booleanValue: v };
+  if(typeof v === "number")
+    return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+  if(typeof v === "string") return { stringValue: v };
+  if(Array.isArray(v))
+    return { arrayValue: { values: v.map(toFv) } };
+  if(typeof v === "object") {
+    const fields = {};
+    for(const [k, vv] of Object.entries(v)) fields[k] = toFv(vv);
+    return { mapValue: { fields } };
+  }
+  return { stringValue: String(v) };
+}
+
 function getDatePlusDays(days) {
   const d = new Date(); 
   d.setDate(d.getDate() + days);
@@ -336,6 +355,32 @@ export default async function handler(req, res) {
         skipped,
         results,
       });
+    }
+
+    // Save run log to Firestore (fccnets/reminderlogs.list) so the
+    // Admin view can show it. Fire-and-forget — don't fail the response
+    // if the log save errors.
+    try {
+      const newEntry = {
+        runAt: new Date().toISOString(),
+        reminders: allResults,
+        totalSent,
+        totalSkipped,
+      };
+      const lr = await fetch(`${base}/fccnets/reminderlogs`, { headers });
+      let existingList = [];
+      if(lr.ok) {
+        const lDoc = parseDoc(await lr.json());
+        if(Array.isArray(lDoc.list)) existingList = lDoc.list;
+      }
+      const updatedList = [newEntry, ...existingList].slice(0, 30);
+      await fetch(`${base}/fccnets/reminderlogs?updateMask.fieldPaths=list`, {
+        method: "PATCH",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ fields: { list: toFv(updatedList) } }),
+      });
+    } catch (logErr) {
+      console.error("reminderlogs save failed:", logErr.message);
     }
 
     return res.status(200).json({
