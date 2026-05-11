@@ -1121,7 +1121,7 @@ export default function CaptainXIView() {
           );
         })()}
 
-        <BotNav view={view} setView={setView} userRole={userRole} pendingCount={joinRequests.length} currentUser={currentUser} teams={teams} G={G}/>
+        <BotNav view={view} setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r => r.status === "pending").length} currentUser={currentUser} teams={teams} G={G}/>
         {toast&&<Toast msg={toast} G={G}/>}
       </Shell>
     );
