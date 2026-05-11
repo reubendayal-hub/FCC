@@ -19,6 +19,7 @@ export default function AdminView() {
   const {
     G, view, setView, userRole, currentUser, teams, members,
     sessions, recurring, blockCals, inviteCodes, joinRequests, auditLog, reminderLogs,
+    pins, resetPin,
     saveMembers, saveTeams, saveBlockCals, saveJoinRequests,
     showToast, logAction, joinRequests: _joinReq, toast,
     // Admin form state
