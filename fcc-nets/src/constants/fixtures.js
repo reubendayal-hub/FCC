@@ -108,3 +108,69 @@ export const ALL_FIXTURES = [
   {date:"2026-08-16",label:"U11 Ministævne vs (Home)",division:"U11",home:true},
   {date:"2026-09-20",label:"U11 Ministævne @ Ishøj",division:"U11",home:false},
 ];
+
+// ─── 2026 Home Match Fixtures (block nets) — Pass 6 move ─────
+// Source: DCF 2026_Turnering_Schedule, 11-Mar-Consolidated
+// Away matches excluded — nets not needed for away games
+export const MATCH_FIXTURES = [
+  // ── 2. Division ──────────────────────────────────────────────
+  { date:"2026-05-17", from:"10:00", to:"19:00", label:"Div 2 — FCC vs Århus 1" },
+  { date:"2026-05-24", from:"11:00", to:"20:00", label:"Div 2 — FCC vs Himalaya 1" },
+  { date:"2026-06-07", from:"11:00", to:"20:00", label:"Div 2 — FCC vs Copenhagen 1" },
+  { date:"2026-07-26", from:"11:00", to:"20:00", label:"Div 2 — FCC vs Bella 1" },
+  { date:"2026-08-15", from:"11:00", to:"20:00", label:"Div 2 — FCC vs Kolding 1" },
+  { date:"2026-08-30", from:"11:00", to:"20:00", label:"Div 2 — FCC vs Frem 1" },
+  // ── 3. Division Øst - B ──────────────────────────────────────
+  { date:"2026-05-02", from:"13:00", to:"21:00", label:"Div 3 — FCC vs APMM 1" },
+  { date:"2026-05-31", from:"10:00", to:"19:00", label:"Div 3 — FCC vs Frem 2" },
+  { date:"2026-06-13", from:"14:00", to:"21:00", label:"Div 3 — FCC vs Hvidovre 2" },
+  { date:"2026-06-27", from:"10:00", to:"19:00", label:"Div 3 — FCC vs Ishøj 3" },
+  { date:"2026-08-22", from:"10:00", to:"19:00", label:"Div 3 — FCC vs APMM 1" },
+  { date:"2026-09-05", from:"15:00", to:"21:00", label:"Div 3 — FCC vs AB 2" },
+  // ── 4. Division Øst ──────────────────────────────────────────
+  { date:"2026-05-10", from:"10:00", to:"19:00", label:"Div 4 — FCC vs Tårnby 1" },
+  { date:"2026-05-31", from:"15:00", to:"21:00", label:"Div 4 — FCC vs Albertslund 3" },
+  { date:"2026-06-14", from:"14:00", to:"21:00", label:"Div 4 — FCC vs Tåstrup 2" },
+  { date:"2026-08-01", from:"10:00", to:"19:00", label:"Div 4 — FCC vs Hvidovre 3" },
+  { date:"2026-08-09", from:"14:00", to:"21:00", label:"Div 4 — FCC vs Frem 3" },
+  // ── Kvinderækken ─────────────────────────────────────────────
+  { date:"2026-06-06", from:"10:00", to:"19:00", label:"Women's — FCC vs Esbjerg" },
+  { date:"2026-06-14", from:"10:00", to:"19:00", label:"Women's — FCC vs Svanholm" },
+  { date:"2026-08-02", from:"10:00", to:"19:00", label:"Women's — FCC vs KB" },
+  // ── Oldboys ──────────────────────────────────────────────────
+  { date:"2026-05-06", from:"18:00", to:"21:00", label:"OB — FCC vs Køge OB" },
+  { date:"2026-05-27", from:"18:00", to:"21:00", label:"OB — FCC vs Hvidovre OB" },
+  { date:"2026-06-18", from:"18:00", to:"21:00", label:"OB — FCC vs Forty Øst 1" },
+  { date:"2026-08-12", from:"18:00", to:"21:00", label:"OB — FCC vs Tåstrup OB" },
+  { date:"2026-08-18", from:"18:00", to:"21:00", label:"OB — FCC vs Svanholm OB" },
+  { date:"2026-08-25", from:"18:00", to:"21:00", label:"OB — FCC vs Ishøj OB" },
+  { date:"2026-09-03", from:"18:00", to:"21:00", label:"OB — FCC vs Hvidovre OB" },
+  // ── T20 Serie 4 ──────────────────────────────────────────────
+  { date:"2026-05-03", from:"13:00", to:"21:00", label:"T20 Series 4 — FCC vs Nørrebro 2" },
+  { date:"2026-07-05", from:"10:00", to:"18:00", label:"T20 Series 4 — FCC vs AB 2" },
+  { date:"2026-08-02", from:"15:00", to:"22:00", label:"T20 Series 4 — FCC vs Tåstrup 1" },
+  // ── T20 Serie 5 ──────────────────────────────────────────────
+  { date:"2026-05-16", from:"14:00", to:"22:00", label:"T20 Series 5 — FCC vs Himalaya 1" },
+  { date:"2026-07-05", from:"14:00", to:"22:00", label:"T20 Series 5 — FCC vs Tårnby 1" },
+  { date:"2026-07-11", from:"11:00", to:"19:00", label:"T20 Series 5 — FCC vs Tåstrup 2" },
+  // ── U13 ──────────────────────────────────────────────────────
+  { date:"2026-05-16", from:"10:00", to:"19:00", label:"U13 — FCC vs Glostrup U13" },
+  { date:"2026-05-25", from:"10:00", to:"19:00", label:"U13 — FCC vs Soraner U13" },
+  { date:"2026-06-13", from:"10:00", to:"19:00", label:"U13 — FCC vs Svanholm U13" },
+  { date:"2026-06-20", from:"13:00", to:"21:00", label:"U13 — FCC vs Roskilde U13" },
+  { date:"2026-08-09", from:"10:00", to:"19:00", label:"U13 — FCC vs KB U13" },
+  // ── U15 ──────────────────────────────────────────────────────
+  { date:"2026-04-26", from:"10:00", to:"19:00", label:"U15 — FCC vs KB U15" },
+  { date:"2026-05-23", from:"10:00", to:"19:00", label:"U15 — FCC vs Svanholm U15" },
+  { date:"2026-08-16", from:"14:00", to:"21:00", label:"U15 — FCC vs KB U15" },
+  { date:"2026-09-05", from:"10:00", to:"19:00", label:"U15 — FCC vs Glostrup U15" },
+  // ── U16 ──────────────────────────────────────────────────────
+  { date:"2026-08-03", from:"10:00", to:"19:00", label:"U16 — FCC vs Svanholm U16" },
+  { date:"2026-08-29", from:"10:00", to:"19:00", label:"U16 — FCC vs Glostrup U16" },
+  // ── U18 ──────────────────────────────────────────────────────
+  { date:"2026-06-21", from:"10:00", to:"19:00", label:"U18 — FCC vs Svanholm U18" },
+  { date:"2026-07-25", from:"10:00", to:"19:00", label:"U18 — FCC vs KB U18" },
+  { date:"2026-09-12", from:"10:00", to:"19:00", label:"U18 — FCC vs Glostrup U18" },
+  // ── U11 Ministævne ───────────────────────────────────────────
+  { date:"2026-08-16", from:"10:00", to:"17:00", label:"U11 — Home Ministævne" },
+];
