@@ -12,6 +12,7 @@ import { isAfterCutoff, fmtShort, isToday } from "../utils/time";
 import { canOrCoach, isCoachMember, isAbsent } from "../utils/members";
 import { getLiftObj, getLiftPref } from "../utils/lifts";
 import { makeICS } from "../utils/ics";
+import { uid } from "../constants/seeds";
 
 const dlICS = s => {
   const a=document.createElement("a");
@@ -44,6 +45,13 @@ export default function SessionDetailView() {
     handleJoinDetail, handleDeleteSess,
     joinRequests, toast,
   } = useAppContext();
+
+  const iSt = (extra={}) => ({
+    width:"100%", borderRadius:9, border:`1.5px solid ${G.border}`,
+    padding:"11px 13px", fontSize:15, fontFamily:"'DM Sans',sans-serif",
+    fontWeight:500, background:G.cream, color:G.text,
+    outline:"none", boxSizing:"border-box", ...extra,
+  });
 
     const userMem = members.find(m=>m.name===currentUser?.name);
     const isRestricted = !!selSess.restrictedTo;

@@ -16,6 +16,7 @@ import { TEAM_META, getTeamCardColors } from "../constants/teams";
 import { THEMES, THEME_KEYS } from "../constants/themes";
 import { fmtShort, todayStr } from "../utils/time";
 import { isCoachMember, profileCompletion, maskEmail, getMemberRoleChips } from "../utils/members";
+import { uid } from "../constants/seeds";
 
 export default function ProfileView() {
   const {
