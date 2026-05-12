@@ -39,12 +39,6 @@ const G = {
 // Match-type and status accents are brand-semantic, not theme-derived,
 // so they stay as literals at module level (independent of theme G).
 const NAVY = "#1B2A5C";
-
-// Shell uses G.green for its sidebar background. We want the sidebar to
-// stay dark navy (matching the rest of the app) while green buttons
-// inside ScorePro keep their forest-green tint, so we pass an overridden
-// palette to Shell only.
-const SHELL_G = { ...G, green: "#1e3a5f" };
 const MATCH_TYPES = [
   { id:"internal", label:"FCC Internal",  desc:"Both teams from FCC squads",          icon:"🏏", savesStats:true,  color:"#1a6b38" },
   { id:"friendly", label:"FCC Friendly",  desc:"FCC vs external club — stats saved",  icon:"🤝", savesStats:true,  color:NAVY      },
@@ -118,7 +112,7 @@ export default function MatchesView({
   const canCreate = ["superadmin","admin","captain","vicecaptain","coach","member"].includes(userRole);
 
   return (
-    <Shell G={SHELL_G} sidebar={
+    <Shell G={G} sidebar={
       <SidebarNav view={view} setView={setView} userRole={userRole}
         currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO} />
     }>
@@ -344,7 +338,7 @@ function CreateMatchScreen({
   const STEPS = ["Basics","Teams","Squads","Confirm"];
 
   return (
-    <Shell G={SHELL_G} sidebar={
+    <Shell G={G} sidebar={
       <SidebarNav view={view} setView={setView} userRole={userRole}
         currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO} />
     }>
