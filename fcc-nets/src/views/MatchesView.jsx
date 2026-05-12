@@ -183,7 +183,7 @@ export default function MatchesView({
 
       <BotNav G={G} view="scorelive" setView={setView} userRole={userRole}
         pendingCount={pendingCount} currentUser={currentUser} teams={teams} />
-      {toast && <Toast msg={toast} />}
+      {toast && <Toast msg={toast} G={G} />}
     </Shell>
   );
 }
@@ -502,7 +502,7 @@ function CreateMatchScreen({
           </div>
         )}
       </div>
-      {toast && <Toast msg={toast}/>}
+      {toast && <Toast msg={toast} G={G}/>}
     </Shell>
   );
 }
