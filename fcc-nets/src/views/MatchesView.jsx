@@ -16,6 +16,11 @@ import BotNav     from "../ui/BotNav";
 import Toast      from "../ui/Toast";
 import { FCC_LOGO } from "../constants/logo";
 
+// Takeover constants — kept in sync with LiveScorerView.
+const TAKEOVER_PIN = "4321";
+const SCORER_LOCK_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+const TAKEOVER_REQUEST_TIMEOUT_S = 30;
+
 // Colours are hardcoded inline — no THEMES, no context, no import.
 // Trade-off: MatchesView is locked to this palette regardless of the
 // app theme. Chosen for reliability after repeated runtime failures
@@ -79,6 +84,98 @@ export default function MatchesView({
   const [loadingList,   setLoadingList]   = useState(true);
   const [screen,        setScreen]        = useState("list");
   const [activeMatchId, setActiveMatchId] = useState(null);
+
+  // Takeover request flow state (Task 4c/4d)
+  // takeoverMatch: the match being targeted; phase: "confirm"|"waiting"|"pin"
+  const [takeoverMatch, setTakeoverMatch] = useState(null);
+  const [takeoverPhase, setTakeoverPhase] = useState(null);
+  const [takeoverError, setTakeoverError] = useState("");
+
+  const meId = currentUser?.uid || currentUser?.id || null;
+
+  function navigateToScorer(matchId) {
+    setActiveMatchId(matchId);
+    setView(`scorer-${matchId}`);
+  }
+
+  function requestScore(m) {
+    const aId = m.activeScorerId || null;
+    const aAt = m.activeScorerLastActiveAt;
+    const aAtMs = aAt?.toMillis?.() ?? (aAt?.seconds ? aAt.seconds * 1000 : 0);
+    const ageMs = aAtMs ? Date.now() - aAtMs : Infinity;
+    // Free, mine, or stale lock — go straight in.
+    if (!aId || aId === meId || ageMs > SCORER_LOCK_TIMEOUT_MS) {
+      if (aId && aId !== meId && ageMs > SCORER_LOCK_TIMEOUT_MS) {
+        const hrs = Math.floor(ageMs / (60 * 60 * 1000));
+        const ok = window.confirm(`Score this match? Previous scorer was last active ${hrs} hour${hrs === 1 ? "" : "s"} ago.`);
+        if (!ok) return;
+      }
+      navigateToScorer(m.id);
+      return;
+    }
+    // Active lock by someone else — open takeover sheet.
+    setTakeoverError("");
+    setTakeoverMatch(m);
+    setTakeoverPhase("confirm");
+  }
+
+  async function sendTakeoverRequest() {
+    if (!takeoverMatch) return;
+    try {
+      await setDoc(doc(db, "fccscorer", "data", "matches", takeoverMatch.id), {
+        takeoverRequest: {
+          fromId: meId,
+          fromName: currentUser?.name || null,
+          requestedAt: serverTimestamp(),
+        },
+        takeoverDecision: null,
+      }, { merge: true });
+      setTakeoverPhase("waiting");
+    } catch (e) {
+      console.error("sendTakeoverRequest error:", e);
+      setTakeoverError("Could not send request — try again.");
+    }
+  }
+
+  async function claimScorer(matchId) {
+    try {
+      await setDoc(doc(db, "fccscorer", "data", "matches", matchId), {
+        activeScorerId: meId,
+        activeScorerName: currentUser?.name || null,
+        activeScorerLastActiveAt: serverTimestamp(),
+        takeoverRequest: null,
+        takeoverDecision: null,
+      }, { merge: true });
+    } catch (e) {
+      console.error("claimScorer error:", e);
+    }
+  }
+
+  function closeTakeover() {
+    setTakeoverMatch(null);
+    setTakeoverPhase(null);
+    setTakeoverError("");
+  }
+
+  async function approvedTakeover() {
+    if (!takeoverMatch) return;
+    const id = takeoverMatch.id;
+    await claimScorer(id);
+    closeTakeover();
+    navigateToScorer(id);
+  }
+
+  async function pinTakeover(pin) {
+    if (!takeoverMatch) return;
+    if (pin !== TAKEOVER_PIN) {
+      setTakeoverError("Incorrect PIN.");
+      return;
+    }
+    const id = takeoverMatch.id;
+    await claimScorer(id);
+    closeTakeover();
+    navigateToScorer(id);
+  }
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -153,7 +250,7 @@ export default function MatchesView({
           <Section G={G} label="🔴 Live now">
             {liveMatches.map(m => (
               <MatchCard key={m.id} G={G} match={m}
-                onScore={() => { setActiveMatchId(m.id); setView(`scorer-${m.id}`); }}
+                onScore={() => requestScore(m)}
                 onWatch={() => { setActiveMatchId(m.id); setView(`live-${m.id}`); }}
                 currentUser={currentUser} />
             ))}
@@ -163,7 +260,7 @@ export default function MatchesView({
           <Section G={G} label="📅 Upcoming">
             {upcomingMatches.map(m => (
               <MatchCard key={m.id} G={G} match={m}
-                onScore={() => { setActiveMatchId(m.id); setView(`scorer-${m.id}`); }}
+                onScore={() => requestScore(m)}
                 onWatch={() => { setActiveMatchId(m.id); setView(`live-${m.id}`); }}
                 currentUser={currentUser} />
             ))}
@@ -173,7 +270,7 @@ export default function MatchesView({
           <Section G={G} label="✅ Recent results">
             {completedMatches.slice(0,10).map(m => (
               <MatchCard key={m.id} G={G} match={m}
-                onScore={() => { setActiveMatchId(m.id); setView(`scorer-${m.id}`); }}
+                onScore={() => requestScore(m)}
                 onWatch={() => { setActiveMatchId(m.id); setView(`live-${m.id}`); }}
                 currentUser={currentUser} />
             ))}
@@ -194,8 +291,195 @@ export default function MatchesView({
       <BotNav G={G} view="scorelive" setView={setView} userRole={userRole}
         pendingCount={pendingCount} currentUser={currentUser} teams={teams} />
       {toast && <Toast msg={toast} G={G} />}
+
+      {/* Takeover flow: confirm sheet → waiting → PIN entry */}
+      {takeoverMatch && (
+        <TakeoverSheet
+          phase={takeoverPhase}
+          match={takeoverMatch}
+          error={takeoverError}
+          onClose={closeTakeover}
+          onRequest={sendTakeoverRequest}
+          onApproved={approvedTakeover}
+          onPinSubmit={pinTakeover}
+          onTimeout={() => setTakeoverPhase("pin")}
+        />
+      )}
     </Shell>
   );
+}
+
+// ── Takeover sheet (confirm + waiting + PIN) ─────────────────
+function TakeoverSheet({ phase, match, error, onClose, onRequest, onApproved, onPinSubmit, onTimeout }) {
+  const [secondsLeft, setSecondsLeft] = useState(TAKEOVER_REQUEST_TIMEOUT_S);
+  const [pinInput, setPinInput] = useState("");
+  const [decision, setDecision] = useState(null); // "approved"|"denied"|null
+  const [decisionFromName, setDecisionFromName] = useState("");
+
+  // Compute minutes since active scorer last beat for the confirm copy.
+  const aAt = match.activeScorerLastActiveAt;
+  const aAtMs = aAt?.toMillis?.() ?? (aAt?.seconds ? aAt.seconds * 1000 : 0);
+  const minsAgo = aAtMs ? Math.max(0, Math.floor((Date.now() - aAtMs) / 60000)) : null;
+
+  // Waiting-phase: countdown ticker
+  useEffect(() => {
+    if (phase !== "waiting") return;
+    setSecondsLeft(TAKEOVER_REQUEST_TIMEOUT_S);
+    const t = setInterval(() => {
+      setSecondsLeft(s => {
+        if (s <= 1) {
+          clearInterval(t);
+          onTimeout?.();
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [phase]);
+
+  // Subscribe to the match doc for takeoverDecision
+  useEffect(() => {
+    if (phase !== "waiting") return;
+    const unsub = onSnapshot(doc(db, "fccscorer", "data", "matches", match.id), (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      if (data.takeoverDecision === "approved") {
+        setDecision("approved");
+        setTimeout(() => onApproved?.(), 600);
+      } else if (data.takeoverDecision === "denied") {
+        setDecision("denied");
+        setDecisionFromName(data.activeScorerName || "The scorer");
+      }
+    });
+    return unsub;
+  }, [phase, match.id]);
+
+  const wrap = {
+    position: "fixed", inset: 0, zIndex: 800,
+    background: "rgba(0,0,0,0.55)",
+    display: "flex", alignItems: "flex-end", justifyContent: "center",
+  };
+  const card = {
+    width: "100%", maxWidth: 420, background: "#fff",
+    borderRadius: "20px 20px 0 0", padding: "20px 18px 28px",
+    boxShadow: "0 -8px 40px rgba(0,0,0,0.3)",
+  };
+
+  // Confirm phase
+  if (phase === "confirm") {
+    return (
+      <div style={wrap} onClick={(e) => e.target === e.currentTarget && onClose()}>
+        <div style={card}>
+          <div style={{ width: 36, height: 4, background: "#cbd5e1", borderRadius: 2, margin: "0 auto 14px" }} />
+          <div style={{ fontSize: 16, fontWeight: 800, color: "#1B2A5C", marginBottom: 4, textAlign: "center" }}>
+            Currently being scored by {match.activeScorerName || "another scorer"}
+          </div>
+          <div style={{ fontSize: 13, color: "#64748b", marginBottom: 18, textAlign: "center" }}>
+            {minsAgo != null ? `Last active ${minsAgo} min ago` : "Last active recently"}
+          </div>
+          {error && <div style={{ fontSize: 12, color: "#dc2626", marginBottom: 10, textAlign: "center" }}>{error}</div>}
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={onClose} style={{
+              flex: 1, padding: "12px 12px", borderRadius: 10,
+              background: "#fff", border: "1.5px solid #e2e8f0", color: "#64748b",
+              fontWeight: 700, fontSize: 14, cursor: "pointer",
+            }}>Cancel</button>
+            <button onClick={onRequest} style={{
+              flex: 1, padding: "12px 12px", borderRadius: 10, border: "none",
+              background: "linear-gradient(135deg,#1B2A5C,#152043)",
+              color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer",
+            }}>Request takeover</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Waiting phase
+  if (phase === "waiting") {
+    if (decision === "denied") {
+      return (
+        <div style={wrap} onClick={(e) => e.target === e.currentTarget && onClose()}>
+          <div style={card}>
+            <div style={{ width: 36, height: 4, background: "#cbd5e1", borderRadius: 2, margin: "0 auto 14px" }} />
+            <div style={{ fontSize: 36, textAlign: "center", marginBottom: 6 }}>🚫</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: "#dc2626", textAlign: "center", marginBottom: 16 }}>
+              {decisionFromName} denied your request
+            </div>
+            <button onClick={onClose} style={{
+              width: "100%", padding: "12px 12px", borderRadius: 10, border: "none",
+              background: "#1B2A5C", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer",
+            }}>Close</button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div style={wrap}>
+        <div style={card}>
+          <div style={{ width: 36, height: 4, background: "#cbd5e1", borderRadius: 2, margin: "0 auto 14px" }} />
+          <div style={{ fontSize: 15, fontWeight: 800, color: "#1B2A5C", textAlign: "center", marginBottom: 6 }}>
+            Waiting for {match.activeScorerName || "the scorer"} to approve…
+          </div>
+          <div style={{
+            fontSize: 56, fontWeight: 900, color: "#C9A84C",
+            textAlign: "center", margin: "8px 0", fontVariantNumeric: "tabular-nums",
+          }}>{secondsLeft}s</div>
+          <div onClick={onTimeout} style={{
+            textAlign: "center", fontSize: 12, color: "#64748b",
+            textDecoration: "underline", cursor: "pointer", marginTop: 8, marginBottom: 14,
+          }}>Enter PIN to force takeover</div>
+          <button onClick={onClose} style={{
+            width: "100%", padding: "12px 12px", borderRadius: 10,
+            background: "#fff", border: "1.5px solid #e2e8f0", color: "#64748b",
+            fontWeight: 700, fontSize: 13, cursor: "pointer",
+          }}>Cancel</button>
+        </div>
+      </div>
+    );
+  }
+
+  // PIN phase
+  if (phase === "pin") {
+    return (
+      <div style={wrap} onClick={(e) => e.target === e.currentTarget && onClose()}>
+        <div style={card}>
+          <div style={{ width: 36, height: 4, background: "#cbd5e1", borderRadius: 2, margin: "0 auto 14px" }} />
+          <div style={{ fontSize: 15, fontWeight: 800, color: "#1B2A5C", textAlign: "center", marginBottom: 6 }}>
+            No response — enter PIN to force takeover
+          </div>
+          <div style={{ fontSize: 12, color: "#64748b", textAlign: "center", marginBottom: 14 }}>
+            4-digit PIN required
+          </div>
+          <input value={pinInput} onChange={e => setPinInput(e.target.value.replace(/\D/g, "").slice(0, 4))}
+            type="tel" inputMode="numeric" autoFocus
+            placeholder="••••"
+            style={{
+              width: "100%", padding: "14px 12px", borderRadius: 10, border: "1.5px solid #e2e8f0",
+              fontSize: 26, textAlign: "center", letterSpacing: 8, fontWeight: 800,
+              boxSizing: "border-box", outline: "none", color: "#1B2A5C", marginBottom: 10,
+            }} />
+          {error && <div style={{ fontSize: 12, color: "#dc2626", marginBottom: 8, textAlign: "center" }}>{error}</div>}
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={onClose} style={{
+              flex: 1, padding: "12px 12px", borderRadius: 10,
+              background: "#fff", border: "1.5px solid #e2e8f0", color: "#64748b",
+              fontWeight: 700, fontSize: 14, cursor: "pointer",
+            }}>Cancel</button>
+            <button onClick={() => onPinSubmit?.(pinInput)} disabled={pinInput.length !== 4} style={{
+              flex: 1, padding: "12px 12px", borderRadius: 10, border: "none",
+              background: pinInput.length === 4 ? "linear-gradient(135deg,#dc2626,#991b1b)" : "#e2e8f0",
+              color: pinInput.length === 4 ? "#fff" : "#94a3b8",
+              fontWeight: 800, fontSize: 14, cursor: pinInput.length === 4 ? "pointer" : "not-allowed",
+            }}>Take over</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 function Section({ G, label, children }) {
@@ -211,12 +495,16 @@ function Section({ G, label, children }) {
 function MatchCard({ G, match, onScore, onWatch, currentUser }) {
   const st = STATUS_META[match.status] || STATUS_META.setup;
   const mt = MATCH_TYPES.find(t => t.id === match.type) || MATCH_TYPES[1];
-  const isScorer = match.scorerIds?.includes(currentUser?.uid) || match.createdBy === currentUser?.uid;
+  const meId = currentUser?.uid || currentUser?.id || null;
+  const isScorer = match.scorerIds?.includes(meId) || match.createdBy === meId;
   const isLive   = match.status === "live";
   const isDone   = match.status === "completed" || match.status === "abandoned";
   const dateStr  = match.date
     ? new Date(match.date).toLocaleDateString("en-GB", { weekday:"short", day:"numeric", month:"short" })
     : "—";
+  // Resume gating (Task 3b): only show pulsing-red RESUME for the last scorer.
+  const isMyResume = isLive && match.lastScorerId && meId && match.lastScorerId === meId;
+  const scoreLabel = isMyResume ? "Resume scoring →" : "Score →";
 
   return (
     <div style={{ background:G.white, borderRadius:14,
@@ -264,11 +552,22 @@ function MatchCard({ G, match, onScore, onWatch, currentUser }) {
         <>
           <style>{`@keyframes cardPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.35;transform:scale(0.85)} }`}</style>
           <div style={{ display:"flex", alignItems:"center", gap:6, padding:"4px 14px 0" }}>
-            <div style={{ width:8, height:8, borderRadius:"50%", background:"#dc2626",
-              animation:"cardPulse 1.4s ease-in-out infinite" }} />
-            <div style={{ fontSize:10, fontWeight:800, color:"#dc2626", letterSpacing:1.2 }}>
-              RESUME SCORING
-            </div>
+            {isMyResume ? (
+              <>
+                <div style={{ width:8, height:8, borderRadius:"50%", background:"#dc2626",
+                  animation:"cardPulse 1.4s ease-in-out infinite" }} />
+                <div style={{ fontSize:10, fontWeight:800, color:"#dc2626", letterSpacing:1.2 }}>
+                  RESUME SCORING
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ width:6, height:6, borderRadius:"50%", background:"#dc2626" }} />
+                <div style={{ fontSize:10, fontWeight:700, color:"#dc2626", letterSpacing:1 }}>
+                  Live
+                </div>
+              </>
+            )}
           </div>
         </>
       )}
@@ -276,11 +575,11 @@ function MatchCard({ G, match, onScore, onWatch, currentUser }) {
       <div style={{ padding:"10px 14px", display:"flex", gap:8 }}>
         {isScorer && !isDone && (
           <button onClick={onScore} style={{ flex:1, padding:"9px 12px", borderRadius:9,
-            background:isLive
+            background:isMyResume
               ? "linear-gradient(135deg,#dc2626,#991b1b)"
               : `linear-gradient(135deg,${G.green},#14532d)`,
             border:"none", cursor:"pointer", fontSize:13, fontWeight:700, color:G.white }}>
-            {isLive ? "▶ Continue scoring" : "▶ Start scoring"}
+            {scoreLabel}
           </button>
         )}
         <button onClick={onWatch} style={{

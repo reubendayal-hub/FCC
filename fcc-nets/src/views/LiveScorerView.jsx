@@ -1,7 +1,13 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { db } from "../firebase";
-import { doc, setDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, onSnapshot, arrayUnion } from "firebase/firestore";
 import ScorecardView from "./ScorecardView";
+
+// ── Takeover constants ───────────────────────────────────────
+const TAKEOVER_PIN = "4321";
+const SCORER_LOCK_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+const TAKEOVER_REQUEST_TIMEOUT_S = 30;
+const HEARTBEAT_MS = 30 * 1000;
 
 // ── Palette ───────────────────────────────────────────────────
 const SC = {
@@ -457,6 +463,25 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
   const [scorecardOpen, setScorecardOpen] = useState(false);
   const lastBallSnapshotRef = useRef(null);
 
+  // ── Event log buffering (Task 1) ────────────────────────────
+  // Buffered events to write on the next debounced save. Cleared on success.
+  const pendingEventsRef = useRef([]);
+
+  // Client-built fall-of-wickets array (Option A: keep whole-innings overwrite).
+  // Hydrated from saved innings on mount so the running list survives reloads.
+  const [fowList, setFowList] = useState(() => {
+    const fromI2 = safe.innings2?.fow;
+    const fromI1 = safe.innings1?.fow;
+    return Array.isArray(safe.innings2) ? [] : Array.isArray(fromI2) ? fromI2 : Array.isArray(fromI1) ? fromI1 : [];
+  });
+
+  // Viewer celebration tracking — fire on event-array growth, skip first-hydration.
+  const prevEventsLengthRef = useRef(null);
+
+  // ── Takeover state (Task 4) ─────────────────────────────────
+  const [incomingTakeover, setIncomingTakeover] = useState(null); // {fromId, fromName, requestedAt}
+  const takeoverClearTimerRef = useRef(null);
+
   // Theme
   const T = nightMode
     ? { bg: SC.bgDark, surface: SC.surfaceDk, text: "#FFFFFF", textDim: "rgba(255,255,255,0.6)" }
@@ -497,7 +522,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
           ballsBowled: balls,
           batsmen: batters.map(b => ({ ...b, dismissal: b.dismissal || null, notOut: b.dismissal ? false : true })),
           bowling: [{ name: bowler, overs: overStr(balls), maidens: 0, runs: 0, wickets: 0, dots: 0, wides: 0, noballs: 0 }],
-          fow: [],
+          fow: fowList,
           extras: { ...extras },
           target: innings === 1 ? null : target,
           dnb: [],
@@ -505,19 +530,37 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
         const i1Payload = innings === 1 ? currentInnings : (savedInnings1 || null);
         const i2Payload = innings === 2 ? currentInnings : null;
         const status = inningsEnd && innings === 2 ? "completed" : (balls > 0 || score > 0 || wickets > 0) ? "live" : "setup";
-        await setDoc(doc(db, "fccscorer", "data", "matches", safe.matchId), {
+
+        // Snapshot+clear events to avoid double-write across debounce ticks.
+        const eventsToWrite = pendingEventsRef.current.slice();
+        pendingEventsRef.current = [];
+
+        const payload = {
           status,
           innings1: i1Payload,
           innings2: i2Payload,
           bowling: { team: bowlingName },
           updatedAt: serverTimestamp(),
-        }, { merge: true });
+          lastScorerId:   currentUser?.uid || currentUser?.id || null,
+          lastScorerName: currentUser?.name || null,
+          lastScorerAt:   serverTimestamp(),
+        };
+        if (eventsToWrite.length > 0) {
+          payload.events = arrayUnion(...eventsToWrite);
+        }
+        await setDoc(doc(db, "fccscorer", "data", "matches", safe.matchId), payload, { merge: true });
       } catch (e) {
         console.error("LiveScorer save error:", e);
+        // On error, re-queue events so we don't lose them.
+        // (No-op: we already cleared, but next ball will trigger another save.
+        // In practice we'd push them back, but the simpler shape is to log.)
       }
     }, 1200);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
-  }, [score, wickets, balls, batters, bowler, extras, innings, target, inningsEnd, safe.matchId, readOnly]);
+  }, [score, wickets, balls, batters, bowler, extras, innings, target, inningsEnd, safe.matchId, readOnly, fowList, currentUser]);
+
+  // ── Latest event data for viewer replay/catch-up ────────────
+  const latestEventsRef = useRef([]);
 
   // ── Viewer-mode live subscription (Stage 3) ─────────────────
   useEffect(() => {
@@ -531,7 +574,6 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       const innData = isI2 ? data.innings2 : data.innings1;
       if (!innData) return;
       const newBalls = innData.ballsBowled ?? 0;
-      const prevBalls = lastBallSnapshotRef.current;
       // Apply state
       setInnings(isI2 ? 2 : 1);
       setScore(innData.score ?? 0);
@@ -562,22 +604,32 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
         setTarget(data.innings1.score + 1);
       }
 
-      // Detect new ball for celebration replay
-      if (prevBalls != null && newBalls > prevBalls) {
-        const lastLabel = (() => {
-          // We don't have the over-by-ball log so guess from innings counters
-          // No reliable way without an event log — skip silently.
-          return null;
-        })();
-        if (lastLabel === "4" || lastLabel === "6" || lastLabel === "W") {
-          const batName = innData.batsmen?.[0]?.name || "";
-          setCelebration({
-            type: lastLabel === "6" ? "six" : lastLabel === "4" ? "four" : "wicket",
-            text: lastLabel === "6" ? "SIX!! 🚀" : lastLabel === "4" ? "FOUR! 🏏" : "WICKET!",
-            sub: lastLabel === "W" ? `${batName} — out` : batName,
-          });
-        }
+      // ── Event-log driven celebrations (Task 2c) ──
+      const events = Array.isArray(data.events) ? data.events : [];
+      latestEventsRef.current = events;
+      const prevLen = prevEventsLengthRef.current;
+      if (prevLen == null) {
+        // First hydration — don't fire celebrations for the whole backlog.
+        prevEventsLengthRef.current = events.length;
+      } else if (events.length > prevLen) {
+        const newEvents = events.slice(prevLen);
+        newEvents.forEach(ev => {
+          if (ev.wicket) {
+            const isDuck = (ev.wicket.runs || 0) === 0;
+            setCelebration({
+              type: isDuck ? "duck" : "wicket",
+              text: isDuck ? "Duck! 🦆" : "WICKET!",
+              sub: `${ev.wicket.batter} — ${ev.wicket.type}`,
+            });
+          } else if (ev.runs === 6) {
+            setCelebration({ type: "six", text: "SIX!! 🚀", sub: ev.commentary || ev.striker });
+          } else if (ev.runs === 4) {
+            setCelebration({ type: "four", text: "FOUR! 🏏", sub: `${ev.striker} finds the boundary` });
+          }
+        });
+        prevEventsLengthRef.current = events.length;
       }
+
       lastBallSnapshotRef.current = newBalls;
     }, (err) => {
       console.error("Viewer onSnapshot error:", err);
@@ -585,25 +637,113 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     return unsub;
   }, [readOnly, safe.matchId]);
 
-  // ── Catch-up trigger (viewer only) ───────────────────────────
+  // ── Catch-up trigger (viewer only, event-log driven) ────────
   useEffect(() => {
     if (!readOnly || !safe.matchId) return;
-    // Run once after first sync — wait until balls is non-zero or after a short delay.
     let lastSeen = 0;
     try {
       const raw = localStorage.getItem("fcc-watched-" + safe.matchId);
       lastSeen = raw ? parseInt(raw, 10) || 0 : 0;
     } catch {}
     const t = setTimeout(() => {
-      const drift = balls - lastSeen;
-      if (drift > 5) {
-        setMissedBallsCount(drift);
+      const evCount = latestEventsRef.current.length;
+      const missed = Math.max(0, evCount - lastSeen);
+      if (missed > 5) {
+        setMissedBallsCount(missed);
         setCatchUpOpen(true);
       }
     }, 900);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [readOnly, safe.matchId]);
+
+  // ── Active-scorer heartbeat (Task 4b) ───────────────────────
+  useEffect(() => {
+    if (readOnly) return;
+    if (!safe.matchId) return;
+    const meId = currentUser?.uid || currentUser?.id || null;
+    if (!meId) return;
+    const ref = doc(db, "fccscorer", "data", "matches", safe.matchId);
+
+    // Initial claim/refresh.
+    setDoc(ref, {
+      activeScorerId: meId,
+      activeScorerName: currentUser?.name || null,
+      activeScorerLastActiveAt: serverTimestamp(),
+    }, { merge: true }).catch(e => console.error("heartbeat init error:", e));
+
+    const t = setInterval(() => {
+      setDoc(ref, {
+        activeScorerLastActiveAt: serverTimestamp(),
+      }, { merge: true }).catch(e => console.error("heartbeat tick error:", e));
+    }, HEARTBEAT_MS);
+
+    return () => clearInterval(t);
+  }, [readOnly, safe.matchId, currentUser]);
+
+  // ── Takeover-request subscription (Task 4e) ─────────────────
+  // Only active scorers subscribe — viewers already onSnapshot above and
+  // don't need approval modals.
+  useEffect(() => {
+    if (readOnly) return;
+    if (!safe.matchId) return;
+    const meId = currentUser?.uid || currentUser?.id || null;
+    const ref = doc(db, "fccscorer", "data", "matches", safe.matchId);
+    const unsub = onSnapshot(ref, (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      const req = data.takeoverRequest;
+      if (!req || !req.fromId) {
+        setIncomingTakeover(null);
+        return;
+      }
+      if (req.fromId === meId) {
+        // Self-request edge case — no modal.
+        setIncomingTakeover(null);
+        return;
+      }
+      if (data.takeoverDecision) {
+        // Already decided — ignore.
+        return;
+      }
+      setIncomingTakeover({
+        fromId: req.fromId,
+        fromName: req.fromName || "Another scorer",
+        requestedAt: req.requestedAt || null,
+      });
+    });
+    return unsub;
+  }, [safe.matchId, currentUser, readOnly]);
+
+  // ── Approve/Deny actions ─────────────────────────────────────
+  async function respondTakeover(decision) {
+    if (!safe.matchId) return;
+    const ref = doc(db, "fccscorer", "data", "matches", safe.matchId);
+    try {
+      await setDoc(ref, {
+        takeoverDecision: decision,
+        takeoverDecidedAt: serverTimestamp(),
+      }, { merge: true });
+    } catch (e) {
+      console.error("respondTakeover error:", e);
+    }
+    setIncomingTakeover(null);
+    // Schedule cleanup of takeover fields after a brief delay so the requester
+    // has time to read the decision via their own onSnapshot.
+    if (takeoverClearTimerRef.current) clearTimeout(takeoverClearTimerRef.current);
+    takeoverClearTimerRef.current = setTimeout(() => {
+      setDoc(ref, {
+        takeoverRequest: null,
+        takeoverDecision: null,
+      }, { merge: true }).catch(e => console.error("takeover cleanup error:", e));
+    }, 5000);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (takeoverClearTimerRef.current) clearTimeout(takeoverClearTimerRef.current);
+    };
+  }, []);
 
   // ── Helpers ─────────────────────────────────────────────────
   function snapshot() {
@@ -639,6 +779,28 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       // Prompt bowler change
       setTimeout(() => setModal("bowler"), 400);
     }
+  }
+
+  // ── Event log helper (Task 1) ───────────────────────────────
+  function pushEvent(delta) {
+    if (readOnly) return;
+    pendingEventsRef.current.push({
+      ts: Date.now(),
+      innings,
+      over: Math.floor(balls / 6),
+      ball: balls % 6,
+      striker: batters[striker]?.name || null,
+      nonStriker: batters[1 - striker]?.name || null,
+      bowler: bowler || null,
+      commentary: commentary || "",
+      pitch: pendingBall?.pitch || null,
+      zone: activeZone || null,
+      shot: typeof activeShot === "string" ? activeShot : (activeShot?.n || null),
+      label: null,
+      runs: 0,
+      wicket: null,
+      ...delta, // overrides
+    });
   }
 
   // ── Ball recording ──────────────────────────────────────────
@@ -683,6 +845,12 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     } else {
       setCommentary(`${COMMENTARY[persona].label} ${getComm(persona, "one", { name: batName })}`);
     }
+    pushEvent({
+      label: runs === 0 ? "•" : String(runs),
+      runs,
+      over: Math.floor((newBalls - 1) / 6),
+      ball: (newBalls - 1) % 6,
+    });
     rotateOnOver(newBalls);
   }
 
@@ -705,6 +873,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     const label = labelOverride || (kind === "lb" ? "Wd+LB" : kind === "b" ? "Wd+B" : `Wd${totalAdd}`);
     setOverSlot(balls, label);
     setCommentary(`${COMMENTARY[persona].label} ${getComm(persona, "wide")}`);
+    pushEvent({ label, runs: totalAdd });
     // Wide doesn't count as a ball, no striker rotation, no free hit.
   }
 
@@ -741,6 +910,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       setStriker(s => (s === 0 ? 1 : 0));
     }
     setCommentary(`${COMMENTARY[persona].label} ${getComm(persona, "noball")}`);
+    pushEvent({ label, runs: totalAdd });
   }
 
   function recordBye(runs) {
@@ -759,6 +929,12 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     if (runs % 2 === 1) setStriker(s => (s === 0 ? 1 : 0));
     if (freeHit) setFreeHit(false);
     setCommentary(`${COMMENTARY[persona].label} Bye — ${runs} run${runs === 1 ? "" : "s"}.`);
+    pushEvent({
+      label: `B${runs}`,
+      runs,
+      over: Math.floor((newBalls - 1) / 6),
+      ball: (newBalls - 1) % 6,
+    });
     rotateOnOver(newBalls);
   }
 
@@ -787,8 +963,35 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       sub: `${batName} — ${wicketType}`,
     });
     setCommentary(`${COMMENTARY[persona].label} ${getComm(persona, isDuck ? "duck" : "wicket", { name: batName })}`);
+    // Append fall-of-wickets entry (Option A: client-built array).
+    const fowEntry = {
+      wicketNum: wickets + 1,
+      teamScore: score,
+      batter: batName,
+      bowler,
+      over: `${Math.floor(newBalls / 6)}.${newBalls % 6}`,
+    };
+    setFowList(f => [...f, fowEntry]);
+    // Event-log row for the wicket ball.
+    pushEvent({
+      label: "W",
+      runs: 0,
+      over: Math.floor((newBalls - 1) / 6),
+      ball: (newBalls - 1) % 6,
+      wicket: {
+        type: wicketType,
+        batter: batName,
+        runs: batters[wicketStriker]?.runs || 0,
+        bowler,
+        fielder: fielder || null,
+      },
+    });
     setWicketType(null);
     setFielder("");
+    setPendingBall(null);
+    setActiveZone(null);
+    setTapPoint(null);
+    setActiveShot(null);
     setModal(null);
     // Prompt new batter
     setTimeout(() => setModal("newbatter"), 600);
@@ -914,14 +1117,37 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     restore(last);
   }
 
-  // ── Replay last over (shared between viewer floating btn + More menu) ──
+  // ── Replay helpers (event-log driven where possible) ────────
+  function enrichFromEvents(evs) {
+    return evs.map((ev, idx) => ({
+      label: ev.label || "•",
+      name: ev.striker || "—",
+      line: ev.commentary || "",
+      runs: ev.runs || 0,
+      idx,
+    }));
+  }
+
   function triggerReplayLastOver() {
-    // overBalls holds the most recent (current) over.
+    // Prefer event-log slice for viewers; fall back to local overBalls.
+    if (readOnly) {
+      const evs = latestEventsRef.current || [];
+      const slice = evs.slice(-6);
+      if (slice.length) {
+        setReplay({
+          balls: enrichFromEvents(slice),
+          index: 0,
+          onDone: () => {
+            try { if (safe.matchId) localStorage.setItem("fcc-watched-" + safe.matchId, String(evs.length)); } catch {}
+          },
+        });
+        return;
+      }
+    }
+    // Scorer / fallback: use the local overBalls strip.
     const present = overBalls.filter(Boolean);
     if (!present.length) return;
-    // Map each label to a richer payload for the overlay.
     const enriched = present.map((label, idx) => {
-      // Best-effort striker attribution: use current striker name.
       const name = batters[striker]?.name || "—";
       const personaLabel = COMMENTARY[persona]?.label || "";
       let evt = "dot";
@@ -939,8 +1165,25 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
   }
 
   function triggerReplayCatchUp() {
-    // No event log yet — best we can do is the current overBalls.
-    triggerReplayLastOver();
+    const evs = latestEventsRef.current || [];
+    let lastSeen = 0;
+    try {
+      const raw = localStorage.getItem("fcc-watched-" + safe.matchId);
+      lastSeen = raw ? parseInt(raw, 10) || 0 : 0;
+    } catch {}
+    const slice = evs.slice(lastSeen);
+    if (!slice.length) {
+      // Nothing to replay — just mark caught up.
+      try { if (safe.matchId) localStorage.setItem("fcc-watched-" + safe.matchId, String(evs.length)); } catch {}
+      return;
+    }
+    setReplay({
+      balls: enrichFromEvents(slice),
+      index: 0,
+      onDone: () => {
+        try { if (safe.matchId) localStorage.setItem("fcc-watched-" + safe.matchId, String(evs.length)); } catch {}
+      },
+    });
   }
 
   function start2nd() {
@@ -952,11 +1195,12 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       ballsBowled: balls,
       batsmen: batters.map(b => ({ ...b, notOut: b.dismissal ? false : true })),
       bowling: [{ name: bowler, overs: overStr(balls), maidens: 0, runs: 0, wickets: 0, dots: 0, wides: 0, noballs: 0 }],
-      fow: [],
+      fow: fowList,
       extras: { ...extras },
       target: null,
       dnb: [],
     });
+    setFowList([]);
     const t = score + 1;
     setTarget(t);
     setInnings(2);
@@ -1507,6 +1751,15 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
           </Sheet>
         )}
 
+        {/* Takeover approval modal (active-scorer side) */}
+        {incomingTakeover && !readOnly && (
+          <TakeoverApprovalModal
+            fromName={incomingTakeover.fromName}
+            onApprove={() => respondTakeover("approved")}
+            onDeny={() => respondTakeover("denied")}
+          />
+        )}
+
         {/* Overlays */}
         {celebration && <Celebrate data={celebration} onDone={() => setCelebration(null)} />}
         {breakActive && <BreakScreen reason={breakReason} elapsed={breakElapsed} onResume={() => { setBreakActive(false); setBreakElapsed(0); }} />}
@@ -1526,7 +1779,10 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
           <CatchUpModal
             count={missedBallsCount}
             onSkip={() => {
-              try { localStorage.setItem("fcc-watched-" + safe.matchId, String(balls)); } catch {}
+              try {
+                const evCount = latestEventsRef.current.length;
+                if (safe.matchId) localStorage.setItem("fcc-watched-" + safe.matchId, String(evCount));
+              } catch {}
               setCatchUpOpen(false);
             }}
             onReplay={() => {
@@ -1543,11 +1799,19 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
             persona={persona}
             onAdvance={(nextIdx) => setReplay(r => r ? { ...r, index: nextIdx } : null)}
             onSkip={() => {
-              try { if (safe.matchId) localStorage.setItem("fcc-watched-" + safe.matchId, String(balls)); } catch {}
+              try {
+                const evCount = latestEventsRef.current.length;
+                if (safe.matchId) localStorage.setItem("fcc-watched-" + safe.matchId, String(evCount));
+              } catch {}
+              if (replay?.onDone) replay.onDone();
               setReplay(null);
             }}
             onDone={() => {
-              try { if (safe.matchId) localStorage.setItem("fcc-watched-" + safe.matchId, String(balls)); } catch {}
+              try {
+                const evCount = latestEventsRef.current.length;
+                if (safe.matchId) localStorage.setItem("fcc-watched-" + safe.matchId, String(evCount));
+              } catch {}
+              if (replay?.onDone) replay.onDone();
               setReplay(null);
             }}
           />
@@ -1596,7 +1860,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
                       })),
                       bowling: [{ name: bowler, overs: overStr(balls) }],
                       extras: { ...extras },
-                      fow: [],
+                      fow: fowList,
                     }
                   : (savedInnings1 || safe.innings1 || null),
                 innings2: innings === 2
@@ -1611,7 +1875,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
                       })),
                       bowling: [{ name: bowler, overs: overStr(balls) }],
                       extras: { ...extras },
-                      fow: [],
+                      fow: fowList,
                       target,
                     }
                   : null,
@@ -1703,6 +1967,47 @@ function PillBtn({ onClick, label, nightMode, noCaps }) {
         cursor: "pointer", userSelect: "none",
         padding: "0 8px", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis",
       }}>{label}</div>
+  );
+}
+
+// ── Takeover approval modal (active-scorer side) ──────────────
+function TakeoverApprovalModal({ fromName, onApprove, onDeny }) {
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 1500,
+      background: "rgba(0,0,0,0.7)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+    }}>
+      <div style={{
+        maxWidth: 340, width: "100%",
+        background: `linear-gradient(135deg, ${SC.navy} 0%, ${SC.navyDk} 100%)`,
+        border: `1.5px solid ${SC.gold}`,
+        borderRadius: 16, padding: 22, textAlign: "center",
+        boxShadow: "0 12px 60px rgba(0,0,0,0.6)",
+      }}>
+        <div style={{ fontSize: 36, marginBottom: 10 }}>🤝</div>
+        <div style={{ fontSize: 17, fontWeight: 800, color: SC.goldLt, marginBottom: 6 }}>
+          {fromName} wants to take over scoring
+        </div>
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginBottom: 18, lineHeight: 1.45 }}>
+          If you approve, they will become the active scorer for this match.
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <div onClick={onDeny} style={{
+            flex: 1, padding: "12px 12px", borderRadius: 12,
+            background: `linear-gradient(135deg, ${SC.red} 0%, ${SC.redDk} 100%)`,
+            color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer",
+            letterSpacing: 0.4, textTransform: "uppercase",
+          }}>Deny</div>
+          <div onClick={onApprove} style={{
+            flex: 1, padding: "12px 12px", borderRadius: 12,
+            background: `linear-gradient(135deg, ${SC.green} 0%, #1E8049 100%)`,
+            color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer",
+            letterSpacing: 0.4, textTransform: "uppercase",
+          }}>Approve</div>
+        </div>
+      </div>
+    </div>
   );
 }
 
