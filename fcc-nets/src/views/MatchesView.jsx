@@ -14,8 +14,16 @@ import Shell      from "../ui/Shell";
 import AppHeader  from "../ui/AppHeader";
 import BotNav     from "../ui/BotNav";
 import Toast      from "../ui/Toast";
-import { useAppContext } from "../context/AppContext";
 import { FCC_LOGO } from "../constants/logo";
+import { THEMES } from "../constants/themes";
+
+// Theme G is read at module load (not via context) — the AppContext
+// path returned an undefined G at runtime in production. Trade-off:
+// MatchesView won't repaint on a theme switch until the page reloads.
+let _themeKey = "navy";
+try { _themeKey = localStorage.getItem("fcc-theme") || "navy"; } catch {}
+if (!THEMES[_themeKey]) _themeKey = "navy";
+const G = THEMES[_themeKey];
 
 // Match-type and status accents are brand-semantic, not theme-derived,
 // so they stay as literals at module level (independent of theme G).
@@ -46,7 +54,6 @@ export default function MatchesView({
   members = [], teams = [], pendingCount = 0,
   toast, showToast, SidebarNav, handleLogout,
 }) {
-  const { G } = useAppContext();
   const [matches,       setMatches]       = useState([]);
   const [loadingList,   setLoadingList]   = useState(true);
   const [screen,        setScreen]        = useState("list");
@@ -65,8 +72,6 @@ export default function MatchesView({
     );
     return unsub;
   }, []);
-
-  if (!G) return null;
 
   if (screen === "create") {
     return (
@@ -260,7 +265,6 @@ function CreateMatchScreen({
   teams, members, currentUser, onBack, onCreated,
   SidebarNav, view, setView, userRole, pendingCount, handleLogout, toast,
 }) {
-  const { G } = useAppContext();
   const [step,   setStep]   = useState(1);
   const [saving, setSaving] = useState(false);
   const [err,    setErr]    = useState("");
@@ -289,8 +293,6 @@ function CreateMatchScreen({
     if (!fccTeam2) return;
     setSquad2(members.filter(m => (m.teams||[]).includes(fccTeam2)).map(m => m.name));
   }, [fccTeam2, members]);
-
-  if (!G) return null;
 
   async function handleCreate() {
     setSaving(true); setErr("");
