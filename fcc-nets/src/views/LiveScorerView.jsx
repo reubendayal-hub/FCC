@@ -93,6 +93,9 @@ const COMMENTARY = {
     wicket:["OUT!! STUMPS SHATTERED!!","OUT!! CAUGHT!! What a grab!!","WICKET!! Celebration time!!"],
     duck:["DUCK! 🦆 Quack quack! Zero from {name}!"],
     maiden:["MAIDEN!! The bowler is pumped!!"],
+    defensive:["DEFENDED! Fortress mode activated!","Solid bat — text-book defence!","Watched the ball onto the bat — clean play!"],
+    miss:["BEATEN! Bowler tempted that one in!","Played and missed — close one!","Through the gate — but ball misses everything!"],
+    leave:["Shouldered arms — left it alone!","Lets it go — sound judgement!","Eye in — knows his off stump!"],
   },
   grumpy:{name:"Grumpy Legend 😤",label:"😤",
     dot:["Good ball. About time.","Dot. Back in my day every ball was.","That's how you do it."],
@@ -104,6 +107,9 @@ const COMMENTARY = {
     wicket:["OUT. Finally.","Wicket. Good. Saw that coming.","OUT. Now maybe someone sensible bats."],
     duck:["Duck. 🦆 {name} won't be pleased."],
     maiden:["Maiden. NOW that's bowling."],
+    defensive:["Defended. Standard.","Bat in the way. Bare minimum.","Block. Could try harder."],
+    miss:["Missed. Predictable.","Played and missed. Embarrassing.","Couldn't lay bat on it. Typical."],
+    leave:["Left it. Wise for once.","Shouldered arms. About time.","No shot. Acceptable."],
   },
   poet:{name:"Dramatic Poet ✍️",label:"✍️",
     dot:["The ball meets the bat in quiet negotiation.","A moment of stillness — the bowler's art honoured.","The leather whispers past the willow, unscathed."],
@@ -115,6 +121,9 @@ const COMMENTARY = {
     wicket:["The curtain falls. The walk back begins.","Out! The stumps speak in the only language that matters.","Caught. Even the greatest arcs must end."],
     duck:["Zero. 🦆 {name} departs into the long silence."],
     maiden:["Six deliveries, six stories — none of them scoring. A maiden."],
+    defensive:["The bat meets ball in quiet conversation.","A moment of stillness — defence honoured.","Willow stands firm, asking no questions."],
+    miss:["The ball passes by, a thought half-formed.","Played and missed — almost a memory.","Bat swings through nothing but air."],
+    leave:["Lets it go — patience as virtue.","Arms drawn back — judgement made.","The ball travels alone to the keeper."],
   },
 };
 
@@ -178,10 +187,22 @@ function Celebrate({ data, onDone }) {
 }
 
 // ── Break screen ──────────────────────────────────────────────
-function BreakScreen({ reason, elapsed, onResume }) {
+// `onResume` may be null (viewer mode) — when null, hide the button.
+function BreakScreen({ reason, elapsed, onResume, startedAtMs }) {
   const icons = { drinks: "☕", rain: "🌧️", injury: "🏥", other: "⏸️" };
   const titles = { drinks: "Drinks Break", rain: "Rain Delay", injury: "Injury Stoppage", other: "Match Paused" };
-  const m = Math.floor(elapsed / 60), s = elapsed % 60;
+  // If startedAtMs supplied, tick locally every 1s using wall-clock delta
+  // so viewers see a live-updating timer regardless of snapshot cadence.
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!startedAtMs) return;
+    const t = setInterval(() => setTick(x => x + 1), 1000);
+    return () => clearInterval(t);
+  }, [startedAtMs]);
+  const liveElapsed = startedAtMs ? Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000)) : (elapsed || 0);
+  // tick is referenced so the eslint deps lint is satisfied + the re-render is triggered
+  void tick;
+  const m = Math.floor(liveElapsed / 60), s = liveElapsed % 60;
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 400, background: `linear-gradient(160deg, ${SC.navy} 0%, ${SC.navyDk} 60%, ${SC.navy} 100%)`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20, padding: 24 }}>
       <div style={{ fontSize: 88, animation: "brkSway 3s ease-in-out infinite", lineHeight: 1 }}>{icons[reason] || "⏸️"}</div>
@@ -197,7 +218,9 @@ function BreakScreen({ reason, elapsed, onResume }) {
         </div>
         <div style={{ fontSize: 12, opacity: 0.45, marginTop: 4 }}>elapsed</div>
       </div>
-      <button onClick={onResume} style={{ marginTop: 16, padding: "15px 44px", borderRadius: 16, background: `linear-gradient(135deg, ${SC.gold} 0%, ${SC.goldLt} 100%)`, color: SC.navy, fontSize: 17, fontWeight: 800, border: "none", cursor: "pointer", boxShadow: "0 4px 20px rgba(201,168,76,0.45)" }}>▶ Resume Match</button>
+      {onResume && (
+        <button onClick={onResume} style={{ marginTop: 16, padding: "15px 44px", borderRadius: 16, background: `linear-gradient(135deg, ${SC.gold} 0%, ${SC.goldLt} 100%)`, color: SC.navy, fontSize: 17, fontWeight: 800, border: "none", cursor: "pointer", boxShadow: "0 4px 20px rgba(201,168,76,0.45)" }}>▶ Resume Match</button>
+      )}
     </div>
   );
 }
@@ -425,6 +448,9 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
   const [breakActive, setBreakActive] = useState(false);
   const [breakReason, setBreakReason] = useState("drinks");
   const [breakElapsed, setBreakElapsed] = useState(0);
+  // Viewer-side break state derived from Firestore breakState field.
+  // { reason, startedAtMs } or null.
+  const [viewerBreak, setViewerBreak] = useState(null);
   const [inningsEnd, setInningsEnd] = useState(false);
   const [persona, setPersona] = useState("hype");
   const [commentary, setCommentary] = useState(`${COMMENTARY.hype.label} Good ball. Building pressure.`);
@@ -441,7 +467,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
 
   // Score mode + pending ball (full-mode flow)
   const [scoreMode, setScoreMode] = useState(() => {
-    try { return localStorage.getItem("fcc-scorer-mode") || "fast"; } catch { return "fast"; }
+    try { return localStorage.getItem("fcc-scorer-mode") || "full"; } catch { return "full"; }
   });
   useEffect(() => {
     try { localStorage.setItem("fcc-scorer-mode", scoreMode); } catch {}
@@ -455,6 +481,8 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
   const [activeZone, setActiveZone] = useState(null);
   const [tapPoint, setTapPoint] = useState(null); // { x, y } in SVG coords
   const [activeShot, setActiveShot] = useState(null);
+  // Defensive-shot type for dot balls in Full mode: "defensive" | "miss" | "leave" | null
+  const [dotShotType, setDotShotType] = useState(null);
 
   // Viewer / replay / scorecard-peek state (Stage 3)
   const [catchUpOpen, setCatchUpOpen] = useState(false);
@@ -482,6 +510,14 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
   const [incomingTakeover, setIncomingTakeover] = useState(null); // {fromId, fromName, requestedAt}
   const takeoverClearTimerRef = useRef(null);
 
+  // ── Active-scorer auto-eject (lockout) ──────────────────────
+  // When another scorer takes over, the current scorer's view flips to
+  // read-only-equivalent — record handlers, debounced save, and heartbeat
+  // are all gated by (readOnly || isLockedOut).
+  const [isLockedOut, setIsLockedOut] = useState(false);
+  const [lockoutToast, setLockoutToast] = useState(null);
+  const lockoutToastTimerRef = useRef(null);
+
   // Theme
   const T = nightMode
     ? { bg: SC.bgDark, surface: SC.surfaceDk, text: "#FFFFFF", textDim: "rgba(255,255,255,0.6)" }
@@ -508,7 +544,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
   // ── Firestore persistence (debounced 1200ms) ────────────────
   const saveTimer = useRef(null);
   useEffect(() => {
-    if (readOnly) return; // viewers consume, never write
+    if (readOnly || isLockedOut) return; // viewers + locked-out scorers never write
     if (!safe.matchId) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
@@ -557,7 +593,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       }
     }, 1200);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
-  }, [score, wickets, balls, batters, bowler, extras, innings, target, inningsEnd, safe.matchId, readOnly, fowList, currentUser]);
+  }, [score, wickets, balls, batters, bowler, extras, innings, target, inningsEnd, safe.matchId, readOnly, fowList, currentUser, isLockedOut]);
 
   // ── Latest event data for viewer replay/catch-up ────────────
   const latestEventsRef = useRef([]);
@@ -574,11 +610,39 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       const innData = isI2 ? data.innings2 : data.innings1;
       if (!innData) return;
       const newBalls = innData.ballsBowled ?? 0;
+      const currentInnings = isI2 ? 2 : 1;
       // Apply state
-      setInnings(isI2 ? 2 : 1);
+      setInnings(currentInnings);
       setScore(innData.score ?? 0);
       setWickets(innData.wickets ?? 0);
       setBalls(newBalls);
+
+      // Derive `thisOver` strip from match.events so viewer pill row stays
+      // in sync. Strip reflects the CURRENT over of the CURRENT innings.
+      const currentOverNum = Math.floor(newBalls / 6);
+      const allEvents = Array.isArray(data.events) ? data.events : [];
+      const overEvents = allEvents
+        .filter(e => e.innings === currentInnings && e.over === currentOverNum)
+        .sort((a, b) => (a.ball ?? 0) - (b.ball ?? 0));
+      const slots = [null, null, null, null, null, null];
+      overEvents.forEach(e => {
+        const slot = (e.ball ?? 0) % 6;
+        if (slot >= 0 && slot < 6) slots[slot] = e.label || null;
+      });
+      setOverBalls(slots);
+
+      // Break state sync.
+      if (data.breakState && data.breakState.reason) {
+        const bs = data.breakState;
+        let startedAtMs = null;
+        if (bs.startedAt) {
+          if (typeof bs.startedAt.toMillis === "function") startedAtMs = bs.startedAt.toMillis();
+          else if (bs.startedAt.seconds) startedAtMs = bs.startedAt.seconds * 1000;
+        }
+        setViewerBreak({ reason: bs.reason, startedAtMs: startedAtMs || Date.now() });
+      } else {
+        setViewerBreak(null);
+      }
       if (Array.isArray(innData.batsmen)) {
         const arr = innData.batsmen.slice(0, 2).map(b => ({
           name: b.name || "—",
@@ -659,7 +723,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
 
   // ── Active-scorer heartbeat (Task 4b) ───────────────────────
   useEffect(() => {
-    if (readOnly) return;
+    if (readOnly || isLockedOut) return;
     if (!safe.matchId) return;
     const meId = currentUser?.uid || currentUser?.id || null;
     if (!meId) return;
@@ -679,7 +743,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     }, HEARTBEAT_MS);
 
     return () => clearInterval(t);
-  }, [readOnly, safe.matchId, currentUser]);
+  }, [readOnly, safe.matchId, currentUser, isLockedOut]);
 
   // ── Takeover-request subscription (Task 4e) ─────────────────
   // Only active scorers subscribe — viewers already onSnapshot above and
@@ -692,6 +756,22 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     const unsub = onSnapshot(ref, (snap) => {
       if (!snap.exists()) return;
       const data = snap.data();
+
+      // ── Auto-eject detection ──
+      // If the active scorer is now someone else, flip to locked-out mode.
+      if (
+        !isLockedOut &&
+        meId &&
+        data.activeScorerId &&
+        data.activeScorerId !== meId
+      ) {
+        setIsLockedOut(true);
+        const takerName = data.activeScorerName || "another scorer";
+        setLockoutToast(`Scoring taken over by ${takerName}`);
+        if (lockoutToastTimerRef.current) clearTimeout(lockoutToastTimerRef.current);
+        lockoutToastTimerRef.current = setTimeout(() => setLockoutToast(null), 4000);
+      }
+
       const req = data.takeoverRequest;
       if (!req || !req.fromId) {
         setIncomingTakeover(null);
@@ -713,7 +793,14 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       });
     });
     return unsub;
-  }, [safe.matchId, currentUser, readOnly]);
+  }, [safe.matchId, currentUser, readOnly, isLockedOut]);
+
+  // Cleanup lockout toast timer on unmount.
+  useEffect(() => {
+    return () => {
+      if (lockoutToastTimerRef.current) clearTimeout(lockoutToastTimerRef.current);
+    };
+  }, []);
 
   // ── Approve/Deny actions ─────────────────────────────────────
   async function respondTakeover(decision) {
@@ -783,7 +870,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
 
   // ── Event log helper (Task 1) ───────────────────────────────
   function pushEvent(delta) {
-    if (readOnly) return;
+    if (readOnly || isLockedOut) return;
     pendingEventsRef.current.push({
       ts: Date.now(),
       innings,
@@ -796,6 +883,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       pitch: pendingBall?.pitch || null,
       zone: activeZone || null,
       shot: typeof activeShot === "string" ? activeShot : (activeShot?.n || null),
+      shotType: pendingBall?.shotType || dotShotType || null,
       label: null,
       runs: 0,
       wicket: null,
@@ -805,7 +893,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
 
   // ── Ball recording ──────────────────────────────────────────
   function recordRuns(runs) {
-    if (readOnly) return;
+    if (readOnly || isLockedOut) return;
     pushHistory();
     const newScore = score + runs;
     const newBalls = balls + 1;
@@ -859,7 +947,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
   // When kind === "lb" or "b", we still add 1 extra on top of the wide and tag the
   // ball with a combined label. No legal ball is consumed; strikers do not rotate.
   function recordWide(bonus = 0, kind = null, labelOverride = null) {
-    if (readOnly) return;
+    if (readOnly || isLockedOut) return;
     pushHistory();
     const extraOnTop = (kind === "lb" || kind === "b") ? 1 : bonus;
     const totalAdd = 1 + extraOnTop;
@@ -880,7 +968,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
   // recordNoBall — bat-runs credit the striker's individual runs (no balls faced).
   // kind: null | "lb" | "b" — leg-bye / bye on top of the no-ball.
   function recordNoBall(batRuns = 0, kind = null, labelOverride = null) {
-    if (readOnly) return;
+    if (readOnly || isLockedOut) return;
     pushHistory();
     const extraOnTop = (kind === "lb" || kind === "b") ? 1 : 0;
     const totalAdd = 1 + batRuns + extraOnTop;
@@ -914,7 +1002,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
   }
 
   function recordBye(runs) {
-    if (readOnly) return;
+    if (readOnly || isLockedOut) return;
     pushHistory();
     const newBalls = balls + 1;
     setScore(s => s + runs);
@@ -939,7 +1027,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
   }
 
   function recordWicket() {
-    if (readOnly) return;
+    if (readOnly || isLockedOut) return;
     if (!wicketType) return;
     pushHistory();
     const newBalls = balls + 1;
@@ -992,6 +1080,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     setActiveZone(null);
     setTapPoint(null);
     setActiveShot(null);
+    setDotShotType(null);
     setModal(null);
     // Prompt new batter
     setTimeout(() => setModal("newbatter"), 600);
@@ -1000,7 +1089,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
 
   // ── Full-mode dispatch ──────────────────────────────────────
   function handleRunTap(runs) {
-    if (readOnly) return;
+    if (readOnly || isLockedOut) return;
     if (scoreMode === "fast") {
       recordRuns(runs);
       return;
@@ -1010,7 +1099,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     setModal("pitch");
   }
   function handleWicketTap() {
-    if (readOnly) return;
+    if (readOnly || isLockedOut) return;
     if (scoreMode === "fast") {
       setWicketStriker(striker);
       setModal("wicket");
@@ -1022,12 +1111,12 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
 
   // WIDE / NO-BALL → open the bonus-runs sheet (both fast + full modes).
   function handleWideTap() {
-    if (readOnly) return;
+    if (readOnly || isLockedOut) return;
     setPendingExtras({ type: "wide", bonusRuns: 0, kind: null });
     setModal("extrasBonus");
   }
   function handleNoBallTap() {
-    if (readOnly) return;
+    if (readOnly || isLockedOut) return;
     setPendingExtras({ type: "noball", bonusRuns: 0, batRuns: 0 });
     setModal("extrasBonus");
   }
@@ -1035,7 +1124,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
   // Apply the user's bonus-sheet choice and record.
   // opt: { bonus?: number, kind?: "lb"|"b" }
   function applyExtrasBonus(opt) {
-    if (readOnly) return;
+    if (readOnly || isLockedOut) return;
     const pe = pendingExtras;
     if (!pe) return;
     if (pe.type === "wide") {
@@ -1056,11 +1145,12 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     setActiveZone(null);
     setTapPoint(null);
     setActiveShot(null);
+    setDotShotType(null);
     setModal(null);
   }
 
   function recordPendingBall(opts = {}) {
-    if (readOnly) return;
+    if (readOnly || isLockedOut) return;
     const pb = { ...(pendingBall || {}), ...opts };
     if (!pb) return;
 
@@ -1083,14 +1173,27 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     const shotName = activeShot || "";
     const pcLabel = COMMENTARY[persona].label;
     const batName = batters[striker]?.name || "";
-    const evt = pb.kind === "wicket" ? "wicket"
-              : pb.runs === 6 ? "six"
-              : pb.runs === 4 ? "four"
-              : pb.runs === 0 ? "dot"
-              : "one";
-    const personaLine = getComm(persona, evt, { name: batName });
-    const parts = [pitchDesc, shotName, personaLine].filter(Boolean);
-    const composed = `${pcLabel} ${parts.join(", ")}`;
+
+    // Dot-ball defensive flow — special-cased commentary using defensive/miss/leave
+    // arrays. Wagon wheel is skipped on this path so shotName is empty.
+    let composed;
+    if (pb.runs === 0 && pb.kind === "run" && pb.shotType) {
+      const dotEvt = pb.shotType === "miss" ? "miss"
+                  : pb.shotType === "leave" ? "leave"
+                  : "defensive";
+      const personaLine = getComm(persona, dotEvt, { name: batName });
+      const parts = [pitchDesc, personaLine].filter(Boolean);
+      composed = `${pcLabel} ${parts.join(" — ")}`;
+    } else {
+      const evt = pb.kind === "wicket" ? "wicket"
+                : pb.runs === 6 ? "six"
+                : pb.runs === 4 ? "four"
+                : pb.runs === 0 ? "dot"
+                : "one";
+      const personaLine = getComm(persona, evt, { name: batName });
+      const parts = [pitchDesc, shotName, personaLine].filter(Boolean);
+      composed = `${pcLabel} ${parts.join(", ")}`;
+    }
 
     if (pb.kind === "wicket") {
       // Send user into the existing wicket flow (need dismissal type / batter)
@@ -1106,11 +1209,12 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     setActiveZone(null);
     setTapPoint(null);
     setActiveShot(null);
+    setDotShotType(null);
     setModal(null);
   }
 
   function undo() {
-    if (readOnly) return;
+    if (readOnly || isLockedOut) return;
     if (!history.length) return;
     const last = history[history.length - 1];
     setHistory(h => h.slice(0, -1));
@@ -1187,7 +1291,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
   }
 
   function start2nd() {
-    if (readOnly) return;
+    if (readOnly || isLockedOut) return;
     setSavedInnings1({
       team: team1Name,
       score, wickets,
@@ -1278,13 +1382,15 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
               <div style={{ fontSize: 11, fontWeight: 700, color: SC.gold, textTransform: "uppercase", letterSpacing: 1.2 }}>
                 {readOnly
                   ? `📺 WATCHING LIVE · ${innings === 1 ? "1ST" : "2ND"} INNINGS`
-                  : `LIVE · ${innings === 1 ? "1ST" : "2ND"} INNINGS`}
+                  : isLockedOut
+                    ? `📺 WATCHING LIVE · ${innings === 1 ? "1ST" : "2ND"} INNINGS`
+                    : `LIVE · ${innings === 1 ? "1ST" : "2ND"} INNINGS`}
               </div>
               {freeHit && <div style={{ fontSize: 9, fontWeight: 800, color: SC.navy, background: SC.goldLt, padding: "2px 7px", borderRadius: 10, letterSpacing: 0.6 }}>FREE HIT</div>}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {/* Fast / Full mode toggle — scorer only */}
-              {!readOnly && (
+              {/* Fast / Full mode toggle — scorer only (hidden once locked out) */}
+              {!readOnly && !isLockedOut && (
                 <div style={{ display: "flex", background: "rgba(255,255,255,0.08)", borderRadius: 14, padding: 2, border: "1px solid rgba(255,255,255,0.12)" }}>
                   {["fast", "full"].map(m => (
                     <div key={m} onClick={() => setScoreMode(m)} style={{
@@ -1296,8 +1402,8 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
                   ))}
                 </div>
               )}
-              {/* Scorer-only Scorecard peek */}
-              {!readOnly && (
+              {/* Scorer-only Scorecard peek (hidden once locked out) */}
+              {!readOnly && !isLockedOut && (
                 <div onClick={() => setScorecardOpen(true)}
                   style={{
                     display: "flex", flexDirection: "column", alignItems: "center",
@@ -1400,8 +1506,8 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
           <div style={{ fontSize: 12, color: T.textDim, fontStyle: "italic", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{commentary}</div>
         </div>
 
-        {/* ── Run buttons panel (hidden for viewers) ── */}
-        {!readOnly && (
+        {/* ── Run buttons panel (hidden for viewers + locked-out scorers) ── */}
+        {!readOnly && !isLockedOut && (
           <div style={{ padding: 12, background: T.bg, flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
 
             {/* Row 1: 0,1,2,3,··· */}
@@ -1449,8 +1555,8 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
           </div>
         )}
 
-        {/* Spacer for viewer — keep score area at top */}
-        {readOnly && <div style={{ flex: 1 }} />}
+        {/* Spacer for viewer / locked-out — keep score area at top */}
+        {(readOnly || isLockedOut) && <div style={{ flex: 1 }} />}
 
         {/* ── BOWLER CARD ── */}
         <div style={{ padding: "0 12px", marginTop: 8, marginBottom: 12 }}>
@@ -1466,7 +1572,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
               <div style={{ fontSize: 14, fontWeight: 700, color: nightMode ? SC.gold : SC.navy, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bowler}</div>
               <div style={{ fontSize: 11, fontWeight: 500, color: T.textDim, marginTop: 2 }}>0.0-0-0-0</div>
             </div>
-            {!readOnly && (
+            {!readOnly && !isLockedOut && (
               <div onClick={() => setModal("bowler")} style={{
                 padding: "4px 10px", borderRadius: 999,
                 background: "transparent", border: `1px solid ${SC.borderMid}`,
@@ -1574,7 +1680,19 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
             <div style={{ fontSize: 13, color: SC.textDim, marginBottom: 14 }}>Select reason for the break</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
               {[{ id: "drinks", icon: "☕", label: "Drinks break" }, { id: "rain", icon: "🌧️", label: "Rain delay" }, { id: "injury", icon: "🏥", label: "Injury" }, { id: "other", icon: "⏸️", label: "Other delay" }].map(b => (
-                <div key={b.id} onClick={() => { setBreakReason(b.id); setBreakElapsed(0); setBreakActive(true); close(); }}
+                <div key={b.id} onClick={() => {
+                  setBreakReason(b.id); setBreakElapsed(0); setBreakActive(true); close();
+                  // Sync break state to Firestore immediately so viewers see it.
+                  if (!readOnly && safe.matchId) {
+                    setDoc(doc(db, "fccscorer", "data", "matches", safe.matchId), {
+                      breakState: {
+                        reason: b.id,
+                        startedAt: serverTimestamp(),
+                        startedBy: currentUser?.name || null,
+                      },
+                    }, { merge: true }).catch(e => console.error("break sync error:", e));
+                  }
+                }}
                   style={{ padding: "20px 12px", borderRadius: 12, border: `1px solid ${SC.border}`, background: SC.surface, cursor: "pointer", textAlign: "center" }}>
                   <div style={{ fontSize: 32, marginBottom: 6 }}>{b.icon}</div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: SC.navy }}>{b.label}</div>
@@ -1646,6 +1764,9 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
                   if (!pendingBall?.pitch) return;
                   if (pendingBall.kind === "wicket") {
                     recordPendingBall();
+                  } else if (pendingBall.kind === "run" && pendingBall.runs === 0) {
+                    // Dot ball — open defensive shot picker instead of wagon wheel.
+                    setModal("dotShot");
                   } else {
                     setModal("wagon");
                   }
@@ -1674,6 +1795,47 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
                 style={{ width: "100%", padding: "12px 8px", borderRadius: 12, background: SC.surface, border: `1px solid ${SC.border}`, color: SC.textDim, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, cursor: "pointer", textAlign: "center", marginTop: 4 }}>
                 Skip — score plain
               </div>
+            </div>
+          </Sheet>
+        )}
+
+        {/* ── DOT-BALL DEFENSIVE SHOT PICKER ── */}
+        {modal === "dotShot" && pendingBall && (
+          <Sheet
+            title="Shot played"
+            onClose={() => {
+              // Skip → record dot with no shotType.
+              setDotShotType(null);
+              recordPendingBall({ shotType: null });
+            }}
+          >
+            <div style={{ fontSize: 12, color: SC.textDim, marginBottom: 14, fontWeight: 600, letterSpacing: 0.3 }}>
+              {(() => {
+                const pitchDescMap = { "Yorker":"Yorker", "Full":"Full ball", "Good length":"Good length", "Back of length":"Back of length", "Short":"Short" };
+                const desc = pendingBall.pitch ? (pitchDescMap[pendingBall.pitch] || pendingBall.pitch) : "";
+                return desc ? `${desc}, no run scored` : "No run scored";
+              })()}
+            </div>
+            {[
+              { id: "defensive", icon: "🛡️", label: "Defended",   sub: "Bat met ball, no run" },
+              { id: "miss",      icon: "❌", label: "Missed",     sub: "Played and missed, no contact" },
+              { id: "leave",     icon: "🚫", label: "Left",       sub: "Shouldered arms, didn't play" },
+            ].map(opt => (
+              <div key={opt.id} onClick={() => {
+                setDotShotType(opt.id);
+                recordPendingBall({ shotType: opt.id });
+              }}
+                style={{ padding: "14px 12px", borderBottom: `1px solid ${SC.border}`, display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
+                <div style={{ fontSize: 24, width: 32, textAlign: "center", flexShrink: 0 }}>{opt.icon}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: nightMode ? SC.gold : SC.navy }}>{opt.label}</div>
+                  <div style={{ fontSize: 11, color: SC.textDim, marginTop: 2 }}>{opt.sub}</div>
+                </div>
+              </div>
+            ))}
+            <div onClick={() => { setDotShotType(null); recordPendingBall({ shotType: null }); }}
+              style={{ padding: "14px 14px", marginTop: 8, textAlign: "center", color: SC.textMuted, fontStyle: "italic", fontSize: 13, cursor: "pointer" }}>
+              Skip
             </div>
           </Sheet>
         )}
@@ -1751,8 +1913,8 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
           </Sheet>
         )}
 
-        {/* Takeover approval modal (active-scorer side) */}
-        {incomingTakeover && !readOnly && (
+        {/* Takeover approval modal (active-scorer side) — hidden once locked out */}
+        {incomingTakeover && !readOnly && !isLockedOut && (
           <TakeoverApprovalModal
             fromName={incomingTakeover.fromName}
             onApprove={() => respondTakeover("approved")}
@@ -1760,9 +1922,51 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
           />
         )}
 
+        {/* Lockout toast — bottom-center, navy gradient, 4s auto-dismiss */}
+        {lockoutToast && (
+          <div style={{
+            position: "fixed", left: "50%", bottom: 28, transform: "translateX(-50%)",
+            zIndex: 1600, maxWidth: 360, width: "calc(100% - 32px)",
+            background: `linear-gradient(135deg, ${SC.navy} 0%, ${SC.navyDk} 100%)`,
+            border: `1.5px solid ${SC.gold}`, borderRadius: 14,
+            padding: "13px 18px", textAlign: "center",
+            color: "#fff", fontSize: 13, fontWeight: 700,
+            boxShadow: "0 8px 28px rgba(0,0,0,0.5)",
+            letterSpacing: 0.2,
+          }}>
+            <div style={{ fontSize: 18, marginBottom: 4 }}>👋</div>
+            {lockoutToast}
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", marginTop: 4, fontWeight: 500 }}>
+              You can keep watching live
+            </div>
+          </div>
+        )}
+
         {/* Overlays */}
         {celebration && <Celebrate data={celebration} onDone={() => setCelebration(null)} />}
-        {breakActive && <BreakScreen reason={breakReason} elapsed={breakElapsed} onResume={() => { setBreakActive(false); setBreakElapsed(0); }} />}
+        {/* Scorer side: local break controls. Viewer side: from Firestore breakState. */}
+        {!readOnly && breakActive && (
+          <BreakScreen
+            reason={breakReason}
+            elapsed={breakElapsed}
+            onResume={() => {
+              setBreakActive(false); setBreakElapsed(0);
+              // Clear break state in Firestore so viewers leave the overlay.
+              if (safe.matchId) {
+                setDoc(doc(db, "fccscorer", "data", "matches", safe.matchId), {
+                  breakState: null,
+                }, { merge: true }).catch(e => console.error("break clear error:", e));
+              }
+            }}
+          />
+        )}
+        {readOnly && viewerBreak && (
+          <BreakScreen
+            reason={viewerBreak.reason}
+            startedAtMs={viewerBreak.startedAtMs}
+            onResume={null}
+          />
+        )}
         {inningsEnd && (
           <InningsEnd
             score={score} wickets={wickets} balls={balls}
