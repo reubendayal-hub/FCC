@@ -39,6 +39,16 @@ const G = {
 // Match-type and status accents are brand-semantic, not theme-derived,
 // so they stay as literals at module level (independent of theme G).
 const NAVY = "#1B2A5C";
+
+// Selected-state palette — used across toss buttons, elected-to,
+// overs pills, match-type cards, squad chips. Distinct from the
+// navy primary-action colour so users can tell "what I've chosen"
+// apart from "what to tap next".
+const SEL = {
+  bg:     "#E0F2D6",
+  border: "#27AE60",
+  text:   "#1A5C28",
+};
 const MATCH_TYPES = [
   { id:"internal", label:"FCC Internal",  desc:"Both teams from FCC squads",          icon:"🏏", savesStats:true,  color:"#1a6b38" },
   { id:"friendly", label:"FCC Friendly",  desc:"FCC vs external club — stats saved",  icon:"🤝", savesStats:true,  color:NAVY      },
@@ -395,9 +405,9 @@ function CreateMatchScreen({
                 {OVERS_OPTIONS.map(o => (
                   <button key={o} onClick={()=>setOvers(o)} style={{
                     padding:"8px 16px", borderRadius:20,
-                    border:`1.5px solid ${overs===o?G.green:G.border}`,
-                    background:overs===o?G.green:G.white,
-                    color:overs===o?G.white:G.text,
+                    border:`${overs===o?2:1.5}px solid ${overs===o?SEL.border:G.border}`,
+                    background:overs===o?SEL.bg:G.white,
+                    color:overs===o?SEL.text:G.text,
                     fontWeight:700, fontSize:13, cursor:"pointer" }}>{o}</button>
                 ))}
               </div>
@@ -407,15 +417,15 @@ function CreateMatchScreen({
                 {MATCH_TYPES.map(mt => (
                   <button key={mt.id} onClick={()=>setType(mt.id)} style={{
                     padding:"12px 14px", borderRadius:12, cursor:"pointer",
-                    border:`1.5px solid ${type===mt.id?mt.color:G.border}`,
-                    background:type===mt.id?mt.color+"12":G.white,
+                    border:`${type===mt.id?2:1.5}px solid ${type===mt.id?SEL.border:G.border}`,
+                    background:type===mt.id?SEL.bg:G.white,
                     display:"flex", alignItems:"center", gap:12, textAlign:"left" }}>
                     <span style={{ fontSize:22 }}>{mt.icon}</span>
                     <div style={{ flex:1 }}>
-                      <div style={{ fontSize:14, fontWeight:700, color:type===mt.id?mt.color:G.text }}>{mt.label}</div>
+                      <div style={{ fontSize:14, fontWeight:700, color:type===mt.id?SEL.text:G.text }}>{mt.label}</div>
                       <div style={{ fontSize:12, color:G.muted }}>{mt.desc}{mt.savesStats?" · Stats saved":" · Stats not saved"}</div>
                     </div>
-                    {type===mt.id && <span style={{ color:mt.color, fontSize:18, fontWeight:700 }}>✓</span>}
+                    {type===mt.id && <span style={{ color:SEL.text, fontSize:18, fontWeight:700 }}>✓</span>}
                   </button>
                 ))}
               </div>
@@ -450,13 +460,13 @@ function CreateMatchScreen({
             </FieldGroup>
             <FieldGroup G={G} label="Toss (optional — can set later)">
               <div style={{ display:"flex", gap:8 }}>
-                {[fccTeam||team1Name||"Team 1", fccTeam2||team2Name||"Team 2"].map(t => (
-                  <button key={t} onClick={()=>setToss(t)} style={{
+                {[team1Display||"Team 1", team2Display||"Team 2"].map((t, i) => (
+                  <button key={`${i}-${t}`} onClick={()=>setToss(t)} style={{
                     flex:1, padding:"10px 8px", borderRadius:10,
-                    border:`1.5px solid ${toss===t?NAVY:G.border}`,
-                    background:toss===t?NAVY+"12":G.white,
-                    color:toss===t?NAVY:G.text,
-                    fontWeight:600, fontSize:13, cursor:"pointer" }}>{t} won toss</button>
+                    border:`${toss===t?2:1.5}px solid ${toss===t?SEL.border:G.border}`,
+                    background:toss===t?SEL.bg:G.white,
+                    color:toss===t?SEL.text:G.text,
+                    fontWeight:toss===t?700:600, fontSize:13, cursor:"pointer" }}>{t} won toss</button>
                 ))}
               </div>
               {toss && (
@@ -464,10 +474,10 @@ function CreateMatchScreen({
                   {["bat","field"].map(e => (
                     <button key={e} onClick={()=>setElected(e)} style={{
                       flex:1, padding:"10px 8px", borderRadius:10,
-                      border:`1.5px solid ${elected===e?G.green:G.border}`,
-                      background:elected===e?G.green+"12":G.white,
-                      color:elected===e?G.green:G.text,
-                      fontWeight:600, fontSize:13, cursor:"pointer" }}>Elected to {e}</button>
+                      border:`${elected===e?2:1.5}px solid ${elected===e?SEL.border:G.border}`,
+                      background:elected===e?SEL.bg:G.white,
+                      color:elected===e?SEL.text:G.text,
+                      fontWeight:elected===e?700:600, fontSize:13, cursor:"pointer" }}>Elected to {e}</button>
                   ))}
                 </div>
               )}
@@ -541,7 +551,7 @@ function SquadPicker({ G, label, hint, allMembers, squad, setSquad, colorActive,
     <div>
       <div style={{ fontSize:13, fontWeight:700, color:G.text, marginBottom:4 }}>
         {label}
-        <span style={{ marginLeft:8, fontSize:11, fontWeight:600, color:colorActive }}>
+        <span style={{ marginLeft:8, fontSize:11, fontWeight:600, color:SEL.border }}>
           {squad.length} selected
         </span>
       </div>
@@ -550,8 +560,8 @@ function SquadPicker({ G, label, hint, allMembers, squad, setSquad, colorActive,
         <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:10 }}>
           {squad.map(name => (
             <button key={name} onClick={()=>toggleMember(name)} style={{
-              padding:"5px 10px", borderRadius:20, background:colorActive+"18",
-              border:`1.5px solid ${colorActive}`, color:colorActive, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+              padding:"5px 10px", borderRadius:20, background:SEL.bg,
+              border:`2px solid ${SEL.border}`, color:SEL.text, fontSize:12, fontWeight:700, cursor:"pointer" }}>
               {name} ✕
             </button>
           ))}
@@ -567,8 +577,8 @@ function SquadPicker({ G, label, hint, allMembers, squad, setSquad, colorActive,
                 padding:"8px 10px", borderRadius:9,
                 cursor:disabled?"not-allowed":"pointer",
                 opacity:disabled?0.4:1,
-                border:`1.5px solid ${sel?colorActive:G.border}`,
-                background:sel?colorActive+"12":G.white, color:sel?colorActive:G.text,
+                border:`${sel?2:1.5}px solid ${sel?SEL.border:G.border}`,
+                background:sel?SEL.bg:G.white, color:sel?SEL.text:G.text,
                 fontSize:12, fontWeight:sel?700:400, textAlign:"left",
                 overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                 {sel?"✓ ":""}{m.name}

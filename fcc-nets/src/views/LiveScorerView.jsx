@@ -1087,7 +1087,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
 
           {/* Team names */}
           <div style={{ textAlign: "center", fontSize: 12, color: SC.gold, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 2 }}>
-            {team1Name} · {team2Name}
+            {team1Name} vs {team2Name}
           </div>
 
           {/* Score */}
