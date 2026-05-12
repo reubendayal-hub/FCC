@@ -41,6 +41,39 @@ const ZONE_PATHS = [
   {id:"fine-leg",  d:"M110,96 L190,30 A104,108 0 0,0 132,4 Z"},
 ];
 
+// ── Cricket ball SVG (red, white dashed seams) ────────────────
+function CricketBallSvg({ size = 20 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" style={{ display: "block", flexShrink: 0 }}>
+      <circle cx="16" cy="16" r="14" fill="#CC2222" />
+      <path d="M20 4 Q28 16 20 28" fill="none" stroke="white" strokeWidth="1.8" strokeDasharray="3,2.5" strokeLinecap="round" />
+      <path d="M24 5 Q32 16 24 27" fill="none" stroke="white" strokeWidth="1.8" strokeDasharray="3,2.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// ── Stumps SVG (3 stumps + 2 bails, white) ────────────────────
+function StumpsSvg({ width = 16, height = 14, fill = "#fff" }) {
+  return (
+    <svg width={width} height={height} viewBox="0 0 32 28" style={{ display: "block", flexShrink: 0 }}>
+      <rect x="6"  y="7" width="4" height="19" rx="2" fill={fill} />
+      <rect x="14" y="7" width="4" height="19" rx="2" fill={fill} />
+      <rect x="22" y="7" width="4" height="19" rx="2" fill={fill} />
+      <rect x="5"  y="5" width="8" height="3.5" rx="1.8" fill={fill} />
+      <rect x="19" y="5" width="8" height="3.5" rx="1.8" fill={fill} />
+    </svg>
+  );
+}
+
+// ── Pitch length zones ────────────────────────────────────────
+const PITCH_ZONES = [
+  { id: "Yorker",         base: "#A07A00", sel: "#D4B040" },
+  { id: "Full",           base: "#1E6018", sel: "#3DA838" },
+  { id: "Good length",    base: "#13407C", sel: "#2A6FBC" },
+  { id: "Back of length", base: "#5A1E78", sel: "#A040C8" },
+  { id: "Short",          base: "#8C1810", sel: "#E0331E" },
+];
+
 // ── Commentary (verbatim) ─────────────────────────────────────
 const COMMENTARY = {
   hype:{name:"Hype Man 🔥",label:"🔥",
@@ -203,7 +236,7 @@ function WagonWheel({ activeZone, onZoneTap }) {
   const z = activeZone ? ZONES[activeZone] : null;
   return (
     <svg width="220" height="226" viewBox="0 0 220 226" style={{ display: "block", cursor: "pointer" }}>
-      <ellipse cx="110" cy="112" rx="104" ry="108" fill="#3A7A22" stroke={SC.navyDk} strokeWidth="1.4" />
+      <ellipse cx="110" cy="112" rx="104" ry="108" fill="#1A4A2B" stroke={SC.navyDk} strokeWidth="1.4" />
       <ellipse cx="110" cy="112" rx="104" ry="108" fill="none" stroke="white" strokeWidth="1.5" opacity="0.7" />
       <ellipse cx="110" cy="112" rx="54" ry="56" fill="none" stroke="white" strokeWidth="1" strokeDasharray="5,4" opacity="0.6" />
       <line x1="110" y1="4" x2="110" y2="220" stroke="white" strokeWidth="0.7" strokeDasharray="4,5" opacity="0.4" />
@@ -231,6 +264,75 @@ function WagonWheel({ activeZone, onZoneTap }) {
         </>
       )}
       {ZONE_PATHS.map(({ id, d }) => <path key={id} d={d} fill="transparent" onClick={() => onZoneTap(id)} style={{ cursor: "pointer" }} />)}
+    </svg>
+  );
+}
+
+// ── Pitch picker (5 length zones + wide flanks) ───────────────
+function PitchPickerSvg({ selected, onPick, onWideOff, onWideLeg }) {
+  // Trapezoid pitch from y=22 (top, batter end) to y=240 (bottom, bowler end)
+  // 5 horizontal zones inside the clipped pitch. Each is a horizontal band.
+  const W = 240, H = 280;
+  // Trapezoid: top narrow (90→150), bottom wide (40→200)
+  const clipId = "pitchClip";
+  const bands = [
+    // top → bottom: Yorker (near batter), Full, Good length, Back of length, Short (near bowler)
+    { id: "Yorker",         y1: 22,  y2: 66 },
+    { id: "Full",           y1: 66,  y2: 110 },
+    { id: "Good length",    y1: 110, y2: 154 },
+    { id: "Back of length", y1: 154, y2: 200 },
+    { id: "Short",          y1: 200, y2: 240 },
+  ];
+  return (
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ maxWidth: 320, display: "block" }}>
+      <defs>
+        <clipPath id={clipId}>
+          {/* trapezoid pitch */}
+          <polygon points="90,22 150,22 200,240 40,240" />
+        </clipPath>
+      </defs>
+      {/* Outfield bg */}
+      <rect x="0" y="0" width={W} height={H} fill="#1A4A2B" rx="14" />
+      {/* Wide-off badge (left of stumps) */}
+      <g onClick={onWideOff} style={{ cursor: "pointer" }}>
+        <rect x="6" y="6" width="58" height="28" rx="6" fill="rgba(0,0,0,0.35)" stroke="#fff" strokeOpacity="0.6" />
+        <text x="35" y="24" fontSize="10" fontWeight="800" fill="#fff" textAnchor="middle" letterSpacing="0.6">WIDE-OFF</text>
+      </g>
+      {/* Wide-leg badge (right of stumps) */}
+      <g onClick={onWideLeg} style={{ cursor: "pointer" }}>
+        <rect x={W - 64} y="6" width="58" height="28" rx="6" fill="rgba(0,0,0,0.35)" stroke="#fff" strokeOpacity="0.6" />
+        <text x={W - 35} y="24" fontSize="10" fontWeight="800" fill="#fff" textAnchor="middle" letterSpacing="0.6">WIDE-LEG</text>
+      </g>
+      {/* Pitch bands (clipped to trapezoid) */}
+      <g clipPath={`url(#${clipId})`}>
+        {bands.map(b => {
+          const zone = PITCH_ZONES.find(z => z.id === b.id);
+          const isSel = selected === b.id;
+          return (
+            <g key={b.id} onClick={() => onPick(b.id)} style={{ cursor: "pointer" }}>
+              <rect x="0" y={b.y1} width={W} height={b.y2 - b.y1} fill={isSel ? zone.sel : zone.base} />
+              <text x={W / 2} y={(b.y1 + b.y2) / 2 + 4} fontSize="13" fontWeight="700" fill="#fff" textAnchor="middle" letterSpacing="0.4">{b.id}</text>
+              {isSel && <circle cx={W / 2} cy={b.y2 - 6} r="3.5" fill="#fff" />}
+            </g>
+          );
+        })}
+      </g>
+      {/* Dashed dividers between bands */}
+      <g clipPath={`url(#${clipId})`}>
+        {bands.slice(0, -1).map(b => (
+          <line key={b.id} x1="0" y1={b.y2} x2={W} y2={b.y2} stroke="white" strokeWidth="0.8" strokeDasharray="4,4" opacity="0.45" />
+        ))}
+      </g>
+      {/* Trapezoid outline */}
+      <polygon points="90,22 150,22 200,240 40,240" fill="none" stroke="#fff" strokeWidth="1.6" opacity="0.8" />
+      {/* Batter stumps at top */}
+      <g>
+        <rect x="108" y="6"  width="3" height="14" rx="1.5" fill="#fff" />
+        <rect x="118" y="6"  width="3" height="14" rx="1.5" fill="#fff" />
+        <rect x="128" y="6"  width="3" height="14" rx="1.5" fill="#fff" />
+        <rect x="106" y="4"  width="11" height="2.5" rx="1.2" fill="#fff" />
+        <rect x="123" y="4"  width="11" height="2.5" rx="1.2" fill="#fff" />
+      </g>
     </svg>
   );
 }
@@ -313,6 +415,10 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
 
   // Bye sub-state
   const [byeRuns, setByeRuns] = useState(null);
+
+  // Score mode + pending ball (full-mode flow)
+  const [scoreMode, setScoreMode] = useState("fast"); // "fast" | "full"
+  const [pendingBall, setPendingBall] = useState(null); // { runs, kind, pitch, zone }
 
   // Theme
   const T = nightMode
@@ -530,6 +636,66 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
     rotateOnOver(newBalls);
   }
 
+  // ── Full-mode dispatch ──────────────────────────────────────
+  function handleRunTap(runs) {
+    if (scoreMode === "fast") {
+      recordRuns(runs);
+      return;
+    }
+    const kind = runs === 6 ? "six" : runs === 4 ? "four" : "run";
+    setPendingBall({ runs, kind });
+    setModal("pitch");
+  }
+  function handleWicketTap() {
+    if (scoreMode === "fast") {
+      setWicketStriker(striker);
+      setModal("wicket");
+      return;
+    }
+    setPendingBall({ runs: 0, kind: "wicket" });
+    setModal("pitch");
+  }
+  function recordPendingBall(opts = {}) {
+    const pb = { ...(pendingBall || {}), ...opts };
+    if (!pb) return;
+    // Composed commentary
+    const pitchDescMap = { "Yorker":"Yorker", "Full":"Full ball", "Good length":"Good length", "Back of length":"Back of length", "Short":"Short" };
+    const pitchDesc = pb.pitch ? (pitchDescMap[pb.pitch] || "") : "";
+    const zone = pb.zone ? ZONES[pb.zone] : null;
+    const shotDesc = zone?.shots?.[0]?.n || "";
+    const pcLabel = COMMENTARY[persona].label;
+    const batName = batters[striker]?.name || "";
+    const evt = pb.kind === "wicket" ? "wicket"
+              : pb.kind === "wide"   ? "wide"
+              : pb.kind === "noball" ? "noball"
+              : pb.runs === 6 ? "six"
+              : pb.runs === 4 ? "four"
+              : pb.runs === 0 ? "dot"
+              : "one";
+    const personaLine = getComm(persona, evt, { name: batName });
+    const parts = [pitchDesc, shotDesc, personaLine].filter(Boolean);
+    const composed = `${pcLabel} ${parts.join(", ")}`;
+
+    if (pb.kind === "wide") {
+      recordWide(0);
+      setCommentary(composed);
+    } else if (pb.kind === "noball") {
+      recordNoBall(0);
+      setCommentary(composed);
+    } else if (pb.kind === "wicket") {
+      // Send user into the existing wicket flow (need dismissal type / batter)
+      setWicketStriker(striker);
+      setPendingBall(pb); // keep pitch/zone metadata for future use
+      setModal("wicket");
+      return;
+    } else {
+      recordRuns(pb.runs);
+      setCommentary(composed);
+    }
+    setPendingBall(null);
+    setModal(null);
+  }
+
   function undo() {
     if (!history.length) return;
     const last = history[history.length - 1];
@@ -597,7 +763,13 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
         @keyframes brkRain { 0%,100%{transform:translateY(0); opacity:1} 50%{transform:translateY(10px); opacity:0.4} }
       `}</style>
 
-      <div style={{ width: "100%", maxWidth: 440, display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+      <div style={{
+        width: "100%", maxWidth: 440, display: "flex", flexDirection: "column", minHeight: "100vh",
+        border: nightMode ? `1.5px solid rgba(201,168,76,0.45)` : `1px solid rgba(27,42,92,0.08)`,
+        boxShadow: nightMode
+          ? "0 0 0 1px rgba(201,168,76,0.15), 0 8px 32px rgba(0,0,0,0.4)"
+          : "0 8px 32px rgba(27,42,92,0.15)",
+      }}>
 
         {/* ── HEADER ── */}
         <div style={{ background: headerBg, padding: "12px 16px 18px", flexShrink: 0, position: "relative", overflow: "hidden", color: "#fff" }}>
@@ -611,16 +783,33 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
               </div>
               {freeHit && <div style={{ fontSize: 9, fontWeight: 800, color: SC.navy, background: SC.goldLt, padding: "2px 7px", borderRadius: 10, letterSpacing: 0.6 }}>FREE HIT</div>}
             </div>
-            {/* Day / Night toggle */}
-            <div onClick={() => setNightMode(n => !n)}
-              style={{ position: "relative", width: 60, height: 24, borderRadius: 14, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)", cursor: "pointer", userSelect: "none", flexShrink: 0 }}>
-              <div style={{
-                position: "absolute", top: 1, left: nightMode ? 34 : 1,
-                width: 24, height: 20, borderRadius: 11,
-                background: `linear-gradient(135deg, ${SC.gold} 0%, ${SC.goldLt} 100%)`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 11, transition: "left 0.22s ease",
-              }}>{nightMode ? "🌙" : "☀️"}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {/* Fast / Full mode toggle */}
+              <div style={{ display: "flex", background: "rgba(255,255,255,0.08)", borderRadius: 14, padding: 2, border: "1px solid rgba(255,255,255,0.12)" }}>
+                {["fast", "full"].map(m => (
+                  <div key={m} onClick={() => setScoreMode(m)} style={{
+                    padding: "4px 10px", borderRadius: 12, fontSize: 10, fontWeight: 700, letterSpacing: 0.6,
+                    textTransform: "uppercase", cursor: "pointer",
+                    background: scoreMode === m ? "linear-gradient(135deg,#C9A84C,#F0D060)" : "transparent",
+                    color: scoreMode === m ? SC.navy : "rgba(255,255,255,0.55)",
+                  }}>{m}</div>
+                ))}
+              </div>
+              {/* Persona quick-pick */}
+              <div onClick={() => setModal("commentary")}
+                style={{ width: 26, height: 26, borderRadius: 13, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, cursor: "pointer", flexShrink: 0 }}
+                title="Commentary voice">🎤</div>
+              {/* Day / Night toggle */}
+              <div onClick={() => setNightMode(n => !n)}
+                style={{ position: "relative", width: 60, height: 24, borderRadius: 14, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)", cursor: "pointer", userSelect: "none", flexShrink: 0 }}>
+                <div style={{
+                  position: "absolute", top: 1, left: nightMode ? 34 : 1,
+                  width: 24, height: 20, borderRadius: 11,
+                  background: `linear-gradient(135deg, ${SC.gold} 0%, ${SC.goldLt} 100%)`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 11, transition: "left 0.22s ease",
+                }}>{nightMode ? "🌙" : "☀️"}</div>
+              </div>
             </div>
           </div>
 
@@ -680,7 +869,7 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
         <div style={{ background: nightMode ? "rgba(255,255,255,0.04)" : "#FAF7EE", padding: "10px 16px", margin: "12px 0 0" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: T.textDim, textTransform: "uppercase", letterSpacing: 1 }}>
-              THIS OVER · {bowler}
+              THIS OVER
             </div>
             <div style={{ fontSize: 12, fontWeight: 700, color: SC.red }}>{overRuns} run{overRuns === 1 ? "" : "s"}</div>
           </div>
@@ -701,28 +890,30 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
           {/* Row 1: 0,1,2,3,··· */}
           <div style={{ display: "flex", gap: 8 }}>
             {[0, 1, 2, 3].map(n => (
-              <RunSmall key={n} onClick={() => recordRuns(n)} label={n === 0 ? "0" : String(n)} nightMode={nightMode} />
+              <RunSmall key={n} onClick={() => handleRunTap(n)} label={n === 0 ? "0" : String(n)} nightMode={nightMode} />
             ))}
             <RunSmall onClick={() => setModal("overRuns")} label={"···"} nightMode={nightMode} small />
           </div>
 
           {/* Row 2: 4, 6, W */}
           <div style={{ display: "flex", gap: 8 }}>
-            <div onClick={() => recordRuns(4)}
+            <div onClick={() => handleRunTap(4)}
               style={{ flex: 1, height: 64, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center",
                 background: `linear-gradient(135deg, ${SC.navy} 0%, ${SC.navyDk} 100%)`,
                 color: "#fff", fontWeight: 900, fontSize: 24, cursor: "pointer",
                 boxShadow: "0 4px 14px rgba(27,42,92,0.35)" }}>4</div>
-            <div onClick={() => recordRuns(6)}
+            <div onClick={() => handleRunTap(6)}
               style={{ flex: 1, height: 64, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center",
                 background: `linear-gradient(135deg, ${SC.gold} 0%, ${SC.goldLt} 100%)`,
                 color: SC.navy, fontWeight: 900, fontSize: 24, cursor: "pointer",
                 boxShadow: "0 4px 14px rgba(201,168,76,0.45)" }}>6</div>
-            <div onClick={() => { setWicketStriker(striker); setModal("wicket"); }}
+            <div onClick={handleWicketTap}
               style={{ flex: 1, height: 64, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center",
                 background: `linear-gradient(135deg, ${SC.red} 0%, ${SC.redDk} 100%)`,
                 color: "#fff", fontWeight: 900, fontSize: 24, cursor: "pointer",
-                boxShadow: "0 4px 14px rgba(192,57,43,0.4)" }}>W</div>
+                boxShadow: "0 4px 14px rgba(192,57,43,0.4)" }}>
+              <StumpsSvg width={24} height={20} fill="#fff" />
+            </div>
           </div>
 
           {/* Row 3: WIDE, NO BALL, BYE, UNDO */}
@@ -733,11 +924,34 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
             <PillBtn onClick={undo} label="↩" nightMode={nightMode} noCaps />
           </div>
 
-          {/* Row 4: bowler / break / more */}
+          {/* Row 4: swap / break / more */}
           <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-            <PillBtn onClick={() => setModal("bowler")} label={`Bowler: ${bowler}`} nightMode={nightMode} noCaps />
+            <PillBtn onClick={() => setStriker(s => s === 0 ? 1 : 0)} label="SWAP" nightMode={nightMode} />
             <PillBtn onClick={() => setModal("break")} label="BREAK" nightMode={nightMode} />
             <PillBtn onClick={() => setModal("more")} label="···" nightMode={nightMode} noCaps />
+          </div>
+        </div>
+
+        {/* ── BOWLER CARD ── */}
+        <div style={{ padding: "0 12px", marginTop: 8, marginBottom: 12 }}>
+          <div style={{
+            background: nightMode ? SC.surfaceDk : SC.surface,
+            border: "1px solid rgba(201,168,76,0.3)",
+            borderRadius: 10,
+            padding: "10px 12px",
+            display: "flex", alignItems: "center", gap: 10,
+          }}>
+            <CricketBallSvg size={20} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: nightMode ? SC.gold : SC.navy, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bowler}</div>
+              <div style={{ fontSize: 11, fontWeight: 500, color: T.textDim, marginTop: 2 }}>0.0-0-0-0</div>
+            </div>
+            <div onClick={() => setModal("bowler")} style={{
+              padding: "4px 10px", borderRadius: 999,
+              background: "transparent", border: `1px solid ${SC.borderMid}`,
+              fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase",
+              color: nightMode ? SC.goldLt : SC.navy, cursor: "pointer", userSelect: "none",
+            }}>Change</div>
           </div>
         </div>
 
@@ -885,6 +1099,59 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
           </Sheet>
         )}
 
+        {/* ── PITCH PICKER ── */}
+        {modal === "pitch" && pendingBall && (
+          <Sheet title="Where did it pitch?" onClose={() => { setPendingBall(null); close(); }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+              <PitchPickerSvg
+                selected={pendingBall.pitch}
+                onPick={(zoneId) => setPendingBall(pb => ({ ...(pb || {}), pitch: zoneId }))}
+                onWideOff={() => recordPendingBall({ kind: "wide", pitch: "wide-off" })}
+                onWideLeg={() => recordPendingBall({ kind: "wide", pitch: "wide-leg" })}
+              />
+              <div onClick={() => recordPendingBall({ kind: "noball" })}
+                style={{ padding: "8px 18px", borderRadius: 20, background: `linear-gradient(135deg,${SC.red},${SC.redDk})`, color: "#fff", fontSize: 12, fontWeight: 800, letterSpacing: 0.6, textTransform: "uppercase", cursor: "pointer", marginTop: 4 }}>
+                No-ball
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 8, width: "100%" }}>
+                <div onClick={() => recordPendingBall()}
+                  style={{ flex: 1, padding: "12px 8px", borderRadius: 12, background: SC.surface, border: `1px solid ${SC.border}`, color: SC.textDim, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, cursor: "pointer", textAlign: "center" }}>
+                  Skip — score plain
+                </div>
+                <div onClick={() => {
+                  if (!pendingBall?.pitch) return;
+                  if (pendingBall.kind === "wicket") {
+                    recordPendingBall();
+                  } else {
+                    setModal("wagon");
+                  }
+                }}
+                  style={{ flex: 1, padding: "12px 8px", borderRadius: 12, background: pendingBall.pitch ? `linear-gradient(135deg,${SC.navy},${SC.navyDk})` : "rgba(27,42,92,0.25)", color: "#fff", fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.6, cursor: pendingBall.pitch ? "pointer" : "not-allowed", textAlign: "center" }}>
+                  Next →
+                </div>
+              </div>
+            </div>
+          </Sheet>
+        )}
+
+        {/* ── WAGON WHEEL ── */}
+        {modal === "wagon" && pendingBall && (
+          <Sheet title="Where did it go?" onClose={() => { setPendingBall(null); close(); }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+              <WagonWheel activeZone={pendingBall.zone} onZoneTap={(zid) => {
+                setPendingBall(pb => ({ ...(pb || {}), zone: zid }));
+                // Auto-record after a short pause to let the indicator show
+                setTimeout(() => recordPendingBall({ zone: zid }), 280);
+              }} />
+              <div style={{ fontSize: 11, color: SC.textDim, fontStyle: "italic", textAlign: "center" }}>Tap a zone to record the ball</div>
+              <div onClick={() => recordPendingBall()}
+                style={{ width: "100%", padding: "12px 8px", borderRadius: 12, background: SC.surface, border: `1px solid ${SC.border}`, color: SC.textDim, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, cursor: "pointer", textAlign: "center", marginTop: 4 }}>
+                Skip — score plain
+              </div>
+            </div>
+          </Sheet>
+        )}
+
         {/* Overlays */}
         {celebration && <Celebrate data={celebration} onDone={() => setCelebration(null)} />}
         {breakActive && <BreakScreen reason={breakReason} elapsed={breakElapsed} onResume={() => { setBreakActive(false); setBreakElapsed(0); }} />}
@@ -915,6 +1182,7 @@ function Stat({ label, value }) {
 
 function BallPill({ val, isLatestSix }) {
   let bg = "#E8E4D8", fg = SC.textMuted, weight = 500, char = val || "·", size = 32, gradient = null, shadow = null, anim = null, fontSize = 13;
+  let useStumps = false;
   if (!val) {
     char = "·";
   } else if (val === "•") {
@@ -922,6 +1190,7 @@ function BallPill({ val, isLatestSix }) {
   } else if (val === "W") {
     gradient = `linear-gradient(135deg, ${SC.red} 0%, ${SC.redDk} 100%)`;
     fg = "#fff"; weight = 800;
+    useStumps = true;
   } else if (val === "4") {
     bg = SC.blueLt; fg = SC.blue; weight = 700;
   } else if (val === "6") {
@@ -945,7 +1214,7 @@ function BallPill({ val, isLatestSix }) {
       background: gradient || bg, color: fg, fontWeight: weight, fontSize,
       boxShadow: shadow || undefined, animation: anim || undefined,
       flexShrink: 0,
-    }}>{char}</div>
+    }}>{useStumps ? <StumpsSvg width={16} height={14} fill="#fff" /> : char}</div>
   );
 }
 

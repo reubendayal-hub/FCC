@@ -250,6 +250,19 @@ function MatchCard({ G, match, onScore, onWatch, currentUser }) {
           borderBottom:`1px solid ${G.border}` }}>{match.result}</div>
       )}
 
+      {isLive && (
+        <>
+          <style>{`@keyframes cardPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.35;transform:scale(0.85)} }`}</style>
+          <div style={{ display:"flex", alignItems:"center", gap:6, padding:"4px 14px 0" }}>
+            <div style={{ width:8, height:8, borderRadius:"50%", background:"#dc2626",
+              animation:"cardPulse 1.4s ease-in-out infinite" }} />
+            <div style={{ fontSize:10, fontWeight:800, color:"#dc2626", letterSpacing:1.2 }}>
+              RESUME SCORING
+            </div>
+          </div>
+        </>
+      )}
+
       <div style={{ padding:"10px 14px", display:"flex", gap:8 }}>
         {isScorer && !isDone && (
           <button onClick={onScore} style={{ flex:1, padding:"9px 12px", borderRadius:9,
