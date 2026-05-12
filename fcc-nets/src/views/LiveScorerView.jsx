@@ -232,8 +232,9 @@ function InningsEnd({ score, wickets, balls, maxOvers, battingTeam, innings, tar
 }
 
 // ── Wagon Wheel (restyled) ────────────────────────────────────
-function WagonWheel({ activeZone, onZoneTap }) {
+function WagonWheel({ activeZone, onZoneTap, tapPoint }) {
   const z = activeZone ? ZONES[activeZone] : null;
+  const indicator = tapPoint ? [tapPoint.x, tapPoint.y] : (z ? z.pt : null);
   return (
     <svg width="220" height="226" viewBox="0 0 220 226" style={{ display: "block", cursor: "pointer" }}>
       <ellipse cx="110" cy="112" rx="104" ry="108" fill="#1A4A2B" stroke={SC.navyDk} strokeWidth="1.4" />
@@ -256,14 +257,29 @@ function WagonWheel({ activeZone, onZoneTap }) {
       <line x1="114" y1="158" x2="114" y2="164" stroke={SC.navy} strokeWidth="1.8" />
       <line x1="104" y1="164" x2="116" y2="164" stroke={SC.navy} strokeWidth="1" />
       <circle cx="110" cy="96" r="6" fill={SC.navy} stroke="white" strokeWidth="1.8" />
-      {z && (
+      {indicator && (
         <>
-          <line x1="110" y1="96" x2={z.pt[0]} y2={z.pt[1]} stroke={SC.red} strokeWidth="3" strokeLinecap="round" />
-          <circle cx={z.pt[0]} cy={z.pt[1]} r="7" fill={SC.red} stroke="white" strokeWidth="2" />
+          <line x1="110" y1="96" x2={indicator[0]} y2={indicator[1]} stroke={SC.red} strokeWidth="3" strokeLinecap="round" />
+          <circle cx={indicator[0]} cy={indicator[1]} r="7" fill={SC.red} stroke="white" strokeWidth="2" />
           <circle cx="110" cy="96" r="6" fill={SC.navy} stroke="white" strokeWidth="1.8" />
         </>
       )}
-      {ZONE_PATHS.map(({ id, d }) => <path key={id} d={d} fill="transparent" onClick={() => onZoneTap(id)} style={{ cursor: "pointer" }} />)}
+      {ZONE_PATHS.map(({ id, d }) => (
+        <path
+          key={id}
+          d={d}
+          fill="transparent"
+          onClick={(e) => {
+            const svg = e.currentTarget.ownerSVGElement;
+            const pt = svg.createSVGPoint();
+            pt.x = e.clientX; pt.y = e.clientY;
+            const ctm = svg.getScreenCTM().inverse();
+            const loc = pt.matrixTransform(ctm);
+            onZoneTap(id, { x: loc.x, y: loc.y });
+          }}
+          style={{ cursor: "pointer" }}
+        />
+      ))}
     </svg>
   );
 }
@@ -417,8 +433,21 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
   const [byeRuns, setByeRuns] = useState(null);
 
   // Score mode + pending ball (full-mode flow)
-  const [scoreMode, setScoreMode] = useState("fast"); // "fast" | "full"
+  const [scoreMode, setScoreMode] = useState(() => {
+    try { return localStorage.getItem("fcc-scorer-mode") || "fast"; } catch { return "fast"; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("fcc-scorer-mode", scoreMode); } catch {}
+  }, [scoreMode]);
   const [pendingBall, setPendingBall] = useState(null); // { runs, kind, pitch, zone }
+
+  // Extras bonus-runs sheet state
+  const [pendingExtras, setPendingExtras] = useState(null); // { type:"wide"|"noball", bonusRuns, kind?, batRuns? }
+
+  // Wagon-wheel tap point + shot picker state
+  const [activeZone, setActiveZone] = useState(null);
+  const [tapPoint, setTapPoint] = useState(null); // { x, y } in SVG coords
+  const [activeShot, setActiveShot] = useState(null);
 
   // Theme
   const T = nightMode
@@ -561,29 +590,58 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
     rotateOnOver(newBalls);
   }
 
-  function recordWide(bonus = 0) {
+  // recordWide — kind: null | "lb" | "b"
+  // bonus: extra runs scored off the wide (excluding the auto-1 for the wide itself)
+  // When kind === "lb" or "b", we still add 1 extra on top of the wide and tag the
+  // ball with a combined label. No legal ball is consumed; strikers do not rotate.
+  function recordWide(bonus = 0, kind = null, labelOverride = null) {
     pushHistory();
-    const addRuns = 1 + bonus;
-    setScore(s => s + addRuns);
-    setExtras(e => ({ ...e, w: e.w + addRuns }));
-    setOverSlot(balls, "Wd");
+    const extraOnTop = (kind === "lb" || kind === "b") ? 1 : bonus;
+    const totalAdd = 1 + extraOnTop;
+    setScore(s => s + totalAdd);
+    setExtras(e => {
+      const next = { ...e, w: e.w + 1 + (kind ? 0 : bonus) };
+      if (kind === "lb") next.lb = next.lb + 1;
+      if (kind === "b")  next.b  = next.b  + 1;
+      return next;
+    });
+    const label = labelOverride || (kind === "lb" ? "Wd+LB" : kind === "b" ? "Wd+B" : `Wd${totalAdd}`);
+    setOverSlot(balls, label);
     setCommentary(`${COMMENTARY[persona].label} ${getComm(persona, "wide")}`);
-    // Wide doesn't count as a ball — slot label kept, but it'll be overwritten on next legal ball at same slot. Acceptable for prototype.
+    // Wide doesn't count as a ball, no striker rotation, no free hit.
   }
 
-  function recordNoBall(batRuns = 0) {
+  // recordNoBall — bat-runs credit the striker's individual runs (no balls faced).
+  // kind: null | "lb" | "b" — leg-bye / bye on top of the no-ball.
+  function recordNoBall(batRuns = 0, kind = null, labelOverride = null) {
     pushHistory();
-    const addRuns = 1 + batRuns;
-    setScore(s => s + addRuns);
-    setExtras(e => ({ ...e, nb: e.nb + 1 }));
-    // Bat runs credited to striker
+    const extraOnTop = (kind === "lb" || kind === "b") ? 1 : 0;
+    const totalAdd = 1 + batRuns + extraOnTop;
+    setScore(s => s + totalAdd);
+    setExtras(e => {
+      const next = { ...e, nb: e.nb + 1 };
+      if (kind === "lb") next.lb = next.lb + 1;
+      if (kind === "b")  next.b  = next.b  + 1;
+      return next;
+    });
+    // Bat runs credited to striker (runs only, no faced ball on a no-ball).
     if (batRuns > 0) {
       const nb = [...batters];
-      nb[striker] = { ...nb[striker], runs: nb[striker].runs + batRuns };
+      nb[striker] = {
+        ...nb[striker],
+        runs: nb[striker].runs + batRuns,
+        fours: nb[striker].fours + (batRuns === 4 ? 1 : 0),
+        sixes: nb[striker].sixes + (batRuns === 6 ? 1 : 0),
+      };
       setBatters(nb);
     }
-    setOverSlot(balls, "Nb");
+    const label = labelOverride || (kind === "lb" ? "Nb+LB" : kind === "b" ? "Nb+B" : `Nb${1 + batRuns}`);
+    setOverSlot(balls, label);
     setFreeHit(true);
+    // Odd bat-runs rotate strikers (kind extras don't credit the bat → no rotation).
+    if (!kind && batRuns % 2 === 1) {
+      setStriker(s => (s === 0 ? 1 : 0));
+    }
     setCommentary(`${COMMENTARY[persona].label} ${getComm(persona, "noball")}`);
   }
 
@@ -655,34 +713,76 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
     setPendingBall({ runs: 0, kind: "wicket" });
     setModal("pitch");
   }
+
+  // WIDE / NO-BALL → open the bonus-runs sheet (both fast + full modes).
+  function handleWideTap() {
+    setPendingExtras({ type: "wide", bonusRuns: 0, kind: null });
+    setModal("extrasBonus");
+  }
+  function handleNoBallTap() {
+    setPendingExtras({ type: "noball", bonusRuns: 0, batRuns: 0 });
+    setModal("extrasBonus");
+  }
+
+  // Apply the user's bonus-sheet choice and record.
+  // opt: { bonus?: number, kind?: "lb"|"b" }
+  function applyExtrasBonus(opt) {
+    const pe = pendingExtras;
+    if (!pe) return;
+    if (pe.type === "wide") {
+      if (opt.kind) {
+        recordWide(0, opt.kind);
+      } else {
+        recordWide(opt.bonus || 0, null);
+      }
+    } else if (pe.type === "noball") {
+      if (opt.kind) {
+        recordNoBall(0, opt.kind);
+      } else {
+        recordNoBall(opt.bonus || 0, null);
+      }
+    }
+    setPendingExtras(null);
+    setPendingBall(null);
+    setActiveZone(null);
+    setTapPoint(null);
+    setActiveShot(null);
+    setModal(null);
+  }
+
   function recordPendingBall(opts = {}) {
     const pb = { ...(pendingBall || {}), ...opts };
     if (!pb) return;
-    // Composed commentary
+
+    // Wide / no-ball from pitch picker → route into bonus sheet instead of
+    // recording immediately. Wagon wheel is skipped for extras.
+    if (pb.kind === "wide") {
+      setPendingExtras({ type: "wide", bonusRuns: 0, kind: null });
+      setModal("extrasBonus");
+      return;
+    }
+    if (pb.kind === "noball") {
+      setPendingExtras({ type: "noball", bonusRuns: 0, batRuns: 0 });
+      setModal("extrasBonus");
+      return;
+    }
+
+    // Composed commentary (uses chosen shot, not first-listed fallback).
     const pitchDescMap = { "Yorker":"Yorker", "Full":"Full ball", "Good length":"Good length", "Back of length":"Back of length", "Short":"Short" };
     const pitchDesc = pb.pitch ? (pitchDescMap[pb.pitch] || "") : "";
-    const zone = pb.zone ? ZONES[pb.zone] : null;
-    const shotDesc = zone?.shots?.[0]?.n || "";
+    const shotName = activeShot || "";
     const pcLabel = COMMENTARY[persona].label;
     const batName = batters[striker]?.name || "";
     const evt = pb.kind === "wicket" ? "wicket"
-              : pb.kind === "wide"   ? "wide"
-              : pb.kind === "noball" ? "noball"
               : pb.runs === 6 ? "six"
               : pb.runs === 4 ? "four"
               : pb.runs === 0 ? "dot"
               : "one";
     const personaLine = getComm(persona, evt, { name: batName });
-    const parts = [pitchDesc, shotDesc, personaLine].filter(Boolean);
+    const parts = [pitchDesc, shotName, personaLine].filter(Boolean);
     const composed = `${pcLabel} ${parts.join(", ")}`;
 
-    if (pb.kind === "wide") {
-      recordWide(0);
-      setCommentary(composed);
-    } else if (pb.kind === "noball") {
-      recordNoBall(0);
-      setCommentary(composed);
-    } else if (pb.kind === "wicket") {
+    if (pb.kind === "wicket") {
       // Send user into the existing wicket flow (need dismissal type / batter)
       setWicketStriker(striker);
       setPendingBall(pb); // keep pitch/zone metadata for future use
@@ -693,6 +793,9 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
       setCommentary(composed);
     }
     setPendingBall(null);
+    setActiveZone(null);
+    setTapPoint(null);
+    setActiveShot(null);
     setModal(null);
   }
 
@@ -739,6 +842,14 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
     return overBalls.reduce((s, b) => {
       if (!b || b === "•" || b === "W") return s;
       if (b === "Wd" || b === "Nb") return s + 1;
+      // Wd1/Wd2/.../Wd7 → trailing number is the total runs added
+      const mw = /^Wd(\d+)$/.exec(b);
+      if (mw) return s + parseInt(mw[1], 10);
+      // Nb1/Nb2/.../Nb7 — total = bat-runs + 1 penalty (label already encodes total)
+      const mn = /^Nb(\d+)$/.exec(b);
+      if (mn) return s + parseInt(mn[1], 10);
+      // Wd+LB / Wd+B / Nb+LB / Nb+B → 2 runs (1 extra penalty + 1 leg-bye/bye)
+      if (b === "Wd+LB" || b === "Wd+B" || b === "Nb+LB" || b === "Nb+B") return s + 2;
       if (b === "B") return s + 0; // approximate
       const n = parseInt(b);
       return Number.isFinite(n) ? s + n : s;
@@ -918,8 +1029,8 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
 
           {/* Row 3: WIDE, NO BALL, BYE, UNDO */}
           <div style={{ display: "flex", gap: 6 }}>
-            <PillBtn onClick={() => recordWide(0)} label="WIDE" nightMode={nightMode} />
-            <PillBtn onClick={() => recordNoBall(0)} label="NO BALL" nightMode={nightMode} />
+            <PillBtn onClick={handleWideTap} label="WIDE" nightMode={nightMode} />
+            <PillBtn onClick={handleNoBallTap} label="NO BALL" nightMode={nightMode} />
             <PillBtn onClick={() => setModal("bye")} label="BYE" nightMode={nightMode} />
             <PillBtn onClick={undo} label="↩" nightMode={nightMode} noCaps />
           </div>
@@ -1136,18 +1247,93 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
 
         {/* ── WAGON WHEEL ── */}
         {modal === "wagon" && pendingBall && (
-          <Sheet title="Where did it go?" onClose={() => { setPendingBall(null); close(); }}>
+          <Sheet title="Where did it go?" onClose={() => { setPendingBall(null); setActiveZone(null); setTapPoint(null); close(); }}>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-              <WagonWheel activeZone={pendingBall.zone} onZoneTap={(zid) => {
+              <WagonWheel activeZone={activeZone} tapPoint={tapPoint} onZoneTap={(zid, point) => {
+                setActiveZone(zid);
+                setTapPoint(point || null);
                 setPendingBall(pb => ({ ...(pb || {}), zone: zid }));
-                // Auto-record after a short pause to let the indicator show
-                setTimeout(() => recordPendingBall({ zone: zid }), 280);
+                // Open shot picker after a short pause so the indicator flashes
+                setTimeout(() => setModal("shot"), 220);
               }} />
-              <div style={{ fontSize: 11, color: SC.textDim, fontStyle: "italic", textAlign: "center" }}>Tap a zone to record the ball</div>
+              <div style={{ fontSize: 11, color: SC.textDim, fontStyle: "italic", textAlign: "center" }}>Tap where it went — then pick a shot</div>
               <div onClick={() => recordPendingBall()}
                 style={{ width: "100%", padding: "12px 8px", borderRadius: 12, background: SC.surface, border: `1px solid ${SC.border}`, color: SC.textDim, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, cursor: "pointer", textAlign: "center", marginTop: 4 }}>
                 Skip — score plain
               </div>
+            </div>
+          </Sheet>
+        )}
+
+        {/* ── SHOT PICKER ── */}
+        {modal === "shot" && pendingBall && activeZone && (
+          <Sheet
+            title="Shot played"
+            onClose={() => { setActiveShot(null); recordPendingBall(); }}
+          >
+            <div style={{ fontSize: 12, color: SC.textDim, marginBottom: 12, fontWeight: 600, letterSpacing: 0.4, textTransform: "uppercase" }}>
+              {ZONES[activeZone]?.label || ""}
+            </div>
+            {(ZONES[activeZone]?.shots || []).map((shot) => (
+              <div key={shot.n} onClick={() => {
+                setActiveShot(shot.n);
+                recordPendingBall();
+              }}
+                style={{ padding: "13px 14px", borderBottom: `1px solid ${SC.border}`, cursor: "pointer" }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: nightMode ? SC.gold : SC.navy }}>{shot.n}</div>
+                <div style={{ fontSize: 11, color: SC.textDim, marginTop: 2 }}>{shot.d}</div>
+              </div>
+            ))}
+            <div onClick={() => { setActiveShot(null); recordPendingBall(); }}
+              style={{ padding: "14px 14px", marginTop: 8, textAlign: "center", color: SC.textMuted, fontStyle: "italic", fontSize: 13, cursor: "pointer" }}>
+              Skip
+            </div>
+          </Sheet>
+        )}
+
+        {/* ── EXTRAS BONUS RUNS ── */}
+        {modal === "extrasBonus" && pendingExtras && (
+          <Sheet
+            title={pendingExtras.type === "wide" ? "Wide — bonus runs?" : "No-ball — bonus runs?"}
+            onClose={() => { setPendingExtras(null); setPendingBall(null); close(); }}
+          >
+            <div style={{ fontSize: 12, color: SC.textDim, marginBottom: 14, lineHeight: 1.4 }}>
+              {pendingExtras.type === "wide"
+                ? "Extra run auto-added. Any bonus runs scored?"
+                : "No-ball — 1 run added. Any runs off the bat?"}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
+              {(pendingExtras.type === "wide"
+                ? [
+                    { lbl: "Wide only", opt: { bonus: 0 } },
+                    { lbl: "+1",        opt: { bonus: 1 } },
+                    { lbl: "+2",        opt: { bonus: 2 } },
+                    { lbl: "+3",        opt: { bonus: 3 } },
+                    { lbl: "+4",        opt: { bonus: 4 } },
+                    { lbl: "+6",        opt: { bonus: 6 } },
+                    { lbl: "+LB",       opt: { kind: "lb" } },
+                    { lbl: "+B",        opt: { kind: "b"  } },
+                  ]
+                : [
+                    { lbl: "No-ball only", opt: { bonus: 0 } },
+                    { lbl: "+1",           opt: { bonus: 1 } },
+                    { lbl: "+2",           opt: { bonus: 2 } },
+                    { lbl: "+3",           opt: { bonus: 3 } },
+                    { lbl: "+4",           opt: { bonus: 4 } },
+                    { lbl: "+6",           opt: { bonus: 6 } },
+                    { lbl: "+LB",          opt: { kind: "lb" } },
+                    { lbl: "+B",           opt: { kind: "b"  } },
+                  ]
+              ).map((b) => (
+                <div key={b.lbl} onClick={() => applyExtrasBonus(b.opt)}
+                  style={{
+                    padding: "14px 4px", borderRadius: 12,
+                    border: `1.5px solid ${SC.border}`,
+                    background: SC.surface,
+                    fontSize: 13, fontWeight: 700, color: SC.navy,
+                    cursor: "pointer", textAlign: "center",
+                  }}>{b.lbl}</div>
+              ))}
             </div>
           </Sheet>
         )}
@@ -1198,8 +1384,8 @@ function BallPill({ val, isLatestSix }) {
     fg = "#fff"; weight = 800; size = 38; fontSize = 15;
     shadow = "0 0 12px rgba(201,168,76,0.5)";
     if (isLatestSix) anim = "glow 1.4s ease-in-out infinite";
-  } else if (val === "Wd" || val === "Nb") {
-    bg = "#FFF3C4"; fg = "#7A4000"; weight = 600; fontSize = 10;
+  } else if (val === "Wd" || val === "Nb" || /^Wd/.test(val) || /^Nb/.test(val)) {
+    bg = "#FFF3C4"; fg = "#7A4000"; weight = 600; fontSize = 9;
     char = val.toLowerCase();
   } else if (val === "B") {
     bg = "#FFF3C4"; fg = "#7A4000"; weight = 600; fontSize = 10;
