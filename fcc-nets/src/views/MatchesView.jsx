@@ -66,6 +66,8 @@ export default function MatchesView({
     return unsub;
   }, []);
 
+  if (!G) return null;
+
   if (screen === "create") {
     return (
       <CreateMatchScreen
@@ -287,6 +289,8 @@ function CreateMatchScreen({
     if (!fccTeam2) return;
     setSquad2(members.filter(m => (m.teams||[]).includes(fccTeam2)).map(m => m.name));
   }, [fccTeam2, members]);
+
+  if (!G) return null;
 
   async function handleCreate() {
     setSaving(true); setErr("");
