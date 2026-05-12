@@ -81,6 +81,24 @@ import ScorecardView from "./views/ScorecardView";
 import { doc as fsDoc, onSnapshot as fsOnSnapshot } from "firebase/firestore";
 import { db as fsDb } from "./firebase";
 
+class DebugBoundary extends React.Component {
+  constructor(p){ super(p); this.state = { err: null }; }
+  static getDerivedStateFromError(err){ return { err }; }
+  componentDidCatch(err, info){ console.error("DebugBoundary caught:", err, info); }
+  render(){
+    if (this.state.err) {
+      return (
+        <div style={{padding:20,fontFamily:"monospace",background:"#fee",
+          color:"#900",whiteSpace:"pre-wrap",minHeight:"100vh"}}>
+          <div style={{fontWeight:700,marginBottom:8}}>MatchesView render error:</div>
+          <div>{String(this.state.err?.stack || this.state.err)}</div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function LiveScorecardLoader({ matchId, onBack }) {
   const [match, setMatch] = useState(null);
   const [loaded, setLoaded] = useState(false);
@@ -2645,21 +2663,29 @@ export default function App() {
   }
 
   if (view === "scorelive" || view.startsWith("scorer-")) {
-    return (
-      <MatchesView
-        view={view}
-        setView={setView}
-        userRole={userRole}
-        currentUser={currentUser}
-        members={members}
-        teams={teams}
-        pendingCount={joinRequests.filter(r => r.status === "pending").length}
-        toast={toast}
-        showToast={showToast}
-        SidebarNav={SidebarNav}
-        handleLogout={handleLogout}
-      />
-    );
+    console.log("rendering MatchesView", view);
+    try {
+      return (
+        <DebugBoundary>
+          <MatchesView
+            view={view}
+            setView={setView}
+            userRole={userRole}
+            currentUser={currentUser}
+            members={members}
+            teams={teams}
+            pendingCount={joinRequests.filter(r => r.status === "pending").length}
+            toast={toast}
+            showToast={showToast}
+            SidebarNav={SidebarNav}
+            handleLogout={handleLogout}
+          />
+        </DebugBoundary>
+      );
+    } catch (e) {
+      console.error("MatchesView JSX threw:", e);
+      return <div style={{padding:20,color:"#900"}}>MatchesView JSX error: {String(e)}</div>;
+    }
   }
 
   // ════════════════════════════════════════════════════════════
