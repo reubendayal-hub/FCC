@@ -21,7 +21,7 @@ import { FCC_LOGO } from "../constants/logo";
 // app theme. Chosen for reliability after repeated runtime failures
 // reading G from useAppContext in production builds.
 const G = {
-  green:   "#1a6b38",
+  green:   "#1B2A5C",
   lime:    "#84cc16",
   white:   "#ffffff",
   bg:      "#f8fafc",
