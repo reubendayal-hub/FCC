@@ -77,6 +77,24 @@ import ProfileView from "./views/ProfileView";
 import CaptainXIView from "./views/CaptainXIView";
 import AdminView from "./views/AdminView";
 import MatchesView from "./views/MatchesView";
+import ScorecardView from "./views/ScorecardView";
+import { doc as fsDoc, onSnapshot as fsOnSnapshot } from "firebase/firestore";
+import { db as fsDb } from "./firebase";
+
+function LiveScorecardLoader({ matchId, onBack }) {
+  const [match, setMatch] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    const unsub = fsOnSnapshot(
+      fsDoc(fsDb, "fccscorer", "data", "matches", matchId),
+      (snap) => { setMatch(snap.exists() ? { id: snap.id, ...snap.data() } : null); setLoaded(true); },
+      (err) => { console.error("Live scorecard load error:", err); setLoaded(true); }
+    );
+    return unsub;
+  }, [matchId]);
+  if (!loaded) return <div style={{padding:40,textAlign:"center",color:"#64748b"}}>Loading scorecard…</div>;
+  return <ScorecardView match={match} onBack={onBack} />;
+}
 
 
 // Storage keys moved to src/hooks/useFirestore.js (Pass 4) — were
@@ -2621,7 +2639,12 @@ export default function App() {
   // ════════════════════════════════════════════════════════════
   if(view==="captainxi") return <CaptainXIView />;
 
-  if (view === "matches" || view.startsWith("scorer-") || view.startsWith("live-")) {
+  if (view.startsWith("live-")) {
+    const matchId = view.replace("live-", "");
+    return <LiveScorecardLoader matchId={matchId} onBack={() => setView("matches")} />;
+  }
+
+  if (view === "matches" || view.startsWith("scorer-")) {
     return (
       <MatchesView
         view={view}

@@ -2,7 +2,7 @@
 // ─────────────────────────────────────────────────────────────
 // FCC Matches — list, create, and enter the scorer
 // Follows exact patterns from other FCC views (Shell, AppHeader,
-// BotNav, G colour tokens, Firestore onSnapshot, same typography)
+// BotNav, theme G from AppContext, Firestore onSnapshot)
 // ─────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect } from "react";
@@ -13,30 +13,25 @@ import {
 import Shell      from "../ui/Shell";
 import AppHeader  from "../ui/AppHeader";
 import BotNav     from "../ui/BotNav";
-import Btn        from "../ui/Btn";
 import Toast      from "../ui/Toast";
+import { useAppContext } from "../context/AppContext";
+import { FCC_LOGO } from "../constants/logo";
 
-const G = {
-  green:   "#1a6b38", lime: "#84cc16", white: "#ffffff",
-  bg:      "#f8fafc", card: "#ffffff", border: "#e2e8f0",
-  text:    "#1e293b", muted: "#64748b", red: "#dc2626",
-  redBg:   "#fef2f2", navy: "#1B2A5C", gold: "#C9A84C",
-  goldDim: "rgba(201,168,76,0.12)",
-};
-
+// Match-type and status accents are brand-semantic, not theme-derived,
+// so they stay as literals at module level (independent of theme G).
+const NAVY = "#1B2A5C";
 const MATCH_TYPES = [
-  { id:"internal", label:"FCC Internal",  desc:"Both teams from FCC squads",          icon:"🏏", savesStats:true,  color:G.green },
-  { id:"friendly", label:"FCC Friendly",  desc:"FCC vs external club — stats saved",  icon:"🤝", savesStats:true,  color:G.navy  },
-  { id:"private",  label:"Private Game",  desc:"Custom teams — no profile saving",    icon:"🎮", savesStats:false, color:G.muted },
+  { id:"internal", label:"FCC Internal",  desc:"Both teams from FCC squads",          icon:"🏏", savesStats:true,  color:"#1a6b38" },
+  { id:"friendly", label:"FCC Friendly",  desc:"FCC vs external club — stats saved",  icon:"🤝", savesStats:true,  color:NAVY      },
+  { id:"private",  label:"Private Game",  desc:"Custom teams — no profile saving",    icon:"🎮", savesStats:false, color:"#64748b" },
 ];
-
 const OVERS_OPTIONS = [6, 10, 15, 20, 25, 40, 50];
-
+const SQUAD_MAX = 15;
 const STATUS_META = {
-  setup:     { label:"Setup",     color:G.muted,    bg:"#f1f5f9" },
-  live:      { label:"Live",      color:"#dc2626",  bg:"#fef2f2" },
-  completed: { label:"Complete",  color:G.green,    bg:"#f0fdf4" },
-  abandoned: { label:"Abandoned", color:G.muted,    bg:"#f1f5f9" },
+  setup:     { label:"Setup",     color:"#64748b", bg:"#f1f5f9" },
+  live:      { label:"Live",      color:"#dc2626", bg:"#fef2f2" },
+  completed: { label:"Complete",  color:"#1a6b38", bg:"#f0fdf4" },
+  abandoned: { label:"Abandoned", color:"#64748b", bg:"#f1f5f9" },
 };
 
 function generateMatchId() {
@@ -51,6 +46,7 @@ export default function MatchesView({
   members = [], teams = [], pendingCount = 0,
   toast, showToast, SidebarNav, handleLogout,
 }) {
+  const { G } = useAppContext();
   const [matches,       setMatches]       = useState([]);
   const [loadingList,   setLoadingList]   = useState(true);
   const [screen,        setScreen]        = useState("list");
@@ -100,7 +96,7 @@ export default function MatchesView({
   return (
     <Shell G={G} sidebar={
       <SidebarNav view={view} setView={setView} userRole={userRole}
-        currentUser={currentUser} onLogout={handleLogout} teams={teams} />
+        currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO} />
     }>
       <AppHeader title="Matches" sub="Score · Watch · Stats"
         currentUser={currentUser} handleLogout={handleLogout} />
@@ -126,9 +122,9 @@ export default function MatchesView({
         )}
 
         {liveMatches.length > 0 && (
-          <Section label="🔴 Live now">
+          <Section G={G} label="🔴 Live now">
             {liveMatches.map(m => (
-              <MatchCard key={m.id} match={m}
+              <MatchCard key={m.id} G={G} match={m}
                 onScore={() => { setActiveMatchId(m.id); setView(`scorer-${m.id}`); }}
                 onWatch={() => { setActiveMatchId(m.id); setView(`live-${m.id}`); }}
                 currentUser={currentUser} />
@@ -136,9 +132,9 @@ export default function MatchesView({
           </Section>
         )}
         {upcomingMatches.length > 0 && (
-          <Section label="📅 Upcoming">
+          <Section G={G} label="📅 Upcoming">
             {upcomingMatches.map(m => (
-              <MatchCard key={m.id} match={m}
+              <MatchCard key={m.id} G={G} match={m}
                 onScore={() => { setActiveMatchId(m.id); setView(`scorer-${m.id}`); }}
                 onWatch={() => { setActiveMatchId(m.id); setView(`live-${m.id}`); }}
                 currentUser={currentUser} />
@@ -146,9 +142,9 @@ export default function MatchesView({
           </Section>
         )}
         {completedMatches.length > 0 && (
-          <Section label="✅ Recent results">
+          <Section G={G} label="✅ Recent results">
             {completedMatches.slice(0,10).map(m => (
-              <MatchCard key={m.id} match={m}
+              <MatchCard key={m.id} G={G} match={m}
                 onScore={() => { setActiveMatchId(m.id); setView(`scorer-${m.id}`); }}
                 onWatch={() => { setActiveMatchId(m.id); setView(`live-${m.id}`); }}
                 currentUser={currentUser} />
@@ -174,7 +170,7 @@ export default function MatchesView({
   );
 }
 
-function Section({ label, children }) {
+function Section({ G, label, children }) {
   return (
     <div style={{ marginBottom:20 }}>
       <div style={{ fontSize:11, fontWeight:800, color:G.muted,
@@ -184,7 +180,7 @@ function Section({ label, children }) {
   );
 }
 
-function MatchCard({ match, onScore, onWatch, currentUser }) {
+function MatchCard({ G, match, onScore, onWatch, currentUser }) {
   const st = STATUS_META[match.status] || STATUS_META.setup;
   const mt = MATCH_TYPES.find(t => t.id === match.type) || MATCH_TYPES[1];
   const isScorer = match.scorerIds?.includes(currentUser?.uid) || match.createdBy === currentUser?.uid;
@@ -195,11 +191,11 @@ function MatchCard({ match, onScore, onWatch, currentUser }) {
     : "—";
 
   return (
-    <div style={{ background:G.card, borderRadius:14,
+    <div style={{ background:G.white, borderRadius:14,
       border:`1.5px solid ${isLive ? "#fca5a5" : G.border}`, overflow:"hidden",
       boxShadow:isLive ? "0 2px 12px rgba(220,38,38,0.12)" : "0 1px 4px rgba(0,0,0,0.05)" }}>
       <div style={{ padding:"10px 14px",
-        background:isLive ? "linear-gradient(90deg,#fef2f2,#fff)" : G.card,
+        background:isLive ? "linear-gradient(90deg,#fef2f2,#fff)" : G.white,
         borderBottom:`1px solid ${G.border}`,
         display:"flex", justifyContent:"space-between", alignItems:"center" }}>
         <div style={{ display:"flex", alignItems:"center", gap:8 }}>
@@ -262,6 +258,7 @@ function CreateMatchScreen({
   teams, members, currentUser, onBack, onCreated,
   SidebarNav, view, setView, userRole, pendingCount, handleLogout, toast,
 }) {
+  const { G } = useAppContext();
   const [step,   setStep]   = useState(1);
   const [saving, setSaving] = useState(false);
   const [err,    setErr]    = useState("");
@@ -274,6 +271,7 @@ function CreateMatchScreen({
   const [team1Name, setTeam1Name] = useState("FCC");
   const [team2Name, setTeam2Name] = useState("");
   const [fccTeam,   setFccTeam]   = useState("");
+  const [fccTeam2,  setFccTeam2]  = useState("");
   const [toss,      setToss]      = useState("");
   const [elected,   setElected]   = useState("bat");
   const [squad1, setSquad1] = useState([]);
@@ -285,6 +283,11 @@ function CreateMatchScreen({
     setSquad1(members.filter(m => (m.teams||[]).includes(fccTeam)).map(m => m.name));
   }, [fccTeam, members]);
 
+  useEffect(() => {
+    if (!fccTeam2) return;
+    setSquad2(members.filter(m => (m.teams||[]).includes(fccTeam2)).map(m => m.name));
+  }, [fccTeam2, members]);
+
   async function handleCreate() {
     setSaving(true); setErr("");
     try {
@@ -293,7 +296,8 @@ function CreateMatchScreen({
         matchId, title: title || `${team1Name} vs ${team2Name}`,
         date, time, venue, overs, type,
         team1: team1Name, team2: team2Name,
-        fccTeam: fccTeam || null, squad1, squad2,
+        fccTeam: fccTeam || null, fccTeam2: fccTeam2 || null,
+        squad1, squad2,
         toss: toss || null, elected: elected || null,
         status: "setup",
         scorerIds: [currentUser?.uid].filter(Boolean),
@@ -314,7 +318,7 @@ function CreateMatchScreen({
   return (
     <Shell G={G} sidebar={
       <SidebarNav view={view} setView={setView} userRole={userRole}
-        currentUser={currentUser} onLogout={handleLogout} teams={teams} />
+        currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO} />
     }>
       <AppHeader title="New Match" sub="Step by step setup"
         currentUser={currentUser} handleLogout={handleLogout} onBack={onBack} />
@@ -337,21 +341,21 @@ function CreateMatchScreen({
       <div style={{ padding:"20px 14px", paddingBottom:100 }}>
         {step === 1 && (
           <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-            <FieldGroup label="Match title (optional)">
+            <FieldGroup G={G} label="Match title (optional)">
               <input value={title} onChange={e=>setTitle(e.target.value)}
                 placeholder={`FCC vs ${team2Name||"Opponent"}`} style={inputStyle}/>
             </FieldGroup>
-            <FieldGroup label="Date">
+            <FieldGroup G={G} label="Date">
               <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={inputStyle}/>
             </FieldGroup>
-            <FieldGroup label="Start time">
+            <FieldGroup G={G} label="Start time">
               <input type="time" value={time} onChange={e=>setTime(e.target.value)} style={inputStyle}/>
             </FieldGroup>
-            <FieldGroup label="Venue">
+            <FieldGroup G={G} label="Venue">
               <input value={venue} onChange={e=>setVenue(e.target.value)}
                 placeholder="Ground name" style={inputStyle}/>
             </FieldGroup>
-            <FieldGroup label="Overs per innings">
+            <FieldGroup G={G} label="Overs per innings">
               <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
                 {OVERS_OPTIONS.map(o => (
                   <button key={o} onClick={()=>setOvers(o)} style={{
@@ -363,7 +367,7 @@ function CreateMatchScreen({
                 ))}
               </div>
             </FieldGroup>
-            <FieldGroup label="Match type">
+            <FieldGroup G={G} label="Match type">
               <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
                 {MATCH_TYPES.map(mt => (
                   <button key={mt.id} onClick={()=>setType(mt.id)} style={{
@@ -381,13 +385,13 @@ function CreateMatchScreen({
                 ))}
               </div>
             </FieldGroup>
-            <NavButtons onNext={()=>setStep(2)} nextLabel="Next: Teams →" nextDisabled={!date}/>
+            <NavButtons G={G} onNext={()=>setStep(2)} nextLabel="Next: Teams →" nextDisabled={!date}/>
           </div>
         )}
 
         {step === 2 && (
           <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-            <FieldGroup label="Team 1 (your side)">
+            <FieldGroup G={G} label="Team 1 (your side)">
               <input value={team1Name} onChange={e=>setTeam1Name(e.target.value)}
                 placeholder="Team name" style={inputStyle}/>
               {type !== "private" && <>
@@ -398,18 +402,25 @@ function CreateMatchScreen({
                 </select>
               </>}
             </FieldGroup>
-            <FieldGroup label="Team 2 (opposition)">
+            <FieldGroup G={G} label="Team 2 (opposition)">
               <input value={team2Name} onChange={e=>setTeam2Name(e.target.value)}
                 placeholder={type==="internal"?"FCC team name":"Opponent club name"} style={inputStyle}/>
+              {type === "internal" && <>
+                <div style={{ fontSize:11, color:G.muted, marginTop:6, marginBottom:4 }}>Pull squad from FCC team:</div>
+                <select value={fccTeam2} onChange={e=>setFccTeam2(e.target.value)} style={inputStyle}>
+                  <option value="">— enter squad manually —</option>
+                  {allTeams.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </>}
             </FieldGroup>
-            <FieldGroup label="Toss (optional — can set later)">
+            <FieldGroup G={G} label="Toss (optional — can set later)">
               <div style={{ display:"flex", gap:8 }}>
                 {[team1Name||"Team 1", team2Name||"Team 2"].map(t => (
                   <button key={t} onClick={()=>setToss(t)} style={{
                     flex:1, padding:"10px 8px", borderRadius:10,
-                    border:`1.5px solid ${toss===t?G.navy:G.border}`,
-                    background:toss===t?G.navy+"12":G.white,
-                    color:toss===t?G.navy:G.text,
+                    border:`1.5px solid ${toss===t?NAVY:G.border}`,
+                    background:toss===t?NAVY+"12":G.white,
+                    color:toss===t?NAVY:G.text,
                     fontWeight:600, fontSize:13, cursor:"pointer" }}>{t} won toss</button>
                 ))}
               </div>
@@ -426,40 +437,40 @@ function CreateMatchScreen({
                 </div>
               )}
             </FieldGroup>
-            <NavButtons onBack={()=>setStep(1)} onNext={()=>setStep(3)}
+            <NavButtons G={G} onBack={()=>setStep(1)} onNext={()=>setStep(3)}
               nextLabel="Next: Squads →" nextDisabled={!team1Name||!team2Name}/>
           </div>
         )}
 
         {step === 3 && (
           <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
-            <SquadPicker label={`${team1Name} XI`} hint="Tap members or type names below"
+            <SquadPicker G={G} label={`${team1Name} squad`} hint="Tap members or type names below"
               allMembers={members} squad={squad1} setSquad={setSquad1} colorActive={G.green}/>
-            <SquadPicker label={`${team2Name} XI`}
+            <SquadPicker G={G} label={`${team2Name} squad`}
               hint={type==="internal"?"Select FCC members":"Enter player names"}
               allMembers={type==="internal"?members:[]}
-              squad={squad2} setSquad={setSquad2} colorActive={G.navy}
+              squad={squad2} setSquad={setSquad2} colorActive={NAVY}
               allowCustom={type!=="internal"}/>
-            <NavButtons onBack={()=>setStep(2)} onNext={()=>setStep(4)} nextLabel="Review →"/>
+            <NavButtons G={G} onBack={()=>setStep(2)} onNext={()=>setStep(4)} nextLabel="Review →"/>
           </div>
         )}
 
         {step === 4 && (
           <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-            <SummaryRow label="Match" value={title||`${team1Name} vs ${team2Name}`}/>
-            <SummaryRow label="Date" value={`${new Date(date).toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"})} at ${time}`}/>
-            {venue && <SummaryRow label="Venue" value={venue}/>}
-            <SummaryRow label="Overs" value={`${overs} per innings`}/>
-            <SummaryRow label="Type" value={MATCH_TYPES.find(t=>t.id===type)?.label}/>
-            {toss && <SummaryRow label="Toss" value={`${toss} won, elected to ${elected}`}/>}
-            <SummaryRow label={`${team1Name} squad`} value={squad1.length>0?`${squad1.length} players selected`:"Not set"}/>
-            <SummaryRow label={`${team2Name} squad`} value={squad2.length>0?`${squad2.length} players selected`:"Not set"}/>
+            <SummaryRow G={G} label="Match" value={title||`${team1Name} vs ${team2Name}`}/>
+            <SummaryRow G={G} label="Date" value={`${new Date(date).toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"})} at ${time}`}/>
+            {venue && <SummaryRow G={G} label="Venue" value={venue}/>}
+            <SummaryRow G={G} label="Overs" value={`${overs} per innings`}/>
+            <SummaryRow G={G} label="Type" value={MATCH_TYPES.find(t=>t.id===type)?.label}/>
+            {toss && <SummaryRow G={G} label="Toss" value={`${toss} won, elected to ${elected}`}/>}
+            <SummaryRow G={G} label={`${team1Name} squad`} value={squad1.length>0?`${squad1.length} selected`:"Not set"}/>
+            <SummaryRow G={G} label={`${team2Name} squad`} value={squad2.length>0?`${squad2.length} selected`:"Not set"}/>
             {MATCH_TYPES.find(t=>t.id===type)?.savesStats
               ? <div style={{ background:G.green+"10", border:`1px solid ${G.green}30`, borderRadius:10, padding:"10px 12px", fontSize:12, color:G.green, fontWeight:600 }}>✓ Batting and bowling stats will be saved to player profiles</div>
               : <div style={{ background:"#f1f5f9", border:`1px solid ${G.border}`, borderRadius:10, padding:"10px 12px", fontSize:12, color:G.muted }}>Stats will not be saved to profiles for this match type</div>
             }
             {err && <div style={{ background:G.redBg, border:`1px solid ${G.red}30`, borderRadius:10, padding:"10px 12px", fontSize:12, color:G.red }}>{err}</div>}
-            <NavButtons onBack={()=>setStep(3)} onNext={handleCreate}
+            <NavButtons G={G} onBack={()=>setStep(3)} onNext={handleCreate}
               nextLabel={saving?"Creating…":"🏏 Create & start scoring"}
               nextDisabled={saving} nextColor={G.green}/>
           </div>
@@ -470,21 +481,32 @@ function CreateMatchScreen({
   );
 }
 
-function SquadPicker({ label, hint, allMembers, squad, setSquad, colorActive, allowCustom=true }) {
+function SquadPicker({ G, label, hint, allMembers, squad, setSquad, colorActive, allowCustom=true }) {
   const [customInput, setCustomInput] = useState("");
-  function toggleMember(name) { setSquad(prev => prev.includes(name)?prev.filter(n=>n!==name):[...prev,name]); }
+  function toggleMember(name) {
+    setSquad(prev => {
+      if (prev.includes(name)) return prev.filter(n=>n!==name);
+      if (prev.length >= SQUAD_MAX) return prev;
+      return [...prev, name];
+    });
+  }
   function addCustom() {
     const name = customInput.trim();
-    if (name && !squad.includes(name)) setSquad(prev=>[...prev,name]);
+    if (name && !squad.includes(name) && squad.length < SQUAD_MAX) {
+      setSquad(prev=>[...prev,name]);
+    }
     setCustomInput("");
   }
+  const atMax = squad.length >= SQUAD_MAX;
   return (
     <div>
       <div style={{ fontSize:13, fontWeight:700, color:G.text, marginBottom:4 }}>
         {label}
-        <span style={{ marginLeft:8, fontSize:11, fontWeight:600, color:squad.length===11?colorActive:G.muted }}>{squad.length}/11</span>
+        <span style={{ marginLeft:8, fontSize:11, fontWeight:600, color:colorActive }}>
+          {squad.length} selected
+        </span>
       </div>
-      <div style={{ fontSize:11, color:G.muted, marginBottom:10 }}>{hint}</div>
+      <div style={{ fontSize:11, color:G.muted, marginBottom:10 }}>{hint} (max {SQUAD_MAX})</div>
       {squad.length > 0 && (
         <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:10 }}>
           {squad.map(name => (
@@ -500,9 +522,12 @@ function SquadPicker({ label, hint, allMembers, squad, setSquad, colorActive, al
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6, marginBottom:10 }}>
           {allMembers.map(m => {
             const sel = squad.includes(m.name);
+            const disabled = !sel && atMax;
             return (
-              <button key={m.id} onClick={()=>toggleMember(m.name)} style={{
-                padding:"8px 10px", borderRadius:9, cursor:"pointer",
+              <button key={m.id} onClick={()=>toggleMember(m.name)} disabled={disabled} style={{
+                padding:"8px 10px", borderRadius:9,
+                cursor:disabled?"not-allowed":"pointer",
+                opacity:disabled?0.4:1,
                 border:`1.5px solid ${sel?colorActive:G.border}`,
                 background:sel?colorActive+"12":G.white, color:sel?colorActive:G.text,
                 fontSize:12, fontWeight:sel?700:400, textAlign:"left",
@@ -517,17 +542,20 @@ function SquadPicker({ label, hint, allMembers, squad, setSquad, colorActive, al
         <div style={{ display:"flex", gap:8 }}>
           <input value={customInput} onChange={e=>setCustomInput(e.target.value)}
             onKeyDown={e=>e.key==="Enter"&&addCustom()}
-            placeholder="Add player by name…" style={{...inputStyle,flex:1,marginBottom:0}}/>
-          <button onClick={addCustom} style={{
+            disabled={atMax}
+            placeholder={atMax ? `Squad full (${SQUAD_MAX})` : "Add player by name…"}
+            style={{...inputStyle,flex:1,marginBottom:0, opacity:atMax?0.5:1}}/>
+          <button onClick={addCustom} disabled={atMax} style={{
             padding:"10px 14px", borderRadius:9, background:colorActive,
-            border:"none", color:G.white, fontWeight:700, fontSize:13, cursor:"pointer" }}>Add</button>
+            border:"none", color:G.white, fontWeight:700, fontSize:13,
+            cursor:atMax?"not-allowed":"pointer", opacity:atMax?0.5:1 }}>Add</button>
         </div>
       )}
     </div>
   );
 }
 
-function FieldGroup({ label, children }) {
+function FieldGroup({ G, label, children }) {
   return (
     <div>
       <div style={{ fontSize:11, fontWeight:800, color:G.muted,
@@ -537,7 +565,7 @@ function FieldGroup({ label, children }) {
   );
 }
 
-function SummaryRow({ label, value }) {
+function SummaryRow({ G, label, value }) {
   return (
     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start",
       padding:"10px 12px", borderRadius:10, background:G.bg, border:`1px solid ${G.border}`, gap:12 }}>
@@ -547,7 +575,8 @@ function SummaryRow({ label, value }) {
   );
 }
 
-function NavButtons({ onBack, onNext, nextLabel="Next →", nextDisabled=false, nextColor=G.green }) {
+function NavButtons({ G, onBack, onNext, nextLabel="Next →", nextDisabled=false, nextColor }) {
+  const color = nextColor || G.green;
   return (
     <div style={{ display:"flex", gap:10, marginTop:8 }}>
       {onBack && (
@@ -557,10 +586,10 @@ function NavButtons({ onBack, onNext, nextLabel="Next →", nextDisabled=false, 
       )}
       <button onClick={nextDisabled?undefined:onNext} style={{
         flex:1, padding:"12px 20px", borderRadius:10, border:"none",
-        background:nextDisabled?G.border:`linear-gradient(135deg,${nextColor},${nextColor}cc)`,
+        background:nextDisabled?G.border:`linear-gradient(135deg,${color},${color}cc)`,
         color:nextDisabled?G.muted:G.white, fontWeight:800, fontSize:14,
         cursor:nextDisabled?"default":"pointer",
-        boxShadow:nextDisabled?"none":`0 4px 12px ${nextColor}44` }}>{nextLabel}</button>
+        boxShadow:nextDisabled?"none":`0 4px 12px ${color}44` }}>{nextLabel}</button>
     </div>
   );
 }
