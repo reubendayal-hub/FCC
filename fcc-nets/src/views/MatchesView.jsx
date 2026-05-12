@@ -15,15 +15,26 @@ import AppHeader  from "../ui/AppHeader";
 import BotNav     from "../ui/BotNav";
 import Toast      from "../ui/Toast";
 import { FCC_LOGO } from "../constants/logo";
-import { THEMES } from "../constants/themes";
 
-// Theme G is read at module load (not via context) — the AppContext
-// path returned an undefined G at runtime in production. Trade-off:
-// MatchesView won't repaint on a theme switch until the page reloads.
-let _themeKey = "navy";
-try { _themeKey = localStorage.getItem("fcc-theme") || "navy"; } catch {}
-if (!THEMES[_themeKey]) _themeKey = "navy";
-const G = THEMES[_themeKey];
+// Colours are hardcoded inline — no THEMES, no context, no import.
+// Trade-off: MatchesView is locked to this palette regardless of the
+// app theme. Chosen for reliability after repeated runtime failures
+// reading G from useAppContext in production builds.
+const G = {
+  green:   "#1a6b38",
+  lime:    "#84cc16",
+  white:   "#ffffff",
+  bg:      "#f8fafc",
+  card:    "#ffffff",
+  border:  "#e2e8f0",
+  text:    "#1e293b",
+  muted:   "#64748b",
+  red:     "#dc2626",
+  redBg:   "#fef2f2",
+  navy:    "#1B2A5C",
+  gold:    "#C9A84C",
+  goldDim: "rgba(201,168,76,0.12)",
+};
 
 // Match-type and status accents are brand-semantic, not theme-derived,
 // so they stay as literals at module level (independent of theme G).
