@@ -78,6 +78,7 @@ import CaptainXIView from "./views/CaptainXIView";
 import AdminView from "./views/AdminView";
 import MatchesView from "./views/MatchesView";
 import ScorecardView from "./views/ScorecardView";
+import LiveScorerView from "./views/LiveScorerView";
 import { doc as fsDoc, onSnapshot as fsOnSnapshot } from "firebase/firestore";
 import { db as fsDb } from "./firebase";
 
@@ -112,6 +113,22 @@ function LiveScorecardLoader({ matchId, onBack }) {
   }, [matchId]);
   if (!loaded) return <div style={{padding:40,textAlign:"center",color:"#64748b"}}>Loading scorecard…</div>;
   return <ScorecardView match={match} onBack={onBack} />;
+}
+
+function LiveScorerLoader({ matchId, onBack, currentUser }) {
+  const [match, setMatch] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    const unsub = fsOnSnapshot(
+      fsDoc(fsDb, "fccscorer", "data", "matches", matchId),
+      (snap) => { setMatch(snap.exists() ? { id: snap.id, ...snap.data() } : null); setLoaded(true); },
+      (err) => { console.error("Live scorer load error:", err); setLoaded(true); }
+    );
+    return unsub;
+  }, [matchId]);
+  if (!loaded) return <div style={{padding:40,textAlign:"center",color:"#64748b"}}>Loading scorer…</div>;
+  if (!match) return <div style={{padding:40,textAlign:"center",color:"#64748b"}}>Match not found</div>;
+  return <LiveScorerView match={match} onBack={onBack} currentUser={currentUser} />;
 }
 
 
@@ -2663,6 +2680,14 @@ export default function App() {
   }
 
   if (view === "scorelive" || view.startsWith("scorer-")) {
+    if (view.startsWith("scorer-")) {
+      const matchId = view.replace("scorer-", "");
+      return (
+        <DebugBoundary>
+          <LiveScorerLoader matchId={matchId} currentUser={currentUser} onBack={() => setView("scorelive")} />
+        </DebugBoundary>
+      );
+    }
     console.log("rendering MatchesView", view);
     try {
       return (
