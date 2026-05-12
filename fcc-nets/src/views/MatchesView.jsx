@@ -39,6 +39,12 @@ const G = {
 // Match-type and status accents are brand-semantic, not theme-derived,
 // so they stay as literals at module level (independent of theme G).
 const NAVY = "#1B2A5C";
+
+// Shell uses G.green for its sidebar background. We want the sidebar to
+// stay dark navy (matching the rest of the app) while green buttons
+// inside ScorePro keep their forest-green tint, so we pass an overridden
+// palette to Shell only.
+const SHELL_G = { ...G, green: "#1e3a5f" };
 const MATCH_TYPES = [
   { id:"internal", label:"FCC Internal",  desc:"Both teams from FCC squads",          icon:"🏏", savesStats:true,  color:"#1a6b38" },
   { id:"friendly", label:"FCC Friendly",  desc:"FCC vs external club — stats saved",  icon:"🤝", savesStats:true,  color:NAVY      },
@@ -112,7 +118,7 @@ export default function MatchesView({
   const canCreate = ["superadmin","admin","captain","vicecaptain","coach","member"].includes(userRole);
 
   return (
-    <Shell G={G} sidebar={
+    <Shell G={SHELL_G} sidebar={
       <SidebarNav view={view} setView={setView} userRole={userRole}
         currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO} />
     }>
@@ -305,14 +311,19 @@ function CreateMatchScreen({
     setSquad2(members.filter(m => (m.teams||[]).includes(fccTeam2)).map(m => m.name));
   }, [fccTeam2, members]);
 
+  // Display names — prefer dropdown-picked FCC team, fall back to typed value.
+  // Used for labels, summaries, and the saved title/team fields.
+  const team1Display = fccTeam  || team1Name;
+  const team2Display = fccTeam2 || team2Name;
+
   async function handleCreate() {
     setSaving(true); setErr("");
     try {
       const matchId = generateMatchId();
       await setDoc(doc(db, "fccscorer", "data", "matches", matchId), {
-        matchId, title: title || `${team1Name} vs ${team2Name}`,
+        matchId, title: title || `${team1Display} vs ${team2Display}`,
         date, time, venue, overs, type,
-        team1: team1Name, team2: team2Name,
+        team1: team1Display, team2: team2Display,
         fccTeam: fccTeam || null, fccTeam2: fccTeam2 || null,
         squad1, squad2,
         toss: toss || null, elected: elected || null,
@@ -333,7 +344,7 @@ function CreateMatchScreen({
   const STEPS = ["Basics","Teams","Squads","Confirm"];
 
   return (
-    <Shell G={G} sidebar={
+    <Shell G={SHELL_G} sidebar={
       <SidebarNav view={view} setView={setView} userRole={userRole}
         currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO} />
     }>
@@ -360,7 +371,7 @@ function CreateMatchScreen({
           <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
             <FieldGroup G={G} label="Match title (optional)">
               <input value={title} onChange={e=>setTitle(e.target.value)}
-                placeholder={`FCC vs ${team2Name||"Opponent"}`} style={inputStyle}/>
+                placeholder={`${team1Display||"FCC"} vs ${team2Display||"Opponent"}`} style={inputStyle}/>
             </FieldGroup>
             <FieldGroup G={G} label="Date">
               <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={inputStyle}/>
@@ -465,9 +476,9 @@ function CreateMatchScreen({
 
         {step === 3 && (
           <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
-            <SquadPicker G={G} label={`${team1Name} squad`} hint="Tap members or type names below"
+            <SquadPicker G={G} label={`${team1Display||"Team 1"} squad`} hint="Tap members or type names below"
               allMembers={members} squad={squad1} setSquad={setSquad1} colorActive={G.green}/>
-            <SquadPicker G={G} label={`${team2Name} squad`}
+            <SquadPicker G={G} label={`${team2Display||"Team 2"} squad`}
               hint={type==="internal"?"Select FCC members":"Enter player names"}
               allMembers={type==="internal"?members:[]}
               squad={squad2} setSquad={setSquad2} colorActive={NAVY}
@@ -478,14 +489,14 @@ function CreateMatchScreen({
 
         {step === 4 && (
           <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-            <SummaryRow G={G} label="Match" value={title||`${team1Name} vs ${team2Name}`}/>
+            <SummaryRow G={G} label="Match" value={title||`${team1Display} vs ${team2Display}`}/>
             <SummaryRow G={G} label="Date" value={`${new Date(date).toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"})} at ${time}`}/>
             {venue && <SummaryRow G={G} label="Venue" value={venue}/>}
             <SummaryRow G={G} label="Overs" value={`${overs} per innings`}/>
             <SummaryRow G={G} label="Type" value={MATCH_TYPES.find(t=>t.id===type)?.label}/>
             {toss && <SummaryRow G={G} label="Toss" value={`${toss} won, elected to ${elected}`}/>}
-            <SummaryRow G={G} label={`${team1Name} squad`} value={squad1.length>0?`${squad1.length} selected`:"Not set"}/>
-            <SummaryRow G={G} label={`${team2Name} squad`} value={squad2.length>0?`${squad2.length} selected`:"Not set"}/>
+            <SummaryRow G={G} label={`${team1Display||"Team 1"} squad`} value={squad1.length>0?`${squad1.length} selected`:"Not set"}/>
+            <SummaryRow G={G} label={`${team2Display||"Team 2"} squad`} value={squad2.length>0?`${squad2.length} selected`:"Not set"}/>
             {MATCH_TYPES.find(t=>t.id===type)?.savesStats
               ? <div style={{ background:G.green+"10", border:`1px solid ${G.green}30`, borderRadius:10, padding:"10px 12px", fontSize:12, color:G.green, fontWeight:600 }}>✓ Batting and bowling stats will be saved to player profiles</div>
               : <div style={{ background:"#f1f5f9", border:`1px solid ${G.border}`, borderRadius:10, padding:"10px 12px", fontSize:12, color:G.muted }}>Stats will not be saved to profiles for this match type</div>
