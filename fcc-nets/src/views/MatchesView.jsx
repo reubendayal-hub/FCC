@@ -98,7 +98,7 @@ export default function MatchesView({
   const canCreate = ["superadmin","admin","captain","vicecaptain","coach","member"].includes(userRole);
 
   return (
-    <Shell sidebar={
+    <Shell G={G} sidebar={
       <SidebarNav view={view} setView={setView} userRole={userRole}
         currentUser={currentUser} onLogout={handleLogout} teams={teams} />
     }>
@@ -167,7 +167,7 @@ export default function MatchesView({
         )}
       </div>
 
-      <BotNav view="matches" setView={setView} userRole={userRole}
+      <BotNav G={G} view="matches" setView={setView} userRole={userRole}
         pendingCount={pendingCount} currentUser={currentUser} teams={teams} />
       {toast && <Toast msg={toast} />}
     </Shell>
@@ -312,7 +312,7 @@ function CreateMatchScreen({
   const STEPS = ["Basics","Teams","Squads","Confirm"];
 
   return (
-    <Shell sidebar={
+    <Shell G={G} sidebar={
       <SidebarNav view={view} setView={setView} userRole={userRole}
         currentUser={currentUser} onLogout={handleLogout} teams={teams} />
     }>
