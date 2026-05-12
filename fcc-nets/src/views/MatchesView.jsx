@@ -314,8 +314,8 @@ function CreateMatchScreen({
       });
       onCreated(matchId);
     } catch (e) {
-      setErr("Failed to create match. Please try again.");
-      console.error(e);
+      setErr(`Failed to create match: ${e.code} — ${e.message}`);
+      console.error("Match creation error:", e);
     } finally { setSaving(false); }
   }
 
