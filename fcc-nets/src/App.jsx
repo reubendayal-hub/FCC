@@ -2641,10 +2641,10 @@ export default function App() {
 
   if (view.startsWith("live-")) {
     const matchId = view.replace("live-", "");
-    return <LiveScorecardLoader matchId={matchId} onBack={() => setView("matches")} />;
+    return <LiveScorecardLoader matchId={matchId} onBack={() => setView("scorelive")} />;
   }
 
-  if (view === "matches" || view.startsWith("scorer-")) {
+  if (view === "scorelive" || view.startsWith("scorer-")) {
     return (
       <MatchesView
         view={view}

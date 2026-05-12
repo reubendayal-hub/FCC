@@ -98,7 +98,7 @@ export default function MatchesView({
       <SidebarNav view={view} setView={setView} userRole={userRole}
         currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO} />
     }>
-      <AppHeader title="Matches" sub="Score · Watch · Stats"
+      <AppHeader title="Score & Live" sub="Score · Watch · Stats"
         currentUser={currentUser} handleLogout={handleLogout} />
 
       <div style={{ padding:"16px 14px", paddingBottom:100 }}>
@@ -163,7 +163,7 @@ export default function MatchesView({
         )}
       </div>
 
-      <BotNav G={G} view="matches" setView={setView} userRole={userRole}
+      <BotNav G={G} view="scorelive" setView={setView} userRole={userRole}
         pendingCount={pendingCount} currentUser={currentUser} teams={teams} />
       {toast && <Toast msg={toast} />}
     </Shell>

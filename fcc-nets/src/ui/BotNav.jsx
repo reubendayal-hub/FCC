@@ -8,7 +8,7 @@ export default function BotNav({view,setView,userRole,pendingCount=0,currentUser
   // Captain/VC of any senior team
   const isCaptain = teams.some(t => t.senior && (t.captain === currentUser?.name || t.vicecaptain === currentUser?.name));
   const active = view==="session"?"schedule":view==="roleAdmin"?"admin":view==="coachhq"?"coachhq":view==="captainxi"?"captainxi":
-    (view === "matches" || view.startsWith("scorer-") || view.startsWith("live-")) ? "matches" : view;
+    (view === "scorelive" || view.startsWith("scorer-") || view.startsWith("live-")) ? "scorelive" : view;
 
   const IconSchedule = ({on}) => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill={on?"currentColor":"none"} stroke="currentColor"
@@ -193,7 +193,7 @@ export default function BotNav({view,setView,userRole,pendingCount=0,currentUser
         </div>
       </button>
 
-      <Tab id="matches" icon={<IconMatches on={active === "matches"} />} label="Matches" />
+      <Tab id="scorelive" icon={<IconMatches on={active === "scorelive"} />} label="Score" />
 
       {isCoach && !isAdmin && (
         <Tab id="coachhq" icon={<IconCoach on={active==="coachhq"}/>} label="Coach HQ"/>
