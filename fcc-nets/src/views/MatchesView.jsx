@@ -98,7 +98,7 @@ export default function MatchesView({
       <SidebarNav view={view} setView={setView} userRole={userRole}
         currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO} />
     }>
-      <AppHeader title="Score & Live" sub="Score · Watch · Stats"
+      <AppHeader title="ScorePro" sub="Score · Watch · Stats"
         currentUser={currentUser} handleLogout={handleLogout} />
 
       <div style={{ padding:"16px 14px", paddingBottom:100 }}>
@@ -415,7 +415,7 @@ function CreateMatchScreen({
             </FieldGroup>
             <FieldGroup G={G} label="Toss (optional — can set later)">
               <div style={{ display:"flex", gap:8 }}>
-                {[team1Name||"Team 1", team2Name||"Team 2"].map(t => (
+                {[fccTeam||team1Name||"Team 1", fccTeam2||team2Name||"Team 2"].map(t => (
                   <button key={t} onClick={()=>setToss(t)} style={{
                     flex:1, padding:"10px 8px", borderRadius:10,
                     border:`1.5px solid ${toss===t?NAVY:G.border}`,
@@ -438,7 +438,11 @@ function CreateMatchScreen({
               )}
             </FieldGroup>
             <NavButtons G={G} onBack={()=>setStep(1)} onNext={()=>setStep(3)}
-              nextLabel="Next: Squads →" nextDisabled={!team1Name||!team2Name}/>
+              nextLabel="Next: Squads →" nextDisabled={
+                type === "internal"
+                  ? (!team1Name || (!team2Name && !fccTeam2))
+                  : (!team1Name || !team2Name)
+              }/>
           </div>
         )}
 

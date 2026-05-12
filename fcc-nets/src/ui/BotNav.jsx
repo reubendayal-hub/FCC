@@ -193,7 +193,7 @@ export default function BotNav({view,setView,userRole,pendingCount=0,currentUser
         </div>
       </button>
 
-      <Tab id="scorelive" icon={<IconMatches on={active === "scorelive"} />} label="Score" />
+      <Tab id="scorelive" icon={<IconMatches on={active === "scorelive"} />} label="ScorePro" />
 
       {isCoach && !isAdmin && (
         <Tab id="coachhq" icon={<IconCoach on={active==="coachhq"}/>} label="Coach HQ"/>
