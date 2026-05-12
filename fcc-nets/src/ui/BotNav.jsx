@@ -7,7 +7,8 @@ export default function BotNav({view,setView,userRole,pendingCount=0,currentUser
   const isCoach = isAdmin || isCoachMember(currentUser?.name, teams);
   // Captain/VC of any senior team
   const isCaptain = teams.some(t => t.senior && (t.captain === currentUser?.name || t.vicecaptain === currentUser?.name));
-  const active = view==="session"?"schedule":view==="roleAdmin"?"admin":view==="coachhq"?"coachhq":view==="captainxi"?"captainxi":view;
+  const active = view==="session"?"schedule":view==="roleAdmin"?"admin":view==="coachhq"?"coachhq":view==="captainxi"?"captainxi":
+    (view === "matches" || view.startsWith("scorer-") || view.startsWith("live-")) ? "matches" : view;
 
   const IconSchedule = ({on}) => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill={on?"currentColor":"none"} stroke="currentColor"
@@ -124,9 +125,19 @@ export default function BotNav({view,setView,userRole,pendingCount=0,currentUser
     </svg>
   );
 
-  // Calculate number of tabs: Schedule + Book + Profile = 3 base, + Coach HQ (only if not admin), + Captain XI, + Admin
+  const IconMatches = ({ on }) => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={on ? 2.5 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12 Q12 9 21 12" />
+      <path d="M3 12 Q12 15 21 12" />
+      <path d="M18 4 Q22 12 18 20" strokeDasharray="2 2" />
+    </svg>
+  );
+
+  // Calculate number of tabs: Schedule + Book + Matches + Profile = 4 base, + Coach HQ (only if not admin), + Captain XI, + Admin
   // Admins reach Coach HQ via the desktop sidebar / Admin panel — hiding it on mobile keeps the bar at <=5 tabs so Profile stays visible.
-  const tabCount = 3 + (isCoach && !isAdmin ? 1 : 0) + ((isCaptain || isAdmin) ? 1 : 0) + (isAdmin ? 1 : 0);
+  const tabCount = 4 + (isCoach && !isAdmin ? 1 : 0) + ((isCaptain || isAdmin) ? 1 : 0) + (isAdmin ? 1 : 0);
 
   return (
     <div className="fcc-mobile-only" style={{
@@ -181,6 +192,8 @@ export default function BotNav({view,setView,userRole,pendingCount=0,currentUser
           }}>Book</span>
         </div>
       </button>
+
+      <Tab id="matches" icon={<IconMatches on={active === "matches"} />} label="Matches" />
 
       {isCoach && !isAdmin && (
         <Tab id="coachhq" icon={<IconCoach on={active==="coachhq"}/>} label="Coach HQ"/>

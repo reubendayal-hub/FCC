@@ -76,6 +76,7 @@ import SessionDetailView from "./views/SessionDetailView";
 import ProfileView from "./views/ProfileView";
 import CaptainXIView from "./views/CaptainXIView";
 import AdminView from "./views/AdminView";
+import MatchesView from "./views/MatchesView";
 
 
 // Storage keys moved to src/hooks/useFirestore.js (Pass 4) — were
@@ -2619,6 +2620,24 @@ export default function App() {
   // RENDER: Captain's Playing XI
   // ════════════════════════════════════════════════════════════
   if(view==="captainxi") return <CaptainXIView />;
+
+  if (view === "matches" || view.startsWith("scorer-") || view.startsWith("live-")) {
+    return (
+      <MatchesView
+        view={view}
+        setView={setView}
+        userRole={userRole}
+        currentUser={currentUser}
+        members={members}
+        teams={teams}
+        pendingCount={joinRequests.filter(r => r.status === "pending").length}
+        toast={toast}
+        showToast={showToast}
+        SidebarNav={SidebarNav}
+        handleLogout={handleLogout}
+      />
+    );
+  }
 
   // ════════════════════════════════════════════════════════════
   // RENDER: Team Availability

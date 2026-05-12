@@ -28,6 +28,7 @@ export default function SidebarNav({view, setView, userRole, currentUser, onLogo
       <div className="fcc-sidebar-links">
         {navBtn("schedule","📅","Schedule")}
         {navBtn("add","＋","Book / Join")}
+        {navBtn("matches", "🏏", "Matches")}
         {(isAdmin || isCoachMember(currentUser?.name,teams)) && navBtn("coachhq","🧢","Coach HQ")}
         {(isCaptain || isAdmin) && navBtn("captainxi","⚓","Captain's XI")}
         {isAdmin && navBtn("admin","👥","Admin Panel")}
