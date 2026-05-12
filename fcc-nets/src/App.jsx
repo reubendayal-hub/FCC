@@ -100,19 +100,20 @@ class DebugBoundary extends React.Component {
   }
 }
 
-function LiveScorecardLoader({ matchId, onBack }) {
+function LiveScorecardLoader({ matchId, onBack, currentUser }) {
   const [match, setMatch] = useState(null);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
     const unsub = fsOnSnapshot(
       fsDoc(fsDb, "fccscorer", "data", "matches", matchId),
-      (snap) => { setMatch(snap.exists() ? { id: snap.id, ...snap.data() } : null); setLoaded(true); },
+      (snap) => { setMatch(snap.exists() ? { id: snap.id, matchId: snap.id, ...snap.data() } : null); setLoaded(true); },
       (err) => { console.error("Live scorecard load error:", err); setLoaded(true); }
     );
     return unsub;
   }, [matchId]);
   if (!loaded) return <div style={{padding:40,textAlign:"center",color:"#64748b"}}>Loading scorecard…</div>;
-  return <ScorecardView match={match} onBack={onBack} />;
+  if (!match) return <div style={{padding:40,textAlign:"center",color:"#64748b"}}>Match not found</div>;
+  return <LiveScorerView match={match} onBack={onBack} currentUser={currentUser} readOnly={true} />;
 }
 
 function LiveScorerLoader({ matchId, onBack, currentUser }) {
@@ -2676,7 +2677,7 @@ export default function App() {
 
   if (view.startsWith("live-")) {
     const matchId = view.replace("live-", "");
-    return <LiveScorecardLoader matchId={matchId} onBack={() => setView("scorelive")} />;
+    return <LiveScorecardLoader matchId={matchId} currentUser={currentUser} onBack={() => setView("scorelive")} />;
   }
 
   if (view === "scorelive" || view.startsWith("scorer-")) {

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { db } from "../firebase";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
+import ScorecardView from "./ScorecardView";
 
 // ── Palette ───────────────────────────────────────────────────
 const SC = {
@@ -354,7 +355,7 @@ function PitchPickerSvg({ selected, onPick, onWideOff, onWideLeg }) {
 }
 
 // ── Main view ─────────────────────────────────────────────────
-export default function LiveScorerView({ match, onBack, currentUser }) {
+export default function LiveScorerView({ match, onBack, currentUser, readOnly = false }) {
   const safe = match || {};
   const squad1 = Array.isArray(safe.squad1) && safe.squad1.length ? safe.squad1 : ["Batter 1", "Batter 2", "Batter 3", "Batter 4", "Batter 5", "Batter 6", "Batter 7", "Batter 8", "Batter 9", "Batter 10", "Batter 11"];
   const squad2 = Array.isArray(safe.squad2) && safe.squad2.length ? safe.squad2 : ["Bowler 1", "Bowler 2", "Bowler 3", "Bowler 4", "Bowler 5", "Bowler 6", "Bowler 7", "Bowler 8", "Bowler 9", "Bowler 10", "Bowler 11"];
@@ -449,6 +450,13 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
   const [tapPoint, setTapPoint] = useState(null); // { x, y } in SVG coords
   const [activeShot, setActiveShot] = useState(null);
 
+  // Viewer / replay / scorecard-peek state (Stage 3)
+  const [catchUpOpen, setCatchUpOpen] = useState(false);
+  const [missedBallsCount, setMissedBallsCount] = useState(0);
+  const [replay, setReplay] = useState(null); // { balls: [...], index: 0 } or null
+  const [scorecardOpen, setScorecardOpen] = useState(false);
+  const lastBallSnapshotRef = useRef(null);
+
   // Theme
   const T = nightMode
     ? { bg: SC.bgDark, surface: SC.surfaceDk, text: "#FFFFFF", textDim: "rgba(255,255,255,0.6)" }
@@ -475,6 +483,7 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
   // ── Firestore persistence (debounced 1200ms) ────────────────
   const saveTimer = useRef(null);
   useEffect(() => {
+    if (readOnly) return; // viewers consume, never write
     if (!safe.matchId) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
@@ -508,7 +517,93 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
       }
     }, 1200);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
-  }, [score, wickets, balls, batters, bowler, extras, innings, target, inningsEnd, safe.matchId]);
+  }, [score, wickets, balls, batters, bowler, extras, innings, target, inningsEnd, safe.matchId, readOnly]);
+
+  // ── Viewer-mode live subscription (Stage 3) ─────────────────
+  useEffect(() => {
+    if (!readOnly || !safe.matchId) return;
+    const ref = doc(db, "fccscorer", "data", "matches", safe.matchId);
+    const unsub = onSnapshot(ref, (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      // Pick the live innings (2nd if exists else 1st)
+      const isI2 = !!data.innings2;
+      const innData = isI2 ? data.innings2 : data.innings1;
+      if (!innData) return;
+      const newBalls = innData.ballsBowled ?? 0;
+      const prevBalls = lastBallSnapshotRef.current;
+      // Apply state
+      setInnings(isI2 ? 2 : 1);
+      setScore(innData.score ?? 0);
+      setWickets(innData.wickets ?? 0);
+      setBalls(newBalls);
+      if (Array.isArray(innData.batsmen)) {
+        const arr = innData.batsmen.slice(0, 2).map(b => ({
+          name: b.name || "—",
+          runs: b.runs ?? 0,
+          balls: b.balls ?? 0,
+          fours: b.fours ?? 0,
+          sixes: b.sixes ?? 0,
+          dismissal: b.dismissal || null,
+          notOut: b.dismissal ? false : true,
+        }));
+        while (arr.length < 2) arr.push({ name: "—", runs: 0, balls: 0, fours: 0, sixes: 0 });
+        setBatters(arr);
+      }
+      if (innData.bowling?.[0]?.name) setBowler(innData.bowling[0].name);
+      if (innData.extras) setExtras({
+        b: innData.extras.b || 0,
+        lb: innData.extras.lb || 0,
+        w: innData.extras.w || 0,
+        nb: innData.extras.nb || 0,
+      });
+      if (data.status === "completed") setInningsEnd(true);
+      if (isI2 && typeof data.innings1?.score === "number") {
+        setTarget(data.innings1.score + 1);
+      }
+
+      // Detect new ball for celebration replay
+      if (prevBalls != null && newBalls > prevBalls) {
+        const lastLabel = (() => {
+          // We don't have the over-by-ball log so guess from innings counters
+          // No reliable way without an event log — skip silently.
+          return null;
+        })();
+        if (lastLabel === "4" || lastLabel === "6" || lastLabel === "W") {
+          const batName = innData.batsmen?.[0]?.name || "";
+          setCelebration({
+            type: lastLabel === "6" ? "six" : lastLabel === "4" ? "four" : "wicket",
+            text: lastLabel === "6" ? "SIX!! 🚀" : lastLabel === "4" ? "FOUR! 🏏" : "WICKET!",
+            sub: lastLabel === "W" ? `${batName} — out` : batName,
+          });
+        }
+      }
+      lastBallSnapshotRef.current = newBalls;
+    }, (err) => {
+      console.error("Viewer onSnapshot error:", err);
+    });
+    return unsub;
+  }, [readOnly, safe.matchId]);
+
+  // ── Catch-up trigger (viewer only) ───────────────────────────
+  useEffect(() => {
+    if (!readOnly || !safe.matchId) return;
+    // Run once after first sync — wait until balls is non-zero or after a short delay.
+    let lastSeen = 0;
+    try {
+      const raw = localStorage.getItem("fcc-watched-" + safe.matchId);
+      lastSeen = raw ? parseInt(raw, 10) || 0 : 0;
+    } catch {}
+    const t = setTimeout(() => {
+      const drift = balls - lastSeen;
+      if (drift > 5) {
+        setMissedBallsCount(drift);
+        setCatchUpOpen(true);
+      }
+    }, 900);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readOnly, safe.matchId]);
 
   // ── Helpers ─────────────────────────────────────────────────
   function snapshot() {
@@ -548,6 +643,7 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
 
   // ── Ball recording ──────────────────────────────────────────
   function recordRuns(runs) {
+    if (readOnly) return;
     pushHistory();
     const newScore = score + runs;
     const newBalls = balls + 1;
@@ -595,6 +691,7 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
   // When kind === "lb" or "b", we still add 1 extra on top of the wide and tag the
   // ball with a combined label. No legal ball is consumed; strikers do not rotate.
   function recordWide(bonus = 0, kind = null, labelOverride = null) {
+    if (readOnly) return;
     pushHistory();
     const extraOnTop = (kind === "lb" || kind === "b") ? 1 : bonus;
     const totalAdd = 1 + extraOnTop;
@@ -614,6 +711,7 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
   // recordNoBall — bat-runs credit the striker's individual runs (no balls faced).
   // kind: null | "lb" | "b" — leg-bye / bye on top of the no-ball.
   function recordNoBall(batRuns = 0, kind = null, labelOverride = null) {
+    if (readOnly) return;
     pushHistory();
     const extraOnTop = (kind === "lb" || kind === "b") ? 1 : 0;
     const totalAdd = 1 + batRuns + extraOnTop;
@@ -646,13 +744,15 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
   }
 
   function recordBye(runs) {
+    if (readOnly) return;
     pushHistory();
     const newBalls = balls + 1;
     setScore(s => s + runs);
     setExtras(e => ({ ...e, b: e.b + runs }));
-    setOverSlot(balls, "B");
+    // Encode run count in label so over-total + parser can credit byes.
+    setOverSlot(balls, `B${runs}`);
     setBalls(newBalls);
-    // Striker still faced a ball
+    // Striker still faced a ball (byes are credited as extras, not bat runs).
     const nb = [...batters];
     nb[striker] = { ...nb[striker], balls: nb[striker].balls + 1 };
     setBatters(nb);
@@ -663,6 +763,7 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
   }
 
   function recordWicket() {
+    if (readOnly) return;
     if (!wicketType) return;
     pushHistory();
     const newBalls = balls + 1;
@@ -696,6 +797,7 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
 
   // ── Full-mode dispatch ──────────────────────────────────────
   function handleRunTap(runs) {
+    if (readOnly) return;
     if (scoreMode === "fast") {
       recordRuns(runs);
       return;
@@ -705,6 +807,7 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
     setModal("pitch");
   }
   function handleWicketTap() {
+    if (readOnly) return;
     if (scoreMode === "fast") {
       setWicketStriker(striker);
       setModal("wicket");
@@ -716,10 +819,12 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
 
   // WIDE / NO-BALL → open the bonus-runs sheet (both fast + full modes).
   function handleWideTap() {
+    if (readOnly) return;
     setPendingExtras({ type: "wide", bonusRuns: 0, kind: null });
     setModal("extrasBonus");
   }
   function handleNoBallTap() {
+    if (readOnly) return;
     setPendingExtras({ type: "noball", bonusRuns: 0, batRuns: 0 });
     setModal("extrasBonus");
   }
@@ -727,6 +832,7 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
   // Apply the user's bonus-sheet choice and record.
   // opt: { bonus?: number, kind?: "lb"|"b" }
   function applyExtrasBonus(opt) {
+    if (readOnly) return;
     const pe = pendingExtras;
     if (!pe) return;
     if (pe.type === "wide") {
@@ -751,6 +857,7 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
   }
 
   function recordPendingBall(opts = {}) {
+    if (readOnly) return;
     const pb = { ...(pendingBall || {}), ...opts };
     if (!pb) return;
 
@@ -800,13 +907,44 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
   }
 
   function undo() {
+    if (readOnly) return;
     if (!history.length) return;
     const last = history[history.length - 1];
     setHistory(h => h.slice(0, -1));
     restore(last);
   }
 
+  // ── Replay last over (shared between viewer floating btn + More menu) ──
+  function triggerReplayLastOver() {
+    // overBalls holds the most recent (current) over.
+    const present = overBalls.filter(Boolean);
+    if (!present.length) return;
+    // Map each label to a richer payload for the overlay.
+    const enriched = present.map((label, idx) => {
+      // Best-effort striker attribution: use current striker name.
+      const name = batters[striker]?.name || "—";
+      const personaLabel = COMMENTARY[persona]?.label || "";
+      let evt = "dot";
+      if (label === "6") evt = "six";
+      else if (label === "4") evt = "four";
+      else if (label === "W") evt = "wicket";
+      else if (/^Wd/.test(label)) evt = "wide";
+      else if (/^Nb/.test(label)) evt = "noball";
+      else if (label === "•") evt = "dot";
+      else if (/^\d+$/.test(label)) evt = "one";
+      const line = `${personaLabel} ${getComm(persona, evt, { name })}`;
+      return { label, name, line, idx };
+    });
+    setReplay({ balls: enriched, index: 0 });
+  }
+
+  function triggerReplayCatchUp() {
+    // No event log yet — best we can do is the current overBalls.
+    triggerReplayLastOver();
+  }
+
   function start2nd() {
+    if (readOnly) return;
     setSavedInnings1({
       team: team1Name,
       score, wickets,
@@ -850,7 +988,11 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
       if (mn) return s + parseInt(mn[1], 10);
       // Wd+LB / Wd+B / Nb+LB / Nb+B → 2 runs (1 extra penalty + 1 leg-bye/bye)
       if (b === "Wd+LB" || b === "Wd+B" || b === "Nb+LB" || b === "Nb+B") return s + 2;
-      if (b === "B") return s + 0; // approximate
+      // Bye-only delivery: "B1".."B4" — runs credited toward over total + team extras
+      // ("B" alone = legacy label, treat as 1).
+      const mb = /^B(\d+)$/.exec(b);
+      if (mb) return s + parseInt(mb[1], 10);
+      if (b === "B") return s + 1;
       const n = parseInt(b);
       return Number.isFinite(n) ? s + n : s;
     }, 0);
@@ -890,23 +1032,42 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
               <div onClick={onBack} style={{ fontSize: 22, lineHeight: 1, cursor: "pointer", color: SC.goldLt, paddingRight: 6 }}>‹</div>
               <div style={{ width: 8, height: 8, borderRadius: "50%", background: SC.red, animation: "pulse 1.4s ease-in-out infinite" }} />
               <div style={{ fontSize: 11, fontWeight: 700, color: SC.gold, textTransform: "uppercase", letterSpacing: 1.2 }}>
-                LIVE · {innings === 1 ? "1ST" : "2ND"} INNINGS
+                {readOnly
+                  ? `📺 WATCHING LIVE · ${innings === 1 ? "1ST" : "2ND"} INNINGS`
+                  : `LIVE · ${innings === 1 ? "1ST" : "2ND"} INNINGS`}
               </div>
               {freeHit && <div style={{ fontSize: 9, fontWeight: 800, color: SC.navy, background: SC.goldLt, padding: "2px 7px", borderRadius: 10, letterSpacing: 0.6 }}>FREE HIT</div>}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {/* Fast / Full mode toggle */}
-              <div style={{ display: "flex", background: "rgba(255,255,255,0.08)", borderRadius: 14, padding: 2, border: "1px solid rgba(255,255,255,0.12)" }}>
-                {["fast", "full"].map(m => (
-                  <div key={m} onClick={() => setScoreMode(m)} style={{
-                    padding: "4px 10px", borderRadius: 12, fontSize: 10, fontWeight: 700, letterSpacing: 0.6,
-                    textTransform: "uppercase", cursor: "pointer",
-                    background: scoreMode === m ? "linear-gradient(135deg,#C9A84C,#F0D060)" : "transparent",
-                    color: scoreMode === m ? SC.navy : "rgba(255,255,255,0.55)",
-                  }}>{m}</div>
-                ))}
-              </div>
-              {/* Persona quick-pick */}
+              {/* Fast / Full mode toggle — scorer only */}
+              {!readOnly && (
+                <div style={{ display: "flex", background: "rgba(255,255,255,0.08)", borderRadius: 14, padding: 2, border: "1px solid rgba(255,255,255,0.12)" }}>
+                  {["fast", "full"].map(m => (
+                    <div key={m} onClick={() => setScoreMode(m)} style={{
+                      padding: "4px 10px", borderRadius: 12, fontSize: 10, fontWeight: 700, letterSpacing: 0.6,
+                      textTransform: "uppercase", cursor: "pointer",
+                      background: scoreMode === m ? "linear-gradient(135deg,#C9A84C,#F0D060)" : "transparent",
+                      color: scoreMode === m ? SC.navy : "rgba(255,255,255,0.55)",
+                    }}>{m}</div>
+                  ))}
+                </div>
+              )}
+              {/* Scorer-only Scorecard peek */}
+              {!readOnly && (
+                <div onClick={() => setScorecardOpen(true)}
+                  style={{
+                    display: "flex", flexDirection: "column", alignItems: "center",
+                    padding: "4px 8px", borderRadius: 10,
+                    background: "rgba(255,255,255,0.08)",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    cursor: "pointer", flexShrink: 0,
+                  }}
+                  title="Scorecard">
+                  <div style={{ fontSize: 14, lineHeight: 1 }}>📊</div>
+                  <div style={{ fontSize: 9, color: "rgba(255,255,255,0.55)", textTransform: "uppercase", letterSpacing: 0.4, marginTop: 1 }}>Scorecard</div>
+                </div>
+              )}
+              {/* Persona quick-pick (kept for viewers too) */}
               <div onClick={() => setModal("commentary")}
                 style={{ width: 26, height: 26, borderRadius: 13, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, cursor: "pointer", flexShrink: 0 }}
                 title="Commentary voice">🎤</div>
@@ -995,53 +1156,57 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
           <div style={{ fontSize: 12, color: T.textDim, fontStyle: "italic", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{commentary}</div>
         </div>
 
-        {/* ── Run buttons panel ── */}
-        <div style={{ padding: 12, background: T.bg, flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+        {/* ── Run buttons panel (hidden for viewers) ── */}
+        {!readOnly && (
+          <div style={{ padding: 12, background: T.bg, flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
 
-          {/* Row 1: 0,1,2,3,··· */}
-          <div style={{ display: "flex", gap: 8 }}>
-            {[0, 1, 2, 3].map(n => (
-              <RunSmall key={n} onClick={() => handleRunTap(n)} label={n === 0 ? "0" : String(n)} nightMode={nightMode} />
-            ))}
-            <RunSmall onClick={() => setModal("overRuns")} label={"···"} nightMode={nightMode} small />
-          </div>
+            {/* Row 1: 0,1,2,3,··· */}
+            <div style={{ display: "flex", gap: 8 }}>
+              {[0, 1, 2, 3].map(n => (
+                <RunSmall key={n} onClick={() => handleRunTap(n)} label={n === 0 ? "0" : String(n)} nightMode={nightMode} />
+              ))}
+              <RunSmall onClick={() => setModal("overRuns")} label={"···"} nightMode={nightMode} small />
+            </div>
 
-          {/* Row 2: 4, 6, W */}
-          <div style={{ display: "flex", gap: 8 }}>
-            <div onClick={() => handleRunTap(4)}
-              style={{ flex: 1, height: 64, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center",
-                background: `linear-gradient(135deg, ${SC.navy} 0%, ${SC.navyDk} 100%)`,
-                color: "#fff", fontWeight: 900, fontSize: 24, cursor: "pointer",
-                boxShadow: "0 4px 14px rgba(27,42,92,0.35)" }}>4</div>
-            <div onClick={() => handleRunTap(6)}
-              style={{ flex: 1, height: 64, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center",
-                background: `linear-gradient(135deg, ${SC.gold} 0%, ${SC.goldLt} 100%)`,
-                color: SC.navy, fontWeight: 900, fontSize: 24, cursor: "pointer",
-                boxShadow: "0 4px 14px rgba(201,168,76,0.45)" }}>6</div>
-            <div onClick={handleWicketTap}
-              style={{ flex: 1, height: 64, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center",
-                background: `linear-gradient(135deg, ${SC.red} 0%, ${SC.redDk} 100%)`,
-                color: "#fff", fontWeight: 900, fontSize: 24, cursor: "pointer",
-                boxShadow: "0 4px 14px rgba(192,57,43,0.4)" }}>
-              <StumpsSvg width={24} height={20} fill="#fff" />
+            {/* Row 2: 4, 6, W */}
+            <div style={{ display: "flex", gap: 8 }}>
+              <div onClick={() => handleRunTap(4)}
+                style={{ flex: 1, height: 64, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center",
+                  background: `linear-gradient(135deg, ${SC.navy} 0%, ${SC.navyDk} 100%)`,
+                  color: "#fff", fontWeight: 900, fontSize: 24, cursor: "pointer",
+                  boxShadow: "0 4px 14px rgba(27,42,92,0.35)" }}>4</div>
+              <div onClick={() => handleRunTap(6)}
+                style={{ flex: 1, height: 64, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center",
+                  background: `linear-gradient(135deg, ${SC.gold} 0%, ${SC.goldLt} 100%)`,
+                  color: SC.navy, fontWeight: 900, fontSize: 24, cursor: "pointer",
+                  boxShadow: "0 4px 14px rgba(201,168,76,0.45)" }}>6</div>
+              <div onClick={handleWicketTap}
+                style={{ flex: 1, height: 64, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center",
+                  background: `linear-gradient(135deg, ${SC.red} 0%, ${SC.redDk} 100%)`,
+                  color: "#fff", fontWeight: 900, fontSize: 24, cursor: "pointer",
+                  boxShadow: "0 4px 14px rgba(192,57,43,0.4)" }}>
+                <StumpsSvg width={24} height={20} fill="#fff" />
+              </div>
+            </div>
+
+            {/* Row 3: WIDE, NO BALL, BYE, UNDO */}
+            <div style={{ display: "flex", gap: 6 }}>
+              <PillBtn onClick={handleWideTap} label="WIDE" nightMode={nightMode} />
+              <PillBtn onClick={handleNoBallTap} label="NO BALL" nightMode={nightMode} />
+              <PillBtn onClick={() => setModal("bye")} label="BYE" nightMode={nightMode} />
+              <PillBtn onClick={undo} label="↩" nightMode={nightMode} noCaps />
+            </div>
+
+            {/* Row 4: break / more (SWAP moved into More menu) */}
+            <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+              <PillBtn onClick={() => setModal("break")} label="BREAK" nightMode={nightMode} />
+              <PillBtn onClick={() => setModal("more")} label="···" nightMode={nightMode} noCaps />
             </div>
           </div>
+        )}
 
-          {/* Row 3: WIDE, NO BALL, BYE, UNDO */}
-          <div style={{ display: "flex", gap: 6 }}>
-            <PillBtn onClick={handleWideTap} label="WIDE" nightMode={nightMode} />
-            <PillBtn onClick={handleNoBallTap} label="NO BALL" nightMode={nightMode} />
-            <PillBtn onClick={() => setModal("bye")} label="BYE" nightMode={nightMode} />
-            <PillBtn onClick={undo} label="↩" nightMode={nightMode} noCaps />
-          </div>
-
-          {/* Row 4: swap / break / more */}
-          <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-            <PillBtn onClick={() => setStriker(s => s === 0 ? 1 : 0)} label="SWAP" nightMode={nightMode} />
-            <PillBtn onClick={() => setModal("break")} label="BREAK" nightMode={nightMode} />
-            <PillBtn onClick={() => setModal("more")} label="···" nightMode={nightMode} noCaps />
-          </div>
-        </div>
+        {/* Spacer for viewer — keep score area at top */}
+        {readOnly && <div style={{ flex: 1 }} />}
 
         {/* ── BOWLER CARD ── */}
         <div style={{ padding: "0 12px", marginTop: 8, marginBottom: 12 }}>
@@ -1057,12 +1222,14 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
               <div style={{ fontSize: 14, fontWeight: 700, color: nightMode ? SC.gold : SC.navy, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bowler}</div>
               <div style={{ fontSize: 11, fontWeight: 500, color: T.textDim, marginTop: 2 }}>0.0-0-0-0</div>
             </div>
-            <div onClick={() => setModal("bowler")} style={{
-              padding: "4px 10px", borderRadius: 999,
-              background: "transparent", border: `1px solid ${SC.borderMid}`,
-              fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase",
-              color: nightMode ? SC.goldLt : SC.navy, cursor: "pointer", userSelect: "none",
-            }}>Change</div>
+            {!readOnly && (
+              <div onClick={() => setModal("bowler")} style={{
+                padding: "4px 10px", borderRadius: 999,
+                background: "transparent", border: `1px solid ${SC.borderMid}`,
+                fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase",
+                color: nightMode ? SC.goldLt : SC.navy, cursor: "pointer", userSelect: "none",
+              }}>Change</div>
+            )}
           </div>
         </div>
 
@@ -1192,7 +1359,9 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
         {modal === "more" && (
           <Sheet title="More" onClose={close}>
             {[
-              { icon: "🔄", label: "Swap strike", onClick: () => { setStriker(s => s === 0 ? 1 : 0); close(); } },
+              { icon: "🔄", label: "Swap batsmen", onClick: () => { setStriker(s => s === 0 ? 1 : 0); close(); } },
+              { icon: "↻", label: "Replay last over", onClick: () => { triggerReplayLastOver(); close(); } },
+              { icon: "📊", label: "Open scorecard", onClick: () => { setScorecardOpen(true); close(); } },
               { icon: "🎤", label: "Commentary voice", sub: `Now: ${COMMENTARY[persona].name}`, onClick: () => setModal("commentary") },
               { icon: "🏏", label: "End innings now", onClick: () => { setInningsEnd(true); close(); } },
               { icon: "🌗", label: `Switch to ${nightMode ? "day" : "night"} mode`, onClick: () => { setNightMode(n => !n); close(); } },
@@ -1351,6 +1520,107 @@ export default function LiveScorerView({ match, onBack, currentUser }) {
             onClose={() => setInningsEnd(false)}
           />
         )}
+
+        {/* Catch-up modal (viewer only) */}
+        {readOnly && catchUpOpen && (
+          <CatchUpModal
+            count={missedBallsCount}
+            onSkip={() => {
+              try { localStorage.setItem("fcc-watched-" + safe.matchId, String(balls)); } catch {}
+              setCatchUpOpen(false);
+            }}
+            onReplay={() => {
+              setCatchUpOpen(false);
+              triggerReplayCatchUp();
+            }}
+          />
+        )}
+
+        {/* Replay overlay (full-screen) */}
+        {replay && (
+          <ReplayOverlay
+            replay={replay}
+            persona={persona}
+            onAdvance={(nextIdx) => setReplay(r => r ? { ...r, index: nextIdx } : null)}
+            onSkip={() => {
+              try { if (safe.matchId) localStorage.setItem("fcc-watched-" + safe.matchId, String(balls)); } catch {}
+              setReplay(null);
+            }}
+            onDone={() => {
+              try { if (safe.matchId) localStorage.setItem("fcc-watched-" + safe.matchId, String(balls)); } catch {}
+              setReplay(null);
+            }}
+          />
+        )}
+
+        {/* Floating "Last over" replay button (viewer only) */}
+        {readOnly && !replay && !catchUpOpen && (
+          <div onClick={triggerReplayLastOver}
+            style={{
+              position: "fixed", bottom: 20, right: 20, zIndex: 50,
+              width: 56, height: 56, borderRadius: 28,
+              background: `linear-gradient(135deg, ${SC.navy} 0%, ${SC.navyDk} 100%)`,
+              border: `1.5px solid ${SC.gold}`,
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              color: SC.gold, cursor: "pointer",
+              boxShadow: "0 6px 22px rgba(0,0,0,0.4)",
+              userSelect: "none",
+            }}
+            title="Replay last over">
+            <div style={{ fontSize: 22, lineHeight: 1, fontWeight: 800 }}>↻</div>
+            <div style={{ fontSize: 7, color: SC.goldLt, textTransform: "uppercase", letterSpacing: 0.4, marginTop: 1, fontWeight: 700 }}>Last over</div>
+          </div>
+        )}
+
+        {/* Scorer Scorecard peek (full-screen overlay) */}
+        {scorecardOpen && (
+          <div style={{
+            position: "fixed", inset: 0, zIndex: 600,
+            background: nightMode ? SC.surfaceDk : SC.bg,
+            overflowY: "auto",
+          }}>
+            <ScorecardView
+              match={{
+                ...safe,
+                team1: team1Name,
+                team2: team2Name,
+                innings1: innings === 1
+                  ? {
+                      team: team1Name,
+                      score, wickets,
+                      overs: overStr(balls),
+                      ballsBowled: balls,
+                      batsmen: batters.map(b => ({
+                        ...b,
+                        notOut: b.dismissal ? false : true,
+                      })),
+                      bowling: [{ name: bowler, overs: overStr(balls) }],
+                      extras: { ...extras },
+                      fow: [],
+                    }
+                  : (savedInnings1 || safe.innings1 || null),
+                innings2: innings === 2
+                  ? {
+                      team: team2Name,
+                      score, wickets,
+                      overs: overStr(balls),
+                      ballsBowled: balls,
+                      batsmen: batters.map(b => ({
+                        ...b,
+                        notOut: b.dismissal ? false : true,
+                      })),
+                      bowling: [{ name: bowler, overs: overStr(balls) }],
+                      extras: { ...extras },
+                      fow: [],
+                      target,
+                    }
+                  : null,
+                status: inningsEnd && innings === 2 ? "completed" : (balls > 0 ? "live" : "setup"),
+              }}
+              onBack={() => setScorecardOpen(false)}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1387,9 +1657,9 @@ function BallPill({ val, isLatestSix }) {
   } else if (val === "Wd" || val === "Nb" || /^Wd/.test(val) || /^Nb/.test(val)) {
     bg = "#FFF3C4"; fg = "#7A4000"; weight = 600; fontSize = 9;
     char = val.toLowerCase();
-  } else if (val === "B") {
+  } else if (val === "B" || /^B\d+$/.test(val)) {
     bg = "#FFF3C4"; fg = "#7A4000"; weight = 600; fontSize = 10;
-    char = "b";
+    char = val === "B" ? "b" : val.toLowerCase();
   } else {
     bg = SC.greenLt; fg = SC.green; weight = 700;
   }
@@ -1433,5 +1703,135 @@ function PillBtn({ onClick, label, nightMode, noCaps }) {
         cursor: "pointer", userSelect: "none",
         padding: "0 8px", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis",
       }}>{label}</div>
+  );
+}
+
+// ── Catch-up modal (viewer-only) ──────────────────────────────
+function CatchUpModal({ count, onSkip, onReplay }) {
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 700,
+      background: "rgba(0,0,0,0.6)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+    }}>
+      <div style={{
+        maxWidth: 320, width: "100%",
+        background: `linear-gradient(135deg, ${SC.navy} 0%, ${SC.navyDk} 100%)`,
+        border: `1.5px solid ${SC.gold}`,
+        borderRadius: 16, padding: 24, textAlign: "center",
+        boxShadow: "0 12px 60px rgba(0,0,0,0.5)",
+      }}>
+        <div style={{ fontSize: 36, marginBottom: 6 }}>📺</div>
+        <div style={{ fontSize: 17, fontWeight: 800, color: SC.goldLt, marginBottom: 6 }}>Catch up on the action?</div>
+        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", marginBottom: 18, lineHeight: 1.4 }}>
+          {count} ball{count === 1 ? "" : "s"} have happened since you last watched
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div onClick={onReplay} style={{
+            padding: "13px 16px", borderRadius: 12,
+            background: `linear-gradient(135deg, ${SC.gold} 0%, ${SC.goldLt} 100%)`,
+            color: SC.navy, fontSize: 14, fontWeight: 800,
+            cursor: "pointer", letterSpacing: 0.4,
+            boxShadow: "0 4px 16px rgba(201,168,76,0.4)",
+          }}>Quick replay</div>
+          <div onClick={onSkip} style={{
+            padding: "12px 16px", borderRadius: 12,
+            background: "rgba(255,255,255,0.06)",
+            border: `1px solid rgba(255,255,255,0.2)`,
+            color: "rgba(255,255,255,0.75)", fontSize: 13, fontWeight: 700,
+            cursor: "pointer",
+          }}>Skip to live</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Replay overlay (shared catch-up / last over) ──────────────
+function ReplayOverlay({ replay, persona, onAdvance, onSkip, onDone }) {
+  const { balls, index } = replay;
+  const current = balls[index];
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (index >= balls.length - 1) {
+        onDone();
+      } else {
+        onAdvance(index + 1);
+      }
+    }, 800);
+    return () => clearTimeout(t);
+  }, [index, balls.length]);
+  if (!current) return null;
+  const label = current.label;
+  let pillBg = "#E8E4D8", pillFg = SC.textMuted, pillContent = label;
+  let useStumps = false;
+  if (label === "6") {
+    pillBg = `linear-gradient(135deg, ${SC.gold} 0%, ${SC.goldLt} 100%)`;
+    pillFg = SC.navy;
+  } else if (label === "4") {
+    pillBg = `linear-gradient(135deg, ${SC.navy} 0%, ${SC.navyDk} 100%)`;
+    pillFg = "#fff";
+  } else if (label === "W") {
+    pillBg = `linear-gradient(135deg, ${SC.red} 0%, ${SC.redDk} 100%)`;
+    pillFg = "#fff";
+    useStumps = true;
+  } else if (label === "•") {
+    pillContent = "·";
+  } else if (/^Wd/.test(label)) {
+    pillBg = "#FFF3C4"; pillFg = "#7A4000"; pillContent = "wd";
+  } else if (/^Nb/.test(label)) {
+    pillBg = "#FFF3C4"; pillFg = "#7A4000"; pillContent = "nb";
+  } else if (/^B/.test(label)) {
+    pillBg = "#FFF3C4"; pillFg = "#7A4000"; pillContent = "b";
+  } else {
+    pillBg = "#E8E4D8"; pillFg = SC.navy;
+  }
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 1000,
+      background: "rgba(0,0,0,0.85)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+    }}>
+      <div style={{
+        maxWidth: 320, width: "100%",
+        background: `linear-gradient(135deg, ${SC.navy} 0%, ${SC.navyDk} 100%)`,
+        border: `1.5px solid ${SC.gold}`,
+        borderRadius: 16, padding: 24, textAlign: "center", position: "relative",
+        boxShadow: "0 12px 60px rgba(0,0,0,0.6)",
+      }}>
+        <div onClick={onSkip} style={{
+          position: "absolute", top: 10, right: 12,
+          fontSize: 11, fontWeight: 700, color: SC.goldLt,
+          padding: "5px 10px", borderRadius: 999,
+          background: "rgba(255,255,255,0.08)",
+          border: "1px solid rgba(255,255,255,0.12)",
+          cursor: "pointer", textTransform: "uppercase", letterSpacing: 0.5,
+        }}>Skip → Live</div>
+
+        <div style={{ height: 30 }} />
+        <div style={{
+          width: 64, height: 64, borderRadius: 32,
+          margin: "0 auto 14px",
+          background: pillBg,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          color: pillFg, fontWeight: 900, fontSize: 26,
+          boxShadow: label === "6" ? "0 0 20px rgba(201,168,76,0.6)" : "none",
+        }}>{useStumps ? <StumpsSvg width={26} height={22} fill="#fff" /> : pillContent}</div>
+
+        <div style={{
+          fontSize: 16, fontWeight: 800, color: "#FFFFFF", marginBottom: 6,
+        }}>{current.name || "—"}</div>
+
+        <div style={{
+          fontSize: 12, color: "rgba(255,255,255,0.7)",
+          fontStyle: "italic", lineHeight: 1.4, minHeight: 32,
+        }}>{current.line || ""}</div>
+
+        <div style={{
+          marginTop: 18, fontSize: 11, fontWeight: 700,
+          color: SC.gold, textTransform: "uppercase", letterSpacing: 1,
+        }}>Ball {index + 1} of {balls.length}</div>
+      </div>
+    </div>
   );
 }
