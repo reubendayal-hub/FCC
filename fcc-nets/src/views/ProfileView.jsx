@@ -64,17 +64,28 @@ export default function ProfileView() {
     const myTeams = (me.teams||[]);
 
     // ── Career stats (TASK 8) ──────────────────────────────────
-    // Context `members` lives in the JSON-blob doc (fccnets/members) and
-    // does NOT carry career stats — those are written by the scorer to
-    // fccnets/data/members/{id} via finalizeMatch. We fetch from there.
-    // Falls back gracefully if the doc / fields don't exist yet.
+    // Data-model split:
+    //   fccnets/members           = roster blob (already in context as
+    //                               `members`). Source of truth for the
+    //                               member id used by the scorer.
+    //   fccnets/data/members/{id} = per-player career stats subcollection.
+    //
+    // Use the resolved member's `.id` from context first (guaranteed to
+    // match the scorer's writes), with `currentUser.id` / `.uid` as
+    // fallbacks for users without a roster entry (parents etc.).
     const [careerDoc, setCareerDoc] = useState(null);
     const [careerLoading, setCareerLoading] = useState(false);
+    const myMemberFromBlob = members.find(m =>
+      m.id === currentUser?.id ||
+      m.id === currentUser?.uid ||
+      (currentUser?.name && m.name?.trim().toLowerCase() === currentUser.name.trim().toLowerCase())
+    );
+    const playerId = myMemberFromBlob?.id || currentUser?.id || currentUser?.uid || null;
     useEffect(() => {
-      const playerId = currentUser?.uid || currentUser?.id;
-      if (!playerId) return;
+      if (!playerId) { setCareerDoc({}); return; }
       let cancelled = false;
       setCareerLoading(true);
+      console.log("ProfileView career fetch — playerId:", playerId, "path: fccnets/data/members/" + playerId);
       (async () => {
         try {
           const snap = await getDoc(doc(db, "fccnets", "data", "members", playerId));
@@ -88,7 +99,7 @@ export default function ProfileView() {
         }
       })();
       return () => { cancelled = true; };
-    }, [currentUser?.uid, currentUser?.id]);
+    }, [playerId]);
 
     const myChildren = (me.children||[]).map(cid => members.find(m=>m.id===cid)).filter(Boolean);
     const isPlayer = myTeams.length > 0;

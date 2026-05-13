@@ -1531,17 +1531,33 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       }
 
       // 5. Resolve names → member doc IDs (case-insensitive, trimmed).
-      // NB: per the brief we use the fccnets/data/members/{id} subcollection
-      // path for STATS storage. The existing members in-app blob lives at
-      // fccnets/members and is separate — career rollups intentionally
-      // build their own collection so we don't have to round-trip the blob.
-      const membersSnap = await getDocs(fsCollection(db, "fccnets", "data", "members"));
-      const nameToId = new Map();
-      membersSnap.forEach(d => {
-        const data = d.data();
-        if (data?.name) nameToId.set(String(data.name).trim().toLowerCase(), d.id);
+      //
+      // ── Data-model split (intentional) ──────────────────────────────
+      //   fccnets/members           = roster blob (single doc with a
+      //                               JSON-stringified `value` field
+      //                               keyed by short member id like
+      //                               "x3kkunl"). Holds names + roles.
+      //   fccnets/data/members/{id} = per-player career stats subcoll.
+      //                               One doc per member, written here.
+      //
+      // The roster blob is the source of truth for name→id resolution.
+      // Career writes live in their own subcollection so we don't have
+      // to rewrite the whole roster blob on every match-end. That also
+      // keeps the in-app context (which uses the blob) lean.
+      const membersBlob = await getDoc(doc(db, "fccnets", "members"));
+      let membersMap = {};
+      if (membersBlob.exists()) {
+        const raw = membersBlob.data()?.value;
+        if (raw) {
+          try { membersMap = JSON.parse(raw); }
+          catch (e) { console.error("members blob parse error:", e); }
+        }
+      }
+      const nameToId = {};
+      Object.entries(membersMap).forEach(([id, m]) => {
+        if (m?.name) nameToId[String(m.name).trim().toLowerCase()] = id;
       });
-      const resolve = (name) => nameToId.get(String(name || "").trim().toLowerCase()) || null;
+      const resolve = (name) => nameToId[String(name || "").trim().toLowerCase()] || null;
 
       // 6. Build the union of players who appeared and run a transaction each.
       const allNames = new Set([...batters.keys(), ...bowlers.keys(), ...fielders.keys()]);
@@ -1557,7 +1573,10 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       const txPromises = [];
       for (const name of allNames) {
         const playerId = resolve(name);
-        if (!playerId) continue; // external opponent etc.
+        if (!playerId) {
+          console.log("Skipping external/unknown player:", name);
+          continue;
+        }
         const batAgg = batters.get(name) || null;
         const bowlAgg = bowlers.get(name) || null;
         const fieldAgg = fielders.get(name) || null;
