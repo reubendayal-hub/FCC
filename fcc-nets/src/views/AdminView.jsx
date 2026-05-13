@@ -1891,78 +1891,73 @@ export default function AdminView() {
                 </div>
               ) : (
                 <div style={{maxHeight:500,overflowY:"auto"}}>
-                  {reminderLogs.map((log, idx) => (
+                  {reminderLogs.map((log, idx) => {
+                    const totalSent = log.totalSent || 0;
+                    const totalSkipped = log.totalSkipped || 0;
+                    const reminders = log.reminders || [];
+                    return (
                     <div key={idx} style={{
                       padding:"14px 16px",
                       borderBottom: idx < reminderLogs.length - 1 ? "1px solid #2d4a6f" : "none",
                       background: idx % 2 === 0 ? "transparent" : "rgba(0,0,0,0.1)"
                     }}>
-                      {/* Run timestamp + target date */}
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-                        <div>
-                          <div style={{color:"#fff",fontWeight:700,fontSize:13}}>
-                            🗓️ For: {fmtShortDate(log.targetDate)}
-                          </div>
-                          <div style={{color:"#64748b",fontSize:10,marginTop:2}}>
-                            Run at: {fmtTs(log.timestamp)}
-                          </div>
+                      {/* Header: run timestamp + totals badge */}
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:10}}>
+                        <div style={{color:"#fff",fontWeight:700,fontSize:13}}>
+                          🗓️ Run at: {fmtTs(log.runAt)}
                         </div>
-                        <div style={{textAlign:"right"}}>
-                          <div style={{
-                            background: log.playersSent > 0 ? "#166534" : "#374151",
-                            color: log.playersSent > 0 ? "#86efac" : "#9ca3af",
-                            padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:700
+                        <div style={{
+                          background: totalSent > 0 ? "#166534" : "#374151",
+                          color: totalSent > 0 ? "#86efac" : "#9ca3af",
+                          padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:700,whiteSpace:"nowrap"
+                        }}>
+                          {totalSent} sent · {totalSkipped} skipped
+                        </div>
+                      </div>
+
+                      {/* One sub-card per reminder run */}
+                      {reminders.map((reminder, ridx) => {
+                        const noSessions = reminder.message === "No sessions";
+                        return (
+                          <div key={ridx} style={{
+                            background:"rgba(255,255,255,0.04)",
+                            border:"1px solid rgba(251,191,36,0.18)",
+                            borderRadius:10,padding:"10px 12px",
+                            marginBottom: ridx < reminders.length - 1 ? 8 : 0
                           }}>
-                            {log.playersSent || 0} sent
+                            <div style={{color:"#fbbf24",fontWeight:700,fontSize:12,marginBottom:noSessions?6:8}}>
+                              For: {fmtShortDate(reminder.date)} · {reminder.type === "24hr" ? "24h reminder" : "48h reminder"}
+                            </div>
+                            {noSessions ? (
+                              <div style={{color:"#94a3b8",fontSize:11,fontStyle:"italic"}}>
+                                No sessions on this date
+                              </div>
+                            ) : (
+                              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                                <div style={{background:"rgba(255,255,255,0.1)",borderRadius:8,padding:"5px 9px"}}>
+                                  <div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.5}}>Sessions</div>
+                                  <div style={{fontSize:13,fontWeight:800,color:"#fff"}}>{reminder.sessions || 0}</div>
+                                </div>
+                                <div style={{background:"rgba(255,255,255,0.1)",borderRadius:8,padding:"5px 9px"}}>
+                                  <div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.5}}>Players</div>
+                                  <div style={{fontSize:13,fontWeight:800,color:"#fff"}}>{reminder.players || 0}</div>
+                                </div>
+                                <div style={{background:"rgba(34,197,94,0.18)",borderRadius:8,padding:"5px 9px"}}>
+                                  <div style={{fontSize:9,color:"#86efac",textTransform:"uppercase",letterSpacing:0.5}}>Sent</div>
+                                  <div style={{fontSize:13,fontWeight:800,color:"#86efac"}}>{reminder.sent || 0}</div>
+                                </div>
+                                <div style={{background:"rgba(245,158,11,0.18)",borderRadius:8,padding:"5px 9px"}}>
+                                  <div style={{fontSize:9,color:"#fbbf24",textTransform:"uppercase",letterSpacing:0.5}}>Skipped</div>
+                                  <div style={{fontSize:13,fontWeight:800,color:"#fbbf24"}}>{reminder.skipped || 0}</div>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      </div>
-                      
-                      {/* Stats row */}
-                      <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:10}}>
-                        <div style={{background:"rgba(255,255,255,0.1)",borderRadius:8,padding:"6px 10px"}}>
-                          <div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.5}}>Sessions</div>
-                          <div style={{fontSize:14,fontWeight:800,color:"#fff"}}>{log.sessionsFound || 0}</div>
-                        </div>
-                        <div style={{background:"rgba(255,255,255,0.1)",borderRadius:8,padding:"6px 10px"}}>
-                          <div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.5}}>Players</div>
-                          <div style={{fontSize:14,fontWeight:800,color:"#fff"}}>{log.totalPlayers || 0}</div>
-                        </div>
-                        <div style={{background:"rgba(255,255,255,0.1)",borderRadius:8,padding:"6px 10px"}}>
-                          <div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.5}}>Skipped</div>
-                          <div style={{fontSize:14,fontWeight:800,color:"#f59e0b"}}>{log.playersSkipped || 0}</div>
-                        </div>
-                        <div style={{background:"rgba(255,255,255,0.1)",borderRadius:8,padding:"6px 10px"}}>
-                          <div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.5}}>Leaders</div>
-                          <div style={{fontSize:14,fontWeight:800,color:"#60a5fa"}}>{log.leadersSent || 0}</div>
-                        </div>
-                      </div>
-                      
-                      {/* Sessions details */}
-                      {log.sessionsDetails && log.sessionsDetails.length > 0 && (
-                        <div style={{marginBottom:8}}>
-                          <div style={{fontSize:10,color:"#94a3b8",marginBottom:4,fontWeight:700}}>Sessions:</div>
-                          <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                            {log.sessionsDetails.map((s, i) => (
-                              <span key={i} style={{
-                                background:"#0c4a6e",color:"#7dd3fc",
-                                padding:"2px 8px",borderRadius:6,fontSize:10,fontWeight:600
-                              }}>
-                                {s.label} ({s.playerCount})
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Message if no sessions */}
-                      {log.message && (
-                        <div style={{color:"#94a3b8",fontSize:11,fontStyle:"italic"}}>
-                          {log.message}
-                        </div>
-                      )}
+                        );
+                      })}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
