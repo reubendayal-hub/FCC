@@ -8,7 +8,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { db } from "../firebase";
 import {
-  collection, doc, onSnapshot, setDoc, serverTimestamp, deleteDoc, getDoc,
+  collection, doc, onSnapshot, setDoc, serverTimestamp, getDoc,
 } from "firebase/firestore";
 import Shell      from "../ui/Shell";
 import AppHeader  from "../ui/AppHeader";
@@ -16,7 +16,7 @@ import BotNav     from "../ui/BotNav";
 import Toast      from "../ui/Toast";
 import { FCC_LOGO } from "../constants/logo";
 import { can } from "../constants/roles";
-import { finalizeMatchStats } from "../utils/finalizeMatchStats";
+import { finalizeMatchStats, deleteMatchAndRecompute } from "../utils/finalizeMatchStats";
 
 // Takeover constants — kept in sync with LiveScorerView.
 const TAKEOVER_PIN = "4321";
@@ -553,9 +553,10 @@ function Section({ G, label, children }) {
 // Reuses the same bottom-sheet pattern as TakeoverSheet so deletion
 // feels consistent across destructive actions. Live matches get an
 // extra warning since the active scorer will be locked out instantly.
-function DeleteMatchSheet({ G, match, dateStr, deleting, onCancel, onConfirm }) {
+function DeleteMatchSheet({ G, match, dateStr, deleting, affectedCount, onCancel, onConfirm }) {
   const isLive = match.status === "live";
   const title = match.title || "Untitled match";
+  const plural = affectedCount === 1 ? "" : "s";
   const wrap = {
     position:"fixed", inset:0, zIndex:900,
     background:"rgba(0,0,0,0.55)",
@@ -574,7 +575,13 @@ function DeleteMatchSheet({ G, match, dateStr, deleting, onCancel, onConfirm }) 
           Delete this match?
         </div>
         <div style={{ fontSize:13, color:G.muted, lineHeight:1.5, marginBottom:12, textAlign:"center" }}>
-          {title} · {dateStr}. This permanently removes all scoring data and cannot be undone.
+          {title} · {dateStr}.{" "}
+          {affectedCount > 0 ? (
+            <>This permanently removes the match <strong>AND</strong> updates career stats for{" "}
+            <strong style={{ color:G.text }}>{affectedCount} player{plural}</strong>. This cannot be undone.</>
+          ) : (
+            <>This permanently removes all scoring data and cannot be undone.</>
+          )}
         </div>
         {isLive && (
           <div style={{
@@ -633,12 +640,34 @@ function MatchCard({ G, match, onScore, onWatch, currentUser, userRole, showToas
   const [confirmRecompute, setConfirmRecompute] = useState(false);
   const [recomputing, setRecomputing] = useState(false);
 
+  // Unique participating players from event log — drives the modal
+  // warning AND mirrors the resolver inside deleteMatchAndRecompute.
+  const affectedCount = useMemo(() => {
+    const names = new Set();
+    for (const e of (match.events || [])) {
+      if (e.striker)         names.add(e.striker);
+      if (e.nonStriker)      names.add(e.nonStriker);
+      if (e.bowler)          names.add(e.bowler);
+      if (e.wicket?.fielder) names.add(e.wicket.fielder);
+    }
+    return names.size;
+  }, [match.events]);
+
   async function performDelete() {
     if (deleting) return;
     setDeleting(true);
     try {
-      await deleteDoc(doc(db, "fccscorer", "data", "matches", match.id));
-      showToast?.("Match deleted");
+      const result = await deleteMatchAndRecompute({
+        db,
+        matchId: match.id,
+        matchData: match,
+      });
+      if (result.affectedPlayers > 0) {
+        const n = result.affectedPlayers;
+        showToast?.(`Match deleted · ${n} player${n === 1 ? "" : "s"} stats updated`);
+      } else {
+        showToast?.("Match deleted");
+      }
       setConfirmDelete(false);
     } catch (e) {
       console.error("Match delete error:", e);
@@ -721,6 +750,7 @@ function MatchCard({ G, match, onScore, onWatch, currentUser, userRole, showToas
           match={match}
           dateStr={dateStr}
           deleting={deleting}
+          affectedCount={affectedCount}
           onCancel={() => !deleting && setConfirmDelete(false)}
           onConfirm={performDelete}
         />
