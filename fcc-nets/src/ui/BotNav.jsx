@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { can } from "../constants/roles";
 import { isCoachMember } from "../utils/members";
 
@@ -9,6 +9,23 @@ export default function BotNav({view,setView,userRole,pendingCount=0,currentUser
   const isCaptain = teams.some(t => t.senior && (t.captain === currentUser?.name || t.vicecaptain === currentUser?.name));
   const active = view==="session"?"schedule":view==="roleAdmin"?"admin":view==="coachhq"?"coachhq":view==="captainxi"?"captainxi":
     (view === "scorelive" || view.startsWith("scorer-") || view.startsWith("live-")) ? "scorelive" : view;
+
+  const containerRef = useRef(null);
+  const [hasOverflow, setHasOverflow] = useState(false);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const check = () => setHasOverflow(el.scrollWidth > el.clientWidth);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  useEffect(() => {
+    const activeEl = containerRef.current?.querySelector('[data-active="true"]');
+    activeEl?.scrollIntoView({ inline: "center", behavior: "smooth", block: "nearest" });
+  }, [active]);
 
   const IconSchedule = ({on}) => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill={on?"currentColor":"none"} stroke="currentColor"
@@ -67,11 +84,13 @@ export default function BotNav({view,setView,userRole,pendingCount=0,currentUser
   const Tab = ({id, icon, label, badge}) => {
     const on = active===id;
     return (
-      <button onClick={()=>setView(id)} style={{
+      <button onClick={()=>setView(id)} data-active={on?"true":"false"} style={{
         background:"none", border:"none", cursor:"pointer",
         fontFamily:"'DM Sans',sans-serif",
         display:"flex", flexDirection:"column", alignItems:"center",
-        justifyContent:"center", gap:0, width:"100%", padding:"6px 4px 2px",
+        justifyContent:"center", gap:0,
+        flexShrink:0, minWidth:74,
+        padding:"6px 4px 2px",
         position:"relative",
       }}>
         <div style={{
@@ -134,10 +153,6 @@ export default function BotNav({view,setView,userRole,pendingCount=0,currentUser
     }}>💯</span>
   );
 
-  // Calculate number of tabs: Schedule + Book + Matches + Profile = 4 base, + Coach HQ (only if not admin), + Captain XI, + Admin
-  // Admins reach Coach HQ via the desktop sidebar / Admin panel — hiding it on mobile keeps the bar at <=5 tabs so Profile stays visible.
-  const tabCount = 4 + (isCoach && !isAdmin ? 1 : 0) + ((isCaptain || isAdmin) ? 1 : 0) + (isAdmin ? 1 : 0);
-
   return (
     <div className="fcc-mobile-only" style={{
       position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)",
@@ -146,21 +161,30 @@ export default function BotNav({view,setView,userRole,pendingCount=0,currentUser
       backdropFilter:"blur(16px)", WebkitBackdropFilter:"blur(16px)",
       borderTop:"1px solid rgba(0,0,0,0.06)",
       boxShadow:"0 -6px 32px rgba(0,0,0,0.10), 0 -1px 0 rgba(0,0,0,0.04)",
-      display:"grid",
-      gridTemplateColumns: `repeat(${tabCount}, 1fr)`,
-      alignItems:"center",
-      padding:"6px 8px",
       paddingBottom:"max(10px, env(safe-area-inset-bottom))",
-      gap:4,
     }}>
+      <style>{`
+        .fcc-botnav-scroll::-webkit-scrollbar { display: none; }
+        .fcc-botnav-scroll { scrollbar-width: none; }
+      `}</style>
+      <div style={{position:"relative"}}>
+        <div ref={containerRef} className="fcc-botnav-scroll" style={{
+          display:"flex",
+          overflowX:"auto",
+          WebkitOverflowScrolling:"touch",
+          padding:"6px 8px",
+          gap:4,
+        }}>
       <Tab id="schedule" icon={<IconSchedule on={active==="schedule"}/>} label="Schedule"/>
 
       {/* Book */}
-      <button onClick={()=>setView("add")} style={{
+      <button onClick={()=>setView("add")} data-active={active==="add"?"true":"false"} style={{
         background:"none", border:"none", cursor:"pointer",
         fontFamily:"'DM Sans',sans-serif",
         display:"flex", flexDirection:"column", alignItems:"center",
-        justifyContent:"center", width:"100%", padding:"6px 4px 2px",
+        justifyContent:"center",
+        flexShrink:0, minWidth:74,
+        padding:"6px 4px 2px",
       }}>
         <div style={{
           display:"flex", flexDirection:"column", alignItems:"center", gap:3,
@@ -194,7 +218,7 @@ export default function BotNav({view,setView,userRole,pendingCount=0,currentUser
 
       <Tab id="scorelive" icon={<IconMatches on={active === "scorelive"} />} label="ScorePro" />
 
-      {isCoach && !isAdmin && (
+      {isCoach && (
         <Tab id="coachhq" icon={<IconCoach on={active==="coachhq"}/>} label="Coach HQ"/>
       )}
       {(isCaptain || isAdmin) && (
@@ -204,6 +228,15 @@ export default function BotNav({view,setView,userRole,pendingCount=0,currentUser
         <Tab id="admin" icon={<IconMembers on={active==="admin"}/>} label="Admin" badge={pendingCount}/>
       )}
       <Tab id="profile" icon={<IconProfile on={active==="profile"}/>} label="Profile"/>
+        </div>
+        {hasOverflow && (
+          <div aria-hidden="true" style={{
+            position:"absolute", top:0, right:0, bottom:0, width:24,
+            pointerEvents:"none",
+            background:"linear-gradient(to left, rgba(245,158,11,0.55) 0%, rgba(245,158,11,0) 100%)",
+          }}/>
+        )}
+      </div>
     </div>
   );
 }

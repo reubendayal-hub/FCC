@@ -549,6 +549,11 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
   });
   const [battingOrderOpen, setBattingOrderOpen] = useState(false);
   const battingOrderAutoOpenedRef = useRef({ 1: false, 2: false });
+  // Opening bowler picker — auto-opens at innings start (once per innings)
+  // and runs BEFORE the batting-order picker. Cancelling leaves the
+  // alphabetical default (squad[0]) in place.
+  const [openingBowlerOpen, setOpeningBowlerOpen] = useState(false);
+  const [openingBowlerShown, setOpeningBowlerShown] = useState({ 1: false, 2: false });
   // BUG 2: Change-opening-batsmen sheet, accessible from More menu when
   // ballsBowled === 0 (i.e. innings has not started). Lets the scorer
   // swap the openers without going through a wicket flow.
@@ -803,19 +808,34 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     }
   }, [wickets, balls, maxOvers, inningsEnd]);
 
+  // Opening bowler picker — fires once per innings at start. Runs BEFORE
+  // the batting-order picker so the scorer picks who's bowling the first
+  // over for the fielding side. Cancelling falls back to the alphabetical
+  // default that was seeded during innings setup.
+  useEffect(() => {
+    if (readOnly || isLockedOut) return;
+    if (balls !== 0) return;
+    if (openingBowlerShown[innings]) return;
+    setOpeningBowlerShown(prev => ({ ...prev, [innings]: true }));
+    setOpeningBowlerOpen(true);
+  }, [innings, balls, readOnly, isLockedOut, openingBowlerShown]);
+
   // TASK 3 — auto-open the batting-order picker once per innings if
   // nothing's been saved and the innings hasn't started. Only the
   // scorer sees the prompt (viewers / locked-out scorers skip).
+  // Waits for the opening-bowler picker to resolve first.
   useEffect(() => {
     if (readOnly || isLockedOut) return;
     if (balls !== 0) return;
     if (battingOrder.length > 0) return;
     if (battingOrderAutoOpenedRef.current[innings]) return;
+    if (openingBowlerOpen) return;
+    if (!openingBowlerShown[innings]) return;
     battingOrderAutoOpenedRef.current[innings] = true;
     // Slight delay so it doesn't race with toss / wicket modals.
     const t = setTimeout(() => setBattingOrderOpen(true), 250);
     return () => clearTimeout(t);
-  }, [innings, balls, battingOrder.length, readOnly, isLockedOut]);
+  }, [innings, balls, battingOrder.length, readOnly, isLockedOut, openingBowlerOpen, openingBowlerShown]);
 
   // ── Firestore persistence (debounced 1200ms) ────────────────
   const saveTimer = useRef(null);
@@ -3078,6 +3098,63 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
               setChangeBatsmenOpen(false);
             }}
           />
+        )}
+
+        {/* Opening bowler picker (auto-opens before batting-order at innings start) */}
+        {openingBowlerOpen && !readOnly && !isLockedOut && (
+          <Sheet title="Opening bowler" onClose={() => setOpeningBowlerOpen(false)}>
+            <div style={{ fontSize: 13, color: SC.textDim, marginBottom: 14 }}>
+              Who's bowling the first over for{" "}
+              <strong style={{ color: SC.navy }}>{innings === 1 ? team2Name : team1Name}</strong>?
+            </div>
+            {(innings === 1 ? squad2 : squad1).map(p => {
+              const member = rosterRef.current.get(String(p).trim().toLowerCase());
+              const handRaw = member?.bowlingHand;
+              const hand = handRaw
+                ? (String(handRaw).toLowerCase().startsWith("l") ? "LH" : "RH")
+                : null;
+              const initials = String(p).split(/\s+/).filter(Boolean)
+                .map(s => s[0]).join("").slice(0, 2).toUpperCase();
+              return (
+                <div key={p} onClick={() => {
+                  setBowler(p);
+                  setOpeningBowlerOpen(false);
+                  if (!bowlerApproach[p]) {
+                    setTimeout(() => setApproachPromptFor(p), 200);
+                  }
+                }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 12,
+                    padding: "12px 14px", borderBottom: `1px solid ${SC.border}`,
+                    cursor: "pointer", background: bowler === p ? "rgba(24,95,165,0.06)" : "transparent",
+                  }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: "50%",
+                    background: SC.navy, color: "#fff",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 13, fontWeight: 700, letterSpacing: 0.5,
+                    flexShrink: 0,
+                  }}>{initials}</div>
+                  <div style={{ flex: 1, fontSize: 14, fontWeight: bowler === p ? 700 : 600,
+                    color: bowler === p ? SC.blue : SC.navy }}>{p}</div>
+                  {hand && (
+                    <div style={{
+                      fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
+                      color: SC.gold, background: "rgba(201,168,76,0.14)",
+                      padding: "3px 8px", borderRadius: 99,
+                    }}>{hand}</div>
+                  )}
+                </div>
+              );
+            })}
+            <div onClick={() => setOpeningBowlerOpen(false)}
+              style={{
+                textAlign: "center", marginTop: 14, padding: "10px",
+                fontSize: 13, fontWeight: 600, color: SC.textMuted, cursor: "pointer",
+              }}>
+              Cancel (use alphabetical default)
+            </div>
+          </Sheet>
         )}
 
         {/* TASK 3 — Batting-order picker (auto-opens on innings start) */}
