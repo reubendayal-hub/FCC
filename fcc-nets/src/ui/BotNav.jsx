@@ -145,12 +145,13 @@ export default function BotNav({view,setView,userRole,pendingCount=0,currentUser
   );
 
   const IconMatches = ({ on }) => (
-    <span style={{
-      fontSize: on ? 22 : 19,
-      filter: on ? "none" : "grayscale(0.4) opacity(0.7)",
-      display: "inline-block",
-      lineHeight: 1,
-    }}>💯</span>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={on ? 2.5 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12 Q12 9 21 12" />
+      <path d="M3 12 Q12 15 21 12" />
+      <path d="M18 4 Q22 12 18 20" strokeDasharray="2 2" />
+    </svg>
   );
 
   return (
