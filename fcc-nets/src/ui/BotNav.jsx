@@ -3,6 +3,7 @@ import { can } from "../constants/roles";
 import { isCoachMember } from "../utils/members";
 
 export default function BotNav({view,setView,userRole,pendingCount=0,currentUser=null,teams=[],G}) {
+  G = G || {};
   const isAdmin = can(userRole,"accessMembers");
   const isCoach = isAdmin || isCoachMember(currentUser?.name, teams);
   // Captain/VC of any senior team
@@ -31,9 +32,9 @@ export default function BotNav({view,setView,userRole,pendingCount=0,currentUser
     <svg width="20" height="20" viewBox="0 0 24 24" fill={on?"currentColor":"none"} stroke="currentColor"
       strokeWidth={on?0:1.8} strokeLinecap="round" strokeLinejoin="round">
       {on ? <>
-        <rect x="3" y="4" width="18" height="18" rx="2" fill={G.green} stroke="none"/>
-        <line x1="16" y1="2" x2="16" y2="6" stroke={G.green} strokeWidth="2.5"/>
-        <line x1="8" y1="2" x2="8" y2="6" stroke={G.green} strokeWidth="2.5"/>
+        <rect x="3" y="4" width="18" height="18" rx="2" fill={(G.green ?? "#1a6b38")} stroke="none"/>
+        <line x1="16" y1="2" x2="16" y2="6" stroke={(G.green ?? "#1a6b38")} strokeWidth="2.5"/>
+        <line x1="8" y1="2" x2="8" y2="6" stroke={(G.green ?? "#1a6b38")} strokeWidth="2.5"/>
         <line x1="3" y1="10" x2="21" y2="10" stroke="white" strokeWidth="1.8"/>
         <rect x="7" y="13" width="3" height="3" rx="0.5" fill="white"/>
         <rect x="11" y="13" width="3" height="3" rx="0.5" fill="white"/>
@@ -110,7 +111,7 @@ export default function BotNav({view,setView,userRole,pendingCount=0,currentUser
           position:"relative",
         }}>
           <div style={{
-            color: on ? G.lime : "#94a3b8",
+            color: on ? (G.lime ?? "#84cc16") : "#94a3b8",
             transition:"color .15s",
             position:"relative",
             display:"flex", alignItems:"center", justifyContent:"center",
@@ -127,7 +128,7 @@ export default function BotNav({view,setView,userRole,pendingCount=0,currentUser
           </div>
           <span style={{
             fontSize:10, fontWeight: on?800:600, letterSpacing:.3,
-            color: on ? G.lime : "#94a3b8",
+            color: on ? (G.lime ?? "#84cc16") : "#94a3b8",
             transition:"color .15s",
           }}>{label}</span>
         </div>
@@ -202,7 +203,7 @@ export default function BotNav({view,setView,userRole,pendingCount=0,currentUser
           transition:"all .18s",
         }}>
           <div style={{
-            color: active==="add" ? G.lime : "#94a3b8",
+            color: active==="add" ? (G.lime ?? "#84cc16") : "#94a3b8",
             transition:"color .15s",
             display:"flex", alignItems:"center", justifyContent:"center",
           }}>
@@ -210,7 +211,7 @@ export default function BotNav({view,setView,userRole,pendingCount=0,currentUser
           </div>
           <span style={{
             fontSize:10, fontWeight: active==="add"?800:600, letterSpacing:.3,
-            color: active==="add" ? G.lime : "#94a3b8",
+            color: active==="add" ? (G.lime ?? "#84cc16") : "#94a3b8",
             transition:"color .15s",
           }}>Book</span>
         </div>
