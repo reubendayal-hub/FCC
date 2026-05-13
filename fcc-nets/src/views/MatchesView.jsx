@@ -8,7 +8,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { db } from "../firebase";
 import {
-  collection, doc, onSnapshot, setDoc, serverTimestamp, deleteDoc,
+  collection, doc, onSnapshot, setDoc, serverTimestamp, deleteDoc, getDoc,
 } from "firebase/firestore";
 import Shell      from "../ui/Shell";
 import AppHeader  from "../ui/AppHeader";
@@ -16,6 +16,7 @@ import BotNav     from "../ui/BotNav";
 import Toast      from "../ui/Toast";
 import { FCC_LOGO } from "../constants/logo";
 import { can } from "../constants/roles";
+import { finalizeMatchStats } from "../utils/finalizeMatchStats";
 
 // Takeover constants — kept in sync with LiveScorerView.
 const TAKEOVER_PIN = "4321";
@@ -598,8 +599,15 @@ function MatchCard({ G, match, onScore, onWatch, currentUser, userRole, showToas
   const isAdmin   = can(userRole, "accessMembers");
   const isCreator = match.createdBy === meId;
   const canDelete = isAdmin || isCreator;
+  // Recompute gating: admins or creator, only on completed matches.
+  // (Abandoned matches intentionally not eligible — their stats were
+  // intentionally not finalised when abandoned, and recompute would
+  // imply they should be — better to surface that as a separate flow.)
+  const canRecompute = (isAdmin || isCreator) && match.status === "completed";
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmRecompute, setConfirmRecompute] = useState(false);
+  const [recomputing, setRecomputing] = useState(false);
 
   async function performDelete() {
     if (deleting) return;
@@ -613,6 +621,40 @@ function MatchCard({ G, match, onScore, onWatch, currentUser, userRole, showToas
       showToast?.(`Could not delete: ${e.message || e.code || "error"}`);
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function performRecompute() {
+    if (recomputing) return;
+    setRecomputing(true);
+    try {
+      const snap = await getDoc(doc(db, "fccscorer", "data", "matches", match.id));
+      if (!snap.exists()) {
+        showToast?.("Match not found");
+        return;
+      }
+      const matchData = { ...snap.data(), matchId: match.id };
+      const result = await finalizeMatchStats({
+        db,
+        matchData,
+        abandoned: matchData.abandoned === true,
+        force: true,
+      });
+      const n = result?.playersUpdated || 0;
+      showToast?.(`Stats recomputed for ${n} player${n === 1 ? "" : "s"}`);
+      if (Array.isArray(result?.skipped) && result.skipped.length > 0) {
+        console.log("Recompute skipped (not in roster):", result.skipped);
+        // Stagger a follow-up so both toasts are visible.
+        setTimeout(() => {
+          showToast?.(`Skipped: ${result.skipped.join(", ")}`);
+        }, 1200);
+      }
+      setConfirmRecompute(false);
+    } catch (e) {
+      console.error("Recompute error:", e);
+      showToast?.(`Recompute failed: ${e.message || e.code || "error"}`);
+    } finally {
+      setRecomputing(false);
     }
   }
 
@@ -723,6 +765,77 @@ function MatchCard({ G, match, onScore, onWatch, currentUser, userRole, showToas
           cursor:"pointer", fontSize:13, fontWeight:600, color:G.muted }}>
           {isDone ? "Scorecard" : "👁 Watch"}
         </button>
+      </div>
+      {canRecompute && (
+        <div style={{ padding:"0 14px 10px", marginTop:-4, display:"flex", justifyContent:"flex-end" }}>
+          <button
+            onClick={() => setConfirmRecompute(true)}
+            title="Re-runs the stats calculation from this match's events"
+            style={{
+              background:"transparent", border:"none", padding:0, cursor:"pointer",
+              fontSize:11, fontWeight:600, color:G.gold, textDecoration:"underline",
+              opacity:0.85,
+            }}>
+            ↻ Recompute stats
+          </button>
+        </div>
+      )}
+      {confirmRecompute && (
+        <RecomputeStatsSheet
+          G={G}
+          match={match}
+          recomputing={recomputing}
+          onCancel={() => !recomputing && setConfirmRecompute(false)}
+          onConfirm={performRecompute}
+        />
+      )}
+    </div>
+  );
+}
+
+function RecomputeStatsSheet({ G, match, recomputing, onCancel, onConfirm }) {
+  const title = match.title || "Untitled match";
+  const wrap = {
+    position:"fixed", inset:0, zIndex:900,
+    background:"rgba(0,0,0,0.55)",
+    display:"flex", alignItems:"flex-end", justifyContent:"center",
+  };
+  const card = {
+    width:"100%", maxWidth:420, background:"#fff",
+    borderRadius:"20px 20px 0 0", padding:"20px 18px 28px",
+    boxShadow:"0 -8px 40px rgba(0,0,0,0.3)",
+  };
+  return (
+    <div style={wrap} onClick={(e) => e.target === e.currentTarget && onCancel()}>
+      <div style={card}>
+        <div style={{ width:36, height:4, background:"#cbd5e1", borderRadius:2, margin:"0 auto 14px" }} />
+        <div style={{ fontSize:16, fontWeight:800, color:G.text, marginBottom:6, textAlign:"center" }}>
+          Recompute career stats?
+        </div>
+        <div style={{ fontSize:13, color:G.muted, lineHeight:1.5, marginBottom:12, textAlign:"center" }}>
+          {title}. Re-runs the stats calculation from this match&rsquo;s events. If career numbers have already been written for this match, they&rsquo;ll be added again.
+        </div>
+        <div style={{
+          fontSize:12, color:"#92400e", background:"#fffbeb",
+          border:"1px solid #fde68a", borderRadius:8,
+          padding:"8px 10px", lineHeight:1.4, marginBottom:14, textAlign:"left",
+        }}>
+          ⚠️ Career counters are incremental — running this on an already-finalised match will inflate totals. Use only to backfill matches that were missed.
+        </div>
+        <div style={{ display:"flex", gap:10 }}>
+          <button onClick={onCancel} disabled={recomputing} style={{
+            flex:1, padding:"12px 12px", borderRadius:10,
+            background:"#fff", border:`1.5px solid ${G.border}`, color:G.muted,
+            fontWeight:700, fontSize:14, cursor:recomputing?"default":"pointer",
+            opacity:recomputing?0.5:1,
+          }}>Cancel</button>
+          <button onClick={onConfirm} disabled={recomputing} style={{
+            flex:1, padding:"12px 12px", borderRadius:10, border:"none",
+            background:recomputing ? "#e2e8f0" : `linear-gradient(135deg,${G.gold},#9e8638)`,
+            color:recomputing ? "#94a3b8" : "#fff",
+            fontWeight:800, fontSize:14, cursor:recomputing?"default":"pointer",
+          }}>{recomputing ? "Recomputing…" : "Recompute"}</button>
+        </div>
       </div>
     </div>
   );

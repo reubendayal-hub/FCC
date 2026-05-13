@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { db } from "../firebase";
 import {
-  doc, setDoc, serverTimestamp, onSnapshot, arrayUnion,
-  collection as fsCollection, getDocs, getDoc, runTransaction,
+  doc, setDoc, serverTimestamp, onSnapshot, arrayUnion, getDoc,
 } from "firebase/firestore";
 import ScorecardView from "./ScorecardView";
 import { pickCommentary, pickEventKey } from "../utils/commentaryGen";
+import { finalizeMatchStats } from "../utils/finalizeMatchStats";
 
 // ── Takeover constants ───────────────────────────────────────
 const TAKEOVER_PIN = "4321";
@@ -1457,242 +1457,46 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
   //   - opponent on matchAppearance: chosen via squad membership; if the
   //     player isn't in either squad it falls back to safe.team2.
   const [finalizingMatch, setFinalizingMatch] = useState(false);
+  // Local guard — `safe` is the (constant) prop, so this state tracks
+  // whether THIS session has already fired finalise, preventing the
+  // auto-effect from re-firing during further state changes.
+  const [finalisedLocal, setFinalisedLocal] = useState(safe.finalised === true);
   async function finalizeMatch({ abandoned } = { abandoned: false }) {
     if (readOnly || isLockedOut) return;
     if (!safe.matchId) return;
     if (finalizingMatch) return;
+    if (finalisedLocal) return;
     setFinalizingMatch(true);
     try {
       // 1. Flush any pending events to Firestore first so nothing is lost.
       const pending = pendingEventsRef.current.slice();
       pendingEventsRef.current = [];
-      const flushPayload = {};
-      if (pending.length > 0) flushPayload.events = arrayUnion(...pending);
       if (pending.length > 0) {
         await setDoc(doc(db, "fccscorer", "data", "matches", safe.matchId),
-          flushPayload, { merge: true });
+          { events: arrayUnion(...pending) }, { merge: true });
       }
 
-      // 2. Mark match completed/abandoned.
+      // 2. Mark match completed/abandoned (status flip kept here so the
+      //    Matches list updates even if the stats util fails later on).
       await setDoc(doc(db, "fccscorer", "data", "matches", safe.matchId), {
         status: "completed",
         completedAt: serverTimestamp(),
         abandoned: abandoned === true,
       }, { merge: true });
 
-      // 3. Re-read the doc to get the canonical events array (post-flush).
+      // 3. Re-read the canonical doc (post-flush) and hand off to the
+      //    shared util — it writes career rollups + matchAppearances
+      //    + flips finalised:true on the match doc.
       const matchSnap = await getDoc(doc(db, "fccscorer", "data", "matches", safe.matchId));
       const matchData = matchSnap.exists() ? matchSnap.data() : {};
-      const events = Array.isArray(matchData.events) ? matchData.events : [];
-
-      // 4. Per-player aggregation. Helpers below classify labels:
-      //    - isLegal: ball that counts toward the bowler's legal-balls tally.
-      //    - isExtraOnly: deliveries where the runs do NOT count to the batter
-      //      (byes/legbyes/wides). No-balls + bat-runs DO count toward the
-      //      batter, hence the distinction.
-      const isLegalBall = (lbl) => {
-        if (!lbl) return false;
-        if (/^Wd/.test(lbl)) return false;
-        if (/^Nb/.test(lbl)) return false;
-        return true;
-      };
-      const isExtraRunsOnly = (lbl) => {
-        // Bye / leg-bye / wide-only — runs are extras, not batter's.
-        if (!lbl) return false;
-        if (/^B\d*$/.test(lbl)) return true;       // bye
-        if (/^LB\d*$/.test(lbl)) return true;      // leg-bye (legacy)
-        if (/^Wd/.test(lbl)) return true;          // wide variants
-        // No-ball+B / No-ball+LB → extras only
-        if (lbl === "Nb+B" || lbl === "Nb+LB") return true;
-        return false;
-      };
-
-      // batter aggregates: key = name, value = aggregate
-      const batters = new Map();        // name → { innings, runs, balls, fours, sixes, dismissalType, notOut }
-      const dismissed = new Map();      // name → wicket type seen (truthy = out)
-      const bowlers = new Map();        // name → { legalBalls, runsConceded, wickets, fiveFor }
-      const fielders = new Map();       // name → { catches, stumpings, runOuts }
-
-      for (const ev of events) {
-        const lbl = ev.label || "";
-        const evInnings = ev.innings || 1;
-
-        // ── Batter side ─────────────────────────────────────────
-        if (ev.striker) {
-          if (!batters.has(ev.striker)) {
-            batters.set(ev.striker, {
-              innings: evInnings,
-              runs: 0, balls: 0, fours: 0, sixes: 0,
-              notOut: true, dismissalType: null,
-            });
-          }
-          const b = batters.get(ev.striker);
-          if (isLegalBall(lbl)) b.balls += 1;
-          if (!isExtraRunsOnly(lbl)) {
-            const runs = Number(ev.runs) || 0;
-            b.runs += runs;
-            if (runs === 4) b.fours += 1;
-            if (runs === 6) b.sixes += 1;
-          }
-        }
-
-        // ── Bowler side ─────────────────────────────────────────
-        if (ev.bowler) {
-          if (!bowlers.has(ev.bowler)) {
-            bowlers.set(ev.bowler, { legalBalls: 0, runsConceded: 0, wickets: 0 });
-          }
-          const bo = bowlers.get(ev.bowler);
-          // Legal-balls: anything not a wide. (No-balls *are* counted toward
-          // legalBalls per the spec's note; spec says "Nb counts as bowler's
-          // ball" by convention — we follow that simpler shape.)
-          if (!/^Wd/.test(lbl)) bo.legalBalls += 1;
-          bo.runsConceded += Number(ev.runs) || 0;
-          if (ev.wicket && ev.wicket.type && ev.wicket.type !== "Run out") {
-            bo.wickets += 1;
-          }
-        }
-
-        // ── Fielding side ───────────────────────────────────────
-        if (ev.wicket) {
-          const name = ev.wicket.fielder;
-          // Dismissal tracking for notOut flag on the OUT batter.
-          if (ev.wicket.batter) dismissed.set(ev.wicket.batter, ev.wicket.type || "out");
-          if (name) {
-            if (!fielders.has(name)) {
-              fielders.set(name, { catches: 0, stumpings: 0, runOuts: 0 });
-            }
-            const fa = fielders.get(name);
-            if (ev.wicket.type === "Caught")  fa.catches += 1;
-            if (ev.wicket.type === "Stumped") fa.stumpings += 1;
-            if (ev.wicket.type === "Run out") fa.runOuts += 1;
-          }
-        }
-      }
-
-      // Finalize batter notOut/dismissalType + milestone flags.
-      for (const [name, b] of batters.entries()) {
-        if (dismissed.has(name)) {
-          b.notOut = false;
-          b.dismissalType = dismissed.get(name);
-        }
-        b.fifty   = b.runs >= 50 && b.runs < 100;
-        b.hundred = b.runs >= 100;
-      }
-      // Finalize bowler 5-fer flag.
-      for (const bo of bowlers.values()) {
-        bo.fiveFor = bo.wickets >= 5;
-      }
-
-      // 5. Resolve names → member doc IDs (case-insensitive, trimmed).
-      //
-      // ── Data-model split (intentional) ──────────────────────────────
-      //   fccnets/members           = roster blob (single doc with a
-      //                               JSON-stringified `value` field
-      //                               keyed by short member id like
-      //                               "x3kkunl"). Holds names + roles.
-      //   fccnets/data/members/{id} = per-player career stats subcoll.
-      //                               One doc per member, written here.
-      //
-      // The roster blob is the source of truth for name→id resolution.
-      // Career writes live in their own subcollection so we don't have
-      // to rewrite the whole roster blob on every match-end. That also
-      // keeps the in-app context (which uses the blob) lean.
-      const membersBlob = await getDoc(doc(db, "fccnets", "members"));
-      let membersMap = {};
-      if (membersBlob.exists()) {
-        const raw = membersBlob.data()?.value;
-        if (raw) {
-          try { membersMap = JSON.parse(raw); }
-          catch (e) { console.error("members blob parse error:", e); }
-        }
-      }
-      const nameToId = {};
-      Object.entries(membersMap).forEach(([id, m]) => {
-        if (m?.name) nameToId[String(m.name).trim().toLowerCase()] = id;
+      // Pass the matchId explicitly — Firestore doc data doesn't include it.
+      await finalizeMatchStats({
+        db,
+        matchData: { ...matchData, matchId: safe.matchId },
+        abandoned: abandoned === true,
+        force: false,
       });
-      const resolve = (name) => nameToId[String(name || "").trim().toLowerCase()] || null;
-
-      // 6. Build the union of players who appeared and run a transaction each.
-      const allNames = new Set([...batters.keys(), ...bowlers.keys(), ...fielders.keys()]);
-      const opponentFor = (name) => {
-        const inSquad1 = (safe.squad1 || []).includes(name);
-        const inSquad2 = (safe.squad2 || []).includes(name);
-        if (inSquad1) return safe.team2 || team2Name;
-        if (inSquad2) return safe.team1 || team1Name;
-        return safe.team2 || team2Name;
-      };
-      const matchDate = safe.date || new Date().toISOString().slice(0, 10);
-
-      const txPromises = [];
-      for (const name of allNames) {
-        const playerId = resolve(name);
-        if (!playerId) {
-          console.log("Skipping external/unknown player:", name);
-          continue;
-        }
-        const batAgg = batters.get(name) || null;
-        const bowlAgg = bowlers.get(name) || null;
-        const fieldAgg = fielders.get(name) || null;
-        const ref = doc(db, "fccnets", "data", "members", playerId);
-
-        txPromises.push(runTransaction(db, async (tx) => {
-          const snap = await tx.get(ref);
-          const data = snap.exists() ? snap.data() : {};
-          const career = data.career || {};
-          const batting = career.batting || {
-            innings: 0, notOuts: 0, runs: 0, balls: 0, fours: 0, sixes: 0,
-            highest: 0, fifties: 0, hundreds: 0,
-          };
-          const bowling = career.bowling || {
-            overs: 0, maidens: 0, runs: 0, wickets: 0, fiveFors: 0, bestFigures: "0/0",
-          };
-          const fielding = career.fielding || { catches: 0, stumpings: 0, runOuts: 0 };
-
-          if (batAgg) {
-            batting.innings += 1;
-            if (batAgg.notOut) batting.notOuts += 1;
-            batting.runs  += batAgg.runs;
-            batting.balls += batAgg.balls;
-            batting.fours += batAgg.fours;
-            batting.sixes += batAgg.sixes;
-            if (batAgg.runs > batting.highest) batting.highest = batAgg.runs;
-            if (batAgg.fifty)   batting.fifties  += 1;
-            if (batAgg.hundred) batting.hundreds += 1;
-          }
-          if (bowlAgg) {
-            const newOvers = (bowling.overs || 0) + (bowlAgg.legalBalls / 6);
-            bowling.overs = Math.round(newOvers * 10) / 10;
-            // maidens stays 0 — per-over run aggregation deferred.
-            bowling.maidens += 0;
-            bowling.runs    += bowlAgg.runsConceded;
-            bowling.wickets += bowlAgg.wickets;
-            if (bowlAgg.fiveFor) bowling.fiveFors += 1;
-            const [curW, curR] = String(bowling.bestFigures || "0/0").split("/").map(n => parseInt(n, 10) || 0);
-            const isBetter = bowlAgg.wickets > curW || (bowlAgg.wickets === curW && bowlAgg.runsConceded < curR);
-            if (isBetter) bowling.bestFigures = `${bowlAgg.wickets}/${bowlAgg.runsConceded}`;
-          }
-          if (fieldAgg) {
-            fielding.catches   += fieldAgg.catches;
-            fielding.stumpings += fieldAgg.stumpings;
-            fielding.runOuts   += fieldAgg.runOuts;
-          }
-
-          tx.set(ref, {
-            career: { batting, bowling, fielding },
-            matchAppearances: arrayUnion({
-              matchId: safe.matchId,
-              date: matchDate,
-              opponent: opponentFor(name),
-              batting: batAgg || null,
-              bowling: bowlAgg || null,
-              fielding: fieldAgg || null,
-              abandoned: abandoned === true,
-            }),
-          }, { merge: true });
-        }));
-      }
-
-      await Promise.all(txPromises);
+      setFinalisedLocal(true);
     } catch (e) {
       console.error("finalizeMatch error:", e);
     } finally {
@@ -1701,6 +1505,32 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       if (typeof onBack === "function") onBack();
     }
   }
+
+  // ── Auto-finalise when 2nd innings ends naturally ────────────
+  // Triggered after every ball-record path (state-keyed effect avoids
+  // race conditions with async state updates inside the handlers).
+  // Tied at full overs is intentionally NOT auto-finalised — let the
+  // scorer disambiguate via "End match" so result text stays correct.
+  useEffect(() => {
+    if (readOnly || isLockedOut) return;
+    if (finalisedLocal || finalizingMatch) return;
+    if (innings !== 2) return;
+    const fullOvers = maxOvers * 6;
+    const allOut = wickets >= 10;
+    const oversDone = balls >= fullOvers;
+    const chased = target != null && score > target;
+    const tiedAtFullOvers = target != null && score === target && balls >= fullOvers;
+    const matchOver = allOut || oversDone || chased;
+    if (!matchOver) return;
+    if (tiedAtFullOvers && !allOut && !oversDone) return; // never hit but explicit
+    // Small grace window so any in-flight debounced write completes
+    // before we re-read the doc inside finalizeMatch.
+    const t = setTimeout(() => {
+      finalizeMatch({ abandoned: false });
+    }, 500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [score, wickets, balls, innings, target, finalisedLocal, readOnly, isLockedOut]);
 
   // End-match-early confirm sheet state (TASK 7).
   const [endMatchConfirm, setEndMatchConfirm] = useState(false);
