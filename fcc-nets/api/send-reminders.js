@@ -312,6 +312,11 @@ export default async function handler(req, res) {
       const results = [];
 
       for (const [name, playerSess] of Object.entries(byPlayer)) {
+        const testOnly = req.query.testOnly;
+        if (testOnly && name !== testOnly) {
+          skipped++;
+          continue;
+        }
         const member = members.find(m => m.name === name);
         if (!member?.email)                          { skipped++; continue; }
         if (!(member.emailDayBeforeReminder ?? true)) { skipped++; continue; }
@@ -325,20 +330,26 @@ export default async function handler(req, res) {
           ? buildHtml24hr(name, playerSess, reminder.date)
           : buildHtml48hr(name, playerSess, reminder.date);
 
-        try {
-          const r = await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              from: "FCC Training App <fcc_training_app@nordicanchor.dk>",
-              to: [member.email],
-              subject,
-              html,
-            }),
-          });
-          if (r.ok) { sent++; results.push({ name, status: "sent", type: reminder.type }); }
-          else { const e = await r.json(); results.push({ name, status: "failed", error: e }); }
-        } catch (e) { results.push({ name, status: "error", error: e.message }); }
+        const dryRun = req.query.dryRun === "true";
+        if (dryRun) {
+          sent++;
+          results.push({ name, status: "would-send", to: member.email, type: reminder.type });
+        } else {
+          try {
+            const r = await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                from: "FCC Training App <fcc_training_app@nordicanchor.dk>",
+                to: [member.email],
+                subject,
+                html,
+              }),
+            });
+            if (r.ok) { sent++; results.push({ name, status: "sent", type: reminder.type }); }
+            else { const e = await r.json(); results.push({ name, status: "failed", error: e }); }
+          } catch (e) { results.push({ name, status: "error", error: e.message }); }
+        }
 
         // Delay 350ms between emails to stay under Resend's 5/sec rate limit
         await delay(350);
