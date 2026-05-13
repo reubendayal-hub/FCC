@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useAppContext } from "../context/AppContext";
 import { db } from "../firebase";
 import { doc, getDoc } from "firebase/firestore";
+import WagonWheelDisplay from "../ui/WagonWheelDisplay";
 import Shell from "../ui/Shell";
 import SidebarNav from "../ui/SidebarNav";
 import BotNav from "../ui/BotNav";
@@ -100,6 +101,75 @@ export default function ProfileView() {
       })();
       return () => { cancelled = true; };
     }, [playerId]);
+
+    // ── Wagon-wheel shot aggregation (TASK 8) ──────────────────
+    // Walk careerDoc.matchAppearances, fetch each unique match doc
+    // once (Promise.all + Map dedupe), then filter events where the
+    // striker is this player and runs > 0. Cheaper than re-aggregating
+    // on every render and avoids inflating Firestore reads — we only
+    // hit each match once per profile session.
+    const [careerShots, setCareerShots] = useState([]);
+    const [shotsLoading, setShotsLoading] = useState(false);
+    const playerName = me?.name || currentUser?.name || null;
+    useEffect(() => {
+      const appearances = Array.isArray(careerDoc?.matchAppearances) ? careerDoc.matchAppearances : [];
+      if (appearances.length === 0 || !playerName) { setCareerShots([]); return; }
+      let cancelled = false;
+      setShotsLoading(true);
+      (async () => {
+        try {
+          const uniqueIds = [...new Set(appearances.map(a => a?.matchId).filter(Boolean))];
+          const matchSnaps = await Promise.all(
+            uniqueIds.map(id => getDoc(doc(db, "fccscorer", "data", "matches", id)).catch(() => null))
+          );
+          if (cancelled) return;
+          const collected = [];
+          const targetName = playerName.trim().toLowerCase();
+          matchSnaps.forEach(snap => {
+            if (!snap || !snap.exists()) return;
+            const data = snap.data();
+            const events = Array.isArray(data.events) ? data.events : [];
+            const matchTitle = data.title || `${data.team1 || "?"} vs ${data.team2 || "?"}`;
+            events.forEach(ev => {
+              if (!ev) return;
+              if (!ev.striker || ev.striker.trim().toLowerCase() !== targetName) return;
+              const runs = Number(ev.runs) || 0;
+              if (runs <= 0) return;
+              if (!ev.zone && !ev.tapPoint) return;
+              collected.push({
+                runs,
+                zone: ev.zone || null,
+                tapPoint: ev.tapPoint || null,
+                bowler: ev.bowler || null,
+                matchTitle,
+              });
+            });
+          });
+          setCareerShots(collected);
+        } catch (e) {
+          console.error("Wagon-wheel fetch error:", e);
+          if (!cancelled) setCareerShots([]);
+        } finally {
+          if (!cancelled) setShotsLoading(false);
+        }
+      })();
+      return () => { cancelled = true; };
+    }, [careerDoc, playerName]);
+
+    // ── Dismissal-map aggregation (TASK 9) ─────────────────────
+    // Counts career dismissal types from matchAppearances. Codes
+    // match the scorer (b / c / lbw / ro / st / hw).
+    const dismissalStats = useMemo(() => {
+      const apps = Array.isArray(careerDoc?.matchAppearances) ? careerDoc.matchAppearances : [];
+      const counts = {};
+      apps.forEach(ap => {
+        const t = ap?.batting?.dismissalType;
+        if (!t) return; // not-out or DNB
+        counts[t] = (counts[t] || 0) + 1;
+      });
+      const total = Object.values(counts).reduce((s, n) => s + n, 0);
+      return { counts, total };
+    }, [careerDoc]);
 
     const myChildren = (me.children||[]).map(cid => members.find(m=>m.id===cid)).filter(Boolean);
     const isPlayer = myTeams.length > 0;
@@ -1148,6 +1218,147 @@ export default function ProfileView() {
                       );
                     })}
                   </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* ── Wagon wheel (TASK 8) ─────────────────────────── */}
+          {(() => {
+            return (
+              <div style={{
+                background: `linear-gradient(135deg, ${STATS_PALETTE.navy} 0%, ${STATS_PALETTE.navyDk} 100%)`,
+                border: `1.5px solid rgba(201,168,76,0.4)`,
+                borderRadius: 14, padding: "18px 16px",
+                boxShadow: "0 6px 22px rgba(27,42,92,0.25)",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                  <span style={{ fontSize: 18 }}>🎯</span>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: "#fff", letterSpacing: 0.4 }}>Wagon wheel</span>
+                  {shotsLoading && (
+                    <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.5)" }}>
+                      loading…
+                    </span>
+                  )}
+                </div>
+                <div style={{ borderBottom: `2px solid ${STATS_PALETTE.gold}`, width: 40, marginBottom: 12 }} />
+
+                {careerShots.length === 0 ? (
+                  <div style={{
+                    textAlign: "center", padding: "20px 8px",
+                    color: "rgba(255,255,255,0.55)", fontSize: 12, fontStyle: "italic",
+                  }}>
+                    {shotsLoading ? "Loading shots…" : "No scoring shots recorded yet"}
+                  </div>
+                ) : (
+                  <>
+                    <WagonWheelDisplay shots={careerShots} />
+                    <div style={{
+                      textAlign: "center", marginTop: 10,
+                      fontSize: 11, color: "rgba(255,255,255,0.6)",
+                    }}>Total shots played: <strong style={{ color: STATS_PALETTE.goldLt }}>{careerShots.length}</strong></div>
+                    {/* Legend */}
+                    <div style={{
+                      display: "flex", justifyContent: "center", gap: 14, marginTop: 8,
+                      fontSize: 10, color: "rgba(255,255,255,0.6)",
+                    }}>
+                      <span><span style={{
+                        display: "inline-block", width: 8, height: 8, borderRadius: 4,
+                        background: "#27AE60", marginRight: 4, verticalAlign: "middle",
+                      }} />1–3</span>
+                      <span><span style={{
+                        display: "inline-block", width: 8, height: 8, borderRadius: 4,
+                        background: "#185FA5", marginRight: 4, verticalAlign: "middle",
+                      }} />4</span>
+                      <span><span style={{
+                        display: "inline-block", width: 8, height: 8, borderRadius: 4,
+                        background: "#C9A84C", marginRight: 4, verticalAlign: "middle",
+                      }} />6</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* ── Dismissal map (TASK 9) ───────────────────────── */}
+          {(() => {
+            const LABELS = {
+              b: "Bowled", c: "Caught", lbw: "LBW",
+              ro: "Run out", st: "Stumped", hw: "Hit wicket",
+            };
+            const COLOURS = {
+              b: "#C0392B", c: "#E67E22", lbw: "#F1C40F",
+              ro: "#185FA5", st: "#8E44AD", hw: "#E84393",
+            };
+            const { counts, total } = dismissalStats;
+            const rows = Object.entries(counts)
+              .map(([code, n]) => ({ code, n, pct: total > 0 ? (n * 100) / total : 0 }))
+              .sort((a, b) => b.n - a.n);
+            const maxN = rows.reduce((m, r) => Math.max(m, r.n), 0);
+
+            return (
+              <div style={{
+                background: `linear-gradient(135deg, ${STATS_PALETTE.navy} 0%, ${STATS_PALETTE.navyDk} 100%)`,
+                border: `1.5px solid rgba(201,168,76,0.4)`,
+                borderRadius: 14, padding: "18px 16px",
+                boxShadow: "0 6px 22px rgba(27,42,92,0.25)",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                  <span style={{ fontSize: 18 }}>📉</span>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: "#fff", letterSpacing: 0.4 }}>Dismissal map</span>
+                </div>
+                <div style={{ borderBottom: `2px solid ${STATS_PALETTE.gold}`, width: 40, marginBottom: 12 }} />
+
+                {total < 3 ? (
+                  <div style={{
+                    textAlign: "center", padding: "20px 8px",
+                    color: "rgba(255,255,255,0.55)", fontSize: 12, fontStyle: "italic",
+                  }}>Not enough innings yet for dismissal analysis.</div>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                      {rows.map(r => {
+                        const widthPct = maxN > 0 ? (r.n / maxN) * 100 : 0;
+                        const colour = COLOURS[r.code] || STATS_PALETTE.gold;
+                        const label  = LABELS[r.code] || r.code;
+                        const pctStr = r.pct.toFixed(0);
+                        return (
+                          <div key={r.code}>
+                            <div style={{
+                              display: "flex", justifyContent: "space-between", alignItems: "center",
+                              fontSize: 11, color: "rgba(255,255,255,0.8)", marginBottom: 3,
+                            }}>
+                              <span style={{ fontWeight: 700 }}>{label}</span>
+                              <span style={{ color: STATS_PALETTE.goldLt, fontWeight: 700 }}>
+                                {r.n} · {pctStr}%
+                              </span>
+                            </div>
+                            <div style={{
+                              height: 8, background: "rgba(255,255,255,0.08)", borderRadius: 4,
+                              overflow: "hidden",
+                            }}>
+                              <div style={{
+                                width: `${widthPct}%`, height: "100%", background: colour,
+                                borderRadius: 4, transition: "width 0.25s",
+                              }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {rows[0] && (
+                      <div style={{
+                        marginTop: 12, paddingTop: 10,
+                        borderTop: "1px solid rgba(201,168,76,0.25)",
+                        fontSize: 11, color: "rgba(255,255,255,0.7)", textAlign: "center",
+                      }}>
+                        Most common: <strong style={{ color: STATS_PALETTE.goldLt }}>
+                          {LABELS[rows[0].code] || rows[0].code}
+                        </strong> ({rows[0].pct.toFixed(0)}%)
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             );

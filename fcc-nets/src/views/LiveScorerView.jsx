@@ -447,6 +447,29 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
   const [freeHit, setFreeHit] = useState(false);
   const [extras, setExtras] = useState({ b: 0, lb: 0, w: 0, nb: 0 });
 
+  // ── Batting order (TASK 3) ──────────────────────────────────
+  // 5-slot top order picked at the start of each innings. Used to:
+  //   1. Pre-select the right player when a wicket falls.
+  //   2. Reset openers on start of innings 2.
+  //   3. Restore on reload from the persisted match doc.
+  // `battingOrderOpen` controls the picker modal. Auto-opens once per
+  // innings (when there's no saved order and no balls bowled). The
+  // matching "battingOrderInnings" ref prevents re-opening on every
+  // batters-change re-render.
+  const [battingOrder, setBattingOrder] = useState(() => {
+    const fromI2 = safe.innings2?.battingOrder;
+    const fromI1 = safe.innings1?.battingOrder;
+    if (safe.innings2 && Array.isArray(fromI2)) return fromI2;
+    if (Array.isArray(fromI1)) return fromI1;
+    return [];
+  });
+  const [battingOrderOpen, setBattingOrderOpen] = useState(false);
+  const battingOrderAutoOpenedRef = useRef({ 1: false, 2: false });
+  // BUG 2: Change-opening-batsmen sheet, accessible from More menu when
+  // ballsBowled === 0 (i.e. innings has not started). Lets the scorer
+  // swap the openers without going through a wicket flow.
+  const [changeBatsmenOpen, setChangeBatsmenOpen] = useState(false);
+
   const [nightMode, setNightMode] = useState(() => {
     try { return localStorage.getItem("fcc-scorer-night") === "1"; } catch { return false; }
   });
@@ -462,6 +485,15 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
   // Viewer-side break state derived from Firestore breakState field.
   // { reason, startedAtMs } or null.
   const [viewerBreak, setViewerBreak] = useState(null);
+  // TASK 5 — viewer-side mirrors of doc fields needed for the
+  // "match hasn't started" waiting screen.
+  const [viewerStatus, setViewerStatus] = useState(safe.status || "setup");
+  const [viewerEventsLen, setViewerEventsLen] = useState(
+    Array.isArray(safe.events) ? safe.events.length : 0
+  );
+  const [viewerLastScorerName, setViewerLastScorerName] = useState(
+    safe.lastScorerName || null
+  );
   const [inningsEnd, setInningsEnd] = useState(false);
   const [persona, setPersona] = useState("hype");
   const [commentary, setCommentary] = useState(`${COMMENTARY.hype.label} Good ball. Building pressure.`);
@@ -559,6 +591,20 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     }
   }, [wickets, balls, maxOvers, inningsEnd]);
 
+  // TASK 3 — auto-open the batting-order picker once per innings if
+  // nothing's been saved and the innings hasn't started. Only the
+  // scorer sees the prompt (viewers / locked-out scorers skip).
+  useEffect(() => {
+    if (readOnly || isLockedOut) return;
+    if (balls !== 0) return;
+    if (battingOrder.length > 0) return;
+    if (battingOrderAutoOpenedRef.current[innings]) return;
+    battingOrderAutoOpenedRef.current[innings] = true;
+    // Slight delay so it doesn't race with toss / wicket modals.
+    const t = setTimeout(() => setBattingOrderOpen(true), 250);
+    return () => clearTimeout(t);
+  }, [innings, balls, battingOrder.length, readOnly, isLockedOut]);
+
   // ── Firestore persistence (debounced 1200ms) ────────────────
   const saveTimer = useRef(null);
   useEffect(() => {
@@ -580,6 +626,8 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
           extras: { ...extras },
           target: innings === 1 ? null : target,
           dnb: [],
+          // TASK 3: persist user-picked top order. Empty = "skipped".
+          battingOrder: battingOrder.length > 0 ? battingOrder : null,
         };
         const i1Payload = innings === 1 ? currentInnings : (savedInnings1 || null);
         const i2Payload = innings === 2 ? currentInnings : null;
@@ -611,7 +659,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       }
     }, 1200);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
-  }, [score, wickets, balls, batters, bowler, extras, innings, target, inningsEnd, safe.matchId, readOnly, fowList, currentUser, isLockedOut]);
+  }, [score, wickets, balls, batters, bowler, extras, innings, target, inningsEnd, safe.matchId, readOnly, fowList, currentUser, isLockedOut, battingOrder]);
 
   // ── Latest event data for viewer replay/catch-up ────────────
   const latestEventsRef = useRef([]);
@@ -623,6 +671,11 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     const unsub = onSnapshot(ref, (snap) => {
       if (!snap.exists()) return;
       const data = snap.data();
+      // TASK 5 + TASK 6 — track status / scorer name / events length so
+      // we can show the waiting screen and the "Scored by …" caption.
+      setViewerStatus(data.status || "setup");
+      setViewerEventsLen(Array.isArray(data.events) ? data.events.length : 0);
+      if (data.lastScorerName) setViewerLastScorerName(data.lastScorerName);
       // Pick the live innings (2nd if exists else 1st)
       const isI2 = !!data.innings2;
       const innData = isI2 ? data.innings2 : data.innings1;
@@ -1665,15 +1718,21 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       extras: { ...extras },
       target: null,
       dnb: [],
+      battingOrder: battingOrder.length > 0 ? battingOrder : null,
     });
     setFowList([]);
     const t = score + 1;
     setTarget(t);
     setInnings(2);
     setScore(0); setWickets(0); setBalls(0);
+    // TASK 3 — reset openers from saved innings-2 batting order if any,
+    // otherwise fall back to the first two players in the squad.
+    const i2Order = safe.innings2?.battingOrder;
+    const opener0 = (Array.isArray(i2Order) && i2Order[0]) || squad2[0];
+    const opener1 = (Array.isArray(i2Order) && i2Order[1]) || squad2[1];
     setBatters([
-      { name: squad2[0], runs: 0, balls: 0, fours: 0, sixes: 0 },
-      { name: squad2[1], runs: 0, balls: 0, fours: 0, sixes: 0 },
+      { name: opener0, runs: 0, balls: 0, fours: 0, sixes: 0 },
+      { name: opener1, runs: 0, balls: 0, fours: 0, sixes: 0 },
     ]);
     setStriker(0);
     setBowler(squad1[0]);
@@ -1684,6 +1743,9 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     setHistory([]);
     // Reset per-bowler wicket tally for the new innings (different bowling side).
     bowlerWktsRef.current = {};
+    // Clear innings-1 batting order from local state; fresh prompt
+    // will auto-open for innings 2 if no order persisted yet.
+    setBattingOrder(Array.isArray(i2Order) ? i2Order : []);
   }
 
   // Computed
@@ -1714,6 +1776,96 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
 
   // ── Render ──────────────────────────────────────────────────
   const headerBg = `linear-gradient(180deg, ${SC.navy} 0%, ${SC.navyDk} 100%)`;
+
+  // TASK 5 — viewer + setup + no events → friendly waiting screen.
+  // Once status flips to "live" via onSnapshot, this branch falls
+  // through and the normal scorer chrome renders.
+  const showWaitingScreen = readOnly && viewerStatus === "setup" && viewerEventsLen === 0;
+  if (showWaitingScreen) {
+    return (
+      <div style={{
+        background: T.bg, minHeight: "100vh",
+        display: "flex", justifyContent: "center",
+        fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+        color: T.text,
+      }}>
+        <div style={{
+          width: "100%", maxWidth: 440, display: "flex", flexDirection: "column", minHeight: "100vh",
+          border: nightMode ? `1.5px solid rgba(201,168,76,0.45)` : `1px solid rgba(27,42,92,0.08)`,
+          boxShadow: nightMode
+            ? "0 0 0 1px rgba(201,168,76,0.15), 0 8px 32px rgba(0,0,0,0.4)"
+            : "0 8px 32px rgba(27,42,92,0.15)",
+        }}>
+          {/* Mini header with back + day/night toggle */}
+          <div style={{ background: headerBg, padding: "12px 16px 18px", color: "#fff" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <div onClick={onBack} style={{ fontSize: 22, lineHeight: 1, cursor: "pointer", color: SC.goldLt, paddingRight: 6 }}>‹</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: SC.gold, textTransform: "uppercase", letterSpacing: 1.2 }}>
+                📺 Watching · Pre-match
+              </div>
+              <div onClick={() => setNightMode(n => !n)}
+                style={{ position: "relative", width: 60, height: 24, borderRadius: 14, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)", cursor: "pointer", userSelect: "none", flexShrink: 0 }}>
+                <div style={{
+                  position: "absolute", top: 1, left: nightMode ? 34 : 1,
+                  width: 24, height: 20, borderRadius: 11,
+                  background: `linear-gradient(135deg, ${SC.gold} 0%, ${SC.goldLt} 100%)`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 11, transition: "left 0.22s ease",
+                }}>{nightMode ? "🌙" : "☀️"}</div>
+              </div>
+            </div>
+            <div style={{
+              textAlign: "center", marginTop: 14,
+              fontSize: 28, fontWeight: 900, letterSpacing: -0.5,
+              background: "linear-gradient(135deg, #FFFFFF 0%, #F0D060 100%)",
+              backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+            }}>{team1Name} vs {team2Name}</div>
+            <div style={{ textAlign: "center", marginTop: 6, fontSize: 14, color: "rgba(255,255,255,0.65)" }}>
+              {safe.date || "—"}{safe.time ? ` · ${safe.time}` : ""}
+            </div>
+          </div>
+
+          {/* Body */}
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "40px 24px 24px", textAlign: "center" }}>
+            <div style={{ fontSize: 64, lineHeight: 1, marginBottom: 16 }}>⏳</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: SC.gold, marginBottom: 8 }}>
+              Match has not started yet
+            </div>
+            <div style={{ fontSize: 13, color: T.textDim }}>
+              {safe.time ? `Check back at ${safe.time}` : "Check back soon"}
+            </div>
+            {safe.venue && (
+              <div style={{ fontSize: 12, color: T.textDim, marginTop: 14, fontStyle: "italic" }}>
+                Venue: {safe.venue}
+              </div>
+            )}
+
+            {/* Scorecard peek button — still useful even when empty */}
+            <button onClick={() => setScorecardOpen(true)}
+              style={{
+                marginTop: 28, padding: "10px 18px", borderRadius: 12,
+                background: "transparent", border: `1.5px solid ${SC.borderMid}`,
+                color: T.textDim, fontSize: 12, fontWeight: 700, cursor: "pointer",
+                letterSpacing: 0.4, textTransform: "uppercase",
+              }}>📊 View scorecard</button>
+          </div>
+
+          {/* Scorecard peek overlay (shared with normal view) */}
+          {scorecardOpen && (
+            <div style={{
+              position: "fixed", inset: 0, zIndex: 600,
+              background: nightMode ? SC.surfaceDk : SC.bg, overflowY: "auto",
+            }}>
+              <ScorecardView
+                match={{ ...safe, team1: team1Name, team2: team2Name, status: "setup" }}
+                onBack={() => setScorecardOpen(false)}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ background: T.bg, minHeight: "100vh", display: "flex", justifyContent: "center", fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", color: T.text, transition: "background 0.25s" }}>
@@ -1806,6 +1958,15 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
           <div style={{ textAlign: "center", fontSize: 12, color: SC.gold, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 2 }}>
             {team1Name} vs {team2Name}
           </div>
+          {/* TASK 6 — viewer-only scorer attribution */}
+          {readOnly && (viewerLastScorerName || safe.lastScorerName) && (
+            <div style={{
+              fontSize: 10, color: SC.gold, fontStyle: "italic",
+              textAlign: "center", marginTop: 1, opacity: 0.7,
+            }}>
+              Scored by {viewerLastScorerName || safe.lastScorerName}
+            </div>
+          )}
 
           {/* Score */}
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 2, marginTop: 4 }}>
@@ -2016,23 +2177,54 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
           </Sheet>
         )}
 
-        {modal === "newbatter" && (
-          <Sheet title="New batter in" onClose={close}>
-            <div style={{ fontSize: 13, color: SC.textDim, marginBottom: 12 }}>Select the incoming batter from the batting squad.</div>
-            {(innings === 1 ? squad1 : squad2)
-              .filter(p => !batters.find(b => b.name === p && !b.dismissal))
-              .map(p => (
-                <div key={p} onClick={() => {
-                  const nb = [...batters];
-                  nb[wicketStriker] = { name: p, runs: 0, balls: 0, fours: 0, sixes: 0 };
-                  setBatters(nb);
-                  setStriker(wicketStriker);
-                  close();
-                }}
-                  style={{ padding: "13px 14px", borderBottom: `1px solid ${SC.border}`, fontSize: 14, color: SC.navy, cursor: "pointer" }}>{p}</div>
-              ))}
-          </Sheet>
-        )}
+        {modal === "newbatter" && (() => {
+          // TASK 3 — suggested next batter from saved batting order.
+          // nextIdx = number of out batters in the current pair (0-indexed
+          // position of the incoming batter in the picked top order).
+          const outCount = batters.filter(b => b.dismissal).length;
+          const suggested = battingOrder[outCount];
+          const stillAvailable = (name) => name &&
+            !batters.find(b => b.name === name && !b.dismissal);
+          const suggestion = stillAvailable(suggested) ? suggested : null;
+          const available = (innings === 1 ? squad1 : squad2)
+            .filter(p => !batters.find(b => b.name === p && !b.dismissal));
+          // Hoist the suggested player to the top of the list visually.
+          const ordered = suggestion
+            ? [suggestion, ...available.filter(p => p !== suggestion)]
+            : available;
+          return (
+            <Sheet title="New batter in" onClose={close}>
+              <div style={{ fontSize: 13, color: SC.textDim, marginBottom: 12 }}>Select the incoming batter from the batting squad.</div>
+              {suggestion && (
+                <div style={{
+                  fontSize: 11, fontWeight: 700, color: SC.gold,
+                  textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 6,
+                }}>Suggested · From batting order</div>
+              )}
+              {ordered.map(p => {
+                const isSuggested = p === suggestion;
+                return (
+                  <div key={p} onClick={() => {
+                    const nb = [...batters];
+                    nb[wicketStriker] = { name: p, runs: 0, balls: 0, fours: 0, sixes: 0 };
+                    setBatters(nb);
+                    setStriker(wicketStriker);
+                    close();
+                  }}
+                    style={{
+                      padding: "13px 14px",
+                      borderBottom: `1px solid ${SC.border}`,
+                      fontSize: 14, color: SC.navy, cursor: "pointer",
+                      background: isSuggested ? "rgba(201,168,76,0.12)" : "transparent",
+                      fontWeight: isSuggested ? 700 : 500,
+                    }}>
+                    {isSuggested ? "★ " : ""}{p}
+                  </div>
+                );
+              })}
+            </Sheet>
+          );
+        })()}
 
         {modal === "bowler" && (
           <Sheet title="Select bowler" onClose={close}>
@@ -2092,19 +2284,34 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
           </Sheet>
         )}
 
-        {modal === "more" && (
+        {modal === "more" && (() => {
+          const battersOut = batters.filter(b => b.dismissal).length;
+          const canEditOrder = battingOrder.length > 0 && battersOut < battingOrder.length;
+          const items = [
+            { icon: "🔄", label: "Swap batsmen", onClick: () => { setStriker(s => s === 0 ? 1 : 0); close(); } },
+            // BUG 2 — swap openers before the first ball.
+            ...(balls === 0
+              ? [{ icon: "🔁", label: "Change batsmen", sub: "Swap openers before the first ball",
+                  onClick: () => { close(); setChangeBatsmenOpen(true); } }]
+              : []),
+            // TASK 3 — edit remaining batting order entries mid-innings.
+            ...(canEditOrder
+              ? [{ icon: "🧾", label: "Edit batting order",
+                  sub: `${battingOrder.length - battersOut} unbatted in order`,
+                  onClick: () => { close(); setBattingOrderOpen(true); } }]
+              : []),
+            { icon: "↻", label: "Replay last over", onClick: () => { triggerReplayLastOver(); close(); } },
+            { icon: "📊", label: "Open scorecard", onClick: () => { setScorecardOpen(true); close(); } },
+            { icon: "🎤", label: "Commentary voice", sub: `Now: ${COMMENTARY[persona].name}`, onClick: () => setModal("commentary") },
+            { icon: "🏏", label: "End innings now", onClick: () => { setInningsEnd(true); close(); } },
+            { icon: "🌗", label: `Switch to ${nightMode ? "day" : "night"} mode`, onClick: () => { setNightMode(n => !n); close(); } },
+            // TASK 7 — abandon match early, but persist stats anyway.
+            { icon: "🏁", label: "End match", sub: "Abandon match early — stats still saved",
+              onClick: () => { close(); setEndMatchConfirm(true); } },
+          ];
+          return (
           <Sheet title="More" onClose={close}>
-            {[
-              { icon: "🔄", label: "Swap batsmen", onClick: () => { setStriker(s => s === 0 ? 1 : 0); close(); } },
-              { icon: "↻", label: "Replay last over", onClick: () => { triggerReplayLastOver(); close(); } },
-              { icon: "📊", label: "Open scorecard", onClick: () => { setScorecardOpen(true); close(); } },
-              { icon: "🎤", label: "Commentary voice", sub: `Now: ${COMMENTARY[persona].name}`, onClick: () => setModal("commentary") },
-              { icon: "🏏", label: "End innings now", onClick: () => { setInningsEnd(true); close(); } },
-              { icon: "🌗", label: `Switch to ${nightMode ? "day" : "night"} mode`, onClick: () => { setNightMode(n => !n); close(); } },
-              // TASK 7 — abandon match early, but persist stats anyway.
-              { icon: "🏁", label: "End match", sub: "Abandon match early — stats still saved",
-                onClick: () => { close(); setEndMatchConfirm(true); } },
-            ].map(a => (
+            {items.map(a => (
               <div key={a.label} onClick={a.onClick}
                 style={{ padding: "14px 12px", borderBottom: `1px solid ${SC.border}`, display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
                 <div style={{ fontSize: 22, width: 30, textAlign: "center", flexShrink: 0 }}>{a.icon}</div>
@@ -2116,7 +2323,8 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
               </div>
             ))}
           </Sheet>
-        )}
+          );
+        })()}
 
         {/* ── PITCH PICKER ── */}
         {modal === "pitch" && pendingBall && (
@@ -2288,6 +2496,56 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
               ))}
             </div>
           </Sheet>
+        )}
+
+        {/* BUG 2 — Change opening batsmen before the first ball */}
+        {changeBatsmenOpen && !readOnly && !isLockedOut && (
+          <ChangeBatsmenSheet
+            squad={innings === 1 ? squad1 : squad2}
+            current={[batters[0]?.name, batters[1]?.name]}
+            onClose={() => setChangeBatsmenOpen(false)}
+            onSave={(strikerName, nonStrikerName) => {
+              setBatters(prev => {
+                const out = [...prev];
+                out[0] = { ...(out[0] || {}), name: strikerName, runs: 0, balls: 0, fours: 0, sixes: 0 };
+                out[1] = { ...(out[1] || {}), name: nonStrikerName, runs: 0, balls: 0, fours: 0, sixes: 0 };
+                return out;
+              });
+              setStriker(0);
+              setChangeBatsmenOpen(false);
+            }}
+          />
+        )}
+
+        {/* TASK 3 — Batting-order picker (auto-opens on innings start) */}
+        {battingOrderOpen && !readOnly && !isLockedOut && (
+          <BattingOrderSheet
+            squad={innings === 1 ? squad1 : squad2}
+            battingTeam={innings === 1 ? team1Name : team2Name}
+            currentOrder={battingOrder}
+            ballsBowled={balls}
+            onClose={() => setBattingOrderOpen(false)}
+            onSave={(order) => {
+              setBattingOrder(order);
+              // If openers can still be repositioned (no ball bowled),
+              // sync batters[0]/batters[1] to the top of the order.
+              if (balls === 0) {
+                setBatters(prev => {
+                  const out = [...prev];
+                  if (order[0]) out[0] = { ...(out[0] || {}), name: order[0], runs: 0, balls: 0, fours: 0, sixes: 0 };
+                  if (order[1]) out[1] = { ...(out[1] || {}), name: order[1], runs: 0, balls: 0, fours: 0, sixes: 0 };
+                  return out;
+                });
+                setStriker(0);
+              }
+              setBattingOrderOpen(false);
+            }}
+            onSkip={() => {
+              const sq = innings === 1 ? squad1 : squad2;
+              setBattingOrder(sq.slice(0, 5));
+              setBattingOrderOpen(false);
+            }}
+          />
         )}
 
         {/* Takeover approval modal (active-scorer side) — hidden once locked out */}
@@ -2748,6 +3006,168 @@ function ReplayOverlay({ replay, persona, onAdvance, onSkip, onDone }) {
           marginTop: 18, fontSize: 11, fontWeight: 700,
           color: SC.gold, textTransform: "uppercase", letterSpacing: 1,
         }}>Ball {index + 1} of {balls.length}</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Change opening batsmen sheet (BUG 2) ──────────────────────
+// Pre-first-ball-only safety net: lets the scorer swap the openers
+// before they've faced anything. Validates the two picks are
+// different players; Save commits to batters[0]/[1].
+function ChangeBatsmenSheet({ squad, current, onClose, onSave }) {
+  const [strikerName, setStrikerName]       = useState(current?.[0] || squad?.[0] || "");
+  const [nonStrikerName, setNonStrikerName] = useState(current?.[1] || squad?.[1] || "");
+  const dup = strikerName && strikerName === nonStrikerName;
+  return (
+    <div onClick={(e) => e.target === e.currentTarget && onClose()}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 700,
+        display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div style={{ width: "100%", maxWidth: 420, background: SC.surface, borderRadius: "20px 20px 0 0",
+        padding: "20px 18px 28px", boxShadow: "0 -8px 40px rgba(0,0,0,0.3)" }}>
+        <div style={{ width: 36, height: 4, background: SC.borderMid, borderRadius: 2, margin: "0 auto 14px" }} />
+        <div style={{ fontSize: 16, fontWeight: 800, color: SC.navy, marginBottom: 4, textAlign: "center" }}>
+          Change batsmen
+        </div>
+        <div style={{ fontSize: 12, color: SC.textDim, marginBottom: 16, textAlign: "center" }}>
+          Swap openers before the first ball
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <label style={{ display: "block" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: SC.textMuted,
+              textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>On strike</div>
+            <select value={strikerName} onChange={e => setStrikerName(e.target.value)}
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 10,
+                border: `1.5px solid ${SC.borderMid}`, fontSize: 14, background: "#fff",
+                fontFamily: "inherit", outline: "none", boxSizing: "border-box", color: SC.navy }}>
+              {(squad || []).map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </label>
+          <label style={{ display: "block" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: SC.textMuted,
+              textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Non-striker</div>
+            <select value={nonStrikerName} onChange={e => setNonStrikerName(e.target.value)}
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 10,
+                border: `1.5px solid ${SC.borderMid}`, fontSize: 14, background: "#fff",
+                fontFamily: "inherit", outline: "none", boxSizing: "border-box", color: SC.navy }}>
+              {(squad || []).map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </label>
+        </div>
+
+        {dup && (
+          <div style={{ fontSize: 11, color: SC.red, fontWeight: 700, marginTop: 10, textAlign: "center" }}>
+            Both batsmen must be different
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+          <button onClick={onClose} style={{
+            flex: 1, padding: "12px", borderRadius: 10,
+            background: "#fff", border: `1.5px solid ${SC.border}`, color: SC.textMuted,
+            fontWeight: 700, fontSize: 14, cursor: "pointer",
+          }}>Cancel</button>
+          <button onClick={() => !dup && onSave(strikerName, nonStrikerName)}
+            disabled={dup} style={{
+            flex: 1, padding: "12px", borderRadius: 10, border: "none",
+            background: dup ? "#e2e8f0" : `linear-gradient(135deg, ${SC.navy}, ${SC.navyDk})`,
+            color: dup ? "#94a3b8" : "#fff", fontWeight: 800, fontSize: 14,
+            cursor: dup ? "not-allowed" : "pointer",
+          }}>Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Batting-order picker (TASK 3) ─────────────────────────────
+// 5 dropdowns, slot labels "#1 (Opener)" / "#2 (Opener)" / "#3"..."#5".
+// Defaults to first five from squad. Duplicate prevention: if user
+// picks a player already in another slot, the other slot reverts to
+// the next available squad member that isn't already in the order.
+function BattingOrderSheet({ squad, battingTeam, currentOrder, ballsBowled, onClose, onSave, onSkip }) {
+  const [slots, setSlots] = useState(() => {
+    const initial = Array.from({ length: 5 }, (_, i) =>
+      (currentOrder && currentOrder[i]) || (squad && squad[i]) || ""
+    );
+    return initial;
+  });
+  const LABELS = ["#1 (Opener)", "#2 (Opener)", "#3", "#4", "#5"];
+
+  function setSlot(i, value) {
+    setSlots(prev => {
+      const next = [...prev];
+      // If the chosen value already exists elsewhere in the slots, swap
+      // the conflicting slot to the next-available squad name not yet in
+      // the order so we never end up with duplicates.
+      const dupIdx = next.findIndex((v, idx) => idx !== i && v === value);
+      next[i] = value;
+      if (dupIdx >= 0) {
+        const used = new Set(next);
+        const replacement = (squad || []).find(p => !used.has(p)) || "";
+        next[dupIdx] = replacement;
+      }
+      return next;
+    });
+  }
+
+  const allFilled = slots.every(Boolean);
+
+  return (
+    <div onClick={(e) => e.target === e.currentTarget && onClose()}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 700,
+        display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div style={{ width: "100%", maxWidth: 420, background: SC.surface, borderRadius: "20px 20px 0 0",
+        padding: "20px 18px 28px", boxShadow: "0 -8px 40px rgba(0,0,0,0.3)",
+        maxHeight: "92vh", overflowY: "auto" }}>
+        <div style={{ width: 36, height: 4, background: SC.borderMid, borderRadius: 2, margin: "0 auto 14px" }} />
+        <div style={{ fontSize: 16, fontWeight: 800, color: SC.navy, marginBottom: 4, textAlign: "center" }}>
+          Set batting order for {battingTeam}
+        </div>
+        <div style={{ fontSize: 12, color: SC.textDim, marginBottom: 16, textAlign: "center", lineHeight: 1.4 }}>
+          Pick your top 5. The rest will auto-fill from squad order.
+          {ballsBowled > 0 && (
+            <div style={{ fontSize: 11, color: SC.gold, fontWeight: 700, marginTop: 4 }}>
+              Innings already started — only unbatted slots can change.
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {LABELS.map((lbl, i) => (
+            <label key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: SC.textMuted,
+                textTransform: "uppercase", letterSpacing: 0.6, width: 84, flexShrink: 0 }}>{lbl}</div>
+              <select value={slots[i]} onChange={e => setSlot(i, e.target.value)}
+                style={{ flex: 1, padding: "10px 12px", borderRadius: 10,
+                  border: `1.5px solid ${SC.borderMid}`, fontSize: 14, background: "#fff",
+                  fontFamily: "inherit", outline: "none", boxSizing: "border-box", color: SC.navy }}>
+                {(squad || []).map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </label>
+          ))}
+        </div>
+
+        <div onClick={onSkip} style={{
+          textAlign: "center", fontSize: 12, color: SC.textDim, marginTop: 14,
+          textDecoration: "underline", cursor: "pointer",
+        }}>Skip — use squad order as is</div>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+          <button onClick={onClose} style={{
+            flex: 1, padding: "12px", borderRadius: 10,
+            background: "#fff", border: `1.5px solid ${SC.border}`, color: SC.textMuted,
+            fontWeight: 700, fontSize: 14, cursor: "pointer",
+          }}>Cancel</button>
+          <button onClick={() => allFilled && onSave(slots.slice(0, 5))} disabled={!allFilled}
+            style={{
+              flex: 1, padding: "12px", borderRadius: 10, border: "none",
+              background: allFilled ? `linear-gradient(135deg, ${SC.gold}, ${SC.goldLt})` : "#e2e8f0",
+              color: allFilled ? SC.navy : "#94a3b8", fontWeight: 800, fontSize: 14,
+              cursor: allFilled ? "pointer" : "not-allowed",
+            }}>Save</button>
+        </div>
       </div>
     </div>
   );

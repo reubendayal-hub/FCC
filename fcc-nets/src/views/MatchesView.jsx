@@ -5,7 +5,7 @@
 // BotNav, theme G from AppContext, Firestore onSnapshot)
 // ─────────────────────────────────────────────────────────────
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { db } from "../firebase";
 import {
   collection, doc, onSnapshot, setDoc, serverTimestamp, deleteDoc,
@@ -82,6 +82,29 @@ function generateMatchId() {
   return Array.from({ length: 6 }, () =>
     chars[Math.floor(Math.random() * chars.length)]
   ).join("");
+}
+
+// TASK 7 — format the date / time / range line for a match card.
+// Three modes:
+//   today  → "Today · 11:00 — 15:30"
+//   past + setup status → "⏰ Scheduled to start 11:00"   (overdue)
+//   future → "📅 Sat 18 May · 11:00 — 15:30"
+function formatMatchSchedule(match) {
+  const m = match.date ? new Date(match.date) : null;
+  if (!m) return "—";
+  const now = new Date();
+  const isToday = m.toDateString() === now.toDateString();
+  const isPast = m < new Date(now.toDateString());
+  const timeRange = match.time
+    ? `${match.time}${match.endTime ? ` — ${match.endTime}` : ""}`
+    : "";
+  if (isToday) return `Today${timeRange ? ` · ${timeRange}` : ""}`;
+  if (isPast && match.status === "setup") {
+    return `⏰ Scheduled to start ${match.time || "?"}`;
+  }
+  const dayName = m.toLocaleDateString("en-GB", { weekday: "short" });
+  const dayNum  = m.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  return `📅 ${dayName} ${dayNum}${timeRange ? ` · ${timeRange}` : ""}`;
 }
 
 export default function MatchesView({
@@ -560,10 +583,13 @@ function MatchCard({ G, match, onScore, onWatch, currentUser, userRole, showToas
   const meId = currentUser?.uid || currentUser?.id || null;
   const isScorer = match.scorerIds?.includes(meId) || match.createdBy === meId;
   const isLive   = match.status === "live";
+  const isSetup  = match.status === "setup";
   const isDone   = match.status === "completed" || match.status === "abandoned";
   const dateStr  = match.date
     ? new Date(match.date).toLocaleDateString("en-GB", { weekday:"short", day:"numeric", month:"short" })
     : "—";
+  // TASK 7 — friendly schedule line (today / future / past+setup variants).
+  const scheduleStr = formatMatchSchedule(match);
   // Resume gating (Task 3b): only show pulsing-red RESUME for the last scorer.
   const isMyResume = isLive && match.lastScorerId && meId && match.lastScorerId === meId;
   const scoreLabel = isMyResume ? "Resume scoring →" : "Score →";
@@ -605,7 +631,7 @@ function MatchCard({ G, match, onScore, onWatch, currentUser, userRole, showToas
               maxWidth:200, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
               {match.title || "Untitled match"}
             </div>
-            <div style={{ fontSize:11, color:G.muted }}>{dateStr} · {match.overs||"?"} ov</div>
+            <div style={{ fontSize:11, color:G.muted }}>{scheduleStr} · {match.overs||"?"} ov</div>
           </div>
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:8 }}>
@@ -683,9 +709,11 @@ function MatchCard({ G, match, onScore, onWatch, currentUser, userRole, showToas
           <button onClick={onScore} style={{ flex:1, padding:"9px 12px", borderRadius:9,
             background:isMyResume
               ? "linear-gradient(135deg,#dc2626,#991b1b)"
-              : `linear-gradient(135deg,${G.green},#14532d)`,
+              : isSetup
+                ? `linear-gradient(135deg,${G.navy},#152043)`
+                : `linear-gradient(135deg,${G.green},#14532d)`,
             border:"none", cursor:"pointer", fontSize:13, fontWeight:700, color:G.white }}>
-            {scoreLabel}
+            {isSetup ? "Start scoring →" : scoreLabel}
           </button>
         )}
         <button onClick={onWatch} style={{
@@ -710,8 +738,22 @@ function CreateMatchScreen({
   const [title,  setTitle]  = useState("");
   const [date,   setDate]   = useState(new Date().toISOString().slice(0,10));
   const [time,   setTime]   = useState("11:00");
+  const [endTime,setEndTime]= useState("");
   const [venue,  setVenue]  = useState("");
   const [overs,  setOvers]  = useState(20);
+
+  // TASK 4 — auto-suggest match end time from overs + start time.
+  // T20 → +3.5h, 50-over → +8h etc. Kicks in only when user leaves
+  // the end-time field blank; otherwise their entry wins.
+  const autoEndTime = useMemo(() => {
+    if (!time) return "";
+    const addHours = overs <= 10 ? 2 : overs <= 20 ? 3.5 : overs <= 35 ? 5 : 8;
+    const [h, m] = time.split(":").map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return "";
+    const start = new Date(2000, 0, 1, h, m);
+    const end = new Date(start.getTime() + addHours * 60 * 60 * 1000);
+    return `${String(end.getHours()).padStart(2, "0")}:${String(end.getMinutes()).padStart(2, "0")}`;
+  }, [time, overs]);
   const [type,   setType]   = useState("friendly");
   const [team1Name, setTeam1Name] = useState("FCC");
   const [team2Name, setTeam2Name] = useState("");
@@ -744,7 +786,8 @@ function CreateMatchScreen({
       const matchId = generateMatchId();
       await setDoc(doc(db, "fccscorer", "data", "matches", matchId), {
         matchId, title: title || `${team1Display} vs ${team2Display}`,
-        date, time, venue, overs, type,
+        date, time, endTime: endTime || autoEndTime || null,
+        venue, overs, type,
         team1: team1Display, team2: team2Display,
         fccTeam: fccTeam || null, fccTeam2: fccTeam2 || null,
         squad1, squad2,
@@ -800,6 +843,13 @@ function CreateMatchScreen({
             </FieldGroup>
             <FieldGroup G={G} label="Start time">
               <input type="time" value={time} onChange={e=>setTime(e.target.value)} style={inputStyle}/>
+            </FieldGroup>
+            <FieldGroup G={G} label="Expected end time (optional)">
+              <input type="time" value={endTime} onChange={e=>setEndTime(e.target.value)}
+                placeholder={autoEndTime} style={inputStyle}/>
+              <div style={{ fontSize:11, color:G.muted, marginTop:6 }}>
+                We'll suggest <strong>{autoEndTime || "—"}</strong> based on format if you skip
+              </div>
             </FieldGroup>
             <FieldGroup G={G} label="Venue">
               <input value={venue} onChange={e=>setVenue(e.target.value)}
