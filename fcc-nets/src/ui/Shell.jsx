@@ -1,8 +1,9 @@
 import React from "react";
 
 export default function Shell({children, sidebar, G}) {
+  G = G || {};
   return (
-    <div style={{fontFamily:"'DM Sans',sans-serif",background:G.bg,minHeight:"100vh",
+    <div style={{fontFamily:"'DM Sans',sans-serif",background:(G.bg ?? "#f8fafc"),minHeight:"100vh",
       display:"flex",justifyContent:"center",alignItems:"flex-start"}}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;0,800;0,900;1,400&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet"/>
       <style>{`
@@ -14,7 +15,7 @@ export default function Shell({children, sidebar, G}) {
             display:flex!important;flex-direction:column;align-items:flex-start;
             padding:40px 28px;width:240px;flex-shrink:0;
             min-height:100vh;position:sticky;top:0;align-self:flex-start;
-            background:${G.green};gap:20px;
+            background:${(G.green ?? "#1a6b38")};gap:20px;
           }
           .fcc-sidebar-logo{width:72px;height:72px;border-radius:50%;object-fit:cover;
             border:3px solid rgba(255,255,255,.3);display:block;}
@@ -25,7 +26,7 @@ export default function Shell({children, sidebar, G}) {
           .fcc-sidebar-links{display:flex;flex-direction:column;gap:4px;width:100%;margin-top:4px;}
           .fcc-mobile-only{display:none!important;}
           .fcc-app-pane{max-width:520px;width:100%;min-height:100vh;
-            border-left:1px solid ${G.border};border-right:1px solid ${G.border};}
+            border-left:1px solid ${(G.border ?? "#e2e8f0")};border-right:1px solid ${(G.border ?? "#e2e8f0")};}
         }
         @media(max-width:899px){
           .fcc-sidebar{display:none!important;}
@@ -36,7 +37,7 @@ export default function Shell({children, sidebar, G}) {
       {/* Sidebar slot — only visible on desktop via CSS */}
       {sidebar && <div className="fcc-sidebar">{sidebar}</div>}
       {/* Main content pane */}
-      <div className="fcc-app-pane" style={{position:"relative",paddingBottom:90,background:G.bg}}>
+      <div className="fcc-app-pane" style={{position:"relative",paddingBottom:90,background:(G.bg ?? "#f8fafc")}}>
         {children}
       </div>
     </div>
