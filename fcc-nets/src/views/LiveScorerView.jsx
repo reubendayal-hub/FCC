@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { db } from "../firebase";
 import { doc, setDoc, serverTimestamp, onSnapshot, arrayUnion } from "firebase/firestore";
 import ScorecardView from "./ScorecardView";
+import { pickCommentary, pickEventKey } from "../utils/commentaryGen";
 
 // ── Takeover constants ───────────────────────────────────────
 const TAKEOVER_PIN = "4321";
@@ -81,7 +82,9 @@ const PITCH_ZONES = [
   { id: "Short",          base: "#8C1810", sel: "#E0331E" },
 ];
 
-// ── Commentary (verbatim) ─────────────────────────────────────
+// ── Commentary (legacy persona-based) ─────────────────────────
+// Legacy persona-based commentary — superseded by pickCommentary from
+// utils/commentaryGen, kept for fallback / persona-button UI / replay.
 const COMMENTARY = {
   hype:{name:"Hype Man 🔥",label:"🔥",
     dot:["DEFENDED! Fortress!","Dot ball — pressure building!","Tight as a drum!"],
@@ -454,6 +457,13 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
   const [inningsEnd, setInningsEnd] = useState(false);
   const [persona, setPersona] = useState("hype");
   const [commentary, setCommentary] = useState(`${COMMENTARY.hype.label} Good ball. Building pressure.`);
+  // Second commentary line — surfaces 50/100/5-for milestones and the
+  // occasional end-of-over flavour. Auto-clears after 3 s via setTimeout.
+  const [milestoneLine, setMilestoneLine] = useState(null);
+  const milestoneTimerRef = useRef(null);
+  // Per-bowler wicket tally — used for 5-fer detection without depending
+  // on the event log round-trip. Map<bowlerName, wicketCount>.
+  const bowlerWktsRef = useRef({});
   const [history, setHistory] = useState([]);
   const [savedInnings1, setSavedInnings1] = useState(null);
 
@@ -671,6 +681,15 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       // ── Event-log driven celebrations (Task 2c) ──
       const events = Array.isArray(data.events) ? data.events : [];
       latestEventsRef.current = events;
+      // ── Viewer commentary sync (Task 1) ──
+      // Pull the most-recent event's composed commentary into local state
+      // every snapshot, so the viewer's line tracks the scorer's screen.
+      if (events.length > 0) {
+        const lastEvent = events[events.length - 1];
+        if (lastEvent && lastEvent.commentary) {
+          setCommentary(lastEvent.commentary);
+        }
+      }
       const prevLen = prevEventsLengthRef.current;
       if (prevLen == null) {
         // First hydration — don't fire celebrations for the whole backlog.
@@ -689,6 +708,16 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
             setCelebration({ type: "six", text: "SIX!! 🚀", sub: ev.commentary || ev.striker });
           } else if (ev.runs === 4) {
             setCelebration({ type: "four", text: "FOUR! 🏏", sub: `${ev.striker} finds the boundary` });
+          }
+          // ── Milestone surfacing on viewer ──
+          if (ev.milestone) {
+            const tag = ev.milestone;
+            const vars = { batter: ev.striker || "the batter", bowler: ev.bowler || "the bowler" };
+            const ms = tag === "fifty"   ? pickCommentary("milestone_fifty",   vars)
+                    : tag === "hundred"  ? pickCommentary("milestone_hundred", vars)
+                    : tag === "fiveFor"  ? pickCommentary("milestone_fiveFor", vars)
+                    : null;
+            if (ms) flashMilestone(ms);
           }
         });
         prevEventsLengthRef.current = events.length;
@@ -850,6 +879,18 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     setCommentary(s.commentary);
   }
 
+  // Show a milestone / end-of-over flavour line for ~3 s, then clear it.
+  function flashMilestone(line) {
+    if (!line) return;
+    setMilestoneLine(line);
+    if (milestoneTimerRef.current) clearTimeout(milestoneTimerRef.current);
+    milestoneTimerRef.current = setTimeout(() => setMilestoneLine(null), 3000);
+  }
+  // Clean up the timer on unmount.
+  useEffect(() => () => {
+    if (milestoneTimerRef.current) clearTimeout(milestoneTimerRef.current);
+  }, []);
+
   function setOverSlot(ballIndexBefore, label) {
     // ballIndexBefore = `balls` value before this delivery (count is 0..maxOvers*6)
     const slot = ballIndexBefore % 6;
@@ -869,6 +910,9 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
   }
 
   // ── Event log helper (Task 1) ───────────────────────────────
+  // delta MAY include a `commentary` override — use that in preference to
+  // the stale local-state `commentary`, since record-handlers compose the
+  // new line synchronously alongside the event push.
   function pushEvent(delta) {
     if (readOnly || isLockedOut) return;
     pendingEventsRef.current.push({
@@ -887,28 +931,31 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       label: null,
       runs: 0,
       wicket: null,
+      milestone: null,
       ...delta, // overrides
     });
   }
 
   // ── Ball recording ──────────────────────────────────────────
-  function recordRuns(runs) {
+  function recordRuns(runs, opts = {}) {
     if (readOnly || isLockedOut) return;
     pushHistory();
-    const newScore = score + runs;
     const newBalls = balls + 1;
     const label = runs === 0 ? "•" : String(runs);
     setOverSlot(balls, label);
-    setScore(newScore);
+    setScore(s => s + runs);
     setBalls(newBalls);
     // Update striker batter stats
+    const prevStrikerRuns = batters[striker]?.runs || 0;
+    const newStrikerRuns = prevStrikerRuns + runs;
+    const batName = batters[striker]?.name || "the batter";
     const nb = [...batters];
     nb[striker] = {
       ...nb[striker],
-      runs: nb[striker].runs + runs,
-      balls: nb[striker].balls + 1,
-      fours: nb[striker].fours + (runs === 4 ? 1 : 0),
-      sixes: nb[striker].sixes + (runs === 6 ? 1 : 0),
+      runs: newStrikerRuns,
+      balls: (nb[striker]?.balls || 0) + 1,
+      fours: (nb[striker]?.fours || 0) + (runs === 4 ? 1 : 0),
+      sixes: (nb[striker]?.sixes || 0) + (runs === 6 ? 1 : 0),
     };
     setBatters(nb);
     // Rotate on odd runs (except boundaries which the spec says "don't rotate striker")
@@ -919,23 +966,49 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     }
     // Free hit consumed
     if (freeHit) setFreeHit(false);
-    // Celebrate
-    const batName = nb[striker].name;
+
+    // ── New commentary generator ──
+    // opts.shotType / opts.zone may have been threaded from recordPendingBall.
+    const evKey = pickEventKey({
+      runs,
+      shotType: opts.shotType || null,
+      zone: opts.zone || activeZone || null,
+    });
+    const line = pickCommentary(evKey, { batter: batName, bowler });
+    setCommentary(line);
+
+    // Celebrations still fire for 4/6.
     if (runs === 6) {
       lastSixRef.current = newBalls;
-      setCelebration({ type: "six", text: "SIX!! 🚀", sub: getComm(persona, "six", { name: batName }) });
-      setCommentary(`${COMMENTARY[persona].label} ${getComm(persona, "six", { name: batName })}`);
+      setCelebration({ type: "six", text: "SIX!! 🚀", sub: line });
     } else if (runs === 4) {
       setCelebration({ type: "four", text: "FOUR! 🏏", sub: `${batName} finds the boundary` });
-      setCommentary(`${COMMENTARY[persona].label} ${getComm(persona, "four", { name: batName })}`);
-    } else if (runs === 0) {
-      setCommentary(`${COMMENTARY[persona].label} ${getComm(persona, "dot", { name: batName })}`);
-    } else {
-      setCommentary(`${COMMENTARY[persona].label} ${getComm(persona, "one", { name: batName })}`);
     }
+
+    // ── Milestone detection (striker 50 / 100) ──
+    let milestoneTag = null;
+    if (prevStrikerRuns < 50 && newStrikerRuns >= 50 && newStrikerRuns < 100) {
+      const ms = pickCommentary("milestone_fifty", { batter: batName });
+      flashMilestone(ms);
+      milestoneTag = "fifty";
+    }
+    if (prevStrikerRuns < 100 && newStrikerRuns >= 100) {
+      const ms = pickCommentary("milestone_hundred", { batter: batName });
+      flashMilestone(ms);
+      milestoneTag = "hundred";
+    }
+
+    // ── End-of-over flavour (~30% chance) ──
+    if (newBalls % 6 === 0 && Math.random() < 0.3 && !milestoneTag) {
+      const eo = pickCommentary("end_of_over", { bowler, batter: batName });
+      flashMilestone(eo);
+    }
+
     pushEvent({
       label: runs === 0 ? "•" : String(runs),
       runs,
+      commentary: line,
+      milestone: milestoneTag,
       over: Math.floor((newBalls - 1) / 6),
       ball: (newBalls - 1) % 6,
     });
@@ -960,8 +1033,10 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     });
     const label = labelOverride || (kind === "lb" ? "Wd+LB" : kind === "b" ? "Wd+B" : `Wd${totalAdd}`);
     setOverSlot(balls, label);
-    setCommentary(`${COMMENTARY[persona].label} ${getComm(persona, "wide")}`);
-    pushEvent({ label, runs: totalAdd });
+    const batName = batters[striker]?.name || "the batter";
+    const line = pickCommentary(pickEventKey({ extras: "wide" }), { batter: batName, bowler });
+    setCommentary(line);
+    pushEvent({ label, runs: totalAdd, commentary: line });
     // Wide doesn't count as a ball, no striker rotation, no free hit.
   }
 
@@ -997,8 +1072,10 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     if (!kind && batRuns % 2 === 1) {
       setStriker(s => (s === 0 ? 1 : 0));
     }
-    setCommentary(`${COMMENTARY[persona].label} ${getComm(persona, "noball")}`);
-    pushEvent({ label, runs: totalAdd });
+    const batName = batters[striker]?.name || "the batter";
+    const line = pickCommentary(pickEventKey({ extras: "noball" }), { batter: batName, bowler });
+    setCommentary(line);
+    pushEvent({ label, runs: totalAdd, commentary: line });
   }
 
   function recordBye(runs) {
@@ -1016,10 +1093,13 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     setBatters(nb);
     if (runs % 2 === 1) setStriker(s => (s === 0 ? 1 : 0));
     if (freeHit) setFreeHit(false);
-    setCommentary(`${COMMENTARY[persona].label} Bye — ${runs} run${runs === 1 ? "" : "s"}.`);
+    const batName = batters[striker]?.name || "the batter";
+    const line = pickCommentary(pickEventKey({ extras: "bye" }), { batter: batName, bowler });
+    setCommentary(line);
     pushEvent({
       label: `B${runs}`,
       runs,
+      commentary: line,
       over: Math.floor((newBalls - 1) / 6),
       ball: (newBalls - 1) % 6,
     });
@@ -1050,7 +1130,15 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       text: isDuck ? "Duck! 🦆" : "WICKET!",
       sub: `${batName} — ${wicketType}`,
     });
-    setCommentary(`${COMMENTARY[persona].label} ${getComm(persona, isDuck ? "duck" : "wicket", { name: batName })}`);
+    // ── New commentary generator ──
+    const wicketShape = { type: wicketType, fielder: fielder || null };
+    const evKey = pickEventKey({ wicket: wicketShape });
+    const line = pickCommentary(evKey, {
+      batter: batName,
+      bowler,
+      fielder: fielder || null,
+    });
+    setCommentary(line);
     // Append fall-of-wickets entry (Option A: client-built array).
     const fowEntry = {
       wicketNum: wickets + 1,
@@ -1060,10 +1148,26 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       over: `${Math.floor(newBalls / 6)}.${newBalls % 6}`,
     };
     setFowList(f => [...f, fowEntry]);
+
+    // ── 5-wicket-haul detection ──
+    // Track per-bowler wickets in a local ref so we don't depend on a
+    // round-trip through Firestore. Ref persists across renders.
+    const prevWktsForBowler = bowlerWktsRef.current[bowler] || 0;
+    const newWktsForBowler = prevWktsForBowler + 1;
+    bowlerWktsRef.current[bowler] = newWktsForBowler;
+    let milestoneTag = null;
+    if (prevWktsForBowler < 5 && newWktsForBowler >= 5) {
+      const ms = pickCommentary("milestone_fiveFor", { bowler });
+      flashMilestone(ms);
+      milestoneTag = "fiveFor";
+    }
+
     // Event-log row for the wicket ball.
     pushEvent({
       label: "W",
       runs: 0,
+      commentary: line,
+      milestone: milestoneTag,
       over: Math.floor((newBalls - 1) / 6),
       ball: (newBalls - 1) % 6,
       wicket: {
@@ -1167,34 +1271,6 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       return;
     }
 
-    // Composed commentary (uses chosen shot, not first-listed fallback).
-    const pitchDescMap = { "Yorker":"Yorker", "Full":"Full ball", "Good length":"Good length", "Back of length":"Back of length", "Short":"Short" };
-    const pitchDesc = pb.pitch ? (pitchDescMap[pb.pitch] || "") : "";
-    const shotName = activeShot || "";
-    const pcLabel = COMMENTARY[persona].label;
-    const batName = batters[striker]?.name || "";
-
-    // Dot-ball defensive flow — special-cased commentary using defensive/miss/leave
-    // arrays. Wagon wheel is skipped on this path so shotName is empty.
-    let composed;
-    if (pb.runs === 0 && pb.kind === "run" && pb.shotType) {
-      const dotEvt = pb.shotType === "miss" ? "miss"
-                  : pb.shotType === "leave" ? "leave"
-                  : "defensive";
-      const personaLine = getComm(persona, dotEvt, { name: batName });
-      const parts = [pitchDesc, personaLine].filter(Boolean);
-      composed = `${pcLabel} ${parts.join(" — ")}`;
-    } else {
-      const evt = pb.kind === "wicket" ? "wicket"
-                : pb.runs === 6 ? "six"
-                : pb.runs === 4 ? "four"
-                : pb.runs === 0 ? "dot"
-                : "one";
-      const personaLine = getComm(persona, evt, { name: batName });
-      const parts = [pitchDesc, shotName, personaLine].filter(Boolean);
-      composed = `${pcLabel} ${parts.join(", ")}`;
-    }
-
     if (pb.kind === "wicket") {
       // Send user into the existing wicket flow (need dismissal type / batter)
       setWicketStriker(striker);
@@ -1202,8 +1278,14 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       setModal("wicket");
       return;
     } else {
-      recordRuns(pb.runs);
-      setCommentary(composed);
+      // Thread shotType + zone through to recordRuns so the new commentary
+      // generator picks the correct sub-category (driven vs pulled vs
+      // edged for 4s, straight/legside/offside for 6s, defended/missed/
+      // leave for dots).
+      recordRuns(pb.runs, {
+        shotType: pb.shotType || dotShotType || null,
+        zone: activeZone || pb.zone || null,
+      });
     }
     setPendingBall(null);
     setActiveZone(null);
@@ -1320,6 +1402,8 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     setInningsEnd(false);
     setFreeHit(false);
     setHistory([]);
+    // Reset per-bowler wicket tally for the new innings (different bowling side).
+    bowlerWktsRef.current = {};
   }
 
   // Computed
@@ -1362,6 +1446,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
         @keyframes cfWaddle { 0%{transform:rotate(-18deg)} 100%{transform:rotate(18deg)} }
         @keyframes brkSway { 0%,100%{transform:rotate(-6deg)} 50%{transform:rotate(6deg)} }
         @keyframes brkRain { 0%,100%{transform:translateY(0); opacity:1} 50%{transform:translateY(10px); opacity:0.4} }
+        @keyframes msFade { from{opacity:0; transform:translateY(-2px)} to{opacity:1; transform:translateY(0)} }
       `}</style>
 
       <div style={{
@@ -1504,6 +1589,13 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
         <div onClick={() => setModal("commentary")}
           style={{ background: T.surface, padding: "10px 16px", borderTop: `1px solid ${SC.border}`, borderBottom: `1px solid ${SC.border}`, cursor: "pointer" }}>
           <div style={{ fontSize: 12, color: T.textDim, fontStyle: "italic", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{commentary}</div>
+          {milestoneLine && (
+            <div style={{
+              fontSize: 11, color: SC.gold, fontStyle: "italic", fontWeight: 700,
+              marginTop: 4, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis",
+              animation: "msFade 0.25s ease-out",
+            }}>{milestoneLine}</div>
+          )}
         </div>
 
         {/* ── Run buttons panel (hidden for viewers + locked-out scorers) ── */}
