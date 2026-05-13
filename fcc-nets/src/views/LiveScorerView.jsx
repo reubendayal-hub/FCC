@@ -742,9 +742,14 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
   }, [safe.matchId]);
 
   // Persist battingHand writebacks to the roster blob.
-  // Resolves the matching member by id (preferred) or name (fallback),
-  // sets battingHand, re-stringifies the array, and merges to Firestore.
+  // Resolves the matching member by name (case-insensitive), sets
+  // battingHand, re-stringifies the array, and merges to Firestore.
+  // Stored format is lowercase "right" | "left" to match the
+  // ProfileView edit form. The resolver above normalises both forms.
   async function persistRosterBattingHand(name, hand) {
+    // Normalise to lowercase legacy form for storage.
+    const stored = String(hand).toLowerCase() === "lh" || String(hand).toLowerCase() === "left"
+      ? "left" : "right";
     try {
       const ref = doc(db, "fccnets", "members");
       const snap = await getDoc(ref);
@@ -759,7 +764,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
         if (!m || typeof m !== "object" || !m.name) return m;
         if (String(m.name).trim().toLowerCase() === targetLc) {
           mutated = true;
-          return { ...m, battingHand: hand };
+          return { ...m, battingHand: stored };
         }
         return m;
       });
@@ -772,9 +777,14 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       if (member) rosterRef.current.set(targetLc, member);
       const nextRaw = typeof raw === "string" ? JSON.stringify(next) : next;
       await setDoc(ref, { value: nextRaw }, { merge: true });
-      console.log(`battingHand writeback ok: ${name} → ${hand}`);
+      console.log(`battingHand writeback ok: ${name} → ${stored}`);
     } catch (e) {
       console.error("battingHand writeback error:", e);
+      // Surface as a flash toast so the scorer notices.
+      try {
+        setLockoutToast("Couldn't save batting hand to profile");
+        setTimeout(() => setLockoutToast(null), 4000);
+      } catch {}
     }
   }
 

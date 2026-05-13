@@ -114,12 +114,13 @@ export default function ProfileView() {
     // Wagon-wheel viewing perspective ("RH" | "LH"). Defaults to the
     // player's own batting hand (legacy "right"/"left" → canonical
     // "RH"/"LH"), with a manual toggle below the wheel.
-    const ownHand = (() => {
+    // Wagon-wheel orientation is driven entirely by the player's saved
+    // batting hand (no user-facing toggle). Accepts legacy "left"/"right"
+    // and canonical "LH"/"RH" — normalised here.
+    const ownIsLH = (() => {
       const v = String(me?.battingHand || "").toLowerCase();
-      if (v === "lh" || v === "left") return "LH";
-      return "RH";
+      return v === "lh" || v === "left";
     })();
-    const [wagonPerspective, setWagonPerspective] = useState(ownHand);
     useEffect(() => {
       const appearances = Array.isArray(careerDoc?.matchAppearances) ? careerDoc.matchAppearances : [];
       if (appearances.length === 0 || !playerName) { setCareerShots([]); return; }
@@ -1088,7 +1089,15 @@ export default function ProfileView() {
             const batRuns = bat.runs    || 0;
             const batBalls= bat.balls   || 0;
             const dismissals = Math.max(0, batInns - batNo);
-            const batAvg = dismissals > 0 ? (batRuns / dismissals).toFixed(2) : "—";
+            // Cricket convention:
+            // - innings 0 → "—"
+            // - always not-out (innings - notOuts = 0) → "{runs}*"
+            // - else runs / dismissals to 2dp
+            const batAvg = batInns === 0
+              ? "—"
+              : dismissals === 0
+                ? `${batRuns}*`
+                : (batRuns / dismissals).toFixed(2);
             const batSR  = batBalls > 0   ? ((batRuns * 100) / batBalls).toFixed(1) : "—";
             const hs     = bat.highest ?? 0;
             const fifties= bat.fifties ?? 0;
@@ -1200,7 +1209,7 @@ export default function ProfileView() {
                         : "";
                       return (
                         <button key={i} type="button"
-                          onClick={() => ap?.matchId && setView(`live-${ap.matchId}`)}
+                          onClick={() => ap?.matchId && setView(`scorecard-${ap.matchId}`)}
                           style={{
                             background: "rgba(255,255,255,0.06)",
                             border: "1px solid rgba(201,168,76,0.18)",
@@ -1266,20 +1275,20 @@ export default function ProfileView() {
                   </div>
                 ) : (
                   <>
-                    {/* Per-shot mirror normalisation: if a ball was
-                        recorded with battingHand that differs from the
-                        chosen perspective, reflect its tapPoint x and
-                        flip its zone before plotting so all dots appear
-                        in the chosen frame. Zone IDs are flipped by a
-                        small static map below. */}
+                    {/* Per-shot mirror: flip a shot's x if it was
+                        recorded as LH (event.battingHand) and the
+                        player's own hand is RH — or vice versa. The
+                        SVG itself mirrors via scaleX(-1) only when
+                        the player is LH; labels stay outside that
+                        transform inside WagonWheelDisplay. */}
                     <WagonWheelDisplay
-                      mirror={wagonPerspective === "LH"}
+                      mirror={ownIsLH}
                       shots={careerShots.map(s => {
-                        const sh = s.battingHand
-                          ? String(s.battingHand).toUpperCase()
-                          : "RH";
-                        if (sh === wagonPerspective) return s;
-                        // Flip x for tapPoint, and mirror the zone id.
+                        const shotHand = s.battingHand
+                          ? String(s.battingHand).toLowerCase()
+                          : (ownIsLH ? "left" : "right");
+                        const shotIsLH = shotHand === "lh" || shotHand === "left";
+                        if (shotIsLH === ownIsLH) return s;
                         const flipped = { ...s };
                         if (s.tapPoint) {
                           flipped.tapPoint = { x: 220 - s.tapPoint.x, y: s.tapPoint.y };
@@ -1297,26 +1306,6 @@ export default function ProfileView() {
                         return flipped;
                       })}
                     />
-                    {/* Manual RH / LH perspective toggle */}
-                    <div style={{
-                      display: "flex", justifyContent: "center",
-                      gap: 6, marginTop: 10,
-                    }}>
-                      {["RH", "LH"].map(p => (
-                        <button key={p}
-                          onClick={() => setWagonPerspective(p)}
-                          style={{
-                            padding: "5px 14px", borderRadius: 16,
-                            background: wagonPerspective === p
-                              ? `linear-gradient(135deg, ${STATS_PALETTE.gold}, ${STATS_PALETTE.goldLt})`
-                              : "transparent",
-                            border: `1px solid ${wagonPerspective === p ? STATS_PALETTE.gold : "rgba(255,255,255,0.2)"}`,
-                            color: wagonPerspective === p ? STATS_PALETTE.navy : "rgba(255,255,255,0.65)",
-                            fontSize: 10, fontWeight: 800, letterSpacing: 0.6,
-                            cursor: "pointer", textTransform: "uppercase",
-                          }}>View as {p}</button>
-                      ))}
-                    </div>
                     <div style={{
                       textAlign: "center", marginTop: 10,
                       fontSize: 11, color: "rgba(255,255,255,0.6)",

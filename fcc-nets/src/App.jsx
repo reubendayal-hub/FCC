@@ -132,6 +132,25 @@ function LiveScorerLoader({ matchId, onBack, currentUser }) {
   return <LiveScorerView match={match} onBack={onBack} currentUser={currentUser} />;
 }
 
+// Loader for the standalone ScorecardView (navy hero tile, totals,
+// FOW timeline, etc). Distinct from LiveScorecardLoader which renders
+// the read-only LiveScorerView. Used by Profile "last 5 innings" rows.
+function ScorecardLoader({ matchId, onBack }) {
+  const [match, setMatch] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    const unsub = fsOnSnapshot(
+      fsDoc(fsDb, "fccscorer", "data", "matches", matchId),
+      (snap) => { setMatch(snap.exists() ? { id: snap.id, matchId: snap.id, ...snap.data() } : null); setLoaded(true); },
+      (err) => { console.error("Scorecard load error:", err); setLoaded(true); }
+    );
+    return unsub;
+  }, [matchId]);
+  if (!loaded) return <div style={{padding:40,textAlign:"center",color:"#64748b"}}>Loading scorecard…</div>;
+  if (!match) return <div style={{padding:40,textAlign:"center",color:"#64748b"}}>Match not found</div>;
+  return <ScorecardView match={match} onBack={onBack} />;
+}
+
 
 // Storage keys moved to src/hooks/useFirestore.js (Pass 4) — were
 // only used inside the Firestore-loader effect and save functions.
@@ -2690,6 +2709,15 @@ export default function App() {
   if (view.startsWith("live-")) {
     const matchId = view.replace("live-", "");
     return <LiveScorecardLoader matchId={matchId} currentUser={currentUser} onBack={() => setView("scorelive")} />;
+  }
+
+  if (view.startsWith("scorecard-")) {
+    const matchId = view.replace("scorecard-", "");
+    return (
+      <DebugBoundary>
+        <ScorecardLoader matchId={matchId} onBack={() => setView("profile")} />
+      </DebugBoundary>
+    );
   }
 
   if (view === "scorelive" || view.startsWith("scorer-")) {
