@@ -7,7 +7,9 @@ import { FCC_LOGO } from "../constants/logo";
 import BackBtn from "./BackBtn";
 
 export default function AppHeader({ onBack, title, sub, children }) {
-  const { G, currentUser, handleLogout } = useAppContext();
+  const ctx = useAppContext();
+  const G = ctx.G || { green:"#1a6b38", white:"#fff", lime:"#84cc16" };
+  const { currentUser, handleLogout } = ctx;
   return (
     <div style={{background:G.green,padding:"12px 16px",
       position:"sticky",top:0,zIndex:100}}>

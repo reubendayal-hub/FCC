@@ -76,6 +76,80 @@ import SessionDetailView from "./views/SessionDetailView";
 import ProfileView from "./views/ProfileView";
 import CaptainXIView from "./views/CaptainXIView";
 import AdminView from "./views/AdminView";
+import MatchesView from "./views/MatchesView";
+import ScorecardView from "./views/ScorecardView";
+import LiveScorerView from "./views/LiveScorerView";
+import { doc as fsDoc, onSnapshot as fsOnSnapshot } from "firebase/firestore";
+import { db as fsDb } from "./firebase";
+
+class DebugBoundary extends React.Component {
+  constructor(p){ super(p); this.state = { err: null }; }
+  static getDerivedStateFromError(err){ return { err }; }
+  componentDidCatch(err, info){ console.error("DebugBoundary caught:", err, info); }
+  render(){
+    if (this.state.err) {
+      return (
+        <div style={{padding:20,fontFamily:"monospace",background:"#fee",
+          color:"#900",whiteSpace:"pre-wrap",minHeight:"100vh"}}>
+          <div style={{fontWeight:700,marginBottom:8}}>MatchesView render error:</div>
+          <div>{String(this.state.err?.stack || this.state.err)}</div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function LiveScorecardLoader({ matchId, onBack, currentUser }) {
+  const [match, setMatch] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    const unsub = fsOnSnapshot(
+      fsDoc(fsDb, "fccscorer", "data", "matches", matchId),
+      (snap) => { setMatch(snap.exists() ? { id: snap.id, matchId: snap.id, ...snap.data() } : null); setLoaded(true); },
+      (err) => { console.error("Live scorecard load error:", err); setLoaded(true); }
+    );
+    return unsub;
+  }, [matchId]);
+  if (!loaded) return <div style={{padding:40,textAlign:"center",color:"#64748b"}}>Loading scorecard…</div>;
+  if (!match) return <div style={{padding:40,textAlign:"center",color:"#64748b"}}>Match not found</div>;
+  return <LiveScorerView match={match} onBack={onBack} currentUser={currentUser} readOnly={true} />;
+}
+
+function LiveScorerLoader({ matchId, onBack, currentUser }) {
+  const [match, setMatch] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    const unsub = fsOnSnapshot(
+      fsDoc(fsDb, "fccscorer", "data", "matches", matchId),
+      (snap) => { setMatch(snap.exists() ? { id: snap.id, ...snap.data() } : null); setLoaded(true); },
+      (err) => { console.error("Live scorer load error:", err); setLoaded(true); }
+    );
+    return unsub;
+  }, [matchId]);
+  if (!loaded) return <div style={{padding:40,textAlign:"center",color:"#64748b"}}>Loading scorer…</div>;
+  if (!match) return <div style={{padding:40,textAlign:"center",color:"#64748b"}}>Match not found</div>;
+  return <LiveScorerView match={match} onBack={onBack} currentUser={currentUser} />;
+}
+
+// Loader for the standalone ScorecardView (navy hero tile, totals,
+// FOW timeline, etc). Distinct from LiveScorecardLoader which renders
+// the read-only LiveScorerView. Used by Profile "last 5 innings" rows.
+function ScorecardLoader({ matchId, onBack }) {
+  const [match, setMatch] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    const unsub = fsOnSnapshot(
+      fsDoc(fsDb, "fccscorer", "data", "matches", matchId),
+      (snap) => { setMatch(snap.exists() ? { id: snap.id, matchId: snap.id, ...snap.data() } : null); setLoaded(true); },
+      (err) => { console.error("Scorecard load error:", err); setLoaded(true); }
+    );
+    return unsub;
+  }, [matchId]);
+  if (!loaded) return <div style={{padding:40,textAlign:"center",color:"#64748b"}}>Loading scorecard…</div>;
+  if (!match) return <div style={{padding:40,textAlign:"center",color:"#64748b"}}>Match not found</div>;
+  return <ScorecardView match={match} onBack={onBack} />;
+}
 
 
 // Storage keys moved to src/hooks/useFirestore.js (Pass 4) — were
@@ -230,7 +304,19 @@ export default function App() {
   // joinRequests / auditLog / reminderLogs live in useFirestore.
 
   // App view
-  const [view,     setView]     = useState("schedule");
+  // TASK 5 — deep-link routing for /live/{matchId}. When the user lands
+  // on a /live/{id} URL (e.g. from a shared WhatsApp link), jump
+  // straight into the live viewer for that match rather than the
+  // default schedule view. The remaining "starts with live-" route
+  // logic below already handles this view-name shape.
+  const initialView = (() => {
+    try {
+      const m = window.location.pathname.match(/^\/live\/([A-Za-z0-9_-]+)/);
+      if (m) return `live-${m[1]}`;
+    } catch {}
+    return "schedule";
+  })();
+  const [view,     setView]     = useState(initialView);
   const [selSess,  setSelSess]  = useState(null);
   const [toast,    setToast]    = useState(null);
   // showToast defined here (used by useAuth and elsewhere) — moved up from
@@ -2619,6 +2705,54 @@ export default function App() {
   // RENDER: Captain's Playing XI
   // ════════════════════════════════════════════════════════════
   if(view==="captainxi") return <CaptainXIView />;
+
+  if (view.startsWith("live-")) {
+    const matchId = view.replace("live-", "");
+    return <LiveScorecardLoader matchId={matchId} currentUser={currentUser} onBack={() => setView("scorelive")} />;
+  }
+
+  if (view.startsWith("scorecard-")) {
+    const matchId = view.replace("scorecard-", "");
+    return (
+      <DebugBoundary>
+        <ScorecardLoader matchId={matchId} onBack={() => setView("profile")} />
+      </DebugBoundary>
+    );
+  }
+
+  if (view === "scorelive" || view.startsWith("scorer-")) {
+    if (view.startsWith("scorer-")) {
+      const matchId = view.replace("scorer-", "");
+      return (
+        <DebugBoundary>
+          <LiveScorerLoader matchId={matchId} currentUser={currentUser} onBack={() => setView("scorelive")} />
+        </DebugBoundary>
+      );
+    }
+    console.log("rendering MatchesView", view);
+    try {
+      return (
+        <DebugBoundary>
+          <MatchesView
+            view={view}
+            setView={setView}
+            userRole={userRole}
+            currentUser={currentUser}
+            members={members}
+            teams={teams}
+            pendingCount={joinRequests.filter(r => r.status === "pending").length}
+            toast={toast}
+            showToast={showToast}
+            SidebarNav={SidebarNav}
+            handleLogout={handleLogout}
+          />
+        </DebugBoundary>
+      );
+    } catch (e) {
+      console.error("MatchesView JSX threw:", e);
+      return <div style={{padding:20,color:"#900"}}>MatchesView JSX error: {String(e)}</div>;
+    }
+  }
 
   // ════════════════════════════════════════════════════════════
   // RENDER: Team Availability
