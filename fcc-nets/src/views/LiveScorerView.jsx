@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { db } from "../firebase";
-import { doc, setDoc, serverTimestamp, onSnapshot, arrayUnion } from "firebase/firestore";
+import {
+  doc, setDoc, serverTimestamp, onSnapshot, arrayUnion,
+  collection as fsCollection, getDocs, getDoc, runTransaction,
+} from "firebase/firestore";
 import ScorecardView from "./ScorecardView";
 import { pickCommentary, pickEventKey } from "../utils/commentaryGen";
 
@@ -229,7 +232,9 @@ function BreakScreen({ reason, elapsed, onResume, startedAtMs }) {
 }
 
 // ── Innings end ───────────────────────────────────────────────
-function InningsEnd({ score, wickets, balls, maxOvers, battingTeam, innings, target, onStart2nd, onClose }) {
+// TASK 6: at the 2nd-innings end we offer a gold "Save match & exit"
+// button that calls finalizeMatch(); this is the natural saving path.
+function InningsEnd({ score, wickets, balls, maxOvers, battingTeam, innings, target, onStart2nd, onClose, onSaveExit, saving }) {
   const reason = wickets >= 10 ? "All out" : `${maxOvers} overs completed`;
   const won = innings === 2 && score >= (target || 999);
   const tied = innings === 2 && score === (target || 999) - 1 && balls >= maxOvers * 6;
@@ -254,9 +259,12 @@ function InningsEnd({ score, wickets, balls, maxOvers, battingTeam, innings, tar
           </div>
         </div>
       )}
-      <div style={{ display: "flex", gap: 10 }}>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
         {innings === 1 && (
           <button onClick={onStart2nd} style={{ marginTop: 12, padding: "16px 44px", borderRadius: 16, background: `linear-gradient(135deg, ${SC.gold} 0%, ${SC.goldLt} 100%)`, color: SC.navy, fontSize: 17, fontWeight: 800, border: "none", cursor: "pointer", boxShadow: "0 4px 20px rgba(201,168,76,0.5)" }}>Start 2nd Innings →</button>
+        )}
+        {innings === 2 && onSaveExit && (
+          <button onClick={onSaveExit} disabled={saving} style={{ marginTop: 12, padding: "16px 28px", borderRadius: 16, background: saving ? "rgba(255,255,255,0.15)" : `linear-gradient(135deg, ${SC.gold} 0%, ${SC.goldLt} 100%)`, color: saving ? "rgba(255,255,255,0.6)" : SC.navy, fontSize: 15, fontWeight: 800, border: "none", cursor: saving ? "default" : "pointer", boxShadow: saving ? "none" : "0 4px 20px rgba(201,168,76,0.5)" }}>{saving ? "Saving stats…" : "Save match & exit"}</button>
         )}
         <button onClick={onClose} style={{ marginTop: 12, padding: "16px 28px", borderRadius: 16, background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: 15, fontWeight: 700, border: `1px solid ${SC.gold}`, cursor: "pointer" }}>Close</button>
       </div>
@@ -1140,12 +1148,23 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     });
     setCommentary(line);
     // Append fall-of-wickets entry (Option A: client-built array).
+    // FIX 3: enrich with dismissalType + fielder so the ScorecardView reader
+    // can render rich strings (e.g. "Smith c Jones b Patel · 8.2 ov"). Codes
+    // chosen to be compact in Firestore and forward-compatible:
+    //   b   bowled    c   caught    lbw  leg-before
+    //   ro  run out   st  stumped   hw   hit wicket
+    const DISMISSAL_CODE = {
+      "Bowled": "b", "Caught": "c", "LBW": "lbw",
+      "Run out": "ro", "Stumped": "st", "Hit wicket": "hw",
+    };
     const fowEntry = {
       wicketNum: wickets + 1,
       teamScore: score,
       batter: batName,
       bowler,
       over: `${Math.floor(newBalls / 6)}.${newBalls % 6}`,
+      dismissalType: DISMISSAL_CODE[wicketType] || null,
+      fielder: fielder || null,
     };
     setFowList(f => [...f, fowEntry]);
 
@@ -1372,6 +1391,248 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     });
   }
 
+  // ── Match finalization & stats persistence (TASK 6) ────────
+  // Wraps up the match: flushes any pending events, marks the doc completed,
+  // then walks the events log to build per-player batting / bowling / fielding
+  // aggregates and folds them into fccnets/data/members/{id} career rollups
+  // (each player resolved by case-insensitive name match against the members
+  // collection). Players not in the lookup are skipped silently — handles
+  // friendlies / external opponents without exploding.
+  //
+  // Known limitations (documented in commit):
+  //   - maidens = 0 always (per-over run aggregation deferred).
+  //   - opponent on matchAppearance: chosen via squad membership; if the
+  //     player isn't in either squad it falls back to safe.team2.
+  const [finalizingMatch, setFinalizingMatch] = useState(false);
+  async function finalizeMatch({ abandoned } = { abandoned: false }) {
+    if (readOnly || isLockedOut) return;
+    if (!safe.matchId) return;
+    if (finalizingMatch) return;
+    setFinalizingMatch(true);
+    try {
+      // 1. Flush any pending events to Firestore first so nothing is lost.
+      const pending = pendingEventsRef.current.slice();
+      pendingEventsRef.current = [];
+      const flushPayload = {};
+      if (pending.length > 0) flushPayload.events = arrayUnion(...pending);
+      if (pending.length > 0) {
+        await setDoc(doc(db, "fccscorer", "data", "matches", safe.matchId),
+          flushPayload, { merge: true });
+      }
+
+      // 2. Mark match completed/abandoned.
+      await setDoc(doc(db, "fccscorer", "data", "matches", safe.matchId), {
+        status: "completed",
+        completedAt: serverTimestamp(),
+        abandoned: abandoned === true,
+      }, { merge: true });
+
+      // 3. Re-read the doc to get the canonical events array (post-flush).
+      const matchSnap = await getDoc(doc(db, "fccscorer", "data", "matches", safe.matchId));
+      const matchData = matchSnap.exists() ? matchSnap.data() : {};
+      const events = Array.isArray(matchData.events) ? matchData.events : [];
+
+      // 4. Per-player aggregation. Helpers below classify labels:
+      //    - isLegal: ball that counts toward the bowler's legal-balls tally.
+      //    - isExtraOnly: deliveries where the runs do NOT count to the batter
+      //      (byes/legbyes/wides). No-balls + bat-runs DO count toward the
+      //      batter, hence the distinction.
+      const isLegalBall = (lbl) => {
+        if (!lbl) return false;
+        if (/^Wd/.test(lbl)) return false;
+        if (/^Nb/.test(lbl)) return false;
+        return true;
+      };
+      const isExtraRunsOnly = (lbl) => {
+        // Bye / leg-bye / wide-only — runs are extras, not batter's.
+        if (!lbl) return false;
+        if (/^B\d*$/.test(lbl)) return true;       // bye
+        if (/^LB\d*$/.test(lbl)) return true;      // leg-bye (legacy)
+        if (/^Wd/.test(lbl)) return true;          // wide variants
+        // No-ball+B / No-ball+LB → extras only
+        if (lbl === "Nb+B" || lbl === "Nb+LB") return true;
+        return false;
+      };
+
+      // batter aggregates: key = name, value = aggregate
+      const batters = new Map();        // name → { innings, runs, balls, fours, sixes, dismissalType, notOut }
+      const dismissed = new Map();      // name → wicket type seen (truthy = out)
+      const bowlers = new Map();        // name → { legalBalls, runsConceded, wickets, fiveFor }
+      const fielders = new Map();       // name → { catches, stumpings, runOuts }
+
+      for (const ev of events) {
+        const lbl = ev.label || "";
+        const evInnings = ev.innings || 1;
+
+        // ── Batter side ─────────────────────────────────────────
+        if (ev.striker) {
+          if (!batters.has(ev.striker)) {
+            batters.set(ev.striker, {
+              innings: evInnings,
+              runs: 0, balls: 0, fours: 0, sixes: 0,
+              notOut: true, dismissalType: null,
+            });
+          }
+          const b = batters.get(ev.striker);
+          if (isLegalBall(lbl)) b.balls += 1;
+          if (!isExtraRunsOnly(lbl)) {
+            const runs = Number(ev.runs) || 0;
+            b.runs += runs;
+            if (runs === 4) b.fours += 1;
+            if (runs === 6) b.sixes += 1;
+          }
+        }
+
+        // ── Bowler side ─────────────────────────────────────────
+        if (ev.bowler) {
+          if (!bowlers.has(ev.bowler)) {
+            bowlers.set(ev.bowler, { legalBalls: 0, runsConceded: 0, wickets: 0 });
+          }
+          const bo = bowlers.get(ev.bowler);
+          // Legal-balls: anything not a wide. (No-balls *are* counted toward
+          // legalBalls per the spec's note; spec says "Nb counts as bowler's
+          // ball" by convention — we follow that simpler shape.)
+          if (!/^Wd/.test(lbl)) bo.legalBalls += 1;
+          bo.runsConceded += Number(ev.runs) || 0;
+          if (ev.wicket && ev.wicket.type && ev.wicket.type !== "Run out") {
+            bo.wickets += 1;
+          }
+        }
+
+        // ── Fielding side ───────────────────────────────────────
+        if (ev.wicket) {
+          const name = ev.wicket.fielder;
+          // Dismissal tracking for notOut flag on the OUT batter.
+          if (ev.wicket.batter) dismissed.set(ev.wicket.batter, ev.wicket.type || "out");
+          if (name) {
+            if (!fielders.has(name)) {
+              fielders.set(name, { catches: 0, stumpings: 0, runOuts: 0 });
+            }
+            const fa = fielders.get(name);
+            if (ev.wicket.type === "Caught")  fa.catches += 1;
+            if (ev.wicket.type === "Stumped") fa.stumpings += 1;
+            if (ev.wicket.type === "Run out") fa.runOuts += 1;
+          }
+        }
+      }
+
+      // Finalize batter notOut/dismissalType + milestone flags.
+      for (const [name, b] of batters.entries()) {
+        if (dismissed.has(name)) {
+          b.notOut = false;
+          b.dismissalType = dismissed.get(name);
+        }
+        b.fifty   = b.runs >= 50 && b.runs < 100;
+        b.hundred = b.runs >= 100;
+      }
+      // Finalize bowler 5-fer flag.
+      for (const bo of bowlers.values()) {
+        bo.fiveFor = bo.wickets >= 5;
+      }
+
+      // 5. Resolve names → member doc IDs (case-insensitive, trimmed).
+      // NB: per the brief we use the fccnets/data/members/{id} subcollection
+      // path for STATS storage. The existing members in-app blob lives at
+      // fccnets/members and is separate — career rollups intentionally
+      // build their own collection so we don't have to round-trip the blob.
+      const membersSnap = await getDocs(fsCollection(db, "fccnets", "data", "members"));
+      const nameToId = new Map();
+      membersSnap.forEach(d => {
+        const data = d.data();
+        if (data?.name) nameToId.set(String(data.name).trim().toLowerCase(), d.id);
+      });
+      const resolve = (name) => nameToId.get(String(name || "").trim().toLowerCase()) || null;
+
+      // 6. Build the union of players who appeared and run a transaction each.
+      const allNames = new Set([...batters.keys(), ...bowlers.keys(), ...fielders.keys()]);
+      const opponentFor = (name) => {
+        const inSquad1 = (safe.squad1 || []).includes(name);
+        const inSquad2 = (safe.squad2 || []).includes(name);
+        if (inSquad1) return safe.team2 || team2Name;
+        if (inSquad2) return safe.team1 || team1Name;
+        return safe.team2 || team2Name;
+      };
+      const matchDate = safe.date || new Date().toISOString().slice(0, 10);
+
+      const txPromises = [];
+      for (const name of allNames) {
+        const playerId = resolve(name);
+        if (!playerId) continue; // external opponent etc.
+        const batAgg = batters.get(name) || null;
+        const bowlAgg = bowlers.get(name) || null;
+        const fieldAgg = fielders.get(name) || null;
+        const ref = doc(db, "fccnets", "data", "members", playerId);
+
+        txPromises.push(runTransaction(db, async (tx) => {
+          const snap = await tx.get(ref);
+          const data = snap.exists() ? snap.data() : {};
+          const career = data.career || {};
+          const batting = career.batting || {
+            innings: 0, notOuts: 0, runs: 0, balls: 0, fours: 0, sixes: 0,
+            highest: 0, fifties: 0, hundreds: 0,
+          };
+          const bowling = career.bowling || {
+            overs: 0, maidens: 0, runs: 0, wickets: 0, fiveFors: 0, bestFigures: "0/0",
+          };
+          const fielding = career.fielding || { catches: 0, stumpings: 0, runOuts: 0 };
+
+          if (batAgg) {
+            batting.innings += 1;
+            if (batAgg.notOut) batting.notOuts += 1;
+            batting.runs  += batAgg.runs;
+            batting.balls += batAgg.balls;
+            batting.fours += batAgg.fours;
+            batting.sixes += batAgg.sixes;
+            if (batAgg.runs > batting.highest) batting.highest = batAgg.runs;
+            if (batAgg.fifty)   batting.fifties  += 1;
+            if (batAgg.hundred) batting.hundreds += 1;
+          }
+          if (bowlAgg) {
+            const newOvers = (bowling.overs || 0) + (bowlAgg.legalBalls / 6);
+            bowling.overs = Math.round(newOvers * 10) / 10;
+            // maidens stays 0 — per-over run aggregation deferred.
+            bowling.maidens += 0;
+            bowling.runs    += bowlAgg.runsConceded;
+            bowling.wickets += bowlAgg.wickets;
+            if (bowlAgg.fiveFor) bowling.fiveFors += 1;
+            const [curW, curR] = String(bowling.bestFigures || "0/0").split("/").map(n => parseInt(n, 10) || 0);
+            const isBetter = bowlAgg.wickets > curW || (bowlAgg.wickets === curW && bowlAgg.runsConceded < curR);
+            if (isBetter) bowling.bestFigures = `${bowlAgg.wickets}/${bowlAgg.runsConceded}`;
+          }
+          if (fieldAgg) {
+            fielding.catches   += fieldAgg.catches;
+            fielding.stumpings += fieldAgg.stumpings;
+            fielding.runOuts   += fieldAgg.runOuts;
+          }
+
+          tx.set(ref, {
+            career: { batting, bowling, fielding },
+            matchAppearances: arrayUnion({
+              matchId: safe.matchId,
+              date: matchDate,
+              opponent: opponentFor(name),
+              batting: batAgg || null,
+              bowling: bowlAgg || null,
+              fielding: fieldAgg || null,
+              abandoned: abandoned === true,
+            }),
+          }, { merge: true });
+        }));
+      }
+
+      await Promise.all(txPromises);
+    } catch (e) {
+      console.error("finalizeMatch error:", e);
+    } finally {
+      setFinalizingMatch(false);
+      // Return the user to the matches list either way.
+      if (typeof onBack === "function") onBack();
+    }
+  }
+
+  // End-match-early confirm sheet state (TASK 7).
+  const [endMatchConfirm, setEndMatchConfirm] = useState(false);
+
   function start2nd() {
     if (readOnly || isLockedOut) return;
     setSavedInnings1({
@@ -1487,8 +1748,10 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
                   ))}
                 </div>
               )}
-              {/* Scorer-only Scorecard peek (hidden once locked out) */}
-              {!readOnly && !isLockedOut && (
+              {/* Scorecard peek — available to viewers too (FIX 2).
+                  Locked-out scorers still get the peek since they behave like
+                  viewers; only the active-scorer-only controls are gated. */}
+              {!isLockedOut && (
                 <div onClick={() => setScorecardOpen(true)}
                   style={{
                     display: "flex", flexDirection: "column", alignItems: "center",
@@ -1819,6 +2082,9 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
               { icon: "🎤", label: "Commentary voice", sub: `Now: ${COMMENTARY[persona].name}`, onClick: () => setModal("commentary") },
               { icon: "🏏", label: "End innings now", onClick: () => { setInningsEnd(true); close(); } },
               { icon: "🌗", label: `Switch to ${nightMode ? "day" : "night"} mode`, onClick: () => { setNightMode(n => !n); close(); } },
+              // TASK 7 — abandon match early, but persist stats anyway.
+              { icon: "🏁", label: "End match", sub: "Abandon match early — stats still saved",
+                onClick: () => { close(); setEndMatchConfirm(true); } },
             ].map(a => (
               <div key={a.label} onClick={a.onClick}
                 style={{ padding: "14px 12px", borderBottom: `1px solid ${SC.border}`, display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
@@ -2067,7 +2333,38 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
             innings={innings} target={target}
             onStart2nd={() => { start2nd(); setInningsEnd(false); }}
             onClose={() => setInningsEnd(false)}
+            saving={finalizingMatch}
+            onSaveExit={readOnly || isLockedOut
+              ? null
+              : () => finalizeMatch({ abandoned: false })}
           />
+        )}
+
+        {/* End-match-early confirm sheet (TASK 7) */}
+        {endMatchConfirm && (
+          <Sheet title="End match early?" onClose={() => !finalizingMatch && setEndMatchConfirm(false)}>
+            <div style={{ fontSize: 13, color: SC.textDim, lineHeight: 1.5, marginBottom: 16 }}>
+              Stats will be saved to player profiles, but the match will be flagged as abandoned.
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => !finalizingMatch && setEndMatchConfirm(false)}
+                disabled={finalizingMatch}
+                style={{
+                  flex: 1, padding: "12px 12px", borderRadius: 10,
+                  background: "#fff", border: `1.5px solid ${SC.border}`, color: SC.textMuted,
+                  fontWeight: 700, fontSize: 14, cursor: finalizingMatch ? "default" : "pointer",
+                  opacity: finalizingMatch ? 0.5 : 1,
+                }}>Cancel</button>
+              <button onClick={async () => { await finalizeMatch({ abandoned: true }); setEndMatchConfirm(false); }}
+                disabled={finalizingMatch}
+                style={{
+                  flex: 1, padding: "12px 12px", borderRadius: 10, border: "none",
+                  background: finalizingMatch ? "#e2e8f0" : `linear-gradient(135deg, ${SC.red}, ${SC.redDk})`,
+                  color: finalizingMatch ? "#94a3b8" : "#fff",
+                  fontWeight: 800, fontSize: 14, cursor: finalizingMatch ? "default" : "pointer",
+                }}>{finalizingMatch ? "Saving…" : "End match"}</button>
+            </div>
+          </Sheet>
         )}
 
         {/* Catch-up modal (viewer only) */}

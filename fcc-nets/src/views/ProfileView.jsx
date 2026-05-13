@@ -1,4 +1,7 @@
+import { useEffect, useState } from "react";
 import { useAppContext } from "../context/AppContext";
+import { db } from "../firebase";
+import { doc, getDoc } from "firebase/firestore";
 import Shell from "../ui/Shell";
 import SidebarNav from "../ui/SidebarNav";
 import BotNav from "../ui/BotNav";
@@ -17,6 +20,18 @@ import { THEMES, THEME_KEYS } from "../constants/themes";
 import { fmtShort, todayStr } from "../utils/time";
 import { isCoachMember, profileCompletion, maskEmail, getMemberRoleChips } from "../utils/members";
 import { uid } from "../constants/seeds";
+
+// Local navy/gold palette so the career-stats section reads as the
+// scorecard family instead of the green/cream profile chrome.
+const STATS_PALETTE = {
+  navy:   "#1B2A5C",
+  navyDk: "#152043",
+  gold:   "#C9A84C",
+  goldLt: "#F0D060",
+  bgCard: "#FFFFFF",
+  dim:    "#5C6B8F",
+  muted:  "#8A95B0",
+};
 
 export default function ProfileView() {
   const {
@@ -47,6 +62,34 @@ export default function ProfileView() {
 
     const me = members.find(m=>m.id===currentUser.id)||currentUser;
     const myTeams = (me.teams||[]);
+
+    // ── Career stats (TASK 8) ──────────────────────────────────
+    // Context `members` lives in the JSON-blob doc (fccnets/members) and
+    // does NOT carry career stats — those are written by the scorer to
+    // fccnets/data/members/{id} via finalizeMatch. We fetch from there.
+    // Falls back gracefully if the doc / fields don't exist yet.
+    const [careerDoc, setCareerDoc] = useState(null);
+    const [careerLoading, setCareerLoading] = useState(false);
+    useEffect(() => {
+      const playerId = currentUser?.uid || currentUser?.id;
+      if (!playerId) return;
+      let cancelled = false;
+      setCareerLoading(true);
+      (async () => {
+        try {
+          const snap = await getDoc(doc(db, "fccnets", "data", "members", playerId));
+          if (cancelled) return;
+          setCareerDoc(snap.exists() ? snap.data() : {});
+        } catch (e) {
+          console.error("Career stats fetch error:", e);
+          if (!cancelled) setCareerDoc({});
+        } finally {
+          if (!cancelled) setCareerLoading(false);
+        }
+      })();
+      return () => { cancelled = true; };
+    }, [currentUser?.uid, currentUser?.id]);
+
     const myChildren = (me.children||[]).map(cid => members.find(m=>m.id===cid)).filter(Boolean);
     const isPlayer = myTeams.length > 0;
     const isParent = myChildren.length > 0 || me.memberType === "parent";
@@ -934,6 +977,170 @@ export default function ProfileView() {
               })}
             </div>
           </div>
+
+          {/* ── Career stats (TASK 8) ─────────────────────────── */}
+          {(() => {
+            const c = careerDoc?.career || {};
+            const bat = c.batting || {};
+            const bowl = c.bowling || {};
+            const fld = c.fielding || {};
+            const appearances = Array.isArray(careerDoc?.matchAppearances)
+              ? careerDoc.matchAppearances
+              : [];
+
+            const batInns = bat.innings || 0;
+            const batNo   = bat.notOuts || 0;
+            const batRuns = bat.runs    || 0;
+            const batBalls= bat.balls   || 0;
+            const dismissals = Math.max(0, batInns - batNo);
+            const batAvg = dismissals > 0 ? (batRuns / dismissals).toFixed(2) : "—";
+            const batSR  = batBalls > 0   ? ((batRuns * 100) / batBalls).toFixed(1) : "—";
+            const hs     = bat.highest ?? 0;
+            const fifties= bat.fifties ?? 0;
+            const hundreds = bat.hundreds ?? 0;
+
+            const bWkts  = bowl.wickets || 0;
+            const bRuns  = bowl.runs    || 0;
+            const bOvers = bowl.overs   || 0;
+            const bowlAvg = bWkts > 0 ? (bRuns / bWkts).toFixed(2) : "—";
+            const bowlEcon = bOvers > 0 ? (bRuns / bOvers).toFixed(2) : "—";
+            const fiveFors = bowl.fiveFors ?? 0;
+            const best     = bowl.bestFigures || "0/0";
+
+            const catches   = fld.catches   ?? 0;
+            const stumpings = fld.stumpings ?? 0;
+            const runOuts   = fld.runOuts   ?? 0;
+
+            const last5 = appearances.slice(-5).reverse();
+
+            const Section = ({ title, children }) => (
+              <div style={{ marginBottom: 10 }}>
+                <div style={{
+                  fontSize: 10, fontWeight: 800,
+                  color: STATS_PALETTE.gold,
+                  textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6,
+                }}>{title}</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", lineHeight: 1.7 }}>
+                  {children}
+                </div>
+              </div>
+            );
+
+            return (
+              <div style={{
+                background: `linear-gradient(135deg, ${STATS_PALETTE.navy} 0%, ${STATS_PALETTE.navyDk} 100%)`,
+                border: `1.5px solid rgba(201,168,76,0.4)`,
+                borderRadius: 14, padding: "18px 16px",
+                boxShadow: "0 6px 22px rgba(27,42,92,0.25)",
+              }}>
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 8, marginBottom: 14,
+                }}>
+                  <span style={{ fontSize: 18 }}>📊</span>
+                  <span style={{
+                    fontSize: 14, fontWeight: 800, color: "#fff",
+                    letterSpacing: 0.4,
+                  }}>Career stats</span>
+                  {careerLoading && (
+                    <span style={{
+                      marginLeft: "auto", fontSize: 10, fontWeight: 700,
+                      color: "rgba(255,255,255,0.5)",
+                    }}>loading…</span>
+                  )}
+                </div>
+
+                <Section title="Batting">
+                  Innings: <strong style={{ color: STATS_PALETTE.goldLt }}>{batInns}</strong>
+                  {" · "}Runs: <strong style={{ color: STATS_PALETTE.goldLt }}>{batRuns}</strong>
+                  {" · "}Avg: <strong style={{ color: STATS_PALETTE.goldLt }}>{batAvg}</strong>
+                  {" · "}SR: <strong style={{ color: STATS_PALETTE.goldLt }}>{batSR}</strong>
+                  {" · "}HS: <strong style={{ color: STATS_PALETTE.goldLt }}>{hs}</strong>
+                  {" · "}50s: <strong style={{ color: STATS_PALETTE.goldLt }}>{fifties}</strong>
+                  {" · "}100s: <strong style={{ color: STATS_PALETTE.goldLt }}>{hundreds}</strong>
+                </Section>
+
+                <Section title="Bowling">
+                  Wkts: <strong style={{ color: STATS_PALETTE.goldLt }}>{bWkts}</strong>
+                  {" · "}Avg: <strong style={{ color: STATS_PALETTE.goldLt }}>{bowlAvg}</strong>
+                  {" · "}Econ: <strong style={{ color: STATS_PALETTE.goldLt }}>{bowlEcon}</strong>
+                  {" · "}5-fers: <strong style={{ color: STATS_PALETTE.goldLt }}>{fiveFors}</strong>
+                  {" · "}Best: <strong style={{ color: STATS_PALETTE.goldLt }}>{best}</strong>
+                </Section>
+
+                <Section title="Fielding">
+                  Catches: <strong style={{ color: STATS_PALETTE.goldLt }}>{catches}</strong>
+                  {" · "}Stumpings: <strong style={{ color: STATS_PALETTE.goldLt }}>{stumpings}</strong>
+                  {" · "}Run-outs: <strong style={{ color: STATS_PALETTE.goldLt }}>{runOuts}</strong>
+                </Section>
+
+                <div style={{
+                  borderTop: "1px solid rgba(201,168,76,0.25)",
+                  margin: "12px 0 10px",
+                }} />
+
+                <div style={{
+                  fontSize: 10, fontWeight: 800, color: STATS_PALETTE.gold,
+                  textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 8,
+                }}>Last 5 innings</div>
+
+                {last5.length === 0 ? (
+                  <div style={{
+                    textAlign: "center", padding: "16px 8px",
+                    color: "rgba(255,255,255,0.55)", fontSize: 12, fontStyle: "italic",
+                  }}>No matches played yet</div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {last5.map((ap, i) => {
+                      const dateLbl = ap?.date
+                        ? new Date(ap.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+                        : "—";
+                      const opp = ap?.opponent || "—";
+                      const batting = ap?.batting;
+                      const bowling = ap?.bowling;
+                      const batStr = batting && batting.balls > 0
+                        ? `${batting.runs} (${batting.balls})`
+                        : "DNB";
+                      const bowlStr = bowling && bowling.legalBalls > 0
+                        ? `${bowling.wickets || 0} for ${bowling.runsConceded || 0}`
+                        : "";
+                      return (
+                        <button key={i} type="button"
+                          onClick={() => ap?.matchId && setView(`live-${ap.matchId}`)}
+                          style={{
+                            background: "rgba(255,255,255,0.06)",
+                            border: "1px solid rgba(201,168,76,0.18)",
+                            borderRadius: 10, padding: "9px 11px",
+                            color: "#fff", fontFamily: "inherit",
+                            cursor: ap?.matchId ? "pointer" : "default",
+                            textAlign: "left",
+                          }}>
+                          <div style={{
+                            display: "flex", justifyContent: "space-between",
+                            alignItems: "center", gap: 8,
+                          }}>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{
+                                fontSize: 12, fontWeight: 700, color: "#fff",
+                                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                              }}>{dateLbl} · vs {opp}</div>
+                              <div style={{
+                                fontSize: 11, color: "rgba(255,255,255,0.7)",
+                                marginTop: 2, fontVariantNumeric: "tabular-nums",
+                              }}>
+                                {batStr}{bowlStr ? ` · ${bowlStr}` : ""}
+                                {ap?.abandoned ? " · abandoned" : ""}
+                              </div>
+                            </div>
+                            <span style={{ color: STATS_PALETTE.goldLt, fontSize: 14 }}>›</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Help & Contact */}
           <button type="button" onClick={()=>setView("help")}

@@ -200,6 +200,34 @@ function BowlingHeader({ nightMode }) {
   );
 }
 
+// FIX 3 reader — format a Fall-of-Wickets entry into a rich human string.
+// Supports the new schema (dismissalType + fielder + batter/bowler/over)
+// AND legacy entries (which only had a free-form `dismissal` string) so
+// nothing regresses on older match docs.
+function formatFow(entry) {
+  if (!entry) return "";
+  const batter = entry.batter || entry.name || "—";
+  const bowler = entry.bowler || "";
+  const fielder = entry.fielder || "";
+  const over = entry.over || entry.overStr || "";
+  const ovSuffix = over ? ` · ${over} ov` : "";
+  const dt = entry.dismissalType;
+
+  // New rich schema
+  if (dt === "b")   return `${batter} b ${bowler}${ovSuffix}`;
+  if (dt === "c")   return fielder
+    ? `${batter} c ${fielder} b ${bowler}${ovSuffix}`
+    : `${batter} c b ${bowler}${ovSuffix}`;
+  if (dt === "lbw") return `${batter} lbw b ${bowler}${ovSuffix}`;
+  if (dt === "ro")  return `${batter} run out${fielder ? ` (${fielder})` : ""}${ovSuffix}`;
+  if (dt === "st")  return `${batter} st ${fielder} b ${bowler}${ovSuffix}`;
+  if (dt === "hw")  return `${batter} hit wicket b ${bowler}${ovSuffix}`;
+
+  // Legacy free-form `dismissal` string fallback
+  if (entry.dismissal) return `${batter} ${entry.dismissal}${ovSuffix}`;
+  return `${batter} out${ovSuffix}`;
+}
+
 // ── Fall of wickets — horizontal navy timeline ────────────────
 function FallOfWicketsTimeline({ fow = [], nightMode }) {
   const [openIdx, setOpenIdx] = useState(null);
@@ -225,13 +253,18 @@ function FallOfWicketsTimeline({ fow = [], nightMode }) {
             {rowItems.map((f, i) => {
               const idx = rowIdx * 6 + i;
               const x = rowItems.length === 1 ? w / 2 : 4 + (i / (rowItems.length - 1)) * (w - 8);
+              // Wicket number caption above; team-score caption (gold) below.
+              const wktNum = f.wicketNum ?? f.wicket ?? (idx + 1);
+              const teamScore = f.teamScore ?? f.score ?? "";
               return (
                 <g key={i} onClick={() => setOpenIdx(openIdx === idx ? null : idx)} style={{ cursor: "pointer" }}>
+                  {/* Caption ABOVE the dot: W{n} */}
+                  <text x={x} y="4" textAnchor="middle" fontSize="3.6" fill={muted}
+                    fontWeight="700" letterSpacing="0.3">W{wktNum}</text>
                   <circle cx={x} cy="12" r="3.2" fill={SC.gold} stroke={SC.navy} strokeWidth="0.5" />
-                  <text x={x} y="28" textAnchor="middle" fontSize="4.2" fill={muted}
-                    fontWeight="700" letterSpacing="0.3">
-                    W{f.wicket ?? idx + 1} {f.score ?? ""}
-                  </text>
+                  {/* Caption BELOW the dot: team score in gold */}
+                  <text x={x} y="28" textAnchor="middle" fontSize="4.2" fill={SC.gold}
+                    fontWeight="800" letterSpacing="0.3">{teamScore}</text>
                 </g>
               );
             })}
@@ -244,12 +277,13 @@ function FallOfWicketsTimeline({ fow = [], nightMode }) {
           padding: "4px 2px", lineHeight: 1.4,
         }}>
           <strong style={{ color: nightMode ? "#FFFFFF" : SC.text, fontWeight: 700 }}>
-            {fow[openIdx].name || "—"}
+            {formatFow(fow[openIdx])}
           </strong>
-          {fow[openIdx].dismissal ? ` ${fow[openIdx].dismissal}` : ""}
-          {fow[openIdx].score != null && fow[openIdx].wicket != null
-            ? `, ${fow[openIdx].score}/${fow[openIdx].wicket}` : ""}
-          {fow[openIdx].over ? ` (${fow[openIdx].over} ov)` : ""}
+          {(fow[openIdx].teamScore != null || fow[openIdx].score != null) && (fow[openIdx].wicketNum != null || fow[openIdx].wicket != null) && (
+            <span style={{ marginLeft: 6, color: muted }}>
+              · {(fow[openIdx].teamScore ?? fow[openIdx].score)}/{(fow[openIdx].wicketNum ?? fow[openIdx].wicket)}
+            </span>
+          )}
         </div>
       )}
     </div>

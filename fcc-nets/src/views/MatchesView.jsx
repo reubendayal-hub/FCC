@@ -8,13 +8,14 @@
 import React, { useState, useEffect } from "react";
 import { db } from "../firebase";
 import {
-  collection, doc, onSnapshot, setDoc, serverTimestamp,
+  collection, doc, onSnapshot, setDoc, serverTimestamp, deleteDoc,
 } from "firebase/firestore";
 import Shell      from "../ui/Shell";
 import AppHeader  from "../ui/AppHeader";
 import BotNav     from "../ui/BotNav";
 import Toast      from "../ui/Toast";
 import { FCC_LOGO } from "../constants/logo";
+import { can } from "../constants/roles";
 
 // Takeover constants — kept in sync with LiveScorerView.
 const TAKEOVER_PIN = "4321";
@@ -53,6 +54,14 @@ const SEL = {
   bg:     "#E0F2D6",
   border: "#27AE60",
   text:   "#1A5C28",
+};
+// Red squad palette — used for Team 2 chips in the SquadPicker step,
+// so users can visually distinguish the two squads while picking.
+// All other selected-state UI (toss, overs, match type) stays green-only.
+const SEL_RED = {
+  bg:     "#FCE4E4",
+  border: "#C0392B",
+  text:   "#8B1A1A",
 };
 const MATCH_TYPES = [
   { id:"internal", label:"FCC Internal",  desc:"Both teams from FCC squads",          icon:"🏏", savesStats:true,  color:"#1a6b38" },
@@ -252,7 +261,7 @@ export default function MatchesView({
               <MatchCard key={m.id} G={G} match={m}
                 onScore={() => requestScore(m)}
                 onWatch={() => { setActiveMatchId(m.id); setView(`live-${m.id}`); }}
-                currentUser={currentUser} />
+                currentUser={currentUser} userRole={userRole} showToast={showToast} />
             ))}
           </Section>
         )}
@@ -262,7 +271,7 @@ export default function MatchesView({
               <MatchCard key={m.id} G={G} match={m}
                 onScore={() => requestScore(m)}
                 onWatch={() => { setActiveMatchId(m.id); setView(`live-${m.id}`); }}
-                currentUser={currentUser} />
+                currentUser={currentUser} userRole={userRole} showToast={showToast} />
             ))}
           </Section>
         )}
@@ -272,7 +281,7 @@ export default function MatchesView({
               <MatchCard key={m.id} G={G} match={m}
                 onScore={() => requestScore(m)}
                 onWatch={() => { setActiveMatchId(m.id); setView(`live-${m.id}`); }}
-                currentUser={currentUser} />
+                currentUser={currentUser} userRole={userRole} showToast={showToast} />
             ))}
           </Section>
         )}
@@ -492,7 +501,60 @@ function Section({ G, label, children }) {
   );
 }
 
-function MatchCard({ G, match, onScore, onWatch, currentUser }) {
+// ── Delete-match confirm sheet ────────────────────────────────
+// Reuses the same bottom-sheet pattern as TakeoverSheet so deletion
+// feels consistent across destructive actions. Live matches get an
+// extra warning since the active scorer will be locked out instantly.
+function DeleteMatchSheet({ G, match, dateStr, deleting, onCancel, onConfirm }) {
+  const isLive = match.status === "live";
+  const title = match.title || "Untitled match";
+  const wrap = {
+    position:"fixed", inset:0, zIndex:900,
+    background:"rgba(0,0,0,0.55)",
+    display:"flex", alignItems:"flex-end", justifyContent:"center",
+  };
+  const card = {
+    width:"100%", maxWidth:420, background:"#fff",
+    borderRadius:"20px 20px 0 0", padding:"20px 18px 28px",
+    boxShadow:"0 -8px 40px rgba(0,0,0,0.3)",
+  };
+  return (
+    <div style={wrap} onClick={(e) => e.target === e.currentTarget && onCancel()}>
+      <div style={card}>
+        <div style={{ width:36, height:4, background:"#cbd5e1", borderRadius:2, margin:"0 auto 14px" }} />
+        <div style={{ fontSize:16, fontWeight:800, color:G.text, marginBottom:6, textAlign:"center" }}>
+          Delete this match?
+        </div>
+        <div style={{ fontSize:13, color:G.muted, lineHeight:1.5, marginBottom:12, textAlign:"center" }}>
+          {title} · {dateStr}. This permanently removes all scoring data and cannot be undone.
+        </div>
+        {isLive && (
+          <div style={{
+            fontSize:12, color:"#92400e", background:"#fffbeb",
+            border:"1px solid #fde68a", borderRadius:8,
+            padding:"8px 10px", lineHeight:1.4, marginBottom:14, textAlign:"left",
+          }}>⚠️ This match is currently being scored. The scorer will be locked out immediately.</div>
+        )}
+        <div style={{ display:"flex", gap:10 }}>
+          <button onClick={onCancel} disabled={deleting} style={{
+            flex:1, padding:"12px 12px", borderRadius:10,
+            background:"#fff", border:`1.5px solid ${G.border}`, color:G.muted,
+            fontWeight:700, fontSize:14, cursor:deleting?"default":"pointer",
+            opacity:deleting?0.5:1,
+          }}>Cancel</button>
+          <button onClick={onConfirm} disabled={deleting} style={{
+            flex:1, padding:"12px 12px", borderRadius:10, border:"none",
+            background:deleting ? "#e2e8f0" : "linear-gradient(135deg,#dc2626,#991b1b)",
+            color:deleting ? "#94a3b8" : "#fff",
+            fontWeight:800, fontSize:14, cursor:deleting?"default":"pointer",
+          }}>{deleting ? "Deleting…" : "Delete"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MatchCard({ G, match, onScore, onWatch, currentUser, userRole, showToast }) {
   const st = STATUS_META[match.status] || STATUS_META.setup;
   const mt = MATCH_TYPES.find(t => t.id === match.type) || MATCH_TYPES[1];
   const meId = currentUser?.uid || currentUser?.id || null;
@@ -506,8 +568,30 @@ function MatchCard({ G, match, onScore, onWatch, currentUser }) {
   const isMyResume = isLive && match.lastScorerId && meId && match.lastScorerId === meId;
   const scoreLabel = isMyResume ? "Resume scoring →" : "Score →";
 
+  // Deletion gating: admins always; otherwise the original creator.
+  const isAdmin   = can(userRole, "accessMembers");
+  const isCreator = match.createdBy === meId;
+  const canDelete = isAdmin || isCreator;
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function performDelete() {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await deleteDoc(doc(db, "fccscorer", "data", "matches", match.id));
+      showToast?.("Match deleted");
+      setConfirmDelete(false);
+    } catch (e) {
+      console.error("Match delete error:", e);
+      showToast?.(`Could not delete: ${e.message || e.code || "error"}`);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
-    <div style={{ background:G.white, borderRadius:14,
+    <div style={{ background:G.white, borderRadius:14, position:"relative",
       border:`1.5px solid ${isLive ? "#fca5a5" : G.border}`, overflow:"hidden",
       boxShadow:isLive ? "0 2px 12px rgba(220,38,38,0.12)" : "0 1px 4px rgba(0,0,0,0.05)" }}>
       <div style={{ padding:"10px 14px",
@@ -524,9 +608,31 @@ function MatchCard({ G, match, onScore, onWatch, currentUser }) {
             <div style={{ fontSize:11, color:G.muted }}>{dateStr} · {match.overs||"?"} ov</div>
           </div>
         </div>
-        <span style={{ fontSize:10, fontWeight:700, padding:"3px 8px", borderRadius:20,
-          background:st.bg, color:st.color }}>{st.label}</span>
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          <span style={{ fontSize:10, fontWeight:700, padding:"3px 8px", borderRadius:20,
+            background:st.bg, color:st.color }}>{st.label}</span>
+          {canDelete && (
+            <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }}
+              title="Delete match"
+              style={{
+                width:24, height:24, borderRadius:6,
+                background:"transparent", border:`1px solid ${G.border}`,
+                cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
+                color:G.muted, fontSize:12, lineHeight:1, padding:0,
+              }}>🗑️</button>
+          )}
+        </div>
       </div>
+      {confirmDelete && (
+        <DeleteMatchSheet
+          G={G}
+          match={match}
+          dateStr={dateStr}
+          deleting={deleting}
+          onCancel={() => !deleting && setConfirmDelete(false)}
+          onConfirm={performDelete}
+        />
+      )}
 
       {(isLive || isDone) && match.innings1 && (
         <div style={{ padding:"8px 14px", borderBottom:`1px solid ${G.border}`,
@@ -573,7 +679,7 @@ function MatchCard({ G, match, onScore, onWatch, currentUser }) {
       )}
 
       <div style={{ padding:"10px 14px", display:"flex", gap:8 }}>
-        {isScorer && !isDone && (
+        {(isScorer || isMyResume) && !isDone && (
           <button onClick={onScore} style={{ flex:1, padding:"9px 12px", borderRadius:9,
             background:isMyResume
               ? "linear-gradient(135deg,#dc2626,#991b1b)"
@@ -583,7 +689,7 @@ function MatchCard({ G, match, onScore, onWatch, currentUser }) {
           </button>
         )}
         <button onClick={onWatch} style={{
-          flex:isScorer && !isDone ? "0 0 auto" : 1,
+          flex:(isScorer || isMyResume) && !isDone ? "0 0 auto" : 1,
           padding:"9px 14px", borderRadius:9,
           background:G.bg, border:`1.5px solid ${G.border}`,
           cursor:"pointer", fontSize:13, fontWeight:600, color:G.muted }}>
@@ -793,12 +899,14 @@ function CreateMatchScreen({
         {step === 3 && (
           <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
             <SquadPicker G={G} label={`${team1Display||"Team 1"} squad`} hint="Tap members or type names below"
-              allMembers={members} squad={squad1} setSquad={setSquad1} colorActive={G.green}/>
+              allMembers={members} squad={squad1} setSquad={setSquad1} colorActive={G.green}
+              selPalette={SEL}/>
             <SquadPicker G={G} label={`${team2Display||"Team 2"} squad`}
               hint={type==="internal"?"Select FCC members":"Enter player names"}
               allMembers={type==="internal"?members:[]}
               squad={squad2} setSquad={setSquad2} colorActive={NAVY}
-              allowCustom={type!=="internal"}/>
+              allowCustom={type!=="internal"}
+              selPalette={SEL_RED}/>
             <NavButtons G={G} onBack={()=>setStep(2)} onNext={()=>setStep(4)} nextLabel="Review →"/>
           </div>
         )}
@@ -829,7 +937,7 @@ function CreateMatchScreen({
   );
 }
 
-function SquadPicker({ G, label, hint, allMembers, squad, setSquad, colorActive, allowCustom=true }) {
+function SquadPicker({ G, label, hint, allMembers, squad, setSquad, colorActive, allowCustom=true, selPalette=SEL }) {
   const [customInput, setCustomInput] = useState("");
   function toggleMember(name) {
     setSquad(prev => {
@@ -850,7 +958,7 @@ function SquadPicker({ G, label, hint, allMembers, squad, setSquad, colorActive,
     <div>
       <div style={{ fontSize:13, fontWeight:700, color:G.text, marginBottom:4 }}>
         {label}
-        <span style={{ marginLeft:8, fontSize:11, fontWeight:600, color:SEL.border }}>
+        <span style={{ marginLeft:8, fontSize:11, fontWeight:600, color:selPalette.border }}>
           {squad.length} selected
         </span>
       </div>
@@ -859,8 +967,8 @@ function SquadPicker({ G, label, hint, allMembers, squad, setSquad, colorActive,
         <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:10 }}>
           {squad.map(name => (
             <button key={name} onClick={()=>toggleMember(name)} style={{
-              padding:"5px 10px", borderRadius:20, background:SEL.bg,
-              border:`2px solid ${SEL.border}`, color:SEL.text, fontSize:12, fontWeight:700, cursor:"pointer" }}>
+              padding:"5px 10px", borderRadius:20, background:selPalette.bg,
+              border:`2px solid ${selPalette.border}`, color:selPalette.text, fontSize:12, fontWeight:700, cursor:"pointer" }}>
               {name} ✕
             </button>
           ))}
@@ -876,8 +984,8 @@ function SquadPicker({ G, label, hint, allMembers, squad, setSquad, colorActive,
                 padding:"8px 10px", borderRadius:9,
                 cursor:disabled?"not-allowed":"pointer",
                 opacity:disabled?0.4:1,
-                border:`${sel?2:1.5}px solid ${sel?SEL.border:G.border}`,
-                background:sel?SEL.bg:G.white, color:sel?SEL.text:G.text,
+                border:`${sel?2:1.5}px solid ${sel?selPalette.border:G.border}`,
+                background:sel?selPalette.bg:G.white, color:sel?selPalette.text:G.text,
                 fontSize:12, fontWeight:sel?700:400, textAlign:"left",
                 overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                 {sel?"✓ ":""}{m.name}
