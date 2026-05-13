@@ -28,7 +28,25 @@
 
 import {
   doc, getDoc, setDoc, runTransaction, serverTimestamp, arrayUnion,
+  collection, getDocs, deleteDoc,
 } from "firebase/firestore";
+
+// One-time cleanup: an earlier bug wrote career docs to
+// fccnets/data/members/{numericIndex} instead of /{memberId}. This
+// helper deletes any such junk docs (those whose id is all digits).
+// Admin-only — not currently wired into a UI; can be called from the
+// browser console via:
+//   import("/src/utils/finalizeMatchStats.js").then(m => m.cleanupBrokenCareerDocs({ db }))
+// Returns the number of docs deleted.
+export async function cleanupBrokenCareerDocs({ db }) {
+  const snap = await getDocs(collection(db, "fccnets", "data", "members"));
+  const dels = [];
+  snap.forEach(d => {
+    if (/^\d+$/.test(d.id)) dels.push(deleteDoc(d.ref));
+  });
+  await Promise.all(dels);
+  return dels.length;
+}
 
 // ── Label classifiers (mirror of LiveScorerView's logic) ─────
 const isLegalBall = (lbl) => {
@@ -144,10 +162,20 @@ export async function finalizeMatchStats({ db, matchData, abandoned = false, for
       catch (e) { console.error("members blob parse error:", e); }
     }
   }
+  // The roster blob's `value` is a JSON ARRAY of member objects, each
+  // with its own `.id` field (short string like "x3kkunl"). Older
+  // versions of this file used Object.entries() which treated the
+  // array as a keyed object — producing numeric-index "ids" like "7"
+  // and writing career docs to fccnets/data/members/7 etc. The
+  // Array.isArray check below tolerates both shapes (if anyone ever
+  // changes the blob to keyed-object form later, it still works).
   const nameToId = {};
-  Object.entries(membersMap).forEach(([id, m]) => {
-    if (m?.name) nameToId[String(m.name).trim().toLowerCase()] = id;
-  });
+  const membersArray = Array.isArray(membersMap) ? membersMap : Object.values(membersMap);
+  for (const m of membersArray) {
+    if (m?.name && m?.id) {
+      nameToId[String(m.name).trim().toLowerCase()] = m.id;
+    }
+  }
   const resolve = (name) => nameToId[String(name || "").trim().toLowerCase()] || null;
 
   // ── Squad / opponent / date helpers ─────────────────────────
