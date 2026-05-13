@@ -18,7 +18,16 @@ export function pickCommentary(eventKey, vars = {}) {
   const pool = COMMENTARY_LIB[eventKey] || COMMENTARY_LIB.run_1 || [];
   if (pool.length === 0) return "";
 
-  const all = pool.map((line, idx) => ({ line, id: `${eventKey}-${idx}` }));
+  // Approach-aware filtering: lines containing {approach} are only
+  // eligible when vars.approach is non-empty. Keeps the over/round-the-
+  // wicket flavour surfacing only when the scorer has actually told us
+  // which angle the bowler is using.
+  const filtered = vars.approach
+    ? pool
+    : pool.filter(line => !line.includes("{approach}"));
+  if (filtered.length === 0) return "";
+
+  const all = filtered.map((line) => ({ line, id: `${eventKey}::${line}` }));
   const available = all.filter(x => !recentLineIds.includes(x.id));
   const candidates = available.length > 0 ? available : all;
 
@@ -27,9 +36,10 @@ export function pickCommentary(eventKey, vars = {}) {
   if (recentLineIds.length > MAX_RECENT) recentLineIds.shift();
 
   return pick.line
-    .replace(/\{batter\}/g,  vars.batter  || "the batter")
-    .replace(/\{bowler\}/g,  vars.bowler  || "the bowler")
-    .replace(/\{fielder\}/g, vars.fielder || "the fielder");
+    .replace(/\{batter\}/g,   vars.batter   || "the batter")
+    .replace(/\{bowler\}/g,   vars.bowler   || "the bowler")
+    .replace(/\{fielder\}/g,  vars.fielder  || "the fielder")
+    .replace(/\{approach\}/g, vars.approach || "");
 }
 
 // pickEventKey — translate a ball outcome into a commentary library key.

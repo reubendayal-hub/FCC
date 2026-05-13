@@ -78,6 +78,30 @@ const STATUS_META = {
   abandoned: { label:"Abandoned", color:"#64748b", bg:"#f1f5f9" },
 };
 
+// TASK 5 — WhatsApp share helper.
+// Composes a clean, copy-pasteable summary + a deep link to the live
+// viewer (/live/{matchId}). The link points at the production domain
+// (fcc-training.vercel.app); preview / branch URLs won't resolve there
+// — that's intentional. Users only ever share from the production app.
+function shareMatch(m) {
+  if (!m) return;
+  const isLive = m.status === "live";
+  const isDone = m.status === "completed" || m.status === "abandoned";
+  const inn = isLive ? (m.innings2 || m.innings1 || {}) : null;
+  let liveStatus;
+  if (isLive && inn) {
+    liveStatus = `🔴 LIVE — ${inn.score || 0}/${inn.wickets || 0} (${inn.overs || "0.0"} ov)`;
+  } else if (isDone) {
+    liveStatus = `✅ Final: ${m.result || "Match ended"}`;
+  } else {
+    liveStatus = `📅 ${m.date || "?"}${m.time ? ` ${m.time}` : ""}`;
+  }
+  const matchLink = `https://fcc-training.vercel.app/live/${m.id}`;
+  const shareText = `🏏 *${m.team1 || "Team 1"} vs ${m.team2 || "Team 2"}*\n${liveStatus}\nWatch live: ${matchLink}`;
+  const url = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+  window.open(url, "_blank");
+}
+
 function generateMatchId() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   return Array.from({ length: 6 }, () =>
@@ -765,6 +789,15 @@ function MatchCard({ G, match, onScore, onWatch, currentUser, userRole, showToas
           cursor:"pointer", fontSize:13, fontWeight:600, color:G.muted }}>
           {isDone ? "Scorecard" : "👁 Watch"}
         </button>
+        {/* TASK 5 — WhatsApp share. Setup cards too (pre-match fixture). */}
+        <button
+          onClick={(e) => { e.stopPropagation(); shareMatch(match); }}
+          title="Share via WhatsApp"
+          style={{
+            flex:"0 0 auto", padding:"9px 12px", borderRadius:9,
+            background:G.white, border:`1.5px solid ${G.gold}`,
+            cursor:"pointer", fontSize:13, fontWeight:700, color:G.gold,
+          }}>📲 Share</button>
       </div>
       {canRecompute && (
         <div style={{ padding:"0 14px 10px", marginTop:-4, display:"flex", justifyContent:"flex-end" }}>

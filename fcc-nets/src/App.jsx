@@ -285,7 +285,19 @@ export default function App() {
   // joinRequests / auditLog / reminderLogs live in useFirestore.
 
   // App view
-  const [view,     setView]     = useState("schedule");
+  // TASK 5 — deep-link routing for /live/{matchId}. When the user lands
+  // on a /live/{id} URL (e.g. from a shared WhatsApp link), jump
+  // straight into the live viewer for that match rather than the
+  // default schedule view. The remaining "starts with live-" route
+  // logic below already handles this view-name shape.
+  const initialView = (() => {
+    try {
+      const m = window.location.pathname.match(/^\/live\/([A-Za-z0-9_-]+)/);
+      if (m) return `live-${m[1]}`;
+    } catch {}
+    return "schedule";
+  })();
+  const [view,     setView]     = useState(initialView);
   const [selSess,  setSelSess]  = useState(null);
   const [toast,    setToast]    = useState(null);
   // showToast defined here (used by useAuth and elsewhere) — moved up from

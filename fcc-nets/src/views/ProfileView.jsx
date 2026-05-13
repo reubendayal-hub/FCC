@@ -111,6 +111,15 @@ export default function ProfileView() {
     const [careerShots, setCareerShots] = useState([]);
     const [shotsLoading, setShotsLoading] = useState(false);
     const playerName = me?.name || currentUser?.name || null;
+    // Wagon-wheel viewing perspective ("RH" | "LH"). Defaults to the
+    // player's own batting hand (legacy "right"/"left" → canonical
+    // "RH"/"LH"), with a manual toggle below the wheel.
+    const ownHand = (() => {
+      const v = String(me?.battingHand || "").toLowerCase();
+      if (v === "lh" || v === "left") return "LH";
+      return "RH";
+    })();
+    const [wagonPerspective, setWagonPerspective] = useState(ownHand);
     useEffect(() => {
       const appearances = Array.isArray(careerDoc?.matchAppearances) ? careerDoc.matchAppearances : [];
       if (appearances.length === 0 || !playerName) { setCareerShots([]); return; }
@@ -142,6 +151,11 @@ export default function ProfileView() {
                 tapPoint: ev.tapPoint || null,
                 bowler: ev.bowler || null,
                 matchTitle,
+                // Per-shot batting hand from the original ball event.
+                // Used by the wagon-wheel renderer to per-dot mirror
+                // when the scorer-side and viewer-side perspectives
+                // disagree (e.g. recorded as LH, viewed as RH).
+                battingHand: ev.battingHand || null,
               });
             });
           });
@@ -1252,7 +1266,57 @@ export default function ProfileView() {
                   </div>
                 ) : (
                   <>
-                    <WagonWheelDisplay shots={careerShots} />
+                    {/* Per-shot mirror normalisation: if a ball was
+                        recorded with battingHand that differs from the
+                        chosen perspective, reflect its tapPoint x and
+                        flip its zone before plotting so all dots appear
+                        in the chosen frame. Zone IDs are flipped by a
+                        small static map below. */}
+                    <WagonWheelDisplay
+                      mirror={wagonPerspective === "LH"}
+                      shots={careerShots.map(s => {
+                        const sh = s.battingHand
+                          ? String(s.battingHand).toUpperCase()
+                          : "RH";
+                        if (sh === wagonPerspective) return s;
+                        // Flip x for tapPoint, and mirror the zone id.
+                        const flipped = { ...s };
+                        if (s.tapPoint) {
+                          flipped.tapPoint = { x: 220 - s.tapPoint.x, y: s.tapPoint.y };
+                        }
+                        if (s.zone) {
+                          const ZONE_MIRROR = {
+                            behind: "behind", straight: "straight",
+                            "third-man": "fine-leg", "fine-leg": "third-man",
+                            point: "sq-leg", "sq-leg": "point",
+                            cover: "midwicket", midwicket: "cover",
+                            "mid-off": "on-drive", "on-drive": "mid-off",
+                          };
+                          flipped.zone = ZONE_MIRROR[s.zone] || s.zone;
+                        }
+                        return flipped;
+                      })}
+                    />
+                    {/* Manual RH / LH perspective toggle */}
+                    <div style={{
+                      display: "flex", justifyContent: "center",
+                      gap: 6, marginTop: 10,
+                    }}>
+                      {["RH", "LH"].map(p => (
+                        <button key={p}
+                          onClick={() => setWagonPerspective(p)}
+                          style={{
+                            padding: "5px 14px", borderRadius: 16,
+                            background: wagonPerspective === p
+                              ? `linear-gradient(135deg, ${STATS_PALETTE.gold}, ${STATS_PALETTE.goldLt})`
+                              : "transparent",
+                            border: `1px solid ${wagonPerspective === p ? STATS_PALETTE.gold : "rgba(255,255,255,0.2)"}`,
+                            color: wagonPerspective === p ? STATS_PALETTE.navy : "rgba(255,255,255,0.65)",
+                            fontSize: 10, fontWeight: 800, letterSpacing: 0.6,
+                            cursor: "pointer", textTransform: "uppercase",
+                          }}>View as {p}</button>
+                      ))}
+                    </div>
                     <div style={{
                       textAlign: "center", marginTop: 10,
                       fontSize: 11, color: "rgba(255,255,255,0.6)",

@@ -90,6 +90,10 @@ export const COMMENTARY_LIB = {
     "Eased into the gap — a single, but a confidence-builder.",
     "Touched fine, scampered through.",
     "One run — quietly important.",
+    // Approach-aware (over/round the wicket) — only fire when scorer
+    // has set bowlerApproach for this bowler.
+    "From {approach}, angled in — nudged for a single.",
+    "{approach}, straight on the pads — flicked away for one.",
   ],
 
   run_2: [
@@ -141,6 +145,9 @@ export const COMMENTARY_LIB = {
     // in the spirit of Bhogle
     "Classical. Almost old-school. And the boundary, modern enough.",
     "Stand and deliver — {batter} unfurls the drive.",
+    // Approach-aware
+    "From {approach}, full and there — driven for FOUR.",
+    "{approach}, on the half-volley — and {batter} times it sweetly to the rope.",
   ],
 
   four_pulled: [
@@ -282,6 +289,8 @@ export const COMMENTARY_LIB = {
     // in the spirit of Bhogle
     "The bails go for a stroll — {bowler} has his reward.",
     "Stumps rearranged — superb delivery from {bowler}.",
+    // Approach-aware
+    "{approach}, jagging back in — and the off pole takes a tumble!",
   ],
 
   wicket_caught: [
@@ -300,6 +309,8 @@ export const COMMENTARY_LIB = {
     "Caught behind! {bowler} celebrates with the cordon.",
     "Drilled — straight to the fielder! {batter} dawdles, dismayed.",
     "{fielder} clings on — magnificent work in the deep!",
+    // Approach-aware
+    "{approach}, fishing outside off — and {fielder} pouches it!",
   ],
 
   wicket_lbw: [
@@ -317,6 +328,8 @@ export const COMMENTARY_LIB = {
     "Inswinger does the trick — {batter} struck dead in front.",
     "Trapped on the back foot — and {bowler} has the breakthrough.",
     "Skid-on, no bat, and the umpire's finger speaks.",
+    // Approach-aware
+    "From {approach}, struck on the pad — finger up!",
   ],
 
   wicket_runout: [

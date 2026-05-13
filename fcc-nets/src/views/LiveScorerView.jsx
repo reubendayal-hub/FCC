@@ -26,18 +26,75 @@ const SC = {
   border:"rgba(27,42,92,0.08)", borderMid:"rgba(27,42,92,0.15)",
 };
 
-// ── Zones / Wagon Wheel (verbatim from reference) ─────────────
+// ── Zones / Wagon Wheel (cricket-accurate shot lists) ────────
+// Each zone's `shots` array has been hand-tuned for cricket realism:
+//   - "Cow corner" removed (it's a fielding position, not a shot —
+//     replaced with Slog / Slog sweep on the midwicket zone).
+//   - "Reverse sweep" removed from behind/third-man (a reverse sweep
+//     goes to point / cover, not behind the keeper).
+//   - "Defended" added to inner zones (point/cover/mid-off/straight/
+//     on-drive/midwicket/sq-leg) so dot balls in those areas can be
+//     scored without bouncing through the dot-ball-only shot picker.
 const ZONES = {
-  behind:     {pt:[110,10], label:"Behind",      side:"neu", shots:[{n:"Ramp/scoop",d:"Over keeper's head"},{n:"Dilscoop",d:"On knee, over keeper"},{n:"Upper cut",d:"Sliced over slips"},{n:"Reverse sweep",d:"Behind square off"}]},
-  "third-man":{pt:[28,28],  label:"Third man",   side:"off", shots:[{n:"Late cut",d:"Deflected to third man"},{n:"Upper cut",d:"Sliced over gully"},{n:"Reverse sweep",d:"Swept behind square"},{n:"Outside edge",d:"Edge behind slip cordon"}]},
-  point:      {pt:[8,96],   label:"Point/gully", side:"off", shots:[{n:"Square cut",d:"Short wide to point"},{n:"Square drive",d:"Wide ball to cover"},{n:"Cover drive",d:"Full ball through cover"},{n:"Upper cut",d:"Bouncer over point"}]},
-  cover:      {pt:[14,150], label:"Cover",       side:"off", shots:[{n:"Cover drive",d:"Classic cover drive"},{n:"Off drive",d:"Right of straight"},{n:"Square drive",d:"Between point & cover"}]},
-  "mid-off":  {pt:[38,196], label:"Mid-off",     side:"off", shots:[{n:"Off drive",d:"Toward mid-off/long-off"},{n:"Straight drive",d:"Past bowler off side"},{n:"Lofted drive",d:"Over mid-off"}]},
-  straight:   {pt:[110,218],label:"Straight",    side:"neu", shots:[{n:"Straight drive",d:"Back past the bowler"},{n:"Off drive",d:"Slightly off side"},{n:"On drive",d:"Slightly leg side"},{n:"Lofted drive",d:"Over the bowler"}]},
-  "on-drive": {pt:[182,196],label:"Mid-on",      side:"leg", shots:[{n:"On drive",d:"Toward mid-on/long-on"},{n:"Flick",d:"Wristy flick mid-on"},{n:"Lofted drive",d:"Over mid-on"}]},
-  midwicket:  {pt:[206,150],label:"Midwicket",   side:"leg", shots:[{n:"Flick",d:"Wristy flick midwicket"},{n:"Slog sweep",d:"Lofted sweep midwicket"},{n:"Cow corner",d:"Heave deep midwicket"},{n:"Pull",d:"Short ball to midwicket"}]},
-  "sq-leg":   {pt:[212,96], label:"Square leg",  side:"leg", shots:[{n:"Pull",d:"Short ball pulled square"},{n:"Hook",d:"Head-high bouncer"},{n:"Sweep",d:"Spinner to sq leg"},{n:"Flick",d:"Full ball flicked square"}]},
-  "fine-leg": {pt:[192,28], label:"Fine leg",    side:"leg", shots:[{n:"Leg glance",d:"Off pads, deflected fine"},{n:"Paddle sweep",d:"Soft deflection fine"},{n:"Hook",d:"Bouncer hooked fine"},{n:"Glance",d:"Angled bat down leg"}]},
+  behind: { pt:[110,10], label:"Behind keeper", side:"neu", shots:[
+    {n:"Ramp/scoop",d:"Over keeper's head"},
+    {n:"Reverse paddle",d:"Soft deflection behind"},
+    {n:"Inside edge",d:"Past leg stump"},
+  ]},
+  "third-man": { pt:[28,28], label:"Third man", side:"off", shots:[
+    {n:"Late cut",d:"Deflected to third man"},
+    {n:"Upper cut",d:"Sliced over slips/gully"},
+    {n:"Outside edge",d:"Edge behind slip cordon"},
+    {n:"Steered to third",d:"Soft hands behind point"},
+  ]},
+  point: { pt:[8,96], label:"Point", side:"off", shots:[
+    {n:"Square cut",d:"Short wide ball, hard cut"},
+    {n:"Late cut",d:"Soft deflection backward of point"},
+    {n:"Defended",d:"Pushed to point"},
+    {n:"Dabbed to point",d:"Steered with soft hands"},
+  ]},
+  cover: { pt:[14,150], label:"Cover", side:"off", shots:[
+    {n:"Cover drive",d:"Classic full ball through cover"},
+    {n:"Square drive",d:"Wider, hit squarer of cover"},
+    {n:"Inside-out drive",d:"Stepped out, hit over cover"},
+    {n:"Defended",d:"Pushed to cover"},
+  ]},
+  "mid-off": { pt:[38,196], label:"Mid-off", side:"off", shots:[
+    {n:"Off drive",d:"Driven toward mid-off"},
+    {n:"Lofted drive",d:"Over mid-off"},
+    {n:"Punched",d:"Back-foot push past the bowler"},
+    {n:"Defended",d:"Pushed to mid-off"},
+  ]},
+  straight: { pt:[110,218], label:"Straight", side:"neu", shots:[
+    {n:"Straight drive",d:"Back past the bowler"},
+    {n:"Lofted straight drive",d:"Over the bowler's head"},
+    {n:"Defended",d:"Pushed straight back"},
+  ]},
+  "on-drive": { pt:[182,196], label:"Mid-on", side:"leg", shots:[
+    {n:"On drive",d:"Driven toward mid-on"},
+    {n:"Flick",d:"Wristy flick off the pads"},
+    {n:"Lofted on drive",d:"Over mid-on"},
+    {n:"Defended",d:"Pushed to mid-on"},
+  ]},
+  midwicket: { pt:[206,150], label:"Midwicket", side:"leg", shots:[
+    {n:"Flick",d:"Wristy off the pads"},
+    {n:"Pull",d:"Short ball pulled square"},
+    {n:"Slog",d:"Heave over midwicket"},
+    {n:"Slog sweep",d:"Lofted sweep over midwicket"},
+    {n:"Defended",d:"Pushed to midwicket"},
+  ]},
+  "sq-leg": { pt:[212,96], label:"Square leg", side:"leg", shots:[
+    {n:"Pull",d:"Short ball pulled square"},
+    {n:"Hook",d:"Head-high bouncer"},
+    {n:"Sweep",d:"Spinner swept square"},
+    {n:"Defended",d:"Pushed square"},
+  ]},
+  "fine-leg": { pt:[192,28], label:"Fine leg", side:"leg", shots:[
+    {n:"Leg glance",d:"Off pads, deflected fine"},
+    {n:"Paddle sweep",d:"Soft deflection fine"},
+    {n:"Hook (fine)",d:"Bouncer hooked fine"},
+    {n:"Tickled fine",d:"Deflected behind square leg"},
+  ]},
 };
 const ZONE_PATHS = [
   {id:"behind",    d:"M110,96 L88,4 A104,108 0 0,1 132,4 Z"},
@@ -273,54 +330,81 @@ function InningsEnd({ score, wickets, balls, maxOvers, battingTeam, innings, tar
 }
 
 // ── Wagon Wheel (restyled) ────────────────────────────────────
-function WagonWheel({ activeZone, onZoneTap, tapPoint }) {
+// `mirror` (boolean) — when true, the inner SVG group is mirrored
+// horizontally so LH batters see leg/off correctly reversed. Labels
+// (none yet — labels lived in ZONES.label) stay outside the mirrored
+// group so any future label text would render unflipped.
+// Zone-id semantics are preserved: "cover" still means cover relative
+// to the BATTER's orientation regardless of mirror state — leg-side /
+// off-side mirror visually, not in the IDs.
+// Tap coords are normalized BEFORE bubbling up: in mirrored mode the
+// raw SVG coord is reflected back across x=110 so persisted coords are
+// always in the canonical RH-perspective frame. ProfileView re-mirrors
+// based on the stored event.battingHand.
+function WagonWheel({ activeZone, onZoneTap, tapPoint, mirror = false }) {
   const z = activeZone ? ZONES[activeZone] : null;
   const indicator = tapPoint ? [tapPoint.x, tapPoint.y] : (z ? z.pt : null);
+  const innerTransform = mirror ? "translate(220,0) scale(-1,1)" : "";
   return (
     <svg width="220" height="226" viewBox="0 0 220 226" style={{ display: "block", cursor: "pointer" }}>
-      <ellipse cx="110" cy="112" rx="104" ry="108" fill="#1A4A2B" stroke={SC.navyDk} strokeWidth="1.4" />
-      <ellipse cx="110" cy="112" rx="104" ry="108" fill="none" stroke="white" strokeWidth="1.5" opacity="0.7" />
-      <ellipse cx="110" cy="112" rx="54" ry="56" fill="none" stroke="white" strokeWidth="1" strokeDasharray="5,4" opacity="0.6" />
-      <line x1="110" y1="4" x2="110" y2="220" stroke="white" strokeWidth="0.7" strokeDasharray="4,5" opacity="0.4" />
-      <line x1="6" y1="96" x2="214" y2="96" stroke="white" strokeWidth="0.6" strokeDasharray="3,5" opacity="0.36" />
-      {/* Gold pitch */}
-      <rect x="102" y="88" width="16" height="72" rx="2" fill={SC.gold} fillOpacity="0.4" stroke={SC.gold} strokeWidth="0.8" />
-      <line x1="102" y1="106" x2="118" y2="106" stroke="white" strokeWidth="0.9" />
-      <line x1="102" y1="140" x2="118" y2="140" stroke="white" strokeWidth="0.9" />
-      {/* Top stumps */}
-      <line x1="106" y1="84" x2="106" y2="90" stroke={SC.navy} strokeWidth="1.8" />
-      <line x1="110" y1="82" x2="110" y2="90" stroke={SC.navy} strokeWidth="1.8" />
-      <line x1="114" y1="84" x2="114" y2="90" stroke={SC.navy} strokeWidth="1.8" />
-      <line x1="104" y1="84" x2="116" y2="84" stroke={SC.navy} strokeWidth="1" />
-      {/* Bottom stumps */}
-      <line x1="106" y1="158" x2="106" y2="164" stroke={SC.navy} strokeWidth="1.8" />
-      <line x1="110" y1="158" x2="110" y2="166" stroke={SC.navy} strokeWidth="1.8" />
-      <line x1="114" y1="158" x2="114" y2="164" stroke={SC.navy} strokeWidth="1.8" />
-      <line x1="104" y1="164" x2="116" y2="164" stroke={SC.navy} strokeWidth="1" />
-      <circle cx="110" cy="96" r="6" fill={SC.navy} stroke="white" strokeWidth="1.8" />
-      {indicator && (
-        <>
-          <line x1="110" y1="96" x2={indicator[0]} y2={indicator[1]} stroke={SC.red} strokeWidth="3" strokeLinecap="round" />
-          <circle cx={indicator[0]} cy={indicator[1]} r="7" fill={SC.red} stroke="white" strokeWidth="2" />
-          <circle cx="110" cy="96" r="6" fill={SC.navy} stroke="white" strokeWidth="1.8" />
-        </>
-      )}
-      {ZONE_PATHS.map(({ id, d }) => (
-        <path
-          key={id}
-          d={d}
-          fill="transparent"
-          onClick={(e) => {
-            const svg = e.currentTarget.ownerSVGElement;
-            const pt = svg.createSVGPoint();
-            pt.x = e.clientX; pt.y = e.clientY;
-            const ctm = svg.getScreenCTM().inverse();
-            const loc = pt.matrixTransform(ctm);
-            onZoneTap(id, { x: loc.x, y: loc.y });
-          }}
-          style={{ cursor: "pointer" }}
-        />
-      ))}
+      <g transform={innerTransform}>
+        <ellipse cx="110" cy="112" rx="104" ry="108" fill="#1A4A2B" stroke={SC.navyDk} strokeWidth="1.4" />
+        <ellipse cx="110" cy="112" rx="104" ry="108" fill="none" stroke="white" strokeWidth="1.5" opacity="0.7" />
+        <ellipse cx="110" cy="112" rx="54" ry="56" fill="none" stroke="white" strokeWidth="1" strokeDasharray="5,4" opacity="0.6" />
+        <line x1="110" y1="4" x2="110" y2="220" stroke="white" strokeWidth="0.7" strokeDasharray="4,5" opacity="0.4" />
+        <line x1="6" y1="96" x2="214" y2="96" stroke="white" strokeWidth="0.6" strokeDasharray="3,5" opacity="0.36" />
+        {/* Gold pitch */}
+        <rect x="102" y="88" width="16" height="72" rx="2" fill={SC.gold} fillOpacity="0.4" stroke={SC.gold} strokeWidth="0.8" />
+        <line x1="102" y1="106" x2="118" y2="106" stroke="white" strokeWidth="0.9" />
+        <line x1="102" y1="140" x2="118" y2="140" stroke="white" strokeWidth="0.9" />
+        {/* Top stumps */}
+        <line x1="106" y1="84" x2="106" y2="90" stroke={SC.navy} strokeWidth="1.8" />
+        <line x1="110" y1="82" x2="110" y2="90" stroke={SC.navy} strokeWidth="1.8" />
+        <line x1="114" y1="84" x2="114" y2="90" stroke={SC.navy} strokeWidth="1.8" />
+        <line x1="104" y1="84" x2="116" y2="84" stroke={SC.navy} strokeWidth="1" />
+        {/* Bottom stumps */}
+        <line x1="106" y1="158" x2="106" y2="164" stroke={SC.navy} strokeWidth="1.8" />
+        <line x1="110" y1="158" x2="110" y2="166" stroke={SC.navy} strokeWidth="1.8" />
+        <line x1="114" y1="158" x2="114" y2="164" stroke={SC.navy} strokeWidth="1.8" />
+        <line x1="104" y1="164" x2="116" y2="164" stroke={SC.navy} strokeWidth="1" />
+        <circle cx="110" cy="96" r="6" fill={SC.navy} stroke="white" strokeWidth="1.8" />
+        {indicator && (() => {
+          // Indicator is stored in canonical (RH-perspective) coords.
+          // When mirroring, reflect it visually so the dot lands on the
+          // matching mirrored zone — without that, an LH batter who taps
+          // their LEG side would see the dot draw on the OFF side.
+          const vx = mirror ? (220 - indicator[0]) : indicator[0];
+          const vy = indicator[1];
+          return (
+            <>
+              <line x1="110" y1="96" x2={vx} y2={vy} stroke={SC.red} strokeWidth="3" strokeLinecap="round" />
+              <circle cx={vx} cy={vy} r="7" fill={SC.red} stroke="white" strokeWidth="2" />
+              <circle cx="110" cy="96" r="6" fill={SC.navy} stroke="white" strokeWidth="1.8" />
+            </>
+          );
+        })()}
+        {ZONE_PATHS.map(({ id, d }) => (
+          <path
+            key={id}
+            d={d}
+            fill="transparent"
+            onClick={(e) => {
+              const svg = e.currentTarget.ownerSVGElement;
+              const pt = svg.createSVGPoint();
+              pt.x = e.clientX; pt.y = e.clientY;
+              const ctm = svg.getScreenCTM().inverse();
+              let loc = pt.matrixTransform(ctm);
+              // When the parent g is mirrored, getScreenCTM().inverse()
+              // already accounts for the SVG→viewBox transform but NOT
+              // the inner group's scale(-1,1). Reflect manually so the
+              // coord we hand up is the canonical RH-perspective coord.
+              if (mirror) loc = { x: 220 - loc.x, y: loc.y };
+              onZoneTap(id, { x: loc.x, y: loc.y });
+            }}
+            style={{ cursor: "pointer" }}
+          />
+        ))}
+      </g>
     </svg>
   );
 }
@@ -534,6 +618,49 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
   // Defensive-shot type for dot balls in Full mode: "defensive" | "miss" | "leave" | null
   const [dotShotType, setDotShotType] = useState(null);
 
+  // ── Batter handedness (LH/RH wagon-wheel mirroring) ─────────
+  // rosterRef: Map<lowercased name, member doc> built once on mount.
+  // battingHandByName: per-innings cache of resolved RH/LH; the same
+  // batter might be in multiple innings so we keep the map flat.
+  // pendingHandPrompt: { name, resume } — when set, intercepts the
+  // recording flow on a batter's first ball and shows the LH/RH sheet.
+  const rosterRef = useRef(new Map());
+  const [battingHandByName, setBattingHandByName] = useState({});
+  const [pendingHandPrompt, setPendingHandPrompt] = useState(null);
+
+  // Per-bowler approach map ("over" | "around") — hydrated from match doc.
+  const [bowlerApproach, setBowlerApproach] = useState(() => {
+    return (safe.bowlerApproach && typeof safe.bowlerApproach === "object")
+      ? { ...safe.bowlerApproach }
+      : {};
+  });
+  // Sheet for picking the new bowler's approach after a bowler-change.
+  const [approachPromptFor, setApproachPromptFor] = useState(null);
+
+  // Ball-edit state — { eventIndex, originalEvent } while editing,
+  // null otherwise. When non-null, recordPendingBall's commit path
+  // splices the event in place instead of pushing.
+  const [editingBall, setEditingBall] = useState(null);
+  const [ballEditSheetOpen, setBallEditSheetOpen] = useState(false);
+
+  // Resolve a name's batting hand — local state first, roster blob next,
+  // null if unknown (external opponent or unset). Accepts string or
+  // member shape; normalises stored values to "RH"/"LH".
+  function resolveBattingHand(name) {
+    if (!name) return null;
+    const local = battingHandByName[name];
+    if (local) return local;
+    const member = rosterRef.current.get(name.trim().toLowerCase());
+    const raw = member?.battingHand;
+    if (!raw) return null;
+    // Accept both "RH"/"LH" (canonical) and "right"/"left" (legacy
+    // ProfileView format) — normalise both to the canonical form.
+    const v = String(raw).toLowerCase();
+    if (v === "lh" || v === "left") return "LH";
+    if (v === "rh" || v === "right") return "RH";
+    return null;
+  }
+
   // Viewer / replay / scorecard-peek state (Stage 3)
   const [catchUpOpen, setCatchUpOpen] = useState(false);
   const [missedBallsCount, setMissedBallsCount] = useState(0);
@@ -575,6 +702,81 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
 
   // Track most recent 6 for the glow animation
   const lastSixRef = useRef(null);
+
+  // ── Roster blob → in-memory Map (mount-once) ────────────────
+  // The members roster lives at fccnets/members as a single doc with
+  // `value` = JSON-encoded array (or object). We parse once on mount
+  // and keep a Map<lowercased name, member> in a ref for O(1) lookup
+  // when a new batter takes guard. The ref intentionally outlives
+  // re-renders since it's a static lookup table.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, "fccnets", "members"));
+        if (cancelled || !snap.exists()) return;
+        const raw = snap.data()?.value;
+        if (!raw) return;
+        const arr = typeof raw === "string" ? JSON.parse(raw) : raw;
+        const list = Array.isArray(arr) ? arr : Object.values(arr || {});
+        const map = new Map();
+        for (const m of list) {
+          if (m && typeof m === "object" && m.name) {
+            map.set(String(m.name).trim().toLowerCase(), m);
+          }
+        }
+        if (!cancelled) rosterRef.current = map;
+      } catch (e) {
+        console.error("roster fetch/parse error:", e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Hydrate bowlerApproach from snapshot updates (e.g. on resume).
+  useEffect(() => {
+    if (safe.bowlerApproach && typeof safe.bowlerApproach === "object") {
+      setBowlerApproach(prev => ({ ...prev, ...safe.bowlerApproach }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [safe.matchId]);
+
+  // Persist battingHand writebacks to the roster blob.
+  // Resolves the matching member by id (preferred) or name (fallback),
+  // sets battingHand, re-stringifies the array, and merges to Firestore.
+  async function persistRosterBattingHand(name, hand) {
+    try {
+      const ref = doc(db, "fccnets", "members");
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return;
+      const raw = snap.data()?.value;
+      if (!raw) return;
+      const arr = typeof raw === "string" ? JSON.parse(raw) : raw;
+      const list = Array.isArray(arr) ? arr : Object.values(arr || {});
+      const targetLc = String(name).trim().toLowerCase();
+      let mutated = false;
+      const next = list.map(m => {
+        if (!m || typeof m !== "object" || !m.name) return m;
+        if (String(m.name).trim().toLowerCase() === targetLc) {
+          mutated = true;
+          return { ...m, battingHand: hand };
+        }
+        return m;
+      });
+      if (!mutated) {
+        console.log(`battingHand writeback skipped (no roster match): ${name}`);
+        return;
+      }
+      // Update in-memory map so subsequent batters resolve without a re-fetch.
+      const member = next.find(m => m && m.name && String(m.name).trim().toLowerCase() === targetLc);
+      if (member) rosterRef.current.set(targetLc, member);
+      const nextRaw = typeof raw === "string" ? JSON.stringify(next) : next;
+      await setDoc(ref, { value: nextRaw }, { merge: true });
+      console.log(`battingHand writeback ok: ${name} → ${hand}`);
+    } catch (e) {
+      console.error("battingHand writeback error:", e);
+    }
+  }
 
   // Break timer
   useEffect(() => {
@@ -642,6 +844,10 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
           innings1: i1Payload,
           innings2: i2Payload,
           bowling: { team: bowlingName },
+          // TASK 3 — per-bowler approach map (over/around the wicket).
+          bowlerApproach: bowlerApproach && Object.keys(bowlerApproach).length > 0
+            ? bowlerApproach
+            : null,
           updatedAt: serverTimestamp(),
           lastScorerId:   currentUser?.uid || currentUser?.id || null,
           lastScorerName: currentUser?.name || null,
@@ -659,7 +865,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       }
     }, 1200);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
-  }, [score, wickets, balls, batters, bowler, extras, innings, target, inningsEnd, safe.matchId, readOnly, fowList, currentUser, isLockedOut, battingOrder]);
+  }, [score, wickets, balls, batters, bowler, extras, innings, target, inningsEnd, safe.matchId, readOnly, fowList, currentUser, isLockedOut, battingOrder, bowlerApproach]);
 
   // ── Latest event data for viewer replay/catch-up ────────────
   const latestEventsRef = useRef([]);
@@ -976,25 +1182,47 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
   // new line synchronously alongside the event push.
   function pushEvent(delta) {
     if (readOnly || isLockedOut) return;
+    const strikerName = batters[striker]?.name || null;
+    // Persist the resolved hand at-record-time so the profile-side
+    // wagon wheel can re-mirror correctly per-ball even if the same
+    // batter later switches stance (rare, but defensive).
+    const hand = strikerName ? (battingHandByName[strikerName] || null) : null;
     pendingEventsRef.current.push({
       ts: Date.now(),
       innings,
       over: Math.floor(balls / 6),
       ball: balls % 6,
-      striker: batters[striker]?.name || null,
+      striker: strikerName,
       nonStriker: batters[1 - striker]?.name || null,
       bowler: bowler || null,
       commentary: commentary || "",
       pitch: pendingBall?.pitch || null,
       zone: activeZone || null,
+      tapPoint: tapPoint ? { x: tapPoint.x, y: tapPoint.y } : null,
       shot: typeof activeShot === "string" ? activeShot : (activeShot?.n || null),
       shotType: pendingBall?.shotType || dotShotType || null,
+      battingHand: hand,
+      approach: bowler && bowlerApproach[bowler]
+        ? (bowlerApproach[bowler] === "around" ? "around" : "over")
+        : null,
       label: null,
       runs: 0,
       wicket: null,
       milestone: null,
       ...delta, // overrides
     });
+  }
+
+  // Approach-aware commentary helper: returns a human-readable phrase
+  // ~30% of the time when the current bowler has an approach set, else
+  // "" (which causes commentaryGen to filter out approach-templated
+  // lines). Capped at one call per ball so probability is per-delivery,
+  // not per-pickCommentary invocation.
+  function approachVarForCurrentBall() {
+    const a = bowler && bowlerApproach[bowler];
+    if (!a) return "";
+    if (Math.random() >= 0.3) return "";
+    return a === "around" ? "Round the wicket" : "Over the wicket";
   }
 
   // ── Ball recording ──────────────────────────────────────────
@@ -1035,7 +1263,8 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
       shotType: opts.shotType || null,
       zone: opts.zone || activeZone || null,
     });
-    const line = pickCommentary(evKey, { batter: batName, bowler });
+    const approach = approachVarForCurrentBall();
+    const line = pickCommentary(evKey, { batter: batName, bowler, approach });
     setCommentary(line);
 
     // Celebrations still fire for 4/6.
@@ -1194,10 +1423,12 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     // ── New commentary generator ──
     const wicketShape = { type: wicketType, fielder: fielder || null };
     const evKey = pickEventKey({ wicket: wicketShape });
+    const approach = approachVarForCurrentBall();
     const line = pickCommentary(evKey, {
       batter: batName,
       bowler,
       fielder: fielder || null,
+      approach,
     });
     setCommentary(line);
     // Append fall-of-wickets entry (Option A: client-built array).
@@ -1264,37 +1495,71 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
   }
 
   // ── Full-mode dispatch ──────────────────────────────────────
-  function handleRunTap(runs) {
-    if (readOnly || isLockedOut) return;
-    if (scoreMode === "fast") {
-      recordRuns(runs);
+  // ensureBattingHand: gate any record-flow on knowing the striker's
+  // batting hand. If the batter has no resolved hand AND is in the
+  // roster, we open the hand-prompt sheet and stash `resume` for
+  // continuation. External opponents (not in roster) default to "RH"
+  // silently — they'll never be re-prompted in subsequent matches.
+  function ensureBattingHand(resume) {
+    const name = batters[striker]?.name;
+    if (!name) { resume(); return; }
+    if (battingHandByName[name]) { resume(); return; }
+    const rosterHand = resolveBattingHand(name);
+    if (rosterHand) {
+      setBattingHandByName(prev => ({ ...prev, [name]: rosterHand }));
+      resume();
       return;
     }
-    const kind = runs === 6 ? "six" : runs === 4 ? "four" : "run";
-    setPendingBall({ runs, kind });
-    setModal("pitch");
+    // External opponent (not in roster) — default to RH, no prompt.
+    const inRoster = rosterRef.current.has(name.trim().toLowerCase());
+    if (!inRoster) {
+      setBattingHandByName(prev => ({ ...prev, [name]: "RH" }));
+      resume();
+      return;
+    }
+    // In roster but no battingHand recorded — prompt user.
+    setPendingHandPrompt({ name, resume });
+  }
+
+  function handleRunTap(runs) {
+    if (readOnly || isLockedOut) return;
+    ensureBattingHand(() => {
+      if (scoreMode === "fast") {
+        recordRuns(runs);
+        return;
+      }
+      const kind = runs === 6 ? "six" : runs === 4 ? "four" : "run";
+      setPendingBall({ runs, kind });
+      setModal("pitch");
+    });
   }
   function handleWicketTap() {
     if (readOnly || isLockedOut) return;
-    if (scoreMode === "fast") {
-      setWicketStriker(striker);
-      setModal("wicket");
-      return;
-    }
-    setPendingBall({ runs: 0, kind: "wicket" });
-    setModal("pitch");
+    ensureBattingHand(() => {
+      if (scoreMode === "fast") {
+        setWicketStriker(striker);
+        setModal("wicket");
+        return;
+      }
+      setPendingBall({ runs: 0, kind: "wicket" });
+      setModal("pitch");
+    });
   }
 
   // WIDE / NO-BALL → open the bonus-runs sheet (both fast + full modes).
   function handleWideTap() {
     if (readOnly || isLockedOut) return;
-    setPendingExtras({ type: "wide", bonusRuns: 0, kind: null });
-    setModal("extrasBonus");
+    ensureBattingHand(() => {
+      setPendingExtras({ type: "wide", bonusRuns: 0, kind: null });
+      setModal("extrasBonus");
+    });
   }
   function handleNoBallTap() {
     if (readOnly || isLockedOut) return;
-    setPendingExtras({ type: "noball", bonusRuns: 0, batRuns: 0 });
-    setModal("extrasBonus");
+    ensureBattingHand(() => {
+      setPendingExtras({ type: "noball", bonusRuns: 0, batRuns: 0 });
+      setModal("extrasBonus");
+    });
   }
 
   // Apply the user's bonus-sheet choice and record.
@@ -1329,6 +1594,36 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     if (readOnly || isLockedOut) return;
     const pb = { ...(pendingBall || {}), ...opts };
     if (!pb) return;
+
+    // ── Edit mode: commit the new shape into the events array
+    //    instead of appending. We deliberately don't route through
+    //    recordRuns/recordWide/etc. for edits — commitBallEdit walks
+    //    the recomputed forward-pass, so all derived totals fall out.
+    if (editingBall) {
+      // Limited edit semantics: we only re-thread pitch / zone / shot
+      // / shotType / runs. Extras (wide/no-ball/bye) and wicket
+      // dismissal type are NOT re-editable through this path — they
+      // require their own dedicated flows. If the original event was
+      // a wicket we preserve the wicket sub-shape; the edited values
+      // refine the metadata (pitch/zone/shot) only.
+      const orig = editingBall.originalEvent || {};
+      const wasWicket = !!orig.wicket;
+      const newRuns = wasWicket ? 0 : (pb.runs ?? 0);
+      const label = wasWicket ? "W" : (newRuns === 0 ? "•" : String(newRuns));
+      const newEvent = {
+        runs: newRuns,
+        label,
+        pitch: pb.pitch || null,
+        zone: activeZone || pb.zone || null,
+        tapPoint: tapPoint ? { x: tapPoint.x, y: tapPoint.y } : null,
+        shot: typeof activeShot === "string" ? activeShot : (activeShot?.n || null),
+        shotType: pb.shotType || dotShotType || null,
+        // Preserve immutables / sub-shapes.
+        wicket: orig.wicket || null,
+      };
+      commitBallEdit(newEvent);
+      return;
+    }
 
     // Wide / no-ball from pitch picker → route into bonus sheet instead of
     // recording immediately. Wagon wheel is skipped for extras.
@@ -1365,6 +1660,284 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
     setActiveShot(null);
     setDotShotType(null);
     setModal(null);
+  }
+
+  // ── Per-innings opener resolution (for forward-pass) ──────────
+  // recomputeForInnings needs to know who walked out first. Prefer the
+  // saved batting order; fall back to the first two squad entries.
+  function openersForInnings(inningsNum) {
+    const order = inningsNum === 1 ? safe.innings1?.battingOrder : safe.innings2?.battingOrder;
+    if (Array.isArray(order) && order[0] && order[1]) return [order[0], order[1]];
+    if (inningsNum === 1) return [squad1[0], squad1[1]];
+    return [squad2[0], squad2[1]];
+  }
+
+  // Apply a recomputed snapshot to local React state.
+  function applyRecomputedSnapshot(snap) {
+    setScore(snap.score);
+    setWickets(snap.wickets);
+    setBalls(snap.balls);
+    setBatters(snap.batters);
+    setStriker(snap.striker);
+    setOverBalls(snap.overBalls);
+    setFreeHit(snap.freeHit);
+    setExtras(snap.extras);
+    setFowList(snap.fowList);
+  }
+
+  // Load this-over events on demand for the edit sheet. We fetch once
+  // from Firestore (committed) and merge any locally-pending events so
+  // the most recent ball is visible even if the debounced save hasn't
+  // run yet. Returns {events, currentOverEvents, currentOverNum}.
+  async function loadOverEventsForEdit() {
+    const out = { events: [], currentOverEvents: [] };
+    try {
+      if (!safe.matchId) return out;
+      const snap = await getDoc(doc(db, "fccscorer", "data", "matches", safe.matchId));
+      const committed = Array.isArray(snap.data()?.events) ? snap.data().events : [];
+      const merged = [...committed, ...pendingEventsRef.current];
+      const currentOverNum = Math.floor(balls / 6);
+      const isCurrentBall = balls % 6 === 0 && balls > 0; // over boundary edge case
+      // Filter to current innings + current over.
+      const currentOverEvents = merged
+        .map((ev, idx) => ({ ev, idx }))
+        .filter(({ ev }) =>
+          (ev?.innings ?? 1) === innings &&
+          (ev?.over ?? Math.floor((ev?.ball ?? 0) / 6)) === (isCurrentBall ? currentOverNum - 1 : currentOverNum)
+        );
+      out.events = merged;
+      out.currentOverEvents = currentOverEvents;
+      return out;
+    } catch (e) {
+      console.error("loadOverEventsForEdit error:", e);
+      return out;
+    }
+  }
+
+  // Ball edit save — splice the event in `events`, persist the full
+  // array (not arrayUnion), and recompute scoreboard state.
+  async function commitBallEdit(newEvent) {
+    if (readOnly || isLockedOut) return;
+    if (!editingBall) return;
+    if (!safe.matchId) return;
+    try {
+      // Flush anything in pendingEventsRef first so the on-disk events
+      // array isn't behind us.
+      const pending = pendingEventsRef.current.slice();
+      pendingEventsRef.current = [];
+      const ref = doc(db, "fccscorer", "data", "matches", safe.matchId);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return;
+      const data = snap.data();
+      const events = Array.isArray(data.events) ? data.events.slice() : [];
+      // If we still have un-flushed pending, append them first.
+      pending.forEach(ev => events.push(ev));
+      const idx = editingBall.eventIndex;
+      if (idx < 0 || idx >= events.length) {
+        console.warn("commitBallEdit: index out of range", idx, events.length);
+        setEditingBall(null);
+        return;
+      }
+      // Preserve immutable fields (ts/innings/over/ball/striker etc.)
+      events[idx] = { ...events[idx], ...newEvent };
+      // Recompute the snapshot for the current innings — innings 1 if
+      // we haven't switched yet, innings 2 otherwise.
+      const recomputed = recomputeForInnings(events, innings, openersForInnings(innings), bowler);
+      applyRecomputedSnapshot(recomputed);
+      await setDoc(ref, {
+        events,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      console.log(`ball edit committed: event #${idx}`);
+    } catch (e) {
+      console.error("commitBallEdit error:", e);
+    } finally {
+      setEditingBall(null);
+      setBallEditSheetOpen(false);
+      setPendingBall(null);
+      setActiveZone(null);
+      setTapPoint(null);
+      setActiveShot(null);
+      setDotShotType(null);
+      setModal(null);
+    }
+  }
+
+  // ── Forward-pass recomputation (TASK 4 — Ball edit) ─────────
+  // Walks the events array for the CURRENT innings in order and rebuilds
+  // every scoreboard slot from scratch. Returns the recomputed snapshot
+  // ({score, wickets, balls, batters, striker, freeHit, overBalls,
+  // fowList, extras}); the caller applies it via setState.
+  //
+  // Trade-off: this duplicates the per-event mutation logic from
+  // recordRuns/recordWide/recordNoBall/recordBye/recordWicket — a single
+  // source of truth would be better, but the in-place mutation helpers
+  // are tightly coupled to React state setters and pushHistory. Cleanest
+  // to fork the math into a pure function here.
+  function recomputeForInnings(events, inningsNum, openers, openingBowler) {
+    let score = 0, wickets = 0, ballsCount = 0;
+    let strikerIdx = 0;
+    let freeHit = false;
+    const ex = { b: 0, lb: 0, w: 0, nb: 0 };
+    // Snapshot of the two crease batters — name + cumulative figures.
+    const batsRecord = openers.map(name => ({
+      name, runs: 0, balls: 0, fours: 0, sixes: 0, dismissal: null, notOut: true,
+    }));
+    let nextIncomingIdx = 2;       // points into the squad/order for the next batter
+    const fow = [];
+    const overSlots = [null, null, null, null, null, null];
+
+    // Track all "ever batted" entries so dismissed batters' figures are
+    // preserved beyond their dismissal — keyed by name (collision-free
+    // assuming squad names are unique within a match).
+    const allBatsByName = {};
+    openers.forEach(n => { allBatsByName[n] = batsRecord[0].name === n ? batsRecord[0] : batsRecord[1]; });
+
+    // Innings-2 batting order, if persisted.
+    const order = (inningsNum === 1 ? safe.innings1?.battingOrder : safe.innings2?.battingOrder) || battingOrder || [];
+    const fillNextBatter = () => {
+      // Look up the next unbatted name from the saved order; fall back
+      // to squad order. Skips anyone already in the all-bats map.
+      const squad = inningsNum === 1 ? squad1 : squad2;
+      const tried = new Set(Object.keys(allBatsByName));
+      const pickFromList = (list) => list.find(n => n && !tried.has(n));
+      const next = pickFromList(order) || pickFromList(squad);
+      if (!next) return null;
+      const rec = { name: next, runs: 0, balls: 0, fours: 0, sixes: 0, dismissal: null, notOut: true };
+      allBatsByName[next] = rec;
+      nextIncomingIdx++;
+      return rec;
+    };
+
+    const setOver = (slotIdx, label) => {
+      if (slotIdx >= 0 && slotIdx < 6) overSlots[slotIdx] = label;
+    };
+
+    const filtered = events.filter(e => (e?.innings ?? 1) === inningsNum);
+    filtered.forEach(ev => {
+      const r = Number(ev.runs) || 0;
+      const wkt = ev.wicket || null;
+      const label = ev.label || "•";
+      const slot = ballsCount % 6;
+      const isWide = /^Wd/.test(label);
+      const isNb = /^Nb/.test(label);
+      const isBye = /^B\d*$/.test(label);
+      // ── Wicket ──
+      if (wkt) {
+        score += r; // (usually 0 for a wicket ball, but defensive)
+        const dismissedName = wkt.batter || batsRecord[strikerIdx]?.name;
+        const rec = allBatsByName[dismissedName] || batsRecord[strikerIdx];
+        if (rec) {
+          rec.balls = (rec.balls || 0) + 1;
+          rec.dismissal = wkt.type + (wkt.fielder ? ` (${wkt.fielder})` : "");
+          rec.notOut = false;
+        }
+        // Replace dismissed batter at the crease.
+        const replaceIdx = batsRecord[0]?.name === dismissedName ? 0
+          : batsRecord[1]?.name === dismissedName ? 1
+          : strikerIdx;
+        const incoming = fillNextBatter();
+        if (incoming) batsRecord[replaceIdx] = incoming;
+        wickets += 1;
+        ballsCount += 1;
+        setOver(slot, "W");
+        fow.push({
+          wicketNum: wickets,
+          teamScore: score,
+          batter: dismissedName,
+          bowler: wkt.bowler || ev.bowler || null,
+          over: `${Math.floor(ballsCount / 6)}.${ballsCount % 6}`,
+          dismissalType: ({
+            "Bowled": "b", "Caught": "c", "LBW": "lbw",
+            "Run out": "ro", "Stumped": "st", "Hit wicket": "hw",
+          })[wkt.type] || null,
+          fielder: wkt.fielder || null,
+        });
+        if (freeHit) freeHit = false;
+        if (ballsCount % 6 === 0) {
+          overSlots.fill(null);
+          strikerIdx = strikerIdx === 0 ? 1 : 0;
+        }
+        return;
+      }
+      // ── Extras: wide ──
+      if (isWide) {
+        score += r;
+        ex.w += 1 + (label === "Wd+LB" || label === "Wd+B" ? 0 : Math.max(0, r - 1));
+        if (label === "Wd+LB") ex.lb += 1;
+        if (label === "Wd+B")  ex.b  += 1;
+        setOver(slot, label);
+        // No ball faced, no rotation, no freeHit consumption.
+        return;
+      }
+      // ── Extras: no-ball ──
+      if (isNb) {
+        score += r;
+        ex.nb += 1;
+        const extraLbOrB = label === "Nb+LB" ? "lb" : label === "Nb+B" ? "b" : null;
+        if (extraLbOrB) ex[extraLbOrB] += 1;
+        // Bat-runs credited to striker but no faced ball.
+        const m = /^Nb(\d+)$/.exec(label);
+        const batRuns = m ? Math.max(0, parseInt(m[1], 10) - 1) : 0;
+        if (batRuns > 0 && batsRecord[strikerIdx]) {
+          batsRecord[strikerIdx].runs += batRuns;
+          if (batRuns === 4) batsRecord[strikerIdx].fours += 1;
+          if (batRuns === 6) batsRecord[strikerIdx].sixes += 1;
+        }
+        setOver(slot, label);
+        freeHit = true;
+        if (!extraLbOrB && batRuns % 2 === 1) strikerIdx = strikerIdx === 0 ? 1 : 0;
+        return;
+      }
+      // ── Bye ──
+      if (isBye) {
+        const m = /^B(\d+)$/.exec(label);
+        const byeRuns = m ? parseInt(m[1], 10) : (r || 1);
+        score += byeRuns;
+        ex.b += byeRuns;
+        ballsCount += 1;
+        setOver(slot, label);
+        if (batsRecord[strikerIdx]) batsRecord[strikerIdx].balls += 1;
+        if (byeRuns % 2 === 1) strikerIdx = strikerIdx === 0 ? 1 : 0;
+        if (freeHit) freeHit = false;
+        if (ballsCount % 6 === 0) {
+          overSlots.fill(null);
+          strikerIdx = strikerIdx === 0 ? 1 : 0;
+        }
+        return;
+      }
+      // ── Regular run (incl. 0 dot) ──
+      score += r;
+      const rec = batsRecord[strikerIdx];
+      if (rec) {
+        rec.runs += r;
+        rec.balls += 1;
+        if (r === 4) rec.fours += 1;
+        if (r === 6) rec.sixes += 1;
+      }
+      ballsCount += 1;
+      setOver(slot, r === 0 ? "•" : String(r));
+      // Rotate on odd, NOT on 4 or 6.
+      if (r !== 4 && r !== 6 && r % 2 === 1) {
+        strikerIdx = strikerIdx === 0 ? 1 : 0;
+      }
+      if (freeHit) freeHit = false;
+      if (ballsCount % 6 === 0) {
+        overSlots.fill(null);
+        strikerIdx = strikerIdx === 0 ? 1 : 0;
+      }
+    });
+
+    return {
+      score, wickets,
+      balls: ballsCount,
+      batters: batsRecord,
+      striker: strikerIdx,
+      freeHit,
+      overBalls: overSlots,
+      fowList: fow,
+      extras: ex,
+    };
   }
 
   function undo() {
@@ -1880,7 +2453,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
               {[0, 1, 2, 3].map(n => (
                 <RunSmall key={n} onClick={() => handleRunTap(n)} label={n === 0 ? "0" : String(n)} nightMode={nightMode} />
               ))}
-              <RunSmall onClick={() => setModal("overRuns")} label={"···"} nightMode={nightMode} small />
+              <RunSmall onClick={() => ensureBattingHand(() => setModal("overRuns"))} label={"···"} nightMode={nightMode} small />
             </div>
 
             {/* Row 2: 4, 6, W */}
@@ -1908,7 +2481,7 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
             <div style={{ display: "flex", gap: 6 }}>
               <PillBtn onClick={handleWideTap} label="WIDE" nightMode={nightMode} />
               <PillBtn onClick={handleNoBallTap} label="NO BALL" nightMode={nightMode} />
-              <PillBtn onClick={() => setModal("bye")} label="BYE" nightMode={nightMode} />
+              <PillBtn onClick={() => ensureBattingHand(() => setModal("bye"))} label="BYE" nightMode={nightMode} />
               <PillBtn onClick={undo} label="↩" nightMode={nightMode} noCaps />
             </div>
 
@@ -1936,6 +2509,14 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: nightMode ? SC.gold : SC.navy, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bowler}</div>
               <div style={{ fontSize: 11, fontWeight: 500, color: T.textDim, marginTop: 2 }}>0.0-0-0-0</div>
+              {bowlerApproach[bowler] && (
+                <div style={{
+                  fontSize: 10, color: SC.gold, fontStyle: "italic",
+                  marginTop: 2, letterSpacing: 0.4,
+                }}>
+                  {bowlerApproach[bowler] === "around" ? "Round the wicket" : "Over the wicket"}
+                </div>
+              )}
             </div>
             {!readOnly && !isLockedOut && (
               <div onClick={() => setModal("bowler")} style={{
@@ -2062,7 +2643,16 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
               Current: <strong style={{ color: SC.navy }}>{bowler}</strong> · Over {Math.floor(balls / 6) + 1}
             </div>
             {(innings === 1 ? squad2 : squad1).map(p => (
-              <div key={p} onClick={() => { setBowler(p); close(); }}
+              <div key={p} onClick={() => {
+                setBowler(p);
+                close();
+                // Open approach picker if we don't yet know this bowler's
+                // angle — defer one tick so the bowler sheet can finish
+                // closing before the approach sheet pops up.
+                if (!bowlerApproach[p]) {
+                  setTimeout(() => setApproachPromptFor(p), 200);
+                }
+              }}
                 style={{ padding: "13px 14px", borderBottom: `1px solid ${SC.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", background: bowler === p ? "rgba(24,95,165,0.06)" : "transparent" }}>
                 <span style={{ fontSize: 14, fontWeight: bowler === p ? 700 : 500, color: bowler === p ? SC.blue : SC.navy }}>{p}</span>
                 {bowler === p && <span style={{ color: SC.blue, fontSize: 16 }}>✓</span>}
@@ -2130,6 +2720,15 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
                   sub: `${battingOrder.length - battersOut} unbatted in order`,
                   onClick: () => { close(); setBattingOrderOpen(true); } }]
               : []),
+            // TASK 4 — edit a ball in the current over (only when ≥1 ball
+            // has been recorded). The sheet itself reads the doc on open
+            // and merges locally-pending events so the most recent ball
+            // is always editable.
+            ...(overBalls.some(Boolean)
+              ? [{ icon: "📝", label: "Edit ball in this over",
+                  sub: "Tap a pill to correct a recorded ball",
+                  onClick: () => { close(); setBallEditSheetOpen(true); } }]
+              : []),
             { icon: "↻", label: "Replay last over", onClick: () => { triggerReplayLastOver(); close(); } },
             { icon: "📊", label: "Open scorecard", onClick: () => { setScorecardOpen(true); close(); } },
             { icon: "🎤", label: "Commentary voice", sub: `Now: ${COMMENTARY[persona].name}`, onClick: () => setModal("commentary") },
@@ -2158,7 +2757,8 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
 
         {/* ── PITCH PICKER ── */}
         {modal === "pitch" && pendingBall && (
-          <Sheet title="Where did it pitch?" onClose={() => { setPendingBall(null); close(); }}>
+          <Sheet title={editingBall ? "Edit ball — where did it pitch?" : "Where did it pitch?"}
+            onClose={() => { setPendingBall(null); setEditingBall(null); close(); }}>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
               <PitchPickerSvg
                 selected={pendingBall.pitch}
@@ -2198,18 +2798,141 @@ export default function LiveScorerView({ match, onBack, currentUser, readOnly = 
         {modal === "wagon" && pendingBall && (
           <Sheet title="Where did it go?" onClose={() => { setPendingBall(null); setActiveZone(null); setTapPoint(null); close(); }}>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-              <WagonWheel activeZone={activeZone} tapPoint={tapPoint} onZoneTap={(zid, point) => {
-                setActiveZone(zid);
-                setTapPoint(point || null);
-                setPendingBall(pb => ({ ...(pb || {}), zone: zid }));
-                // Open shot picker after a short pause so the indicator flashes
-                setTimeout(() => setModal("shot"), 220);
-              }} />
+              <WagonWheel
+                activeZone={activeZone}
+                tapPoint={tapPoint}
+                mirror={battingHandByName[batters[striker]?.name] === "LH"}
+                onZoneTap={(zid, point) => {
+                  setActiveZone(zid);
+                  setTapPoint(point || null);
+                  setPendingBall(pb => ({ ...(pb || {}), zone: zid }));
+                  // Open shot picker after a short pause so the indicator flashes
+                  setTimeout(() => setModal("shot"), 220);
+                }}
+              />
               <div style={{ fontSize: 11, color: SC.textDim, fontStyle: "italic", textAlign: "center" }}>Tap where it went — then pick a shot</div>
               <div onClick={() => recordPendingBall()}
                 style={{ width: "100%", padding: "12px 8px", borderRadius: 12, background: SC.surface, border: `1px solid ${SC.border}`, color: SC.textDim, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, cursor: "pointer", textAlign: "center", marginTop: 4 }}>
                 Skip — score plain
               </div>
+            </div>
+          </Sheet>
+        )}
+
+        {/* ── BALL EDIT SHEET (TASK 4) ────────────────────────── */}
+        {ballEditSheetOpen && !readOnly && !isLockedOut && (
+          <BallEditSheet
+            balls={balls}
+            innings={innings}
+            overBalls={overBalls}
+            loadEvents={loadOverEventsForEdit}
+            onClose={() => setBallEditSheetOpen(false)}
+            onPick={(eventIndex, originalEvent) => {
+              // Pre-populate the standard flow with the original event's
+              // values, then route it through the pitch picker. The new
+              // values flow through the regular sheets; the FINAL commit
+              // gets intercepted in recordPendingBall via editingBall.
+              setEditingBall({ eventIndex, originalEvent });
+              setActiveZone(originalEvent.zone || null);
+              setTapPoint(originalEvent.tapPoint || null);
+              setActiveShot(originalEvent.shot || null);
+              setDotShotType(originalEvent.shotType || null);
+              const runs = Number(originalEvent.runs) || 0;
+              const isWicket = !!originalEvent.wicket;
+              const kind = isWicket ? "wicket"
+                : runs === 6 ? "six"
+                : runs === 4 ? "four" : "run";
+              setPendingBall({
+                runs,
+                kind,
+                pitch: originalEvent.pitch || null,
+                zone: originalEvent.zone || null,
+                shotType: originalEvent.shotType || null,
+              });
+              setBallEditSheetOpen(false);
+              setModal("pitch");
+            }}
+          />
+        )}
+
+        {/* ── BATTER HANDEDNESS PROMPT (LH / RH wagon mirror) ── */}
+        {pendingHandPrompt && !readOnly && !isLockedOut && (
+          <Sheet
+            title={`${pendingHandPrompt.name} bats right or left handed?`}
+            onClose={() => setPendingHandPrompt(null)}
+          >
+            <div style={{ fontSize: 12, color: SC.textDim, marginBottom: 14, lineHeight: 1.45 }}>
+              We'll mirror the wagon wheel for left-handers — and remember this
+              for future matches.
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {[
+                { id: "RH", label: "Right" },
+                { id: "LH", label: "Left" },
+              ].map(opt => (
+                <div key={opt.id}
+                  onClick={() => {
+                    const name = pendingHandPrompt.name;
+                    const resume = pendingHandPrompt.resume;
+                    setBattingHandByName(prev => ({ ...prev, [name]: opt.id }));
+                    persistRosterBattingHand(name, opt.id);
+                    setPendingHandPrompt(null);
+                    // Resume the original record flow.
+                    if (typeof resume === "function") setTimeout(resume, 0);
+                  }}
+                  style={{
+                    padding: "22px 10px", borderRadius: 14,
+                    background: `linear-gradient(135deg, ${SC.navy} 0%, ${SC.navyDk} 100%)`,
+                    color: "#fff", textAlign: "center",
+                    fontSize: 18, fontWeight: 800, letterSpacing: 0.5,
+                    cursor: "pointer", boxShadow: "0 4px 14px rgba(27,42,92,0.35)",
+                  }}>
+                  {opt.label}
+                </div>
+              ))}
+            </div>
+          </Sheet>
+        )}
+
+        {/* ── BOWLER APPROACH (over / round the wicket) ─────────── */}
+        {approachPromptFor && !readOnly && !isLockedOut && (
+          <Sheet
+            title={`${approachPromptFor}'s approach`}
+            onClose={() => {
+              // Default to "over" if dismissed without a pick.
+              setBowlerApproach(prev => prev[approachPromptFor]
+                ? prev
+                : { ...prev, [approachPromptFor]: "over" });
+              setApproachPromptFor(null);
+            }}
+          >
+            <div style={{ fontSize: 12, color: SC.textDim, marginBottom: 14, lineHeight: 1.45 }}>
+              How is {approachPromptFor} coming in?
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {[
+                { id: "over",   label: "Over the wicket" },
+                { id: "around", label: "Round the wicket" },
+              ].map(opt => (
+                <div key={opt.id}
+                  onClick={() => {
+                    setBowlerApproach(prev => ({ ...prev, [approachPromptFor]: opt.id }));
+                    setApproachPromptFor(null);
+                  }}
+                  style={{
+                    padding: "20px 10px", borderRadius: 14,
+                    background: bowlerApproach[approachPromptFor] === opt.id
+                      ? `linear-gradient(135deg, ${SC.gold} 0%, ${SC.goldLt} 100%)`
+                      : SC.surface,
+                    color: bowlerApproach[approachPromptFor] === opt.id ? SC.navy : SC.navy,
+                    border: `1.5px solid ${bowlerApproach[approachPromptFor] === opt.id ? SC.gold : SC.borderMid}`,
+                    textAlign: "center",
+                    fontSize: 14, fontWeight: 800, letterSpacing: 0.4,
+                    cursor: "pointer",
+                  }}>
+                  {opt.label}
+                </div>
+              ))}
             </div>
           </Sheet>
         )}
@@ -2836,6 +3559,73 @@ function ReplayOverlay({ replay, persona, onAdvance, onSkip, onDone }) {
           marginTop: 18, fontSize: 11, fontWeight: 700,
           color: SC.gold, textTransform: "uppercase", letterSpacing: 1,
         }}>Ball {index + 1} of {balls.length}</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Ball edit picker sheet (TASK 4) ───────────────────────────
+// Bottom sheet listing the current over's recorded events as pills.
+// Tap a pill → onPick(index, originalEvent) is invoked; the parent
+// then routes the user back through the pitch / wagon / shot flow.
+function BallEditSheet({ balls, innings, overBalls, loadEvents, onClose, onPick }) {
+  const [loading, setLoading] = useState(true);
+  const [picks, setPicks] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const { currentOverEvents } = await loadEvents();
+      if (cancelled) return;
+      setPicks(currentOverEvents);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  return (
+    <div onClick={(e) => e.target === e.currentTarget && onClose()}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 700,
+        display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div style={{ width: "100%", maxWidth: 420, background: SC.surface, borderRadius: "20px 20px 0 0",
+        padding: "20px 18px 28px", boxShadow: "0 -8px 40px rgba(0,0,0,0.3)" }}>
+        <div style={{ width: 36, height: 4, background: SC.borderMid, borderRadius: 2, margin: "0 auto 14px" }} />
+        <div style={{ fontSize: 16, fontWeight: 800, color: SC.navy, marginBottom: 4, textAlign: "center" }}>
+          Edit a ball from this over
+        </div>
+        <div style={{ fontSize: 12, color: SC.textDim, marginBottom: 16, textAlign: "center" }}>
+          Tap a ball to change it
+        </div>
+        {loading ? (
+          <div style={{ textAlign: "center", padding: 20, color: SC.textDim, fontSize: 13 }}>
+            Loading…
+          </div>
+        ) : picks.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 20, color: SC.textDim, fontSize: 13 }}>
+            No balls recorded yet in this over.
+          </div>
+        ) : (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+            {picks.map(({ ev, idx }) => {
+              const label = ev?.label || "•";
+              return (
+                <div key={idx} onClick={() => onPick(idx, ev)}
+                  style={{ cursor: "pointer" }}>
+                  <BallPill val={label} />
+                  <div style={{ fontSize: 9, color: SC.textDim, marginTop: 4, textAlign: "center" }}>
+                    Ball {(ev?.ball ?? 0) + 1}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <button onClick={onClose} style={{
+          width: "100%", marginTop: 18, padding: "12px", borderRadius: 10,
+          background: "#fff", border: `1.5px solid ${SC.border}`, color: SC.textMuted,
+          fontWeight: 700, fontSize: 14, cursor: "pointer",
+        }}>Cancel</button>
       </div>
     </div>
   );
