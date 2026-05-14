@@ -21,6 +21,11 @@ import { THEMES, THEME_KEYS } from "../constants/themes";
 import { fmtShort, todayStr } from "../utils/time";
 import { isCoachMember, profileCompletion, maskEmail, getMemberRoleChips } from "../utils/members";
 import { uid } from "../constants/seeds";
+import {
+  getEffectiveConfig, isDutyEnabled, getSupportParents, getSlotCount,
+  isMatchSession, countDuties, getSeasonYear,
+  resolveRoleShort,
+} from "../constants/parent-duty";
 
 // Local navy/gold palette so the career-stats section reads as the
 // scorecard family instead of the green/cream profile chrome.
@@ -52,6 +57,7 @@ export default function ProfileView() {
     absCat, setAbsCat, absNote, setAbsNote,
     absConflicts, setAbsConflicts,
     showToast, joinRequests, toast,
+    parentDutyConfig, setSelSess,
   } = useAppContext();
 
   const iSt = (extra={}) => ({
@@ -1040,6 +1046,244 @@ export default function ProfileView() {
                         : `▼ Show all ${allMyMatches.length} matches`}
                   </button>
                 )}
+              </div>
+            );
+          })()}
+
+          {/* ── My parent duties ── */}
+          {(() => {
+            const me = members.find(m => m.id === currentUser?.id);
+            if (!me) return null;
+            const myChildren = (me.children || [])
+              .map(cid => members.find(m => m.id === cid))
+              .filter(Boolean);
+            if (myChildren.length === 0) return null;
+
+            const myDutyTeams = [...new Set(
+              myChildren.flatMap(c => (c.teams || []).filter(t => isDutyEnabled(t, parentDutyConfig)))
+            )];
+            if (myDutyTeams.length === 0) return null;
+
+            const today = new Date().toISOString().slice(0, 10);
+            const seasonYear = getSeasonYear(today);
+
+            const teamStats = myDutyTeams.map(team => {
+              const cfg = getEffectiveConfig(team, parentDutyConfig);
+              const myCount = countDuties(me, sessions, team, seasonYear);
+              const teamChildIds = new Set(
+                members.filter(m => (m.teams || []).includes(team)).map(m => m.id)
+              );
+              const teamParents = members.filter(m =>
+                (m.children || []).some(cid => teamChildIds.has(cid))
+              );
+              const leaderboard = teamParents
+                .map(p => ({ id: p.id, name: p.name, count: countDuties(p, sessions, team, seasonYear) }))
+                .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+              const myRank = leaderboard.findIndex(p => p.id === me.id) + 1;
+              return { team, cfg, myCount, leaderboard, myRank, totalParents: teamParents.length };
+            });
+
+            return (
+              <div style={{
+                background: G.white, borderRadius: 14, border: `1.5px solid ${G.border}`,
+                padding: "14px 16px", marginTop: 12
+              }}>
+                <div style={{
+                  fontSize: 11, fontWeight: 900, letterSpacing: 1.5, color: G.muted,
+                  textTransform: "uppercase", marginBottom: 12
+                }}>
+                  My parent duties
+                </div>
+
+                {teamStats.map(({ team, cfg, myCount, leaderboard, myRank, totalParents }) => {
+                  const pct = Math.min(100, Math.round((myCount / cfg.minDuties) * 100));
+                  const remaining = Math.max(0, cfg.minDuties - myCount);
+                  const minReached = myCount >= cfg.minDuties;
+                  const barColor = minReached ? "#1D9E75" : "#378ADD";
+
+                  const upcoming = sessions
+                    .filter(s => s.restrictedTo === team && s.date >= today)
+                    .filter(s => getSlotCount(s, parentDutyConfig) > 0)
+                    .sort((a, b) => a.date.localeCompare(b.date))
+                    .slice(0, 8);
+
+                  return (
+                    <div key={team} style={{ marginBottom: 18 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        <span style={{
+                          fontSize: 11, fontWeight: 800,
+                          background: "#E6F1FB", color: "#0C447C",
+                          padding: "3px 10px", borderRadius: 12
+                        }}>
+                          {team}
+                        </span>
+                        {minReached && (
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, color: "#085041",
+                            background: "#E1F5EE", padding: "2px 8px", borderRadius: 10
+                          }}>
+                            ✓ minimum reached
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{
+                        display: "flex", alignItems: "baseline",
+                        justifyContent: "space-between", marginBottom: 6
+                      }}>
+                        <span style={{ fontSize: 12, color: G.muted }}>Done this season</span>
+                        <span style={{ fontSize: 13, fontWeight: 800, color: barColor }}>
+                          {myCount} <span style={{ color: G.muted, fontWeight: 600 }}>/ {cfg.minDuties} min</span>
+                        </span>
+                      </div>
+                      <div style={{
+                        height: 6, background: "#F1EFE8", borderRadius: 3,
+                        overflow: "hidden", marginBottom: 6
+                      }}>
+                        <div style={{
+                          height: "100%", width: `${pct}%`, background: barColor,
+                          borderRadius: 3, transition: "width .3s"
+                        }} />
+                      </div>
+                      <div style={{ fontSize: 11, color: G.muted, marginBottom: 12 }}>
+                        {remaining > 0 ? `${remaining} more to hit your minimum` : "You're sorted for the season"}
+                        {totalParents > 1 && ` · You're ${myRank} of ${totalParents}`}
+                      </div>
+
+                      {upcoming.length > 0 && (
+                        <>
+                          <div style={{
+                            fontSize: 10, fontWeight: 700, letterSpacing: 1,
+                            textTransform: "uppercase", color: G.muted, marginBottom: 6
+                          }}>
+                            Upcoming · tap to claim
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 12 }}>
+                            {upcoming.map(s => {
+                              const isMatch = isMatchSession(s);
+                              const slots = getSlotCount(s, parentDutyConfig);
+                              const filled = getSupportParents(s);
+                              const myEntry = filled.find(sp => sp.memberId === me.id);
+                              const isFull = filled.length >= slots;
+                              const otherNames = filled
+                                .filter(sp => sp.memberId !== me.id)
+                                .map(sp => sp.memberName.split(" ")[0])
+                                .join(", ");
+
+                              const bg = myEntry ? "#378ADD"
+                                       : isFull   ? "#E1F5EE"
+                                       : "#FFFFFF";
+                              const border = myEntry ? "#378ADD"
+                                           : isFull   ? "#9FE1CB"
+                                           : G.border;
+                              const textColor = myEntry ? "#FFFFFF"
+                                              : isFull   ? "#085041"
+                                              : G.text;
+                              const sublineColor = myEntry ? "rgba(255,255,255,.85)"
+                                                 : isFull   ? "#0F6E56"
+                                                 : G.muted;
+
+                              const dateLabel = new Date(s.date).toLocaleDateString("en-GB", {
+                                weekday: "short", day: "numeric", month: "short"
+                              });
+
+                              return (
+                                <button key={s.id}
+                                  onClick={() => { setSelSess(s); setView("sessionDetail"); }}
+                                  style={{
+                                    display: "flex", alignItems: "center", gap: 10,
+                                    background: bg, border: `1px solid ${border}`,
+                                    borderRadius: 8, padding: "8px 10px",
+                                    cursor: "pointer", fontFamily: "inherit",
+                                    textAlign: "left", width: "100%"
+                                  }}>
+                                  <div style={{
+                                    fontSize: 16,
+                                    opacity: myEntry || isFull ? 1 : 0.5
+                                  }}>
+                                    {isMatch ? "🏏" : "🎯"}
+                                  </div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: textColor }}>
+                                      {dateLabel}
+                                      {isMatch && s.matchOpponent ? ` · v ${s.matchOpponent}` : ""}
+                                    </div>
+                                    <div style={{ fontSize: 10, color: sublineColor }}>
+                                      {myEntry
+                                        ? `You · ${myEntry.roleLabel || resolveRoleShort(myEntry.role, team, parentDutyConfig)}`
+                                        : isFull
+                                          ? `Covered by ${otherNames}`
+                                          : `${filled.length}/${slots} ${isMatch ? "volunteers" : "filled"}${otherNames ? ` · ${otherNames}` : ""}`
+                                      }
+                                    </div>
+                                  </div>
+                                  {!myEntry && !isFull && (
+                                    <span style={{
+                                      fontSize: 10, fontWeight: 700,
+                                      color: "#0C447C", background: "#E6F1FB",
+                                      padding: "3px 8px", borderRadius: 10
+                                    }}>
+                                      Claim →
+                                    </span>
+                                  )}
+                                  {myEntry && (
+                                    <span style={{
+                                      fontSize: 10, fontWeight: 700,
+                                      color: "#fff", background: "rgba(255,255,255,.25)",
+                                      padding: "3px 8px", borderRadius: 10
+                                    }}>
+                                      Yours
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+
+                      {totalParents > 1 && (
+                        <div>
+                          <div style={{
+                            fontSize: 10, fontWeight: 700, letterSpacing: 1,
+                            textTransform: "uppercase", color: G.muted, marginBottom: 6
+                          }}>
+                            All parents · this season
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                            {leaderboard.map(p => {
+                              const isMe = p.id === me.id;
+                              const isZero = p.count === 0;
+                              const minHit = p.count >= cfg.minDuties;
+                              return (
+                                <div key={p.id} style={{
+                                  display: "flex", alignItems: "center", gap: 8,
+                                  padding: "6px 8px", borderRadius: 6,
+                                  background: isMe ? "#E6F1FB" : isZero ? "#FCEBEB" : "transparent",
+                                  fontSize: 12
+                                }}>
+                                  <span style={{
+                                    flex: 1,
+                                    color: isMe ? "#0C447C" : isZero ? "#791F1F" : G.text,
+                                    fontWeight: isMe ? 800 : 500
+                                  }}>
+                                    {isMe ? "You" : p.name}
+                                  </span>
+                                  <span style={{
+                                    fontSize: 11, fontWeight: 700,
+                                    color: isMe ? "#0C447C" : isZero ? "#791F1F" : minHit ? "#0F6E56" : G.muted
+                                  }}>
+                                    {p.count}{minHit ? " ✓" : isZero ? " ⚠" : ""}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             );
           })()}

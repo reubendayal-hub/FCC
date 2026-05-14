@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAppContext } from "../context/AppContext";
 import Shell from "../ui/Shell";
 import BotNav from "../ui/BotNav";
@@ -12,8 +13,90 @@ import { NAME_MAP, AMBIGUOUS_FIRST_NAMES, DIVISION_TEAMS, T20_SQUADS } from "../
 import { ROLES, ROLE_META, can } from "../constants/roles";
 import { TEAM_META, getTeamMeta } from "../constants/teams";
 import { fmtShort, todayStr, isFuture } from "../utils/time";
-import { getCoachTeams, getMemberRoleChips, maskEmail } from "../utils/members";
+import { getCoachTeams, getMemberRoleChips, maskEmail, isCoachMember } from "../utils/members";
 import { EMAIL_SEED, normMember, uid } from "../constants/seeds";
+import {
+  DEFAULT_DUTY_CONFIG, DEFAULT_TEAM_CONFIG, STANDARD_ROLES,
+  getEffectiveConfig, isDutyEnabled,
+  getSupportParents, getSlotCount, countDuties, getSeasonYear,
+  slugifyRoleId,
+} from "../constants/parent-duty";
+
+function ConfigRow({ label, sublabel, control }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      padding: "12px 0",
+      borderBottom: "0.5px solid var(--color-border, #e2e8f0)"
+    }}>
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#0f1a3a" }}>
+          {label}
+        </div>
+        {sublabel && (
+          <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
+            {sublabel}
+          </div>
+        )}
+      </div>
+      {control}
+    </div>
+  );
+}
+
+function Toggle({ on, onChange }) {
+  return (
+    <button
+      onClick={() => onChange(!on)}
+      style={{
+        width: 38, height: 22, borderRadius: 11,
+        background: on ? "#1D9E75" : "#D3D1C7",
+        border: "none", cursor: "pointer",
+        position: "relative", padding: 0, flexShrink: 0
+      }}>
+      <span style={{
+        position: "absolute", top: 2,
+        left: on ? 18 : 2,
+        width: 18, height: 18, borderRadius: "50%",
+        background: "#fff", transition: "left .15s"
+      }} />
+    </button>
+  );
+}
+
+function Stepper({ value, min = 0, max = 99, onChange }) {
+  return (
+    <div style={{
+      display: "inline-flex", alignItems: "center",
+      border: "0.5px solid #cbd5e1", borderRadius: 8, overflow: "hidden"
+    }}>
+      <button
+        onClick={() => onChange(Math.max(min, value - 1))}
+        disabled={value <= min}
+        style={{
+          width: 28, height: 28, border: "none",
+          background: "#f1f5f9", fontSize: 14,
+          cursor: value > min ? "pointer" : "not-allowed",
+          fontFamily: "inherit", padding: 0,
+          opacity: value <= min ? 0.4 : 1
+        }}>−</button>
+      <span style={{
+        width: 32, textAlign: "center",
+        fontSize: 13, fontWeight: 700
+      }}>{value}</span>
+      <button
+        onClick={() => onChange(Math.min(max, value + 1))}
+        disabled={value >= max}
+        style={{
+          width: 28, height: 28, border: "none",
+          background: "#f1f5f9", fontSize: 14,
+          cursor: value < max ? "pointer" : "not-allowed",
+          fontFamily: "inherit", padding: 0,
+          opacity: value >= max ? 0.4 : 1
+        }}>+</button>
+    </div>
+  );
+}
 
 export default function AdminView() {
   const {
@@ -60,7 +143,12 @@ export default function AdminView() {
     deleteRecurringSlotSilent, updateRecurringSlot,
     addMember, removeMember, renameMember, fixAllNames,
     toggleMemberTeam, updateRole,
+    parentDutyConfig, saveParentDutyConfig,
   } = useAppContext();
+
+  const [dutyEditTeam, setDutyEditTeam] = useState(null);
+  const [dutyOversightTeam, setDutyOversightTeam] = useState("U11");
+  const [newCustomRole, setNewCustomRole] = useState("");
 
   const iSt = (extra={}) => ({
     width:"100%", borderRadius:9, border:`1.5px solid ${G.border}`,
@@ -888,6 +976,494 @@ export default function AdminView() {
         </>}
 
         </>}
+
+        {/* ── Parent duty config (super-admin only) ────────────── */}
+        {userRole === "superadmin" && (() => {
+          const youthTeams = ["U11", "U13", "U13 B", "U15", "U15 Girls", "U16", "U18"];
+          const configs = youthTeams.reduce((acc, t) => {
+            acc[t] = getEffectiveConfig(t, parentDutyConfig);
+            return acc;
+          }, {});
+          const patchTeamConfig = (team, patch) => {
+            const current = configs[team];
+            const updated = {
+              ...parentDutyConfig,
+              [team]: { ...current, ...patch }
+            };
+            saveParentDutyConfig(updated);
+          };
+          const editingCfg = dutyEditTeam ? configs[dutyEditTeam] : null;
+
+          return (
+            <div style={{
+              background: G.white, borderRadius: 14, border: `1.5px solid ${G.border}`,
+              padding: "16px 18px", marginBottom: 16
+            }}>
+              <div style={{
+                fontSize: 12, fontWeight: 900, letterSpacing: 1.5, color: G.muted,
+                textTransform: "uppercase", marginBottom: 14,
+                display: "flex", alignItems: "center", gap: 8
+              }}>
+                <span>⚙️</span>
+                <span>Parent duty config</span>
+                <span style={{
+                  fontSize: 9, fontWeight: 700, color: "#791F1F",
+                  background: "#FCEBEB", padding: "2px 6px", borderRadius: 6
+                }}>SUPER ADMIN</span>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 14 }}>
+                {youthTeams.map(team => {
+                  const cfg = configs[team];
+                  const isEditing = dutyEditTeam === team;
+                  const enabled = cfg.enabled;
+                  const summary = enabled
+                    ? `${cfg.trainingSlots > 0 ? "Training + " : ""}match days · ${cfg.minDuties} min`
+                    : "Off";
+
+                  return (
+                    <div key={team} style={{
+                      padding: "10px 0",
+                      borderBottom: `0.5px solid ${G.border}`,
+                      background: isEditing ? "#F8FAFC" : "transparent",
+                      margin: isEditing ? "0 -18px" : "0",
+                      paddingLeft: isEditing ? 18 : 0,
+                      paddingRight: isEditing ? 18 : 0,
+                    }}>
+                      <div style={{
+                        display: "flex", alignItems: "center",
+                        justifyContent: "space-between", gap: 8
+                      }}>
+                        <button
+                          onClick={() => setDutyEditTeam(isEditing ? null : team)}
+                          style={{
+                            flex: 1, textAlign: "left",
+                            background: "transparent", border: "none",
+                            cursor: "pointer", fontFamily: "inherit", padding: 0
+                          }}>
+                          <div style={{
+                            fontSize: 14, fontWeight: 700,
+                            color: isEditing ? "#0C447C" : G.text,
+                            display: "flex", alignItems: "center", gap: 8
+                          }}>
+                            {team}
+                            {isEditing && (
+                              <span style={{
+                                fontSize: 9, fontWeight: 700, color: "#0C447C",
+                                background: "#E6F1FB", padding: "2px 6px", borderRadius: 6
+                              }}>editing</span>
+                            )}
+                          </div>
+                          <div style={{
+                            fontSize: 11,
+                            color: enabled ? "#0F6E56" : G.muted,
+                            marginTop: 2
+                          }}>
+                            {summary}
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => patchTeamConfig(team, { enabled: !enabled })}
+                          style={{
+                            width: 38, height: 22, borderRadius: 11,
+                            background: enabled ? "#1D9E75" : "#D3D1C7",
+                            border: "none", cursor: "pointer",
+                            position: "relative", padding: 0, flexShrink: 0
+                          }}>
+                          <span style={{
+                            position: "absolute",
+                            top: 2,
+                            left: enabled ? 18 : 2,
+                            width: 18, height: 18, borderRadius: "50%",
+                            background: "#fff", transition: "left .15s"
+                          }} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {dutyEditTeam && editingCfg && (
+                <div style={{
+                  background: "#F8FAFC", borderRadius: 10,
+                  padding: "14px 14px", border: "1px solid " + G.border
+                }}>
+                  <div style={{
+                    fontSize: 11, fontWeight: 700, letterSpacing: 1,
+                    textTransform: "uppercase", color: G.muted, marginBottom: 12
+                  }}>
+                    {dutyEditTeam} settings
+                  </div>
+
+                  <ConfigRow
+                    label="Training session duty"
+                    sublabel="Parent present at practice"
+                    control={
+                      <Toggle
+                        on={editingCfg.trainingSlots > 0}
+                        onChange={(on) => patchTeamConfig(dutyEditTeam, {
+                          trainingSlots: on ? 1 : 0
+                        })}
+                      />
+                    }
+                  />
+
+                  <ConfigRow
+                    label="Match day volunteers"
+                    sublabel="Slots per match"
+                    control={
+                      <Stepper
+                        value={editingCfg.matchSlots}
+                        min={0}
+                        max={4}
+                        onChange={(v) => patchTeamConfig(dutyEditTeam, { matchSlots: v })}
+                      />
+                    }
+                  />
+
+                  <ConfigRow
+                    label="Minimum duties per parent"
+                    sublabel="Across the season"
+                    control={
+                      <Stepper
+                        value={editingCfg.minDuties}
+                        min={1}
+                        max={10}
+                        onChange={(v) => patchTeamConfig(dutyEditTeam, { minDuties: v })}
+                      />
+                    }
+                  />
+
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{
+                      fontSize: 10, fontWeight: 700, letterSpacing: 1,
+                      textTransform: "uppercase", color: G.muted, marginBottom: 8
+                    }}>
+                      Match day roles · tap to toggle
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {Object.entries(STANDARD_ROLES).map(([id, role]) => {
+                        const isOn = (editingCfg.standardRoles || []).includes(id);
+                        return (
+                          <button key={id}
+                            onClick={() => {
+                              const list = editingCfg.standardRoles || [];
+                              const next = isOn ? list.filter(r => r !== id) : [...list, id];
+                              patchTeamConfig(dutyEditTeam, { standardRoles: next });
+                            }}
+                            style={{
+                              fontSize: 11, fontWeight: 700,
+                              padding: "5px 10px", borderRadius: 12,
+                              border: `0.5px solid ${isOn ? "#85B7EB" : G.border}`,
+                              background: isOn ? "#E6F1FB" : G.white,
+                              color: isOn ? "#0C447C" : G.muted,
+                              cursor: "pointer", fontFamily: "inherit"
+                            }}>
+                            {role.label}
+                          </button>
+                        );
+                      })}
+                      {(editingCfg.customRoles || []).map(r => (
+                        <span key={r.id} style={{
+                          fontSize: 11, fontWeight: 700,
+                          padding: "5px 10px", borderRadius: 12,
+                          border: "0.5px solid #5DCAA5",
+                          background: "#E1F5EE", color: "#085041",
+                          display: "inline-flex", alignItems: "center", gap: 4
+                        }}>
+                          🔧 {r.label}
+                          <button
+                            onClick={() => {
+                              if (!confirm(`Remove "${r.label}" from ${dutyEditTeam} roles?\n\nExisting assignments keep their label.`)) return;
+                              patchTeamConfig(dutyEditTeam, {
+                                customRoles: editingCfg.customRoles.filter(x => x.id !== r.id)
+                              });
+                            }}
+                            style={{
+                              background: "transparent", border: "none",
+                              color: "#085041", cursor: "pointer",
+                              fontFamily: "inherit", fontSize: 13,
+                              padding: 0, opacity: 0.6
+                            }}>×</button>
+                        </span>
+                      ))}
+                    </div>
+
+                    <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+                      <input
+                        type="text"
+                        value={newCustomRole}
+                        placeholder="Add custom role (e.g. Tea & snacks)"
+                        onChange={(e) => setNewCustomRole(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && newCustomRole.trim()) {
+                            const label = newCustomRole.trim();
+                            const id = slugifyRoleId(label);
+                            const existing = editingCfg.customRoles || [];
+                            if (existing.some(r => r.id === id)) {
+                              showToast("That role already exists");
+                              return;
+                            }
+                            patchTeamConfig(dutyEditTeam, {
+                              customRoles: [...existing, { id, label, icon: "tools" }]
+                            });
+                            setNewCustomRole("");
+                          }
+                        }}
+                        style={{
+                          flex: 1, fontSize: 12, padding: "8px 10px",
+                          border: "0.5px solid " + G.border, borderRadius: 8,
+                          fontFamily: "inherit", background: G.white
+                        }}
+                      />
+                      <button
+                        disabled={!newCustomRole.trim()}
+                        onClick={() => {
+                          const label = newCustomRole.trim();
+                          if (!label) return;
+                          const id = slugifyRoleId(label);
+                          const existing = editingCfg.customRoles || [];
+                          if (existing.some(r => r.id === id)) {
+                            showToast("That role already exists");
+                            return;
+                          }
+                          patchTeamConfig(dutyEditTeam, {
+                            customRoles: [...existing, { id, label, icon: "tools" }]
+                          });
+                          setNewCustomRole("");
+                        }}
+                        style={{
+                          fontSize: 12, padding: "8px 14px", borderRadius: 8,
+                          border: "0.5px solid #85B7EB",
+                          background: newCustomRole.trim() ? "#E6F1FB" : G.border,
+                          color: "#0C447C", fontWeight: 700,
+                          cursor: newCustomRole.trim() ? "pointer" : "not-allowed",
+                          fontFamily: "inherit"
+                        }}>
+                        + Add
+                      </button>
+                    </div>
+                    <div style={{
+                      fontSize: 10, color: G.muted, fontStyle: "italic", marginTop: 6
+                    }}>
+                      💡 Custom roles in teal · Standard roles in blue
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      if (!confirm(`Reset ${dutyEditTeam} to default config?`)) return;
+                      const def = DEFAULT_DUTY_CONFIG[dutyEditTeam] || DEFAULT_TEAM_CONFIG;
+                      const updated = { ...parentDutyConfig, [dutyEditTeam]: { ...def } };
+                      saveParentDutyConfig(updated);
+                    }}
+                    style={{
+                      width: "100%", marginTop: 14,
+                      background: "transparent",
+                      border: `0.5px solid ${G.border}`, borderRadius: 8,
+                      padding: "8px", fontSize: 11, fontWeight: 700,
+                      color: G.muted, cursor: "pointer", fontFamily: "inherit"
+                    }}>
+                    Reset to defaults
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* ── Duty roster oversight (admin + coaches) ───────────── */}
+        {(can(userRole, "accessMembers") || isCoachMember(currentUser?.name, teams)) && (() => {
+          const enabledTeams = Object.keys({
+            ...DEFAULT_DUTY_CONFIG, ...parentDutyConfig
+          }).filter(t => isDutyEnabled(t, parentDutyConfig));
+
+          if (enabledTeams.length === 0) return null;
+
+          const activeTeam = enabledTeams.includes(dutyOversightTeam)
+            ? dutyOversightTeam
+            : enabledTeams[0];
+          const cfg = getEffectiveConfig(activeTeam, parentDutyConfig);
+          const today = new Date().toISOString().slice(0, 10);
+          const seasonYear = getSeasonYear(today);
+
+          const teamChildIds = new Set(
+            members.filter(m => (m.teams || []).includes(activeTeam)).map(m => m.id)
+          );
+          const teamParents = members.filter(m =>
+            (m.children || []).some(cid => teamChildIds.has(cid))
+          );
+
+          const teamSessions = sessions.filter(s =>
+            s.restrictedTo === activeTeam &&
+            new Date(s.date).getFullYear() === seasonYear
+          );
+          const upcomingSessions = teamSessions.filter(s => s.date >= today);
+          const uncovered = upcomingSessions.filter(s => {
+            const slots = getSlotCount(s, parentDutyConfig);
+            return slots > 0 && getSupportParents(s).length < slots;
+          }).length;
+
+          const fairness = teamParents
+            .map(p => ({
+              id: p.id, name: p.name,
+              count: countDuties(p, sessions, activeTeam, seasonYear),
+              unlinked: false
+            }));
+          const linkedNames = new Set(teamParents.map(p => p.name.toLowerCase().trim()));
+          const unlinkedMap = new Map();
+          teamSessions.forEach(s => {
+            getSupportParents(s).forEach(sp => {
+              if (sp.unlinked && sp.memberName) {
+                const k = sp.memberName.toLowerCase().trim();
+                if (linkedNames.has(k)) return;
+                unlinkedMap.set(k, (unlinkedMap.get(k) || 0) + 1);
+              }
+            });
+          });
+          for (const [nameKey, count] of unlinkedMap) {
+            let displayName = nameKey;
+            for (const s of teamSessions) {
+              const sp = getSupportParents(s).find(x => x.memberName?.toLowerCase().trim() === nameKey);
+              if (sp) { displayName = sp.memberName; break; }
+            }
+            fairness.push({ id: `unlinked:${nameKey}`, name: displayName, count, unlinked: true });
+          }
+          fairness.sort((a, b) => a.count - b.count || a.name.localeCompare(b.name));
+
+          return (
+            <div style={{
+              background: G.white, borderRadius: 14, border: `1.5px solid ${G.border}`,
+              padding: "16px 18px", marginBottom: 16
+            }}>
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                marginBottom: 14, gap: 8
+              }}>
+                <div style={{
+                  fontSize: 12, fontWeight: 900, letterSpacing: 1.5, color: G.muted,
+                  textTransform: "uppercase"
+                }}>
+                  🙋 Duty roster oversight
+                </div>
+                <select
+                  value={activeTeam}
+                  onChange={(e) => setDutyOversightTeam(e.target.value)}
+                  style={{
+                    fontSize: 12, padding: "5px 10px", borderRadius: 8,
+                    border: `0.5px solid ${G.border}`, background: G.white,
+                    fontFamily: "inherit", fontWeight: 700, color: G.text
+                  }}>
+                  {enabledTeams.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+
+              <div style={{
+                display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14
+              }}>
+                <div style={{
+                  background: "#F8FAFC", borderRadius: 8, padding: 10, textAlign: "center"
+                }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: G.text }}>
+                    {upcomingSessions.length}
+                  </div>
+                  <div style={{ fontSize: 10, color: G.muted, marginTop: 2 }}>
+                    Sessions left
+                  </div>
+                </div>
+                <div style={{
+                  background: uncovered > 0 ? "#FCEBEB" : "#E1F5EE",
+                  borderRadius: 8, padding: 10, textAlign: "center"
+                }}>
+                  <div style={{
+                    fontSize: 20, fontWeight: 800,
+                    color: uncovered > 0 ? "#791F1F" : "#085041"
+                  }}>
+                    {uncovered}
+                  </div>
+                  <div style={{
+                    fontSize: 10,
+                    color: uncovered > 0 ? "#791F1F" : "#085041",
+                    marginTop: 2
+                  }}>
+                    Uncovered
+                  </div>
+                </div>
+              </div>
+
+              <div style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: 1,
+                textTransform: "uppercase", color: G.muted, marginBottom: 8
+              }}>
+                Fairness · {teamParents.length} parents · min {cfg.minDuties} each
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                {fairness.map(p => {
+                  const isZero = p.count === 0;
+                  const minHit = p.count >= cfg.minDuties;
+                  const pct = Math.min(100, Math.round((p.count / cfg.minDuties) * 100));
+                  const barColor = minHit ? "#1D9E75" : isZero ? "#A32D2D" : "#378ADD";
+                  return (
+                    <div key={p.id} style={{
+                      display: "grid",
+                      gridTemplateColumns: "30px 1fr auto",
+                      gap: 10, alignItems: "center",
+                      padding: "8px 0",
+                      borderBottom: `0.5px solid ${G.border}`
+                    }}>
+                      <div style={{
+                        width: 28, height: 28, borderRadius: "50%",
+                        background: isZero ? "#F7C1C1" : minHit ? "#9FE1CB" : "#B5D4F4",
+                        color: isZero ? "#791F1F" : minHit ? "#085041" : "#0C447C",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 10, fontWeight: 900
+                      }}>
+                        {p.name.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase()}
+                      </div>
+                      <div>
+                        <div style={{
+                          fontSize: 12, fontWeight: 700, color: G.text,
+                          display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap"
+                        }}>
+                          {p.name}
+                          {p.unlinked && (
+                            <span style={{
+                              fontSize: 9, fontWeight: 700,
+                              background: "#F1EFE8", color: "#5F5E5A",
+                              padding: "1px 6px", borderRadius: 6
+                            }}>not in app</span>
+                          )}
+                        </div>
+                        <div style={{
+                          height: 5, background: "#F1EFE8", borderRadius: 3,
+                          marginTop: 4, overflow: "hidden"
+                        }}>
+                          <div style={{
+                            height: "100%", width: `${pct}%`, background: barColor
+                          }} />
+                        </div>
+                        {isZero && (
+                          <div style={{ fontSize: 10, color: "#A32D2D", marginTop: 3 }}>
+                            Needs a turn
+                          </div>
+                        )}
+                      </div>
+                      <span style={{
+                        fontSize: 10, fontWeight: 800,
+                        background: isZero ? "#FCEBEB" : minHit ? "#E1F5EE" : "#E6F1FB",
+                        color: isZero ? "#791F1F" : minHit ? "#085041" : "#0C447C",
+                        padding: "2px 8px", borderRadius: 10
+                      }}>
+                        ×{p.count}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── Block Nets Sessions ────────────────────────────── */}
         {can(userRole,"addMember")&&<>
