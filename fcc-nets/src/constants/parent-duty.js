@@ -244,3 +244,89 @@ export function slugifyRoleId(label) {
     .replace(/^-+|-+$/g, "")
     .slice(0, 40) || `role-${Date.now()}`;
 }
+
+// ─── Coach exemption ───────────────────────────────────────────────────────
+export function getTeamCoachNames(teamName, teams) {
+  if (!teamName || !Array.isArray(teams)) return [];
+  const team = teams.find(t => t.name === teamName);
+  if (!team) return [];
+  const raw = team.coaches || team.coachList || (team.coach ? [team.coach] : []);
+  return Array.isArray(raw) ? raw.filter(Boolean) : [];
+}
+
+export function isTeamCoach(member, teamName, teams) {
+  if (!member || !teamName) return false;
+  const coachNames = getTeamCoachNames(teamName, teams);
+  if (coachNames.length === 0) return false;
+  const myName = (member.name || "").toLowerCase().trim();
+  return coachNames.some(n => (n || "").toLowerCase().trim() === myName);
+}
+
+// ─── Orphan kid handling ───────────────────────────────────────────────────
+export function getOrphanKids(team, members) {
+  if (!team || !Array.isArray(members)) return [];
+  const onTeam = members.filter(m => (m.teams || []).includes(team));
+  const linkedChildIds = new Set();
+  members.forEach(m => {
+    (m.children || []).forEach(cid => linkedChildIds.add(cid));
+  });
+  return onTeam.filter(kid => !linkedChildIds.has(kid.id));
+}
+
+export function buildOrphanParentRow(kid, sessions, team, seasonYear) {
+  const hasNamed = !!(kid.parentName && kid.parentName.trim());
+  const displayName = hasNamed
+    ? kid.parentName.trim()
+    : `${kid.name?.split(" ")[0] || "this kid"}'s parent`;
+  let count = 0;
+  if (hasNamed) {
+    const nameLower = kid.parentName.toLowerCase().trim();
+    for (const s of sessions) {
+      if (s.restrictedTo !== team) continue;
+      if (seasonYear && new Date(s.date).getFullYear() !== seasonYear) continue;
+      for (const sp of getSupportParents(s)) {
+        if (!sp.memberId && sp.memberName &&
+            sp.memberName.toLowerCase().trim() === nameLower) {
+          count++;
+          break;
+        }
+      }
+    }
+  }
+  return {
+    id: `orphan:${kid.id}`,
+    kidId: kid.id,
+    kidName: kid.name,
+    name: displayName,
+    hasNamedParent: hasNamed,
+    isOrphan: true,
+    unlinked: true,
+    count,
+  };
+}
+
+// ─── Canonical roster builder ──────────────────────────────────────────────
+// Linked parents (coaches of THIS team excluded) + orphan kid placeholders.
+export function buildTeamParentList(team, members, sessions, teamsRec, seasonYear) {
+  if (!team) return [];
+  const teamChildIds = new Set(
+    members.filter(m => (m.teams || []).includes(team)).map(m => m.id)
+  );
+
+  const linkedParents = members
+    .filter(m =>
+      (m.children || []).some(cid => teamChildIds.has(cid)) &&
+      !isTeamCoach(m, team, teamsRec)
+    )
+    .map(p => ({
+      id: p.id,
+      name: p.name,
+      count: countDuties(p, sessions, team, seasonYear),
+      isOrphan: false,
+    }));
+
+  const orphans = getOrphanKids(team, members)
+    .map(kid => buildOrphanParentRow(kid, sessions, team, seasonYear));
+
+  return [...linkedParents, ...orphans];
+}

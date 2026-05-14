@@ -24,7 +24,7 @@ import { uid } from "../constants/seeds";
 import {
   getEffectiveConfig, isDutyEnabled, getSupportParents, getSlotCount,
   isMatchSession, countDuties, getSeasonYear,
-  resolveRoleShort,
+  resolveRoleShort, buildTeamParentList,
 } from "../constants/parent-duty";
 
 // Local navy/gold palette so the career-stats section reads as the
@@ -1070,17 +1070,10 @@ export default function ProfileView() {
             const teamStats = myDutyTeams.map(team => {
               const cfg = getEffectiveConfig(team, parentDutyConfig);
               const myCount = countDuties(me, sessions, team, seasonYear);
-              const teamChildIds = new Set(
-                members.filter(m => (m.teams || []).includes(team)).map(m => m.id)
-              );
-              const teamParents = members.filter(m =>
-                (m.children || []).some(cid => teamChildIds.has(cid))
-              );
-              const leaderboard = teamParents
-                .map(p => ({ id: p.id, name: p.name, count: countDuties(p, sessions, team, seasonYear) }))
+              const leaderboard = [...buildTeamParentList(team, members, sessions, teams, seasonYear)]
                 .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
               const myRank = leaderboard.findIndex(p => p.id === me.id) + 1;
-              return { team, cfg, myCount, leaderboard, myRank, totalParents: teamParents.length };
+              return { team, cfg, myCount, leaderboard, myRank, totalParents: leaderboard.length };
             });
 
             return (
@@ -1268,6 +1261,15 @@ export default function ProfileView() {
                                     fontWeight: isMe ? 800 : 500
                                   }}>
                                     {isMe ? "You" : p.name}
+                                    {p.isOrphan && !p.hasNamedParent && (
+                                      <span style={{
+                                        fontSize: 9, fontWeight: 700, marginLeft: 6,
+                                        background: "#FAEEDA", color: "#854F0B",
+                                        padding: "1px 6px", borderRadius: 8,
+                                      }}>
+                                        not in app
+                                      </span>
+                                    )}
                                   </span>
                                   <span style={{
                                     fontSize: 11, fontWeight: 700,

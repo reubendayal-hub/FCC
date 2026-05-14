@@ -166,6 +166,33 @@ function countDuties(parent, sessions, team, seasonYear) {
   return count;
 }
 
+// ─── Coach exemption + orphan helpers ───────────────────────────────────────
+function getTeamCoachNames(teamName, teamsList) {
+  if (!teamName || !Array.isArray(teamsList)) return [];
+  const team = teamsList.find(t => t.name === teamName);
+  if (!team) return [];
+  const raw = team.coaches || team.coachList || (team.coach ? [team.coach] : []);
+  return Array.isArray(raw) ? raw.filter(Boolean) : [];
+}
+
+function isTeamCoach(member, teamName, teamsList) {
+  if (!member || !teamName) return false;
+  const coachNames = getTeamCoachNames(teamName, teamsList);
+  if (coachNames.length === 0) return false;
+  const myName = (member.name || "").toLowerCase().trim();
+  return coachNames.some(n => (n || "").toLowerCase().trim() === myName);
+}
+
+function getOrphanKids(team, members) {
+  if (!team || !Array.isArray(members)) return [];
+  const onTeam = members.filter(m => (m.teams || []).includes(team));
+  const linkedChildIds = new Set();
+  members.forEach(m => {
+    (m.children || []).forEach(cid => linkedChildIds.add(cid));
+  });
+  return onTeam.filter(kid => !linkedChildIds.has(kid.id));
+}
+
 // ─── Email templates ─────────────────────────────────────────────────────────
 
 const headerHtml = (subtitle) => `
@@ -252,7 +279,7 @@ function build24hrEmail(parentName, dutiesByTeam, targetDate) {
     </p>`);
 }
 
-function buildMondayDigestEmail(team, sessions, savedConfig) {
+function buildMondayDigestEmail(team, sessions, savedConfig, members) {
   // sessions = next 14 days of duty-bearing sessions for this team
   const rows = sessions.map(s => {
     const slots = getSlotCount(s, savedConfig);
@@ -290,6 +317,9 @@ function buildMondayDigestEmail(team, sessions, savedConfig) {
     getSupportParents(s).length < getSlotCount(s, savedConfig)
   ).length;
 
+  const orphans = getOrphanKids(team, members || []);
+  const unnamedOrphans = orphans.filter(k => !k.parentName?.trim());
+
   return wrapHtml(`${team} duty roster · week of ${fmtDateShort(getDatePlusDays(0))}`, `
     <p style="font-size:15px;color:#111827;margin:0 0 12px;">
       <strong>${team} parent duty — next 14 days</strong>
@@ -301,6 +331,14 @@ function buildMondayDigestEmail(team, sessions, savedConfig) {
         : `<strong style='color:#791F1F'>${uncoveredCount} need volunteers</strong>`
       }
     </p>
+    ${unnamedOrphans.length > 0 ? `
+      <p style="font-size:12px;color:#854F0B;line-height:1.6;margin:0 0 14px;
+        background:#FAEEDA;border-left:3px solid #BA7517;padding:10px 12px;border-radius:6px;">
+        ⚠ ${unnamedOrphans.length} ${team} ${unnamedOrphans.length === 1 ? "kid has" : "kids have"} no parent in the app yet:
+        ${unnamedOrphans.map(k => k.name.split(" ")[0]).join(", ")}.
+        Add their parent's name in admin to track duty fairness.
+      </p>
+    ` : ""}
     ${rows || "<p style='color:#9ca3af;font-size:13px;'>No duty-bearing sessions in the next 14 days.</p>"}
     <a href="${APP_URL}" style="display:inline-block;margin-top:12px;
       background:#1e3a5f;color:#fbbf24;text-decoration:none;
@@ -516,7 +554,7 @@ export default async function handler(req, res) {
         if (testOnly) continue; // skip digest in test-only mode
 
         const subject = `${team} parent duty roster — week of ${fmtDateShort(today)}`;
-        const html = buildMondayDigestEmail(team, teamSessions, savedConfig);
+        const html = buildMondayDigestEmail(team, teamSessions, savedConfig, members);
         const result = await sendEmail(apiKey, recipients, subject, html, dryRun);
         results.mondayDigest.push({ team, recipients: recipients.length, ...result });
         if (result.error) results.totalErrors++;
@@ -538,7 +576,8 @@ export default async function handler(req, res) {
           members.filter(m => (m.teams || []).includes(team)).map(m => m.id)
         );
         const teamParents = members.filter(m =>
-          (m.children || []).some(cid => teamChildIds.has(cid))
+          (m.children || []).some(cid => teamChildIds.has(cid)) &&
+          !isTeamCoach(m, team, teamsList)
         );
         for (const p of teamParents) {
           if (!p.email) continue;

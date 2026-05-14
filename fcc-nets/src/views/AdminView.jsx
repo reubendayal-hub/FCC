@@ -20,6 +20,7 @@ import {
   getEffectiveConfig, isDutyEnabled,
   getSupportParents, getSlotCount, countDuties, getSeasonYear,
   slugifyRoleId,
+  buildTeamParentList, getTeamCoachNames,
 } from "../constants/parent-duty";
 
 function ConfigRow({ label, sublabel, control }) {
@@ -1288,13 +1289,6 @@ export default function AdminView() {
           const today = new Date().toISOString().slice(0, 10);
           const seasonYear = getSeasonYear(today);
 
-          const teamChildIds = new Set(
-            members.filter(m => (m.teams || []).includes(activeTeam)).map(m => m.id)
-          );
-          const teamParents = members.filter(m =>
-            (m.children || []).some(cid => teamChildIds.has(cid))
-          );
-
           const teamSessions = sessions.filter(s =>
             s.restrictedTo === activeTeam &&
             new Date(s.date).getFullYear() === seasonYear
@@ -1305,32 +1299,45 @@ export default function AdminView() {
             return slots > 0 && getSupportParents(s).length < slots;
           }).length;
 
-          const fairness = teamParents
-            .map(p => ({
-              id: p.id, name: p.name,
-              count: countDuties(p, sessions, activeTeam, seasonYear),
-              unlinked: false
-            }));
-          const linkedNames = new Set(teamParents.map(p => p.name.toLowerCase().trim()));
-          const unlinkedMap = new Map();
+          const baseRoster = buildTeamParentList(activeTeam, members, sessions, teams, seasonYear);
+
+          const knownNames = new Set(baseRoster.map(p => p.name.toLowerCase().trim()));
+          const sessionOnlyMap = new Map();
           teamSessions.forEach(s => {
             getSupportParents(s).forEach(sp => {
               if (sp.unlinked && sp.memberName) {
                 const k = sp.memberName.toLowerCase().trim();
-                if (linkedNames.has(k)) return;
-                unlinkedMap.set(k, (unlinkedMap.get(k) || 0) + 1);
+                if (knownNames.has(k)) return;
+                sessionOnlyMap.set(k, (sessionOnlyMap.get(k) || 0) + 1);
               }
             });
           });
-          for (const [nameKey, count] of unlinkedMap) {
+          const sessionOnly = [];
+          for (const [nameKey, count] of sessionOnlyMap) {
             let displayName = nameKey;
             for (const s of teamSessions) {
               const sp = getSupportParents(s).find(x => x.memberName?.toLowerCase().trim() === nameKey);
               if (sp) { displayName = sp.memberName; break; }
             }
-            fairness.push({ id: `unlinked:${nameKey}`, name: displayName, count, unlinked: true });
+            sessionOnly.push({
+              id: `session-only:${nameKey}`,
+              name: displayName,
+              count,
+              isOrphan: false,
+              unlinked: true,
+            });
           }
-          fairness.sort((a, b) => a.count - b.count || a.name.localeCompare(b.name));
+          const fairness = [...baseRoster, ...sessionOnly]
+            .sort((a, b) => a.count - b.count || a.name.localeCompare(b.name));
+
+          const excludedCoaches = getTeamCoachNames(activeTeam, teams).filter(name => {
+            const m = members.find(mm => mm.name === name);
+            if (!m) return false;
+            const teamChildIds = new Set(
+              members.filter(mm => (mm.teams || []).includes(activeTeam)).map(mm => mm.id)
+            );
+            return (m.children || []).some(cid => teamChildIds.has(cid));
+          });
 
           return (
             <div style={{
@@ -1396,7 +1403,12 @@ export default function AdminView() {
                 fontSize: 10, fontWeight: 700, letterSpacing: 1,
                 textTransform: "uppercase", color: G.muted, marginBottom: 8
               }}>
-                Fairness · {teamParents.length} parents · min {cfg.minDuties} each
+                Fairness · {fairness.length} on roster · min {cfg.minDuties} each
+                {excludedCoaches.length > 0 && (
+                  <span style={{ fontWeight: 500, textTransform: "none", letterSpacing: 0 }}>
+                    {" "}· {excludedCoaches.length} coach{excludedCoaches.length > 1 ? "es" : ""} excluded
+                  </span>
+                )}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 {fairness.map(p => {
@@ -1427,12 +1439,44 @@ export default function AdminView() {
                           display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap"
                         }}>
                           {p.name}
-                          {p.unlinked && (
+                          {p.isOrphan && (
+                            <span style={{
+                              fontSize: 9, fontWeight: 700,
+                              background: "#FAEEDA", color: "#854F0B",
+                              padding: "1px 6px", borderRadius: 6
+                            }}>
+                              {p.hasNamedParent ? `parent of ${p.kidName.split(" ")[0]}` : "no parent in app"}
+                            </span>
+                          )}
+                          {p.unlinked && !p.isOrphan && (
                             <span style={{
                               fontSize: 9, fontWeight: 700,
                               background: "#F1EFE8", color: "#5F5E5A",
                               padding: "1px 6px", borderRadius: 6
                             }}>not in app</span>
+                          )}
+                          {p.isOrphan && !p.hasNamedParent && can(userRole, "accessMembers") && (
+                            <button
+                              onClick={() => {
+                                const entered = window.prompt(`What's ${p.kidName}'s parent's name?`);
+                                if (!entered || !entered.trim()) return;
+                                const parentName = entered.trim();
+                                const updMembers = members.map(m =>
+                                  m.id === p.kidId ? { ...m, parentName } : m
+                                );
+                                saveMembers(updMembers);
+                                logAction("members", `Parent name set for ${p.kidName}: "${parentName}" (by ${currentUser?.name})`);
+                                showToast(`${parentName} added`);
+                              }}
+                              style={{
+                                fontSize: 9, fontWeight: 800,
+                                background: "#9FE1CB", color: "#085041",
+                                border: "0.5px solid #5DCAA5",
+                                padding: "2px 8px", borderRadius: 6,
+                                cursor: "pointer", fontFamily: "inherit"
+                              }}>
+                              + Name parent
+                            </button>
                           )}
                         </div>
                         <div style={{

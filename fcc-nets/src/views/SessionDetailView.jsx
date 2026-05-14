@@ -19,6 +19,7 @@ import {
   getSupportParents, setSupportParents, getSlotCount,
   isMatchSession, resolveRoleShort, resolveRoleIcon,
   getSeasonYear, TRAINING_ROLE,
+  buildTeamParentList, isTeamCoach,
 } from "../constants/parent-duty";
 
 const dlICS = s => {
@@ -83,7 +84,7 @@ function UnlinkedParentInput({ onAdd, isMatch, matchRoles, defaultRole }) {
 
 export default function SessionDetailView() {
   const {
-    G, view, setView, userRole, currentUser, teams, members,
+    G, view, setView, userRole, currentUser, teams, members, saveMembers,
     sessions, saveSessions, recurring, saveRecurring,
     cancelledSessions, saveCancelledSessions,
     allAttendance, saveAllAttendance,
@@ -376,27 +377,13 @@ export default function SessionDetailView() {
             const slotCount = getSlotCount(selSess, parentDutyConfig);
             if (slotCount === 0) return null;
 
+            const seasonYear = getSeasonYear(selSess.date);
+            const teamRoster = buildTeamParentList(team, members, sessions, teams, seasonYear);
+            const dutyCount = {};
+            teamRoster.forEach(p => { dutyCount[p.id] = p.count; });
             const teamChildIds = new Set(
               members.filter(m => (m.teams || []).includes(team)).map(m => m.id)
             );
-            const teamParents = members.filter(m =>
-              (m.children || []).some(cid => teamChildIds.has(cid))
-            );
-
-            const seasonYear = getSeasonYear(selSess.date);
-            const teamSessions = sessions.filter(s =>
-              s.restrictedTo === team &&
-              new Date(s.date).getFullYear() === seasonYear
-            );
-            const dutyCount = {};
-            teamParents.forEach(p => { dutyCount[p.id] = 0; });
-            teamSessions.forEach(s => {
-              getSupportParents(s).forEach(sp => {
-                if (sp.memberId && dutyCount[sp.memberId] !== undefined) {
-                  dutyCount[sp.memberId] += 1;
-                }
-              });
-            });
 
             const supportParents = getSupportParents(selSess);
             const slotsFilled = supportParents.length;
@@ -404,7 +391,9 @@ export default function SessionDetailView() {
 
             const meId = currentUser?.id;
             const myRow = members.find(m => m.id === meId);
-            const iAmTeamParent = !!myRow && (myRow.children || []).some(cid => teamChildIds.has(cid));
+            const iAmTeamParent = !!myRow
+              && (myRow.children || []).some(cid => teamChildIds.has(cid))
+              && !isTeamCoach(myRow, team, teams);
             const iAmAssigned = supportParents.some(sp => sp.memberId === meId);
             const isCoachOrAdmin = canOrCoach(userRole, "addOtherPlayer", userMem, teams);
 
@@ -451,8 +440,7 @@ export default function SessionDetailView() {
               showToast("Duty slot cleared");
             };
 
-            const fairness = teamParents
-              .map(p => ({ id: p.id, name: p.name, count: dutyCount[p.id] || 0 }))
+            const fairness = [...teamRoster]
               .sort((a, b) => a.count - b.count || a.name.localeCompare(b.name));
 
             const showAssignUI = assignOpen === selSess.id;
@@ -651,7 +639,11 @@ export default function SessionDetailView() {
                         </div>
                         <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: 8 }}>
                           {fairness.map(p => {
-                            const alreadyHere = supportParents.some(sp => sp.memberId === p.id);
+                            const alreadyHere = p.isOrphan
+                              ? supportParents.some(sp =>
+                                  !sp.memberId && sp.memberName &&
+                                  sp.memberName.toLowerCase().trim() === (p.name || "").toLowerCase().trim())
+                              : supportParents.some(sp => sp.memberId === p.id);
                             return (
                               <div key={p.id} style={{
                                 display: "flex", alignItems: "center", gap: 8,
@@ -666,6 +658,15 @@ export default function SessionDetailView() {
                                   fontWeight: p.count === 0 ? 700 : 500
                                 }}>
                                   {p.name}
+                                  {p.isOrphan && (
+                                    <span style={{
+                                      fontSize: 9, fontWeight: 700, marginLeft: 6,
+                                      background: "#FAEEDA", color: "#854F0B",
+                                      padding: "1px 6px", borderRadius: 8,
+                                    }}>
+                                      {p.hasNamedParent ? `parent of ${p.kidName.split(" ")[0]}` : "no parent in app"}
+                                    </span>
+                                  )}
                                 </span>
                                 <span style={{
                                   fontSize: 10, fontWeight: 800,
@@ -684,11 +685,34 @@ export default function SessionDetailView() {
                                     ✓ on duty
                                   </span>
                                 ) : slotsOpen > 0 ? (
-                                  isMatch && matchRoles.length > 1 ? (
+                                  p.isOrphan && !p.hasNamedParent ? (
+                                    <button
+                                      onClick={() => {
+                                        const entered = (typeof window !== "undefined" && window.prompt)
+                                          ? window.prompt(`What's ${p.kidName}'s parent's name?`)
+                                          : null;
+                                        if (!entered || !entered.trim()) return;
+                                        const parentName = entered.trim();
+                                        const updMembers = members.map(m =>
+                                          m.id === p.kidId ? { ...m, parentName } : m
+                                        );
+                                        saveMembers(updMembers);
+                                        logAction("members", `Parent name set for ${p.kidName}: "${parentName}" (by ${currentUser?.name})`);
+                                        showToast(`${parentName} added — now you can assign duties`);
+                                      }}
+                                      style={{
+                                        background: "#9FE1CB", color: "#085041", border: "0.5px solid #5DCAA5",
+                                        borderRadius: 6, padding: "3px 8px", fontSize: 10,
+                                        fontWeight: 800, cursor: "pointer", fontFamily: "inherit"
+                                      }}>
+                                      Name parent
+                                    </button>
+                                  ) : isMatch && matchRoles.length > 1 ? (
                                     <select
                                       onChange={(e) => {
                                         if (e.target.value) {
-                                          assignSupport(p.id, p.name, e.target.value);
+                                          const targetId = p.isOrphan ? null : p.id;
+                                          assignSupport(targetId, p.name, e.target.value, p.isOrphan);
                                           e.target.value = "";
                                         }
                                       }}
@@ -706,7 +730,11 @@ export default function SessionDetailView() {
                                       ))}
                                     </select>
                                   ) : (
-                                    <button onClick={() => assignSupport(p.id, p.name, defaultRole)}
+                                    <button
+                                      onClick={() => {
+                                        const targetId = p.isOrphan ? null : p.id;
+                                        assignSupport(targetId, p.name, defaultRole, p.isOrphan);
+                                      }}
                                       style={{
                                         background: "#378ADD", color: "#fff", border: "none",
                                         borderRadius: 6, padding: "3px 8px", fontSize: 10,
