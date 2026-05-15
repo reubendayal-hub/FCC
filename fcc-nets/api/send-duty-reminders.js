@@ -112,7 +112,7 @@ function getSeasonYear() {
 const DEFAULT_DUTY_CONFIG = {
   "U11":       { enabled: true,  trainingSlots: 1, matchSlots: 2, minDuties: 4 },
   "U13":       { enabled: true,  trainingSlots: 1, matchSlots: 2, minDuties: 4 },
-  "U13 B":     { enabled: true,  trainingSlots: 1, matchSlots: 2, minDuties: 4 },
+  // U13 B inherits from U13 via TEAM_PARENT_MAP — intentionally not listed.
   "U15":       { enabled: true,  trainingSlots: 0, matchSlots: 2, minDuties: 3 },
   "U15 Girls": { enabled: true,  trainingSlots: 1, matchSlots: 2, minDuties: 4 },
   "U16":       { enabled: false, trainingSlots: 0, matchSlots: 1, minDuties: 2 },
@@ -120,8 +120,9 @@ const DEFAULT_DUTY_CONFIG = {
 };
 
 function getEffectiveConfig(team, savedConfig) {
-  const fromSaved = savedConfig?.[team];
-  const fromDefault = DEFAULT_DUTY_CONFIG[team];
+  const dutyTeam = resolveDutyTeam(team);
+  const fromSaved = savedConfig?.[dutyTeam];
+  const fromDefault = DEFAULT_DUTY_CONFIG[dutyTeam];
   if (fromSaved) return { ...fromDefault, ...fromSaved };
   return fromDefault || { enabled: false, trainingSlots: 0, matchSlots: 0, minDuties: 0 };
 }
