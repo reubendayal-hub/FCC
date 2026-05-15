@@ -157,7 +157,7 @@ function countDuties(parent, sessions, team, seasonYear) {
   const nameLower = (parent.name || "").toLowerCase().trim();
   let count = 0;
   for (const s of sessions) {
-    if (s.restrictedTo !== team) continue;
+    if (getSessionTeam(s) !== team) continue;
     if (seasonYear && new Date(s.date).getFullYear() !== seasonYear) continue;
     for (const sp of getSupportParents(s)) {
       if (sp.memberId && sp.memberId === meId) { count++; break; }
@@ -538,7 +538,7 @@ export default async function handler(req, res) {
             dutiesByTeam: {}
           };
         }
-        const team = s.restrictedTo;
+        const team = getSessionTeam(s);
         if (!dutiesByParent[key].dutiesByTeam[team]) {
           dutiesByParent[key].dutiesByTeam[team] = [];
         }

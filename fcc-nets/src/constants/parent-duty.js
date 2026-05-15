@@ -238,7 +238,7 @@ export function countDuties(parent, sessions, teams, seasonYear) {
   const meId = parent.id;
   let count = 0;
   for (const s of sessions) {
-    if (!teamSet.has(s.restrictedTo)) continue;
+    if (!teamSet.has(getSessionTeam(s))) continue;
     if (seasonYear && new Date(s.date).getFullYear() !== seasonYear) continue;
     const sps = getSupportParents(s);
     for (const sp of sps) {
@@ -320,7 +320,7 @@ export function buildOrphanParentRow(kid, sessions, team, seasonYear) {
   if (hasNamed) {
     const nameLower = kid.parentName.toLowerCase().trim();
     for (const s of sessions) {
-      if (s.restrictedTo !== team) continue;
+      if (getSessionTeam(s) !== team) continue;
       if (seasonYear && new Date(s.date).getFullYear() !== seasonYear) continue;
       for (const sp of getSupportParents(s)) {
         if (!sp.memberId && sp.memberName &&
@@ -388,7 +388,7 @@ export function buildTeamParentList(team, members, sessions, teamsRec, seasonYea
       if (hasNamed) {
         const nameLower = kid.parentName.toLowerCase().trim();
         for (const s of sessions) {
-          if (!rollupSet.has(s.restrictedTo)) continue;
+          if (!rollupSet.has(getSessionTeam(s))) continue;
           if (seasonYear && new Date(s.date).getFullYear() !== seasonYear) continue;
           for (const sp of getSupportParents(s)) {
             if (!sp.memberId && sp.memberName &&
