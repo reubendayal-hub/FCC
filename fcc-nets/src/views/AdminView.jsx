@@ -23,6 +23,11 @@ import {
   buildTeamParentList, getTeamCoachNames,
   sessionBelongsToDutyTeam,
 } from "../constants/parent-duty";
+import {
+  getUnsyncedFixtures,
+  buildSessionsFromUnsynced,
+  SYNCED_TEAMS,
+} from "../constants/fixture-sync";
 
 function ConfigRow({ label, sublabel, control }) {
   return (
@@ -105,7 +110,7 @@ export default function AdminView() {
     G, view, setView, userRole, currentUser, teams, members,
     sessions, recurring, blockCals, inviteCodes, joinRequests, auditLog, reminderLogs,
     pins, resetPin,
-    saveMembers, saveTeams, saveBlockCals, saveJoinRequests,
+    saveMembers, saveTeams, saveBlockCals, saveJoinRequests, saveSessions,
     showToast, logAction, joinRequests: _joinReq, toast,
     // Admin form state
     newName, setNewName, newTeam, setNewTeam,
@@ -1623,6 +1628,109 @@ export default function AdminView() {
                       ⚠️ You have {existingFixtureBlocks.length} existing fixture blocks — clicking Sync will replace them all with the updated list ({MATCH_FIXTURES.length} fixtures). Any manually added event blocks will be kept.
                     </div>
                   )}
+                </div>
+              );
+            })()}
+            {/* ── Create match sessions from DCF fixtures ─────── */}
+            {(() => {
+              const unsynced = getUnsyncedFixtures(
+                ALL_FIXTURES,
+                sessions,
+                new Date().toISOString().slice(0, 10)
+              );
+              const alreadySynced = (sessions || []).filter(s => s.createdBy === "Fixture sync").length;
+
+              const onSync = () => {
+                if (unsynced.length === 0) return;
+                const teamList = [...new Set(unsynced.map(u => u.team))].sort();
+                const confirmed = window.confirm(
+                  `Create ${unsynced.length} match session${unsynced.length > 1 ? "s" : ""} ` +
+                  `for ${teamList.length} team${teamList.length > 1 ? "s" : ""}?\n\n` +
+                  `Teams: ${teamList.join(", ")}\n\n` +
+                  `These sessions will appear in:\n` +
+                  `• Parent duty roster (match-day sign-ups)\n` +
+                  `• Captain's XI selection\n` +
+                  `• ScorePro for live scoring\n\n` +
+                  `Senior teams (Div 2/3/4, T20, OB) are not included — captains add those themselves.`
+                );
+                if (!confirmed) return;
+                const newSessions = buildSessionsFromUnsynced(unsynced, MATCH_FIXTURES, teams);
+                saveSessions([...(sessions || []), ...newSessions]);
+                try {
+                  logAction("session", `Fixture sync: created ${newSessions.length} match sessions (by ${currentUser?.name || "admin"})`);
+                } catch {}
+                try {
+                  showToast(`✓ ${newSessions.length} match session${newSessions.length > 1 ? "s" : ""} created`);
+                } catch {}
+              };
+
+              if (unsynced.length === 0) {
+                return (
+                  <div style={{
+                    background: "#f0fdf4",
+                    border: "1.5px solid #bbf7d0",
+                    borderRadius: 8,
+                    padding: "9px 12px",
+                    marginBottom: 12,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 10,
+                  }}>
+                    <div style={{ fontSize: 12, color: "#166534", fontWeight: 700 }}>
+                      ✅ All youth & coached-team matches synced as sessions
+                      {alreadySynced > 0 && (
+                        <span style={{ fontWeight: 500, marginLeft: 6 }}>
+                          ({alreadySynced} sessions created from fixtures)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+
+              const teamsCount = new Set(unsynced.map(u => u.team)).size;
+              return (
+                <div style={{
+                  background: "#eff6ff",
+                  border: "1.5px solid #bfdbfe",
+                  borderRadius: 8,
+                  padding: "10px 12px",
+                  marginBottom: 12,
+                }}>
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 10,
+                  }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontWeight: 800, fontSize: 12, color: "#1e40af" }}>
+                        📋 Create match sessions
+                      </div>
+                      <div style={{ fontSize: 11, color: "#3b82f6", marginTop: 2 }}>
+                        {unsynced.length} match{unsynced.length > 1 ? "es" : ""} for {teamsCount} team{teamsCount > 1 ? "s" : ""} —
+                        enables parent duty sign-up, captain XI, and scoring
+                      </div>
+                    </div>
+                    <button
+                      onClick={onSync}
+                      style={{
+                        background: "#2563eb",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 8,
+                        padding: "7px 14px",
+                        fontSize: 12,
+                        fontWeight: 800,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        flexShrink: 0,
+                        whiteSpace: "nowrap",
+                      }}>
+                      Sync sessions
+                    </button>
+                  </div>
                 </div>
               );
             })()}
