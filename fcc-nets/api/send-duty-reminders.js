@@ -166,6 +166,22 @@ function countDuties(parent, sessions, team, seasonYear) {
   return count;
 }
 
+// ─── Rollup helpers ─────────────────────────────────────────────────────────
+const TEAM_PARENT_MAP = {
+  "U13 B": "U13",
+};
+
+function resolveDutyTeam(team) {
+  return TEAM_PARENT_MAP[team] || team;
+}
+
+function getRollupTeams(dutyTeam) {
+  const subs = Object.entries(TEAM_PARENT_MAP)
+    .filter(([_sub, parent]) => parent === dutyTeam)
+    .map(([sub]) => sub);
+  return [dutyTeam, ...subs];
+}
+
 // ─── Coach exemption + orphan helpers ───────────────────────────────────────
 function getTeamCoachNames(teamName, teamsList) {
   if (!teamName || !Array.isArray(teamsList)) return [];
@@ -471,9 +487,13 @@ export default async function handler(req, res) {
 
     // ─── 1. 24hr reminders ───────────────────────────────────────────────────
     const targetDate = overrideDate || getDatePlusDays(1);
+    const sessionTeams = new Set();
+    enabledTeams.forEach(t => {
+      getRollupTeams(t).forEach(sub => sessionTeams.add(sub));
+    });
     const tomorrowSessions = allSessions.filter(s =>
       s.date === targetDate &&
-      enabledTeams.includes(s.restrictedTo) &&
+      sessionTeams.has(s.restrictedTo) &&
       getSlotCount(s, savedConfig) > 0 &&
       getSupportParents(s).length > 0
     );
@@ -539,9 +559,10 @@ export default async function handler(req, res) {
         // Sessions in next 14 days for this team
         const today = getDatePlusDays(0);
         const fortnight = getDatePlusDays(14);
+        const rollupTeamSet = new Set(getRollupTeams(team));
         const teamSessions = allSessions
           .filter(s =>
-            s.restrictedTo === team &&
+            rollupTeamSet.has(s.restrictedTo) &&
             s.date >= today && s.date <= fortnight &&
             getSlotCount(s, savedConfig) > 0
           )
@@ -572,17 +593,24 @@ export default async function handler(req, res) {
 
       for (const team of enabledTeams) {
         const cfg = getEffectiveConfig(team, savedConfig);
+        const rollupTeams = getRollupTeams(team);
+        const rollupSet = new Set(rollupTeams);
         const teamChildIds = new Set(
-          members.filter(m => (m.teams || []).includes(team)).map(m => m.id)
+          members
+            .filter(m => (m.teams || []).some(t => rollupSet.has(t)))
+            .map(m => m.id)
         );
         const teamParents = members.filter(m =>
           (m.children || []).some(cid => teamChildIds.has(cid)) &&
-          !isTeamCoach(m, team, teamsList)
+          !rollupTeams.some(t => isTeamCoach(m, t, teamsList))
         );
         for (const p of teamParents) {
           if (!p.email) continue;
           if (testOnly && !p.name.toLowerCase().includes(testOnly.toLowerCase())) continue;
-          const count = countDuties(p, allSessions, team, seasonYear);
+          const count = rollupTeams.reduce(
+            (sum, t) => sum + countDuties(p, allSessions, t, seasonYear),
+            0
+          );
           if (count > 0) continue;
           if (!zeroByParent[p.id]) {
             zeroByParent[p.id] = { name: p.name, email: p.email, teams: [], configs: {} };

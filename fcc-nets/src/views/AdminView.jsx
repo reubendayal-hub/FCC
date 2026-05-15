@@ -284,6 +284,8 @@ export default function AdminView() {
             {label:"➕ Add Member", id:"sec-add-member", key:"addmember"},
             {label:"🏏 Groups",     id:"sec-groups",     key:"groups"},
             {label:"🧢 Coaches & Captains", id:"sec-coaches", key:"coaches"},
+            {label:"⚙️ Duty config", id:"sec-parentduty", key:"parentduty"},
+            {label:"🙋 Duty roster", id:"sec-dutyoversight", key:"dutyoversight"},
             {label:"🚫 Block Nets", id:"sec-blocknets",  key:"blocknets"},
             {label:"🔁 Recurring",  id:"sec-recurring",  key:"recurring"},
             {label:"👑 Audit Log",  id:"sec-auditlog",   key:"auditlog"},
@@ -979,8 +981,25 @@ export default function AdminView() {
         </>}
 
         {/* ── Parent duty config (super-admin only) ────────────── */}
-        {userRole === "superadmin" && (() => {
-          const youthTeams = ["U11", "U13", "U13 B", "U15", "U15 Girls", "U16", "U18"];
+        {userRole === "superadmin" && <>
+        <div id="sec-parentduty"/>
+        <button onClick={()=>toggleAdminSec("parentduty")}
+          style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
+            background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",
+            padding:"8px 0",marginBottom:adminSec.parentduty?8:14}}>
+          <span style={{fontWeight:900,fontSize:13,color:G.text,display:"flex",alignItems:"center",gap:8}}>
+            ⚙️ Parent duty config
+            <span style={{
+              fontSize: 9, fontWeight: 700, color: "#791F1F",
+              background: "#FCEBEB", padding: "2px 6px", borderRadius: 6
+            }}>SUPER ADMIN</span>
+          </span>
+          <span style={{fontSize:12,color:G.muted,fontWeight:700}}>
+            {adminSec.parentduty?"▲ collapse":"▼ show"}
+          </span>
+        </button>
+        {adminSec.parentduty && (() => {
+          const youthTeams = ["U11", "U13", "U15", "U15 Girls", "U16", "U18"];
           const configs = youthTeams.reduce((acc, t) => {
             acc[t] = getEffectiveConfig(t, parentDutyConfig);
             return acc;
@@ -1000,19 +1019,6 @@ export default function AdminView() {
               background: G.white, borderRadius: 14, border: `1.5px solid ${G.border}`,
               padding: "16px 18px", marginBottom: 16
             }}>
-              <div style={{
-                fontSize: 12, fontWeight: 900, letterSpacing: 1.5, color: G.muted,
-                textTransform: "uppercase", marginBottom: 14,
-                display: "flex", alignItems: "center", gap: 8
-              }}>
-                <span>⚙️</span>
-                <span>Parent duty config</span>
-                <span style={{
-                  fontSize: 9, fontWeight: 700, color: "#791F1F",
-                  background: "#FCEBEB", padding: "2px 6px", borderRadius: 6
-                }}>SUPER ADMIN</span>
-              </div>
-
               <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 14 }}>
                 {youthTeams.map(team => {
                   const cfg = configs[team];
@@ -1273,9 +1279,21 @@ export default function AdminView() {
             </div>
           );
         })()}
+        </>}
 
         {/* ── Duty roster oversight (admin + coaches) ───────────── */}
-        {(can(userRole, "accessMembers") || isCoachMember(currentUser?.name, teams)) && (() => {
+        {(can(userRole, "accessMembers") || isCoachMember(currentUser?.name, teams)) && <>
+        <div id="sec-dutyoversight"/>
+        <button onClick={()=>toggleAdminSec("dutyoversight")}
+          style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
+            background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",
+            padding:"8px 0",marginBottom:adminSec.dutyoversight?8:14}}>
+          <span style={{fontWeight:900,fontSize:13,color:G.text}}>🙋 Duty roster oversight</span>
+          <span style={{fontSize:12,color:G.muted,fontWeight:700}}>
+            {adminSec.dutyoversight?"▲ collapse":"▼ show"}
+          </span>
+        </button>
+        {adminSec.dutyoversight && (() => {
           const enabledTeams = Object.keys({
             ...DEFAULT_DUTY_CONFIG, ...parentDutyConfig
           }).filter(t => isDutyEnabled(t, parentDutyConfig));
@@ -1344,26 +1362,41 @@ export default function AdminView() {
               background: G.white, borderRadius: 14, border: `1.5px solid ${G.border}`,
               padding: "16px 18px", marginBottom: 16
             }}>
-              <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                marginBottom: 14, gap: 8
-              }}>
-                <div style={{
-                  fontSize: 12, fontWeight: 900, letterSpacing: 1.5, color: G.muted,
-                  textTransform: "uppercase"
+              <div style={{ marginBottom: 14 }}>
+                <label style={{
+                  fontSize: 11, fontWeight: 700, color: G.muted,
+                  letterSpacing: 1, textTransform: "uppercase",
+                  display: "block", marginBottom: 6
                 }}>
-                  🙋 Duty roster oversight
+                  Team
+                </label>
+                <div style={{
+                  position: "relative",
+                  background: G.white,
+                  border: `1.5px solid ${G.border}`,
+                  borderRadius: 10,
+                  padding: "10px 14px",
+                }}>
+                  <select
+                    value={activeTeam}
+                    onChange={(e) => setDutyOversightTeam(e.target.value)}
+                    style={{
+                      width: "100%",
+                      fontSize: 14, fontWeight: 700, color: G.text,
+                      background: "transparent", border: "none",
+                      fontFamily: "inherit",
+                      appearance: "none", WebkitAppearance: "none", MozAppearance: "none",
+                      cursor: "pointer", outline: "none",
+                      paddingRight: 24,
+                    }}>
+                    {enabledTeams.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <span style={{
+                    position: "absolute",
+                    right: 14, top: "50%", transform: "translateY(-50%)",
+                    fontSize: 12, color: G.muted, pointerEvents: "none",
+                  }}>▾</span>
                 </div>
-                <select
-                  value={activeTeam}
-                  onChange={(e) => setDutyOversightTeam(e.target.value)}
-                  style={{
-                    fontSize: 12, padding: "5px 10px", borderRadius: 8,
-                    border: `0.5px solid ${G.border}`, background: G.white,
-                    fontFamily: "inherit", fontWeight: 700, color: G.text
-                  }}>
-                  {enabledTeams.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
               </div>
 
               <div style={{
@@ -1508,6 +1541,7 @@ export default function AdminView() {
             </div>
           );
         })()}
+        </>}
 
         {/* ── Block Nets Sessions ────────────────────────────── */}
         {can(userRole,"addMember")&&<>

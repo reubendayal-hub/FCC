@@ -42,14 +42,7 @@ export const DEFAULT_DUTY_CONFIG = {
     standardRoles: ["transport_driver", "transport_seats", "kit", "scorer"],
     customRoles: [],
   },
-  "U13 B": {
-    enabled: true,
-    trainingSlots: 1,
-    matchSlots: 2,
-    minDuties: 4,
-    standardRoles: ["transport_driver", "transport_seats", "kit", "scorer"],
-    customRoles: [],
-  },
+  // U13 B inherits from U13 via TEAM_PARENT_MAP — intentionally not listed.
   "U15": {
     enabled: true,
     trainingSlots: 0,
@@ -94,14 +87,34 @@ export const DEFAULT_TEAM_CONFIG = {
   customRoles: [],
 };
 
+// ─── Rollup helpers ────────────────────────────────────────────────────────
+// Sub-teams that share parent duty config with their parent team.
+// Sessions restrictedTo a sub-team count toward the parent team's roster.
+export const TEAM_PARENT_MAP = {
+  "U13 B": "U13",
+};
+
+export function resolveDutyTeam(team) {
+  return TEAM_PARENT_MAP[team] || team;
+}
+
+export function getRollupTeams(dutyTeam) {
+  const subs = Object.entries(TEAM_PARENT_MAP)
+    .filter(([_sub, parent]) => parent === dutyTeam)
+    .map(([sub]) => sub);
+  return [dutyTeam, ...subs];
+}
+
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 // Merge Firestore config over defaults. Returns config for one team.
+// Resolves sub-teams (e.g. "U13 B") to their parent so they share config.
 // Safe to call before Firestore loads — returns DEFAULT_TEAM_CONFIG if missing.
 export function getEffectiveConfig(team, savedConfig) {
   if (!team) return DEFAULT_TEAM_CONFIG;
-  const fromSaved = savedConfig?.[team];
-  const fromDefault = DEFAULT_DUTY_CONFIG[team];
+  const dutyTeam = resolveDutyTeam(team);
+  const fromSaved = savedConfig?.[dutyTeam];
+  const fromDefault = DEFAULT_DUTY_CONFIG[dutyTeam];
   if (fromSaved) return { ...DEFAULT_TEAM_CONFIG, ...fromDefault, ...fromSaved };
   if (fromDefault) return fromDefault;
   return DEFAULT_TEAM_CONFIG;
@@ -306,27 +319,72 @@ export function buildOrphanParentRow(kid, sessions, team, seasonYear) {
 }
 
 // ─── Canonical roster builder ──────────────────────────────────────────────
-// Linked parents (coaches of THIS team excluded) + orphan kid placeholders.
+// Linked parents (coaches of ANY rollup team excluded) + orphan kid placeholders.
+// Sub-teams (e.g. U13 B) roll up into their parent (U13): one roster, one config,
+// one fairness pool. Duties count across all rollup teams' sessions.
 export function buildTeamParentList(team, members, sessions, teamsRec, seasonYear) {
   if (!team) return [];
+  const dutyTeam = resolveDutyTeam(team);
+  const rollupTeams = getRollupTeams(dutyTeam);
+  const rollupSet = new Set(rollupTeams);
+
   const teamChildIds = new Set(
-    members.filter(m => (m.teams || []).includes(team)).map(m => m.id)
+    members
+      .filter(m => (m.teams || []).some(t => rollupSet.has(t)))
+      .map(m => m.id)
   );
+
+  const isCoachOfAnyRollup = (m) =>
+    rollupTeams.some(t => isTeamCoach(m, t, teamsRec));
 
   const linkedParents = members
     .filter(m =>
       (m.children || []).some(cid => teamChildIds.has(cid)) &&
-      !isTeamCoach(m, team, teamsRec)
+      !isCoachOfAnyRollup(m)
     )
     .map(p => ({
       id: p.id,
       name: p.name,
-      count: countDuties(p, sessions, team, seasonYear),
+      count: rollupTeams.reduce(
+        (sum, t) => sum + countDuties(p, sessions, t, seasonYear),
+        0
+      ),
       isOrphan: false,
     }));
 
-  const orphans = getOrphanKids(team, members)
-    .map(kid => buildOrphanParentRow(kid, sessions, team, seasonYear));
+  const orphans = rollupTeams
+    .flatMap(t => getOrphanKids(t, members))
+    .map(kid => {
+      const hasNamed = !!(kid.parentName && kid.parentName.trim());
+      const displayName = hasNamed
+        ? kid.parentName.trim()
+        : `${kid.name?.split(" ")[0] || "this kid"}'s parent`;
+      let count = 0;
+      if (hasNamed) {
+        const nameLower = kid.parentName.toLowerCase().trim();
+        for (const s of sessions) {
+          if (!rollupSet.has(s.restrictedTo)) continue;
+          if (seasonYear && new Date(s.date).getFullYear() !== seasonYear) continue;
+          for (const sp of getSupportParents(s)) {
+            if (!sp.memberId && sp.memberName &&
+                sp.memberName.toLowerCase().trim() === nameLower) {
+              count++;
+              break;
+            }
+          }
+        }
+      }
+      return {
+        id: `orphan:${kid.id}`,
+        kidId: kid.id,
+        kidName: kid.name,
+        name: displayName,
+        hasNamedParent: hasNamed,
+        isOrphan: true,
+        unlinked: true,
+        count,
+      };
+    });
 
   return [...linkedParents, ...orphans];
 }
