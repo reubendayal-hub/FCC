@@ -465,7 +465,9 @@ export default async function handler(req, res) {
       ...Object.keys(DEFAULT_DUTY_CONFIG),
       ...Object.keys(savedConfig),
     ];
-    const enabledTeams = [...new Set(allTeamNames)].filter(t => isDutyEnabled(t, savedConfig));
+    const enabledTeams = [...new Set(allTeamNames)].filter(t =>
+      isDutyEnabled(t, savedConfig) && !TEAM_PARENT_MAP[t]
+    );
 
     if (enabledTeams.length === 0) {
       return res.status(200).json({
