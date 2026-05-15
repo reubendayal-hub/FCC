@@ -7,7 +7,6 @@ export default function CoachCoordinationView() {
     setView, teams, currentUser, members, recurring,
     coachOverrides, setCoachOverrides, saveCoachOverrides,
     blockCals, showToast,
-    sessions, saveSessions,
   } = useAppContext();
 
   return (
@@ -18,9 +17,6 @@ export default function CoachCoordinationView() {
       coachOverrides={coachOverrides}
       recurring={recurring}
       members={members}
-      appSessions={sessions}
-      saveSessions={saveSessions}
-      showToast={showToast}
       blockedDates={blockCals.map(b => ({
         date: b.date,
         reason: b.label,

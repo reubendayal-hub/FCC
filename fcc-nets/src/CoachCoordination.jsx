@@ -1,9 +1,4 @@
 import React, { useState, useMemo } from "react";
-import { MATCH_FIXTURES } from "./constants/fixtures";
-import {
-  getUnsyncedFixtures,
-  buildSessionsFromUnsynced,
-} from "./constants/fixture-sync";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COACH COORDINATION HUB
@@ -222,9 +217,6 @@ export default function CoachCoordination({
   coachOverrides = {}, // {date_sessionId: {newCoach, oldCoach, assignedBy}}
   recurring = [], // Recurring training slots from App.jsx
   members = [], // Members for COACH_PLAYS_IN derivation
-  appSessions = [], // Persisted sessions from Firestore (named to avoid local-`sessions` collision below)
-  saveSessions, // Writer for the sessions doc
-  showToast,
   onBack,
   onReassign, // Callback to save reassignment: (sessionId, date, newCoach, oldCoach) => void
 }) {
@@ -1093,191 +1085,96 @@ export default function CoachCoordination({
         )}
         
         {/* MATCHES VIEW */}
-        {currentView === "matches" && (() => {
-          const today = new Date().toISOString().slice(0, 10);
-          const unsynced = getUnsyncedFixtures(allFixtures, appSessions, today);
-
-          const onSyncAll = () => {
-            if (unsynced.length === 0) return;
-            const confirmed = window.confirm(
-              `Create ${unsynced.length} match session${unsynced.length > 1 ? "s" : ""} from upcoming youth fixtures?\n\n` +
-              `This makes them available for parent duty sign-up, captain XI selection, and scoring.\n\n` +
-              `Senior team fixtures are not included — add those manually via Add Session.`
-            );
-            if (!confirmed) return;
-            const newSessions = buildSessionsFromUnsynced(unsynced, MATCH_FIXTURES, teams);
-            if (typeof saveSessions === "function") {
-              saveSessions([...(appSessions || []), ...newSessions]);
-            }
-            if (typeof showToast === "function") {
-              showToast(`✓ ${newSessions.length} match session${newSessions.length > 1 ? "s" : ""} created`);
-            }
-          };
-
-          return (
-            <div>
-              <div style={{
-                fontSize: 12,
-                color: theme.muted,
-                marginBottom: 12,
-              }}>
-                All {allFixtures.length} Fredensborg matches for 2026 season
-              </div>
-
-              {unsynced.length > 0 ? (
-                <div style={{
-                  background: theme.warnBg,
-                  border: `1px solid ${theme.warn}`,
-                  borderRadius: 8,
-                  padding: "10px 12px",
-                  marginBottom: 16,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 10,
-                }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: 13, fontWeight: 700, color: theme.warn,
-                      marginBottom: 2,
-                    }}>
-                      ⚠ {unsynced.length} match{unsynced.length > 1 ? "es" : ""} not in sessions yet
-                    </div>
-                    <div style={{ fontSize: 11, color: theme.muted, lineHeight: 1.5 }}>
-                      Youth team fixtures need to be created as sessions before parents
-                      can sign up for duties or captains can pick XIs. Senior team
-                      fixtures must be added manually.
-                    </div>
-                  </div>
-                  <button
-                    onClick={onSyncAll}
-                    style={{
-                      background: theme.gold,
-                      color: theme.bg,
-                      border: "none",
-                      borderRadius: 8,
-                      padding: "8px 14px",
-                      fontSize: 12,
-                      fontWeight: 800,
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                      whiteSpace: "nowrap",
-                      flexShrink: 0,
-                    }}>
-                    Sync all
-                  </button>
-                </div>
-              ) : (
-                <div style={{
-                  background: `${theme.ok}20`,
-                  border: `1px solid ${theme.ok}`,
-                  borderRadius: 8,
-                  padding: "8px 12px",
-                  marginBottom: 16,
-                  fontSize: 12, color: theme.ok, fontWeight: 700,
-                }}>
-                  ✓ All youth fixtures synced to sessions
-                </div>
-              )}
-
-              {/* Group by month */}
-              {(() => {
-                const byMonth = {};
-                allFixtures.forEach(m => {
-                  const month = m.date.slice(0, 7);
-                  if (!byMonth[month]) byMonth[month] = [];
-                  byMonth[month].push(m);
-                });
-
-                return Object.entries(byMonth).map(([month, matches]) => (
-                  <div key={month} style={{ marginBottom: 20 }}>
-                    <div style={{
-                      fontSize: 14,
-                      fontWeight: 700,
-                      color: theme.gold,
-                      marginBottom: 10,
-                      fontFamily: "'IBM Plex Mono', monospace",
-                    }}>
-                      {new Date(month + "-01").toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-                    </div>
-
-                    {matches.map((match, i) => {
-                      const divColor = DIVISION_COLORS[match.division] || theme.muted;
-                      const synced = (appSessions || []).some(s =>
-                        s.fixtureKey
-                          ? s.fixtureKey.includes(match.date)
-                          : (s.date === match.date && s.isMatch && (s.matchOpponent || "").length > 0)
-                      );
-                      return (
-                        <div key={i} style={{
-                          padding: "10px 12px",
-                          background: match.home ? theme.surface : theme.surface2,
-                          border: `1px solid ${match.home ? theme.goldBorder : theme.border}`,
-                          borderRadius: 8,
-                          marginBottom: 6,
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 12,
-                        }}>
-                          <div style={{
-                            width: 50,
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: theme.muted,
-                          }}>
-                            {new Date(match.date).toLocaleDateString("en-US", { day: "numeric", month: "short" })}
-                          </div>
-
-                          <div style={{
-                            padding: "3px 8px",
-                            fontSize: 10,
-                            fontWeight: 700,
-                            background: `${divColor}20`,
-                            color: divColor,
-                            borderRadius: 4,
-                            minWidth: 60,
-                            textAlign: "center",
-                          }}>
-                            {match.division}
-                          </div>
-
-                          <div style={{ flex: 1, fontSize: 12, color: theme.text }}>
-                            {match.label.replace(match.division + " ", "")}
-                          </div>
-
-                          {match.home && (
-                            <span style={{
-                              fontSize: 9,
-                              fontWeight: 700,
-                              color: theme.gold,
-                              background: theme.goldDim,
-                              padding: "2px 6px",
-                              borderRadius: 4,
-                            }}>
-                              HOME
-                            </span>
-                          )}
-                          {synced && (
-                            <span style={{
-                              fontSize: 9,
-                              fontWeight: 700,
-                              color: theme.ok,
-                              background: `${theme.ok}20`,
-                              padding: "2px 6px",
-                              borderRadius: 4,
-                            }}>
-                              ✓ session
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ));
-              })()}
+        {currentView === "matches" && (
+          <div>
+            <div style={{
+              fontSize: 12,
+              color: theme.muted,
+              marginBottom: 16,
+            }}>
+              All {allFixtures.length} Fredensborg matches for 2026 season
             </div>
-          );
-        })()}
+
+            {/* Group by month */}
+            {(() => {
+              const byMonth = {};
+              allFixtures.forEach(m => {
+                const month = m.date.slice(0, 7);
+                if (!byMonth[month]) byMonth[month] = [];
+                byMonth[month].push(m);
+              });
+
+              return Object.entries(byMonth).map(([month, matches]) => (
+                <div key={month} style={{ marginBottom: 20 }}>
+                  <div style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: theme.gold,
+                    marginBottom: 10,
+                    fontFamily: "'IBM Plex Mono', monospace",
+                  }}>
+                    {new Date(month + "-01").toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                  </div>
+
+                  {matches.map((match, i) => {
+                    const divColor = DIVISION_COLORS[match.division] || theme.muted;
+                    return (
+                      <div key={i} style={{
+                        padding: "10px 12px",
+                        background: match.home ? theme.surface : theme.surface2,
+                        border: `1px solid ${match.home ? theme.goldBorder : theme.border}`,
+                        borderRadius: 8,
+                        marginBottom: 6,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                      }}>
+                        <div style={{
+                          width: 50,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: theme.muted,
+                        }}>
+                          {new Date(match.date).toLocaleDateString("en-US", { day: "numeric", month: "short" })}
+                        </div>
+
+                        <div style={{
+                          padding: "3px 8px",
+                          fontSize: 10,
+                          fontWeight: 700,
+                          background: `${divColor}20`,
+                          color: divColor,
+                          borderRadius: 4,
+                          minWidth: 60,
+                          textAlign: "center",
+                        }}>
+                          {match.division}
+                        </div>
+
+                        <div style={{ flex: 1, fontSize: 12, color: theme.text }}>
+                          {match.label.replace(match.division + " ", "")}
+                        </div>
+
+                        {match.home && (
+                          <span style={{
+                            fontSize: 9,
+                            fontWeight: 700,
+                            color: theme.gold,
+                            background: theme.goldDim,
+                            padding: "2px 6px",
+                            borderRadius: 4,
+                          }}>
+                            HOME
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ));
+            })()}
+          </div>
+        )}
         
         {/* CONFLICTS VIEW */}
         {currentView === "conflicts" && (

@@ -26,7 +26,6 @@ import {
 import {
   getUnsyncedFixtures,
   buildSessionsFromUnsynced,
-  SYNCED_TEAMS,
 } from "../constants/fixture-sync";
 
 function ConfigRow({ label, sublabel, control }) {
