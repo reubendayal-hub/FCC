@@ -136,7 +136,9 @@ function isMatchSession(s) {
 }
 
 function getSlotCount(s, savedConfig) {
-  const cfg = getEffectiveConfig(s.restrictedTo, savedConfig);
+  const team = getSessionTeam(s);
+  if (!team) return 0;
+  const cfg = getEffectiveConfig(team, savedConfig);
   if (!cfg.enabled) return 0;
   return isMatchSession(s) ? cfg.matchSlots : cfg.trainingSlots;
 }
@@ -181,6 +183,21 @@ function getRollupTeams(dutyTeam) {
     .filter(([_sub, parent]) => parent === dutyTeam)
     .map(([sub]) => sub);
   return [dutyTeam, ...subs];
+}
+
+function getSessionTeam(session) {
+  if (!session) return null;
+  if (session.restrictedTo) return session.restrictedTo;
+  if (Array.isArray(session.sessionTeams) && session.sessionTeams.length > 0) {
+    return session.sessionTeams[0];
+  }
+  return null;
+}
+
+function sessionBelongsToDutyTeam(session, dutyTeam) {
+  const sessionTeam = getSessionTeam(session);
+  if (!sessionTeam) return false;
+  return resolveDutyTeam(sessionTeam) === dutyTeam;
 }
 
 // ─── Coach exemption + orphan helpers ───────────────────────────────────────
@@ -496,7 +513,7 @@ export default async function handler(req, res) {
     });
     const tomorrowSessions = allSessions.filter(s =>
       s.date === targetDate &&
-      sessionTeams.has(s.restrictedTo) &&
+      sessionTeams.has(getSessionTeam(s)) &&
       getSlotCount(s, savedConfig) > 0 &&
       getSupportParents(s).length > 0
     );
@@ -565,7 +582,7 @@ export default async function handler(req, res) {
         const rollupTeamSet = new Set(getRollupTeams(team));
         const teamSessions = allSessions
           .filter(s =>
-            rollupTeamSet.has(s.restrictedTo) &&
+            rollupTeamSet.has(getSessionTeam(s)) &&
             s.date >= today && s.date <= fortnight &&
             getSlotCount(s, savedConfig) > 0
           )

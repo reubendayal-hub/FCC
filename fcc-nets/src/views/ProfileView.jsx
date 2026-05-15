@@ -25,7 +25,7 @@ import {
   getEffectiveConfig, isDutyEnabled, getSupportParents, setSupportParents,
   getSlotCount, isMatchSession, getSeasonYear, getMatchRoles,
   resolveRoleShort, resolveRoleIcon, buildTeamParentList,
-  TRAINING_ROLE, resolveDutyTeam,
+  TRAINING_ROLE, sessionBelongsToDutyTeam,
 } from "../constants/parent-duty";
 
 // Local navy/gold palette so the career-stats section reads as the
@@ -1136,9 +1136,10 @@ export default function ProfileView() {
 
               // Upcoming sessions for this team — include sub-teams that roll up to it.
               // E.g. when team === "U13", a session restrictedTo "U13 B" should appear
-              // here because resolveDutyTeam("U13 B") === "U13".
+              // here. sessionBelongsToDutyTeam handles the fallback to sessionTeams[0]
+              // when restrictedTo is null and the rollup resolution.
               const upcomingAll = sessions
-                .filter(s => s.restrictedTo && resolveDutyTeam(s.restrictedTo) === team)
+                .filter(s => sessionBelongsToDutyTeam(s, team))
                 .filter(s => s.date >= today && s.date <= lookaheadStr)
                 .filter(s => getSlotCount(s, parentDutyConfig) > 0)
                 .sort((a, b) => a.date.localeCompare(b.date));

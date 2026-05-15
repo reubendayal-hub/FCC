@@ -105,6 +105,29 @@ export function getRollupTeams(dutyTeam) {
   return [dutyTeam, ...subs];
 }
 
+// Resolve a session's primary team. Mirrors SessCard.jsx and AvailabilityView's
+// fallback chain: restrictedTo wins, else first entry in sessionTeams, else null.
+// Use this everywhere the duty roster needs to ask "what team does this session
+// belong to?" — it avoids the trap of comparing against restrictedTo strictly,
+// which leaves out sessions that were created without that flag.
+export function getSessionTeam(session) {
+  if (!session) return null;
+  if (session.restrictedTo) return session.restrictedTo;
+  if (Array.isArray(session.sessionTeams) && session.sessionTeams.length > 0) {
+    return session.sessionTeams[0];
+  }
+  return null;
+}
+
+// Convenience: does this session "belong to" the given duty team
+// (after resolving sub-teams like U13 B → U13)?
+// Returns true for both direct matches and rollup matches.
+export function sessionBelongsToDutyTeam(session, dutyTeam) {
+  const sessionTeam = getSessionTeam(session);
+  if (!sessionTeam) return false;
+  return resolveDutyTeam(sessionTeam) === dutyTeam;
+}
+
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 // Merge Firestore config over defaults. Returns config for one team.
@@ -242,7 +265,9 @@ export function isMatchSession(session) {
 // How many slots does this session have (training vs match)?
 export function getSlotCount(session, savedConfig) {
   if (!session) return 0;
-  const cfg = getEffectiveConfig(session.restrictedTo, savedConfig);
+  const team = getSessionTeam(session);
+  if (!team) return 0;
+  const cfg = getEffectiveConfig(team, savedConfig);
   if (!cfg.enabled) return 0;
   return isMatchSession(session) ? cfg.matchSlots : cfg.trainingSlots;
 }

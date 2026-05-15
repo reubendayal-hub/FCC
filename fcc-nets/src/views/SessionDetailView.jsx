@@ -19,7 +19,7 @@ import {
   getSupportParents, setSupportParents, getSlotCount,
   isMatchSession, resolveRoleShort, resolveRoleIcon,
   getSeasonYear, TRAINING_ROLE,
-  buildTeamParentList, isTeamCoach,
+  buildTeamParentList, isTeamCoach, getSessionTeam,
 } from "../constants/parent-duty";
 
 const dlICS = s => {
@@ -370,8 +370,8 @@ export default function SessionDetailView() {
           })()}
 
           {/* ── Parent Duty (config-driven, all enabled youth teams) ── */}
-          {isDutyEnabled(selSess.restrictedTo, parentDutyConfig) && (() => {
-            const team = selSess.restrictedTo;
+          {isDutyEnabled(getSessionTeam(selSess), parentDutyConfig) && (() => {
+            const team = getSessionTeam(selSess);
             const cfg = getEffectiveConfig(team, parentDutyConfig);
             const isMatch = isMatchSession(selSess);
             const slotCount = getSlotCount(selSess, parentDutyConfig);

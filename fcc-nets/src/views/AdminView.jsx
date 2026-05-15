@@ -21,6 +21,7 @@ import {
   getSupportParents, getSlotCount, countDuties, getSeasonYear,
   slugifyRoleId,
   buildTeamParentList, getTeamCoachNames,
+  sessionBelongsToDutyTeam,
 } from "../constants/parent-duty";
 
 function ConfigRow({ label, sublabel, control }) {
@@ -1308,7 +1309,7 @@ export default function AdminView() {
           const seasonYear = getSeasonYear(today);
 
           const teamSessions = sessions.filter(s =>
-            s.restrictedTo === activeTeam &&
+            sessionBelongsToDutyTeam(s, activeTeam) &&
             new Date(s.date).getFullYear() === seasonYear
           );
           const upcomingSessions = teamSessions.filter(s => s.date >= today);
