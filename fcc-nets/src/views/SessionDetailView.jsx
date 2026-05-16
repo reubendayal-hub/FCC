@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAppContext } from "../context/AppContext";
 import Shell from "../ui/Shell";
 import BotNav from "../ui/BotNav";
@@ -13,6 +14,13 @@ import { canOrCoach, isCoachMember, isAbsent } from "../utils/members";
 import { getLiftObj, getLiftPref } from "../utils/lifts";
 import { makeICS } from "../utils/ics";
 import { uid } from "../constants/seeds";
+import {
+  getEffectiveConfig, isDutyEnabled, getMatchRoles,
+  getSupportParents, setSupportParents, getSlotCount,
+  isMatchSession, resolveRoleShort, resolveRoleIcon,
+  getSeasonYear, TRAINING_ROLE,
+  buildTeamParentList, isTeamCoach, getSessionTeam,
+} from "../constants/parent-duty";
 
 const dlICS = s => {
   const a=document.createElement("a");
@@ -20,9 +28,63 @@ const dlICS = s => {
   a.download=`fcc-nets-${s.date}.ics`; a.click();
 };
 
+function UnlinkedParentInput({ onAdd, isMatch, matchRoles, defaultRole }) {
+  const [name, setName] = useState("");
+  const [role, setRole] = useState(defaultRole);
+  const submit = () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    onAdd(trimmed, role);
+    setName("");
+    setRole(defaultRole);
+  };
+  return (
+    <div style={{
+      display: "flex", gap: 4, marginTop: 6,
+      padding: "6px 8px", background: "#F8FAFC", borderRadius: 8,
+      border: "0.5px dashed #B5D4F4"
+    }}>
+      <input
+        type="text"
+        value={name}
+        placeholder="Add unlinked parent…"
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+        style={{
+          flex: 1, fontSize: 11, padding: "4px 8px",
+          border: "0.5px solid #B5D4F4", borderRadius: 6,
+          fontFamily: "inherit", background: "#fff"
+        }}
+      />
+      {isMatch && matchRoles.length > 1 && (
+        <select
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          style={{
+            fontSize: 10, padding: "4px 6px",
+            border: "0.5px solid #B5D4F4", borderRadius: 6,
+            fontFamily: "inherit", background: "#fff"
+          }}>
+          {matchRoles.map(r => (
+            <option key={r.id} value={r.id}>{r.short}</option>
+          ))}
+        </select>
+      )}
+      <button onClick={submit}
+        style={{
+          background: "#378ADD", color: "#fff", border: "none",
+          borderRadius: 6, padding: "4px 10px", fontSize: 10,
+          fontWeight: 800, cursor: "pointer", fontFamily: "inherit"
+        }}>
+        Add
+      </button>
+    </div>
+  );
+}
+
 export default function SessionDetailView() {
   const {
-    G, view, setView, userRole, currentUser, teams, members,
+    G, view, setView, userRole, currentUser, teams, members, saveMembers,
     sessions, saveSessions, recurring, saveRecurring,
     cancelledSessions, saveCancelledSessions,
     allAttendance, saveAllAttendance,
@@ -43,7 +105,8 @@ export default function SessionDetailView() {
     openWA, logAction, setLiftPref,
     handlePostComment, handleDeleteComment, handleVote, handleLeave,
     handleJoinDetail, handleDeleteSess,
-    joinRequests, toast,
+    joinRequests, toast, showToast,
+    parentDutyConfig,
   } = useAppContext();
 
   const iSt = (extra={}) => ({
@@ -306,218 +369,402 @@ export default function SessionDetailView() {
             );
           })()}
 
-          {/* ── Parent Duty (U11 only) ── */}
-          {selSess.restrictedTo === "U11" && (()=>{
-            // Who are the U11 parents? Any member whose children include a U11 player.
-            const u11ChildIds = new Set(
-              members.filter(m => (m.teams||[]).includes("U11")).map(m => m.id)
-            );
-            const u11Parents = members.filter(m =>
-              (m.children||[]).some(cid => u11ChildIds.has(cid))
-            );
-            // Season = all U11 sessions this year (including this one), past + future
-            const seasonYear = new Date(selSess.date).getFullYear();
-            const u11Sessions = sessions.filter(s =>
-              s.restrictedTo === "U11" &&
-              new Date(s.date).getFullYear() === seasonYear
-            );
-            // Count support-duty sessions per parent across the season
+          {/* ── Parent Duty (config-driven, all enabled youth teams) ── */}
+          {isDutyEnabled(getSessionTeam(selSess), parentDutyConfig) && (() => {
+            const team = getSessionTeam(selSess);
+            const cfg = getEffectiveConfig(team, parentDutyConfig);
+            const isMatch = isMatchSession(selSess);
+            const slotCount = getSlotCount(selSess, parentDutyConfig);
+            if (slotCount === 0) return null;
+
+            const seasonYear = getSeasonYear(selSess.date);
+            const teamRoster = buildTeamParentList(team, members, sessions, teams, seasonYear);
             const dutyCount = {};
-            u11Parents.forEach(p => { dutyCount[p.id] = 0; });
-            u11Sessions.forEach(s => {
-              const sp = s.supportParent;
-              if (sp && sp.memberId && dutyCount[sp.memberId] !== undefined) {
-                dutyCount[sp.memberId] += 1;
-              }
-            });
+            teamRoster.forEach(p => { dutyCount[p.id] = p.count; });
+            const teamChildIds = new Set(
+              members.filter(m => (m.teams || []).includes(team)).map(m => m.id)
+            );
 
-            const support = selSess.supportParent || null;
+            const supportParents = getSupportParents(selSess);
+            const slotsFilled = supportParents.length;
+            const slotsOpen = Math.max(0, slotCount - slotsFilled);
+
             const meId = currentUser?.id;
-            const myRow = members.find(m=>m.id===meId);
-            const iAmU11Parent = !!myRow && (myRow.children||[]).some(cid => u11ChildIds.has(cid));
-            const iAmTheSupport = support && support.memberId === meId;
-            const isCoachOrAdmin = canOrCoach(userRole,"addOtherPlayer",userMem,teams);
+            const myRow = members.find(m => m.id === meId);
+            const iAmTeamParent = !!myRow
+              && (myRow.children || []).some(cid => teamChildIds.has(cid))
+              && !isTeamCoach(myRow, team, teams);
+            const iAmAssigned = supportParents.some(sp => sp.memberId === meId);
+            const isCoachOrAdmin = canOrCoach(userRole, "addOtherPlayer", userMem, teams);
 
-            // ── Mutations ──
-            const assignSupport = (memberId, memberName) => {
-              const updSess = {
-                ...selSess,
-                supportParent: {
-                  memberId,
-                  memberName,
-                  assignedBy: currentUser?.name || "unknown",
-                  assignedAt: new Date().toISOString(),
-                },
+            const matchRoles = isMatch ? getMatchRoles(team, parentDutyConfig) : [];
+            const defaultRole = isMatch ? (matchRoles[0]?.id || "support") : "support";
+
+            const assignSupport = (memberId, memberName, role = defaultRole, unlinked = false) => {
+              const existing = getSupportParents(selSess);
+              if (existing.length >= slotCount) {
+                showToast(`All ${slotCount} slot${slotCount > 1 ? "s" : ""} already filled`);
+                return;
+              }
+              if (existing.some(sp => sp.memberId === memberId)) {
+                showToast(`${memberName.split(" ")[0]} is already on this session`);
+                return;
+              }
+              const roleLabel = isMatch
+                ? (matchRoles.find(r => r.id === role)?.label || role)
+                : TRAINING_ROLE.label;
+              const newEntry = {
+                memberId: memberId || null,
+                memberName,
+                role,
+                roleLabel,
+                unlinked,
+                assignedBy: currentUser?.name || "unknown",
+                assignedAt: new Date().toISOString(),
               };
+              const updSess = setSupportParents(selSess, [...existing, newEntry]);
               setSelSess(updSess);
-              saveSessions(sessions.map(s => s.id===selSess.id ? updSess : s));
-              logAction("session", `Support parent set: ${memberName} for U11 ${selSess.date} (by ${currentUser?.name})`);
-              showToast(`${memberName.split(" ")[0]} signed up as support parent ✓`);
-            };
-            const clearSupport = () => {
-              const prev = support?.memberName || "";
-              const updSess = { ...selSess, supportParent: null };
-              setSelSess(updSess);
-              saveSessions(sessions.map(s => s.id===selSess.id ? updSess : s));
-              logAction("session", `Support parent cleared: ${prev} for U11 ${selSess.date} (by ${currentUser?.name})`);
-              showToast("Support parent slot cleared");
+              saveSessions(sessions.map(s => s.id === selSess.id ? updSess : s));
+              logAction("session", `Duty assigned: ${memberName} (${roleLabel}) for ${team} ${selSess.date} (by ${currentUser?.name})`);
+              showToast(`${memberName.split(" ")[0]} signed up ✓`);
             };
 
-            // ── Sorted fairness list for coach/admin view ──
-            const fairness = u11Parents
-              .map(p => ({ id: p.id, name: p.name, count: dutyCount[p.id] || 0 }))
+            const removeSupport = (memberId) => {
+              const existing = getSupportParents(selSess);
+              const target = existing.find(sp => sp.memberId === memberId);
+              const filtered = existing.filter(sp => sp.memberId !== memberId);
+              const updSess = setSupportParents(selSess, filtered);
+              setSelSess(updSess);
+              saveSessions(sessions.map(s => s.id === selSess.id ? updSess : s));
+              logAction("session", `Duty cleared: ${target?.memberName || "?"} for ${team} ${selSess.date} (by ${currentUser?.name})`);
+              showToast("Duty slot cleared");
+            };
+
+            const fairness = [...teamRoster]
               .sort((a, b) => a.count - b.count || a.name.localeCompare(b.name));
 
             const showAssignUI = assignOpen === selSess.id;
 
             return (
               <div style={{
-                background: support ? "#fffbeb" : "#fef9c3",
-                border: `1.5px solid ${support ? "#fcd34d" : "#fde047"}`,
-                borderLeft: `4px solid ${support ? "#d4a217" : "#eab308"}`,
+                background: slotsOpen === 0 ? "#E1F5EE" : "var(--color-bg, #f8fafc)",
+                border: `1.5px solid ${slotsOpen === 0 ? "#5DCAA5" : G.border}`,
+                borderLeft: `4px solid ${slotsOpen === 0 ? "#1D9E75" : "#85B7EB"}`,
                 borderRadius: 10,
                 padding: "12px 14px",
                 marginBottom: 14,
               }}>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:support?6:8}}>
-                  <span style={{fontSize:16}}>🙋</span>
-                  <span style={{fontSize:11,fontWeight:800,letterSpacing:1,
-                    textTransform:"uppercase",color:"#92400e"}}>
-                    Support Parent
-                  </span>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 16 }}>🙋</span>
+                    <span style={{
+                      fontSize: 11, fontWeight: 800, letterSpacing: 1,
+                      textTransform: "uppercase",
+                      color: slotsOpen === 0 ? "#085041" : "#0C447C"
+                    }}>
+                      {isMatch ? "Match day volunteers" : "Support parent"}
+                    </span>
+                  </div>
+                  {slotCount > 1 && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 700,
+                      background: slotsOpen === 0 ? "#9FE1CB" : "#B5D4F4",
+                      color: slotsOpen === 0 ? "#085041" : "#0C447C",
+                      padding: "2px 8px", borderRadius: 10,
+                    }}>
+                      {slotsFilled} / {slotCount}
+                    </span>
+                  )}
                 </div>
 
-                {support ? (
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
-                    <div style={{
-                      width:34,height:34,borderRadius:"50%",
-                      background:"#d4a217",color:"#fff",
-                      display:"flex",alignItems:"center",justifyContent:"center",
-                      fontWeight:900,fontSize:13,flexShrink:0,
-                    }}>
-                      {support.memberName.split(" ").map(w=>w[0]).slice(0,2).join("")}
-                    </div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:14,fontWeight:800,color:"#0f1a3a"}}>
-                        {support.memberName}
-                      </div>
-                      <div style={{fontSize:11,color:"#92400e"}}>
-                        Signed up · thanks for helping the U11s
-                      </div>
-                    </div>
-                    {(iAmTheSupport || isCoachOrAdmin) && (
-                      <button onClick={clearSupport}
-                        style={{background:"transparent",border:"1px solid #fcd34d",
-                          color:"#92400e",borderRadius:8,padding:"5px 10px",
-                          fontSize:11,fontWeight:700,cursor:"pointer",
-                          fontFamily:"inherit",flexShrink:0}}>
-                        {iAmTheSupport ? "Remove me" : "Clear"}
-                      </button>
-                    )}
+                {supportParents.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: slotsOpen > 0 ? 10 : 0 }}>
+                    {supportParents.map((sp, idx) => {
+                      const isMe = sp.memberId === meId;
+                      const canRemove = isMe || isCoachOrAdmin;
+                      return (
+                        <div key={`${sp.memberId || sp.memberName}-${idx}`} style={{
+                          display: "flex", alignItems: "center", gap: 10,
+                          background: "#FFFFFF",
+                          border: "0.5px solid #9FE1CB",
+                          borderRadius: 8,
+                          padding: "8px 10px",
+                        }}>
+                          <div style={{
+                            width: 30, height: 30, borderRadius: "50%",
+                            background: "#9FE1CB", color: "#085041",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontWeight: 900, fontSize: 11, flexShrink: 0,
+                          }}>
+                            {(sp.memberName || "?").split(" ").map(w => w[0]).slice(0, 2).join("")}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: "#0f1a3a" }}>
+                              {sp.memberName}
+                              {sp.unlinked && (
+                                <span style={{
+                                  fontSize: 9, fontWeight: 700, marginLeft: 6,
+                                  background: "#F1EFE8", color: "#5F5E5A",
+                                  padding: "1px 6px", borderRadius: 8,
+                                }}>not in app</span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: 11, color: "#0F6E56" }}>
+                              {resolveRoleIcon(sp.role)} {sp.roleLabel || resolveRoleShort(sp.role, team, parentDutyConfig)}
+                            </div>
+                          </div>
+                          {canRemove && (
+                            <button onClick={() => removeSupport(sp.memberId)}
+                              style={{
+                                background: "transparent", border: "1px solid #9FE1CB",
+                                color: "#085041", borderRadius: 8, padding: "5px 10px",
+                                fontSize: 11, fontWeight: 700, cursor: "pointer",
+                                fontFamily: "inherit", flexShrink: 0
+                              }}>
+                              {isMe ? "Remove me" : "Clear"}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                ) : (
+                )}
+
+                {slotsOpen > 0 && (
                   <>
-                    <div style={{fontSize:12,color:"#78350f",marginBottom:10,lineHeight:1.5}}>
-                      One parent per session — equipment, safety, energy. <b>Not a coaching role.</b>
-                    </div>
-                    {iAmU11Parent && (
-                      <button onClick={()=>assignSupport(meId, currentUser.name)}
-                        style={{width:"100%",background:"#d4a217",border:"none",
-                          color:"#fff",borderRadius:10,padding:"11px 14px",
-                          fontSize:14,fontWeight:800,cursor:"pointer",
-                          fontFamily:"inherit",marginBottom:8}}>
-                        🙋 I'll support this session
-                      </button>
+                    {supportParents.length === 0 && (
+                      <div style={{ fontSize: 12, color: "#0C447C", marginBottom: 10, lineHeight: 1.5 }}>
+                        {isMatch
+                          ? `Need ${slotsOpen} volunteer${slotsOpen > 1 ? "s" : ""} — pick your role below.`
+                          : "One parent per session — equipment, safety, energy. Not a coaching role."}
+                      </div>
                     )}
-                    {!iAmU11Parent && !isCoachOrAdmin && (
-                      <div style={{fontSize:12,color:"#92400e",fontStyle:"italic",padding:"4px 0"}}>
-                        U11 parents can sign up here.
+
+                    {iAmTeamParent && !iAmAssigned && (
+                      isMatch && matchRoles.length > 1 ? (
+                        <div>
+                          <div style={{ fontSize: 11, color: "#0C447C", marginBottom: 6, fontWeight: 600 }}>
+                            I'll volunteer as:
+                          </div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                            {matchRoles.map(r => (
+                              <button key={r.id}
+                                onClick={() => assignSupport(meId, currentUser.name, r.id)}
+                                style={{
+                                  background: "#378ADD", color: "#fff", border: "none",
+                                  borderRadius: 8, padding: "8px 12px",
+                                  fontSize: 12, fontWeight: 700, cursor: "pointer",
+                                  fontFamily: "inherit",
+                                  display: "inline-flex", alignItems: "center", gap: 6,
+                                }}>
+                                {resolveRoleIcon(r.id)} {r.short}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <button onClick={() => assignSupport(meId, currentUser.name, defaultRole)}
+                          style={{
+                            width: "100%", background: "#378ADD", border: "none",
+                            color: "#fff", borderRadius: 10, padding: "11px 14px",
+                            fontSize: 14, fontWeight: 800, cursor: "pointer",
+                            fontFamily: "inherit", marginBottom: 8
+                          }}>
+                          🙋 I'll {isMatch ? "help on match day" : "support this session"}
+                        </button>
+                      )
+                    )}
+
+                    {!iAmTeamParent && !isCoachOrAdmin && (
+                      <div style={{ fontSize: 12, color: "#0C447C", fontStyle: "italic", padding: "4px 0" }}>
+                        {team} parents can sign up here.
                       </div>
                     )}
                   </>
                 )}
 
-                {/* Fairness line: shown to the current parent (their own count) */}
-                {iAmU11Parent && !isCoachOrAdmin && (()=>{
+                {iAmTeamParent && !isCoachOrAdmin && (() => {
                   const myCount = dutyCount[meId] || 0;
+                  const remaining = Math.max(0, cfg.minDuties - myCount);
                   return (
-                    <div style={{fontSize:11,color:"#78350f",marginTop:6,
-                      display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                      <span>Your support sessions this season:</span>
-                      <span style={{background:"#fef3c7",border:"0.5px solid #fde68a",
-                        color:"#92400e",padding:"1px 8px",borderRadius:10,
-                        fontWeight:800}}>{myCount}</span>
+                    <div style={{
+                      fontSize: 11, color: "#0C447C", marginTop: 8,
+                      display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap"
+                    }}>
+                      <span>This season:</span>
+                      <span style={{
+                        background: "#E6F1FB", border: "0.5px solid #B5D4F4",
+                        color: "#0C447C", padding: "1px 8px", borderRadius: 10,
+                        fontWeight: 800
+                      }}>{myCount} / {cfg.minDuties}</span>
+                      {remaining > 0 && (
+                        <span style={{ color: "#5F5E5A" }}>
+                          · {remaining} more to hit minimum
+                        </span>
+                      )}
+                      {remaining === 0 && (
+                        <span style={{ color: "#0F6E56", fontWeight: 700 }}>
+                          ✓ minimum reached
+                        </span>
+                      )}
                     </div>
                   );
                 })()}
 
-                {/* Coach/admin fairness overview & assign UI */}
                 {isCoachOrAdmin && (
-                  <div style={{marginTop:10,paddingTop:10,
-                    borderTop:"1px dashed #fcd34d"}}>
-                    <button onClick={()=>setAssignOpen(assignOpen===selSess.id?null:selSess.id)}
-                      style={{width:"100%",background:"transparent",
-                        border:"1px dashed #d4a217",color:"#92400e",
-                        borderRadius:8,padding:"8px 10px",
-                        fontSize:12,fontWeight:700,cursor:"pointer",
-                        fontFamily:"inherit",marginBottom:8}}>
-                      {showAssignUI ? "▲ Hide season roster" : "▼ Season roster & assign"}
+                  <div style={{
+                    marginTop: slotsOpen > 0 || supportParents.length > 0 ? 10 : 0,
+                    paddingTop: 10,
+                    borderTop: "1px dashed " + (slotsOpen === 0 ? "#5DCAA5" : "#85B7EB")
+                  }}>
+                    <button onClick={() => setAssignOpen(assignOpen === selSess.id ? null : selSess.id)}
+                      style={{
+                        width: "100%", background: "transparent",
+                        border: "1px dashed " + (slotsOpen === 0 ? "#1D9E75" : "#378ADD"),
+                        color: slotsOpen === 0 ? "#085041" : "#0C447C",
+                        borderRadius: 8, padding: "8px 10px",
+                        fontSize: 12, fontWeight: 700, cursor: "pointer",
+                        fontFamily: "inherit", marginBottom: showAssignUI ? 8 : 0
+                      }}>
+                      {showAssignUI ? "▲ Hide assign panel" : `▼ Assign or check fairness (${teamParents.length} parents)`}
                     </button>
 
                     {showAssignUI && (
-                      <>
-                        {/* Fairness list */}
-                        <div style={{fontSize:10,fontWeight:800,letterSpacing:0.8,
-                          textTransform:"uppercase",color:"#92400e",marginBottom:6}}>
-                          Season so far ({u11Sessions.filter(s=>s.supportParent).length}
-                          /{u11Sessions.length} sessions covered)
+                      <div>
+                        <div style={{
+                          fontSize: 10, color: "#5F5E5A", letterSpacing: 1,
+                          textTransform: "uppercase", fontWeight: 700, marginBottom: 6
+                        }}>
+                          Fairness — sorted lowest first
                         </div>
-                        <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:10}}>
-                          {fairness.length === 0 && (
-                            <div style={{fontSize:11,color:"#92400e",fontStyle:"italic"}}>
-                              No U11 parents linked yet. Parents need to link their child in "My Family".
-                            </div>
-                          )}
-                          {fairness.map(p => (
-                            <div key={p.id} style={{
-                              display:"flex",alignItems:"center",gap:8,
-                              background:p.count===0?"#fef3c7":"transparent",
-                              border:p.count===0?"0.5px solid #fde68a":"0.5px solid transparent",
-                              borderRadius:8,padding:"4px 8px",
-                            }}>
-                              <span style={{fontSize:12,color:"#0f1a3a",flex:1,
-                                fontWeight:p.count===0?700:500}}>
-                                {p.name}
-                              </span>
-                              <span style={{fontSize:10,fontWeight:800,color:"#92400e",
-                                background:"#fef9c3",padding:"1px 7px",borderRadius:10,
-                                minWidth:22,textAlign:"center"}}>
-                                ×{p.count}
-                              </span>
-                              {!support && (
-                                <button onClick={()=>assignSupport(p.id, p.name)}
-                                  style={{background:"#d4a217",color:"#fff",border:"none",
-                                    borderRadius:6,padding:"3px 8px",fontSize:10,
-                                    fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
-                                  Assign
-                                </button>
-                              )}
-                              {support && support.memberId !== p.id && (
-                                <button onClick={()=>assignSupport(p.id, p.name)}
-                                  style={{background:"transparent",
-                                    color:"#92400e",border:"1px solid #d4a217",
-                                    borderRadius:6,padding:"3px 8px",fontSize:10,
-                                    fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
-                                  Swap
-                                </button>
-                              )}
-                            </div>
-                          ))}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: 8 }}>
+                          {fairness.map(p => {
+                            const alreadyHere = p.isOrphan
+                              ? supportParents.some(sp =>
+                                  !sp.memberId && sp.memberName &&
+                                  sp.memberName.toLowerCase().trim() === (p.name || "").toLowerCase().trim())
+                              : supportParents.some(sp => sp.memberId === p.id);
+                            return (
+                              <div key={p.id} style={{
+                                display: "flex", alignItems: "center", gap: 8,
+                                background: p.count === 0 ? "#FCEBEB" : p.count < cfg.minDuties ? "#E6F1FB" : "transparent",
+                                border: `0.5px solid ${p.count === 0 ? "#F7C1C1" : p.count < cfg.minDuties ? "#B5D4F4" : "transparent"}`,
+                                borderRadius: 8, padding: "4px 8px",
+                              }}>
+                                <span style={{
+                                  fontSize: 12,
+                                  color: p.count === 0 ? "#791F1F" : "#0f1a3a",
+                                  flex: 1,
+                                  fontWeight: p.count === 0 ? 700 : 500
+                                }}>
+                                  {p.name}
+                                  {p.isOrphan && (
+                                    <span style={{
+                                      fontSize: 9, fontWeight: 700, marginLeft: 6,
+                                      background: "#FAEEDA", color: "#854F0B",
+                                      padding: "1px 6px", borderRadius: 8,
+                                    }}>
+                                      {p.hasNamedParent ? `parent of ${p.kidName.split(" ")[0]}` : "no parent in app"}
+                                    </span>
+                                  )}
+                                </span>
+                                <span style={{
+                                  fontSize: 10, fontWeight: 800,
+                                  color: p.count === 0 ? "#791F1F" : p.count >= cfg.minDuties ? "#085041" : "#0C447C",
+                                  background: p.count === 0 ? "#F7C1C1" : p.count >= cfg.minDuties ? "#9FE1CB" : "#B5D4F4",
+                                  padding: "1px 7px", borderRadius: 10,
+                                  minWidth: 22, textAlign: "center"
+                                }}>
+                                  ×{p.count}
+                                </span>
+                                {alreadyHere ? (
+                                  <span style={{
+                                    fontSize: 10, fontWeight: 700, color: "#085041",
+                                    padding: "3px 8px",
+                                  }}>
+                                    ✓ on duty
+                                  </span>
+                                ) : slotsOpen > 0 ? (
+                                  p.isOrphan && !p.hasNamedParent ? (
+                                    <button
+                                      onClick={() => {
+                                        const entered = (typeof window !== "undefined" && window.prompt)
+                                          ? window.prompt(`What's ${p.kidName}'s parent's name?`)
+                                          : null;
+                                        if (!entered || !entered.trim()) return;
+                                        const parentName = entered.trim();
+                                        const updMembers = members.map(m =>
+                                          m.id === p.kidId ? { ...m, parentName } : m
+                                        );
+                                        saveMembers(updMembers);
+                                        logAction("members", `Parent name set for ${p.kidName}: "${parentName}" (by ${currentUser?.name})`);
+                                        showToast(`${parentName} added — now you can assign duties`);
+                                      }}
+                                      style={{
+                                        background: "#9FE1CB", color: "#085041", border: "0.5px solid #5DCAA5",
+                                        borderRadius: 6, padding: "3px 8px", fontSize: 10,
+                                        fontWeight: 800, cursor: "pointer", fontFamily: "inherit"
+                                      }}>
+                                      Name parent
+                                    </button>
+                                  ) : isMatch && matchRoles.length > 1 ? (
+                                    <select
+                                      onChange={(e) => {
+                                        if (e.target.value) {
+                                          const targetId = p.isOrphan ? null : p.id;
+                                          assignSupport(targetId, p.name, e.target.value, p.isOrphan);
+                                          e.target.value = "";
+                                        }
+                                      }}
+                                      defaultValue=""
+                                      style={{
+                                        fontSize: 10, fontWeight: 700,
+                                        background: "#378ADD", color: "#fff",
+                                        border: "none", borderRadius: 6,
+                                        padding: "3px 6px", cursor: "pointer",
+                                        fontFamily: "inherit"
+                                      }}>
+                                      <option value="">Assign…</option>
+                                      {matchRoles.map(r => (
+                                        <option key={r.id} value={r.id}>{r.short}</option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <button
+                                      onClick={() => {
+                                        const targetId = p.isOrphan ? null : p.id;
+                                        assignSupport(targetId, p.name, defaultRole, p.isOrphan);
+                                      }}
+                                      style={{
+                                        background: "#378ADD", color: "#fff", border: "none",
+                                        borderRadius: 6, padding: "3px 8px", fontSize: 10,
+                                        fontWeight: 800, cursor: "pointer", fontFamily: "inherit"
+                                      }}>
+                                      Assign
+                                    </button>
+                                  )
+                                ) : null}
+                              </div>
+                            );
+                          })}
                         </div>
-                        <div style={{fontSize:10,color:"#92400e",fontStyle:"italic",lineHeight:1.5}}>
-                          💡 Parents in yellow haven't covered a session this season. Assign them if they've not stepped up themselves.
+
+                        {can(userRole, "accessMembers") && slotsOpen > 0 && (
+                          <UnlinkedParentInput
+                            onAdd={(name, role) => assignSupport(null, name, role, true)}
+                            isMatch={isMatch}
+                            matchRoles={matchRoles}
+                            defaultRole={defaultRole}
+                          />
+                        )}
+
+                        <div style={{
+                          fontSize: 10, color: "#5F5E5A", fontStyle: "italic",
+                          lineHeight: 1.5, marginTop: 6
+                        }}>
+                          💡 Red rows = no duties yet this season · Blue rows = below minimum
                         </div>
-                      </>
+                      </div>
                     )}
                   </div>
                 )}

@@ -437,7 +437,8 @@ export default function App() {
   // Admin section collapse — true = open. Members+AddMember open by default, rest collapsed
   const [adminSec, setAdminSec] = useState({
     members:true, addmember:true, groups:false,
-    coaches:false, blocknets:false, recurring:false, backup:false, auditlog:false, reminderlogs:false
+    coaches:false, parentduty:false, dutyoversight:false,
+    blocknets:false, recurring:false, backup:false, auditlog:false, reminderlogs:false
   });
   const toggleAdminSec = k => setAdminSec(s=>({...s,[k]:!s[k]}));
   const [editingName, setEditingName] = useState(null); // {id, value}

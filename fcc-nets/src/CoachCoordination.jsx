@@ -1094,7 +1094,7 @@ export default function CoachCoordination({
             }}>
               All {allFixtures.length} Fredensborg matches for 2026 season
             </div>
-            
+
             {/* Group by month */}
             {(() => {
               const byMonth = {};
@@ -1103,7 +1103,7 @@ export default function CoachCoordination({
                 if (!byMonth[month]) byMonth[month] = [];
                 byMonth[month].push(m);
               });
-              
+
               return Object.entries(byMonth).map(([month, matches]) => (
                 <div key={month} style={{ marginBottom: 20 }}>
                   <div style={{
@@ -1115,7 +1115,7 @@ export default function CoachCoordination({
                   }}>
                     {new Date(month + "-01").toLocaleDateString("en-US", { month: "long", year: "numeric" })}
                   </div>
-                  
+
                   {matches.map((match, i) => {
                     const divColor = DIVISION_COLORS[match.division] || theme.muted;
                     return (
@@ -1137,7 +1137,7 @@ export default function CoachCoordination({
                         }}>
                           {new Date(match.date).toLocaleDateString("en-US", { day: "numeric", month: "short" })}
                         </div>
-                        
+
                         <div style={{
                           padding: "3px 8px",
                           fontSize: 10,
@@ -1150,11 +1150,11 @@ export default function CoachCoordination({
                         }}>
                           {match.division}
                         </div>
-                        
+
                         <div style={{ flex: 1, fontSize: 12, color: theme.text }}>
                           {match.label.replace(match.division + " ", "")}
                         </div>
-                        
+
                         {match.home && (
                           <span style={{
                             fontSize: 9,

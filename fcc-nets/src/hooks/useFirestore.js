@@ -42,6 +42,7 @@ export function useFirestore({ currentUserRef }) {
   const [coachOverrides, setCoachOverrides] = useState({});
   const [matchSelections,setMatchSelections]= useState({});
   const [noteTemplates,  setNoteTemplates]  = useState([]);
+  const [parentDutyConfig, setParentDutyConfig] = useState({});
   const [loading, setLoading] = useState(true);
 
   // Refs that always hold the latest values — avoid stale closures
@@ -163,6 +164,25 @@ export function useFirestore({ currentUserRef }) {
     return () => unsub();
   },[]);
 
+  // ── Parent-duty config: live listener ────────────────────────
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "fccnets", "parentdutyconfig"), (snap) => {
+      if (!snap.exists()) {
+        setParentDutyConfig({});
+        return;
+      }
+      try {
+        const raw = snap.data()?.value;
+        const parsed = raw ? JSON.parse(raw) : {};
+        setParentDutyConfig(parsed || {});
+      } catch (e) {
+        console.error("Failed to parse parentdutyconfig:", e);
+        setParentDutyConfig({});
+      }
+    });
+    return () => unsub();
+  }, []);
+
   // ── Save functions ───────────────────────────────────────────
   const saveSessions  = async u => { setSessions(u); sessionsRef.current=u; await setDoc(doc(db,"fccnets","sessions"), {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveMembers   = async u => {
@@ -208,6 +228,17 @@ export function useFirestore({ currentUserRef }) {
   const saveCoachOverrides  = async u => { setCoachOverrides(u);  await setDoc(doc(db,"fccnets","coachoverrides"), {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveMatchSelections = async u => { setMatchSelections(u); await setDoc(doc(db,"fccnets","matchselections"), {value:JSON.stringify(u)}).catch(()=>{});};
   const saveNoteTemplates   = async u => { setNoteTemplates(u);   await setDoc(doc(db,"fccnets","captainnotes_templates"), {value:JSON.stringify(u)}).catch(()=>{});};
+  const saveParentDutyConfig = async (config) => {
+    try {
+      await setDoc(doc(db,"fccnets","parentdutyconfig"), {
+        value: JSON.stringify(config || {}),
+      });
+      setParentDutyConfig(config || {});
+    } catch (e) {
+      console.error("Failed to save parentdutyconfig:", e);
+      throw e;
+    }
+  };
 
   // ── Audit log ─────────────────────────────────────────────────
   // Cap at 500 entries; newest first. Only superadmin can read.
@@ -335,11 +366,13 @@ export function useFirestore({ currentUserRef }) {
     coachOverrides, setCoachOverrides,
     matchSelections, setMatchSelections,
     noteTemplates, setNoteTemplates,
+    parentDutyConfig, setParentDutyConfig,
     loading,
     saveSessions, saveMembers, savePins, saveTeams, saveRecurring,
     saveBlockCals, saveCancelledSessions, saveInviteCodes, saveJoinRequests,
     saveSeasonPlans, saveAllAttendance, saveAllSessionNotes, savePlayerProgress,
     saveCoachOverrides, saveMatchSelections, saveNoteTemplates, saveAuditLog,
+    saveParentDutyConfig,
     logAction,
   };
 }

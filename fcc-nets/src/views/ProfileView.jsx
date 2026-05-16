@@ -21,6 +21,12 @@ import { THEMES, THEME_KEYS } from "../constants/themes";
 import { fmtShort, todayStr } from "../utils/time";
 import { isCoachMember, profileCompletion, maskEmail, getMemberRoleChips } from "../utils/members";
 import { uid } from "../constants/seeds";
+import {
+  getEffectiveConfig, isDutyEnabled, getSupportParents, setSupportParents,
+  getSlotCount, isMatchSession, getSeasonYear, getMatchRoles,
+  resolveRoleShort, resolveRoleIcon, buildTeamParentList,
+  TRAINING_ROLE, sessionBelongsToDutyTeam,
+} from "../constants/parent-duty";
 
 // Local navy/gold palette so the career-stats section reads as the
 // scorecard family instead of the green/cream profile chrome.
@@ -52,6 +58,7 @@ export default function ProfileView() {
     absCat, setAbsCat, absNote, setAbsNote,
     absConflicts, setAbsConflicts,
     showToast, joinRequests, toast,
+    parentDutyConfig, setSelSess,
   } = useAppContext();
 
   const iSt = (extra={}) => ({
@@ -1040,6 +1047,492 @@ export default function ProfileView() {
                         : `▼ Show all ${allMyMatches.length} matches`}
                   </button>
                 )}
+              </div>
+            );
+          })()}
+
+          {/* ── My parent duties ── */}
+          {(() => {
+            const me = members.find(m => m.id === currentUser?.id);
+            if (!me) return null;
+            const myChildren = (me.children || [])
+              .map(cid => members.find(m => m.id === cid))
+              .filter(Boolean);
+            if (myChildren.length === 0) return null;
+
+            // Which duty-enabled teams do my kids play for?
+            const myDutyTeams = [...new Set(
+              myChildren.flatMap(c => (c.teams || []).filter(t => isDutyEnabled(t, parentDutyConfig)))
+            )];
+            if (myDutyTeams.length === 0) return null;
+
+            const today = new Date().toISOString().slice(0, 10);
+            const seasonYear = getSeasonYear(today);
+            // 12 weeks = 84 days
+            const lookahead = new Date();
+            lookahead.setDate(lookahead.getDate() + 84);
+            const lookaheadStr = lookahead.toISOString().slice(0, 10);
+
+            // ─── Helper: claim a session for the current user ────────────────────────
+            const claimSession = (session, role) => {
+              const existing = getSupportParents(session);
+              const cfg = getEffectiveConfig(session.restrictedTo, parentDutyConfig);
+              const slots = getSlotCount(session, parentDutyConfig);
+              if (existing.length >= slots) {
+                showToast("All slots already filled");
+                return;
+              }
+              if (existing.some(sp => sp.memberId === me.id)) {
+                showToast("You're already on this session");
+                return;
+              }
+              const isMatch = isMatchSession(session);
+              const roleId = role || (isMatch ? null : "support");
+              if (isMatch && !roleId) {
+                showToast("Pick a role first");
+                return;
+              }
+              const matchRoles = getMatchRoles(session.restrictedTo, parentDutyConfig);
+              const roleLabel = isMatch
+                ? (matchRoles.find(r => r.id === roleId)?.label || roleId)
+                : TRAINING_ROLE.label;
+              const newEntry = {
+                memberId: me.id,
+                memberName: me.name,
+                role: roleId,
+                roleLabel,
+                unlinked: false,
+                assignedBy: me.name,
+                assignedAt: new Date().toISOString(),
+              };
+              const updSess = setSupportParents(session, [...existing, newEntry]);
+              saveSessions(sessions.map(s => s.id === session.id ? updSess : s));
+              showToast(`Signed up ✓`);
+            };
+
+            const unclaimSession = (session) => {
+              const existing = getSupportParents(session);
+              const filtered = existing.filter(sp => sp.memberId !== me.id);
+              const updSess = setSupportParents(session, filtered);
+              saveSessions(sessions.map(s => s.id === session.id ? updSess : s));
+              showToast("Removed from this session");
+            };
+
+            // Build per-team stats. Filter early — if a team has nothing duty-eligible
+            // in the next 12 weeks, we still show the team header + leaderboard but
+            // with an empty-state note.
+            const teamStats = myDutyTeams.map(team => {
+              const cfg = getEffectiveConfig(team, parentDutyConfig);
+
+              // Leaderboard via the canonical helper (handles rollup + coach exempt + orphans)
+              const leaderboard = [...buildTeamParentList(team, members, sessions, teams, seasonYear)]
+                .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+
+              // My count from the leaderboard entry (not recomputed)
+              const myEntry = leaderboard.find(p => p.id === me.id);
+              const myCount = myEntry ? myEntry.count : 0;
+              const myRank = leaderboard.findIndex(p => p.id === me.id) + 1;
+              const totalParents = leaderboard.length;
+
+              // Upcoming sessions for this team — include sub-teams that roll up to it.
+              // E.g. when team === "U13", a session restrictedTo "U13 B" should appear
+              // here. sessionBelongsToDutyTeam handles the fallback to sessionTeams[0]
+              // when restrictedTo is null and the rollup resolution.
+              const upcomingAll = sessions
+                .filter(s => sessionBelongsToDutyTeam(s, team))
+                .filter(s => s.date >= today && s.date <= lookaheadStr)
+                .filter(s => getSlotCount(s, parentDutyConfig) > 0)
+                .sort((a, b) => a.date.localeCompare(b.date));
+
+              const upcomingTraining = upcomingAll.filter(s => !isMatchSession(s));
+              const upcomingMatches = upcomingAll.filter(s => isMatchSession(s));
+
+              return {
+                team, cfg, myCount, myRank, totalParents, leaderboard,
+                upcomingTraining, upcomingMatches,
+                hasUpcoming: upcomingAll.length > 0,
+              };
+            });
+
+            return (
+              <div style={{
+                background: G.white, borderRadius: 14, border: `1.5px solid ${G.border}`,
+                padding: "14px 16px", marginTop: 12
+              }}>
+                <div style={{
+                  fontSize: 11, fontWeight: 900, letterSpacing: 1.5, color: G.muted,
+                  textTransform: "uppercase", marginBottom: 12
+                }}>
+                  My parent duties
+                </div>
+
+                {teamStats.map(({
+                  team, cfg, myCount, myRank, totalParents, leaderboard,
+                  upcomingTraining, upcomingMatches, hasUpcoming
+                }) => {
+                  const pct = Math.min(100, Math.round((myCount / cfg.minDuties) * 100));
+                  const remaining = Math.max(0, cfg.minDuties - myCount);
+                  const minReached = myCount >= cfg.minDuties;
+                  const barColor = minReached ? "#1D9E75" : "#378ADD";
+
+                  return (
+                    <div key={team} style={{ marginBottom: 22 }}>
+                      {/* ─── Team header ───────────────────────────────────────────── */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        <span style={{
+                          fontSize: 11, fontWeight: 800,
+                          background: "#E6F1FB", color: "#0C447C",
+                          padding: "3px 10px", borderRadius: 12
+                        }}>
+                          {team}
+                        </span>
+                        {minReached && (
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, color: "#085041",
+                            background: "#E1F5EE", padding: "2px 8px", borderRadius: 10
+                          }}>
+                            ✓ minimum reached
+                          </span>
+                        )}
+                      </div>
+
+                      {/* ─── Progress bar ──────────────────────────────────────────── */}
+                      <div style={{
+                        display: "flex", alignItems: "baseline",
+                        justifyContent: "space-between", marginBottom: 6
+                      }}>
+                        <span style={{ fontSize: 12, color: G.muted }}>Done this season</span>
+                        <span style={{ fontSize: 13, fontWeight: 800, color: barColor }}>
+                          {myCount} <span style={{ color: G.muted, fontWeight: 600 }}>/ {cfg.minDuties} min</span>
+                        </span>
+                      </div>
+                      <div style={{
+                        height: 6, background: "#F1EFE8", borderRadius: 3,
+                        overflow: "hidden", marginBottom: 6
+                      }}>
+                        <div style={{
+                          height: "100%", width: `${pct}%`, background: barColor,
+                          borderRadius: 3, transition: "width .3s"
+                        }} />
+                      </div>
+                      <div style={{ fontSize: 11, color: G.muted, marginBottom: 12 }}>
+                        {remaining > 0 ? `${remaining} more to hit your minimum` : "You're sorted for the season"}
+                        {totalParents > 1 && myRank > 0 && ` · You're ${myRank} of ${totalParents}`}
+                      </div>
+
+                      {/* ─── Empty state if no upcoming sessions ───────────────────── */}
+                      {!hasUpcoming && (
+                        <div style={{
+                          background: "#F8FAFC",
+                          border: `0.5px dashed ${G.border}`,
+                          borderRadius: 8,
+                          padding: "12px 14px",
+                          marginBottom: 12,
+                          fontSize: 12, color: G.muted, fontStyle: "italic",
+                          lineHeight: 1.5
+                        }}>
+                          No upcoming duty sessions in the next 12 weeks — the schedule
+                          will appear here as coaches add training and matches.
+                        </div>
+                      )}
+
+                      {/* ─── Upcoming training ─────────────────────────────────────── */}
+                      {upcomingTraining.length > 0 && (
+                        <>
+                          <div style={{
+                            fontSize: 10, fontWeight: 700, letterSpacing: 1,
+                            textTransform: "uppercase", color: G.muted, marginBottom: 6
+                          }}>
+                            🎯 Upcoming training · tap to claim
+                          </div>
+                          <div style={{
+                            display: "flex", flexDirection: "column",
+                            gap: 4, marginBottom: 14
+                          }}>
+                            {upcomingTraining.map(s => {
+                              const slots = getSlotCount(s, parentDutyConfig);
+                              const filled = getSupportParents(s);
+                              const myEntry = filled.find(sp => sp.memberId === me.id);
+                              const isFull = filled.length >= slots;
+                              const otherNames = filled
+                                .filter(sp => sp.memberId !== me.id)
+                                .map(sp => sp.memberName.split(" ")[0])
+                                .join(", ");
+
+                              const bg = myEntry ? "#378ADD"
+                                       : isFull   ? "#E1F5EE"
+                                       : "#FFFFFF";
+                              const border = myEntry ? "#378ADD"
+                                           : isFull   ? "#9FE1CB"
+                                           : G.border;
+                              const textColor = myEntry ? "#FFFFFF"
+                                              : isFull   ? "#085041"
+                                              : G.text;
+                              const sublineColor = myEntry ? "rgba(255,255,255,.85)"
+                                                 : isFull   ? "#0F6E56"
+                                                 : G.muted;
+
+                              const dateLabel = new Date(s.date).toLocaleDateString("en-GB", {
+                                weekday: "short", day: "numeric", month: "short"
+                              });
+
+                              return (
+                                <div key={s.id} style={{
+                                  display: "flex", alignItems: "center", gap: 10,
+                                  background: bg, border: `1px solid ${border}`,
+                                  borderRadius: 8, padding: "8px 10px",
+                                }}>
+                                  <div style={{ fontSize: 16, flexShrink: 0 }}>🎯</div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: textColor }}>
+                                      {dateLabel}
+                                      {s.from ? ` · ${s.from}` : ""}
+                                      {s.label ? ` · ${s.label}` : ""}
+                                    </div>
+                                    <div style={{ fontSize: 10, color: sublineColor }}>
+                                      {myEntry
+                                        ? "You're on duty"
+                                        : isFull
+                                          ? `Covered by ${otherNames}`
+                                          : `${filled.length}/${slots} filled${otherNames ? ` · ${otherNames}` : ""}`
+                                      }
+                                    </div>
+                                  </div>
+                                  {myEntry ? (
+                                    <button
+                                      onClick={() => unclaimSession(s)}
+                                      style={{
+                                        fontSize: 10, fontWeight: 800,
+                                        background: "rgba(255,255,255,.25)",
+                                        color: "#fff", border: "none",
+                                        padding: "4px 10px", borderRadius: 10,
+                                        cursor: "pointer", fontFamily: "inherit"
+                                      }}>
+                                      Unclaim
+                                    </button>
+                                  ) : !isFull ? (
+                                    <button
+                                      onClick={() => claimSession(s, "support")}
+                                      style={{
+                                        fontSize: 10, fontWeight: 800,
+                                        color: "#0C447C", background: "#E6F1FB",
+                                        border: "0.5px solid #B5D4F4",
+                                        padding: "4px 10px", borderRadius: 10,
+                                        cursor: "pointer", fontFamily: "inherit"
+                                      }}>
+                                      Claim →
+                                    </button>
+                                  ) : null}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+
+                      {/* ─── Upcoming match days ───────────────────────────────────── */}
+                      {upcomingMatches.length > 0 && (
+                        <>
+                          <div style={{
+                            fontSize: 10, fontWeight: 700, letterSpacing: 1,
+                            textTransform: "uppercase", color: G.muted, marginBottom: 6
+                          }}>
+                            🏏 Match days · pick a role
+                          </div>
+                          <div style={{
+                            display: "flex", flexDirection: "column",
+                            gap: 8, marginBottom: 14
+                          }}>
+                            {upcomingMatches.map(s => {
+                              const slots = getSlotCount(s, parentDutyConfig);
+                              const filled = getSupportParents(s);
+                              const myEntry = filled.find(sp => sp.memberId === me.id);
+                              const isFull = filled.length >= slots;
+                              const otherEntries = filled.filter(sp => sp.memberId !== me.id);
+                              const matchRoles = getMatchRoles(s.restrictedTo, parentDutyConfig);
+
+                              const dateLabel = new Date(s.date).toLocaleDateString("en-GB", {
+                                weekday: "short", day: "numeric", month: "short"
+                              });
+                              const opp = s.matchOpponent ? ` v ${s.matchOpponent}` : "";
+                              const subTeam = s.restrictedTo !== team ? ` (${s.restrictedTo})` : "";
+
+                              return (
+                                <div key={s.id} style={{
+                                  background: myEntry ? "#EFF6FF" : "#FFFFFF",
+                                  border: `1px solid ${myEntry ? "#B5D4F4" : G.border}`,
+                                  borderLeft: `4px solid ${myEntry ? "#378ADD" : isFull ? "#5DCAA5" : "#D3D1C7"}`,
+                                  borderRadius: 8,
+                                  padding: "10px 12px",
+                                }}>
+                                  {/* Match header */}
+                                  <div style={{
+                                    display: "flex", alignItems: "baseline",
+                                    justifyContent: "space-between", gap: 8,
+                                    marginBottom: 8, flexWrap: "wrap"
+                                  }}>
+                                    <div>
+                                      <div style={{ fontSize: 13, fontWeight: 800, color: G.text }}>
+                                        🏏 {dateLabel}{opp}
+                                        <span style={{ fontSize: 11, color: G.muted, fontWeight: 600 }}>{subTeam}</span>
+                                      </div>
+                                      {(s.from || s.matchTime) && (
+                                        <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>
+                                          {s.from || s.matchTime}
+                                          {s.venue ? ` · ${s.venue}` : ""}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <span style={{
+                                      fontSize: 10, fontWeight: 800,
+                                      background: isFull ? "#E1F5EE" : "#FAEEDA",
+                                      color: isFull ? "#085041" : "#854F0B",
+                                      padding: "2px 8px", borderRadius: 10
+                                    }}>
+                                      {filled.length}/{slots} covered
+                                    </span>
+                                  </div>
+
+                                  {/* Other parents already on it */}
+                                  {otherEntries.length > 0 && (
+                                    <div style={{
+                                      fontSize: 11, color: "#0F6E56",
+                                      marginBottom: myEntry || !isFull ? 8 : 0,
+                                      lineHeight: 1.5
+                                    }}>
+                                      {otherEntries.map((sp, i) => (
+                                        <span key={i}>
+                                          {i > 0 ? " · " : ""}
+                                          <strong>{sp.memberName.split(" ")[0]}</strong>
+                                          {sp.role && sp.role !== "support"
+                                            ? ` (${sp.roleLabel || resolveRoleShort(sp.role, s.restrictedTo, parentDutyConfig)})`
+                                            : ""}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {/* My role if claimed */}
+                                  {myEntry ? (
+                                    <div style={{
+                                      display: "flex", alignItems: "center",
+                                      justifyContent: "space-between", gap: 8,
+                                      background: "#378ADD", color: "#fff",
+                                      borderRadius: 6, padding: "6px 10px"
+                                    }}>
+                                      <span style={{ fontSize: 12, fontWeight: 700 }}>
+                                        {resolveRoleIcon(myEntry.role)} You: {myEntry.roleLabel || resolveRoleShort(myEntry.role, s.restrictedTo, parentDutyConfig)}
+                                      </span>
+                                      <button
+                                        onClick={() => unclaimSession(s)}
+                                        style={{
+                                          fontSize: 10, fontWeight: 800,
+                                          background: "rgba(255,255,255,.25)",
+                                          color: "#fff", border: "none",
+                                          padding: "4px 10px", borderRadius: 10,
+                                          cursor: "pointer", fontFamily: "inherit"
+                                        }}>
+                                        Unclaim
+                                      </button>
+                                    </div>
+                                  ) : !isFull ? (
+                                    // Role chips for picking
+                                    <div>
+                                      <div style={{
+                                        fontSize: 10, color: G.muted,
+                                        fontWeight: 600, marginBottom: 4
+                                      }}>
+                                        I'll volunteer as:
+                                      </div>
+                                      <div style={{
+                                        display: "flex", flexWrap: "wrap", gap: 4
+                                      }}>
+                                        {matchRoles.map(r => (
+                                          <button
+                                            key={r.id}
+                                            onClick={() => claimSession(s, r.id)}
+                                            style={{
+                                              fontSize: 11, fontWeight: 700,
+                                              background: "#378ADD", color: "#fff",
+                                              border: "none", borderRadius: 8,
+                                              padding: "5px 10px",
+                                              cursor: "pointer", fontFamily: "inherit",
+                                              display: "inline-flex",
+                                              alignItems: "center", gap: 4,
+                                            }}>
+                                            {resolveRoleIcon(r.id)} {r.short}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div style={{
+                                      fontSize: 11, color: "#085041", fontStyle: "italic"
+                                    }}>
+                                      All volunteer slots covered — thanks team
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+
+                      {/* ─── All Parents leaderboard ───────────────────────────────── */}
+                      {totalParents > 1 && (
+                        <div>
+                          <div style={{
+                            fontSize: 10, fontWeight: 700, letterSpacing: 1,
+                            textTransform: "uppercase", color: G.muted, marginBottom: 6
+                          }}>
+                            All parents · this season
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                            {leaderboard.map(p => {
+                              const isMe = p.id === me.id;
+                              const isZero = p.count === 0;
+                              const minHit = p.count >= cfg.minDuties;
+                              return (
+                                <div key={p.id} style={{
+                                  display: "flex", alignItems: "center", gap: 8,
+                                  padding: "6px 8px", borderRadius: 6,
+                                  background: isMe ? "#E6F1FB" : isZero ? "#FCEBEB" : "transparent",
+                                  fontSize: 12
+                                }}>
+                                  <span style={{
+                                    flex: 1,
+                                    color: isMe ? "#0C447C" : isZero ? "#791F1F" : G.text,
+                                    fontWeight: isMe ? 800 : 500,
+                                    display: "inline-flex", alignItems: "center",
+                                    gap: 6, flexWrap: "wrap"
+                                  }}>
+                                    {isMe ? "You" : p.name}
+                                    {p.isOrphan && !p.hasNamedParent && (
+                                      <span style={{
+                                        fontSize: 9, fontWeight: 700,
+                                        background: "#FAEEDA", color: "#854F0B",
+                                        padding: "1px 6px", borderRadius: 8,
+                                      }}>
+                                        not in app
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span style={{
+                                    fontSize: 11, fontWeight: 700,
+                                    color: isMe ? "#0C447C" : isZero ? "#791F1F" : minHit ? "#0F6E56" : G.muted
+                                  }}>
+                                    {p.count}{minHit ? " ✓" : isZero ? " ⚠" : ""}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             );
           })()}
