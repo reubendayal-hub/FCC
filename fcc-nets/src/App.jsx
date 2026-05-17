@@ -405,6 +405,7 @@ export default function App() {
   const [newGenCode,   setNewGenCode]   = useState(false); // generate invite code after adding
   const [aSearch,  setASearch]  = useState("");
   const [aFilter,  setAFilter]  = useState("All");
+  const [aSubTab,  setASubTab]  = useState("all"); // "all" | "players" | "parents" | "attention"
   const [adminListMode, setAdminListMode] = useState("flat"); // "teams" | "flat" — flat by default
   const [selMember, setSelMember] = useState(null); // member selected in flat view
   const [expandedSessions, setExpandedSessions] = useState({});
@@ -1193,7 +1194,19 @@ export default function App() {
     const t=aFilter==="All"
       ||(aFilter==="Unassigned" && (m.teams||[]).length===0)
       ||(m.teams||[]).includes(aFilter);
-    return q&&t;
+
+    // Sub-tab filter (parent/player/orphan triage)
+    const isParent = m.memberType === "parent" || (m.children || []).length > 0;
+    const isOrphanChild = (m.teams || []).some(team =>
+      team.startsWith("U") || team.includes("Girls")
+    ) && !m.parentId && m.memberType !== "parent";
+    const sub =
+         aSubTab === "all"
+      || (aSubTab === "players"   && !isParent)
+      || (aSubTab === "parents"   && isParent)
+      || (aSubTab === "attention" && isOrphanChild);
+
+    return q&&t&&sub;
   });
   const adminGrouped = ALL_TEAMS.reduce((acc,t)=>{
     if(aFilter!=="All"&&aFilter!==t) return acc;
@@ -1254,6 +1267,7 @@ export default function App() {
     newLinkParent, setNewLinkParent,
     newGenCode, setNewGenCode,
     aSearch, setASearch, aFilter, setAFilter,
+    aSubTab, setASubTab,
     adminListMode, setAdminListMode,
     selMember, setSelMember,
     expandedSessions, setExpandedSessions,
