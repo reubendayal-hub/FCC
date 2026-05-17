@@ -114,7 +114,10 @@ function LinkParentModal({ childMember, members, G, showToast, onClose, onLink, 
   const [search, setSearch] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newPhone, setNewPhone] = useState("");
+  // Phone + email pre-fill from the child's record — for orphan children, the
+  // contact captured during the join-request flow is almost always the parent's.
+  const [newPhone, setNewPhone] = useState(childMember.phone || "");
+  const [newEmail, setNewEmail] = useState(childMember.email || "");
 
   // Defensive: if the child somehow already has a parent when the modal opens,
   // bail. The button shouldn't render in that case but race conditions happen.
@@ -146,7 +149,8 @@ function LinkParentModal({ childMember, members, G, showToast, onClose, onLink, 
       id: uid(),
       name: trimmed,
       phone: newPhone.trim() || null,
-      email: null,
+      email: newEmail.trim() || null,
+      emailVerified: false,
       teams: [],
       memberType: "parent",
       role: "member",
@@ -303,12 +307,20 @@ function LinkParentModal({ childMember, members, G, showToast, onClose, onLink, 
               onChange={e => setNewPhone(e.target.value)}
               style={{...inputStyle, background: G.white}}
             />
+            <input
+              type="email"
+              placeholder="Email (optional, for account verification)"
+              value={newEmail}
+              onChange={e => setNewEmail(e.target.value)}
+              style={{...inputStyle, background: G.white}}
+            />
             <div style={{display: "flex", gap: 8}}>
               <button type="button"
                 onClick={() => {
                   setShowCreateForm(false);
                   setNewName("");
                   setNewPhone("");
+                  setNewEmail("");
                 }}
                 style={{
                   flex: 1, minHeight: 44, padding: "10px",
@@ -344,6 +356,253 @@ function LinkParentModal({ childMember, members, G, showToast, onClose, onLink, 
         }}>
           Linking creates a relationship between this child and a parent member.
           The parent's account can later set a PIN to log in.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Link Child picker modal ──────────────────────────────────────────────
+// Mirror of LinkParentModal but for the "+ Link Child" button on parent
+// records. Candidate list = unparented juniors. Inline create has a team
+// dropdown + email field (email pre-fills from the parent).
+const JUNIOR_TEAM_MATCH = (team) =>
+  team.startsWith("U") || team.includes("Girls");
+
+function LinkChildModal({ parentMember, members, teams, G, onClose, onLink, onCreateAndLink }) {
+  const juniorTeams = (teams || [])
+    .map(t => t.name)
+    .filter(JUNIOR_TEAM_MATCH);
+
+  const [search, setSearch] = useState("");
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newTeam, setNewTeam] = useState(juniorTeams[0] || "");
+  const [newEmail, setNewEmail] = useState(parentMember.email || "");
+
+  const candidates = members
+    .filter(c =>
+      c.id !== parentMember.id &&
+      !c.parentId &&
+      (c.teams || []).some(JUNIOR_TEAM_MATCH)
+    )
+    .filter(c =>
+      !search.trim() || c.name.toLowerCase().includes(search.toLowerCase().trim())
+    )
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const handleCreateAndLink = () => {
+    if (!newName.trim() || !newTeam) return;
+    const newChild = normMember({
+      id: uid(),
+      name: newName.trim(),
+      email: newEmail.trim() || null,
+      emailVerified: false,
+      teams: [newTeam],
+      memberType: "player", // children stored as players with parentId
+      role: "member",
+      parentId: parentMember.id,
+      parentName: parentMember.name,
+    });
+    onCreateAndLink(newChild);
+  };
+
+  const rowStyle = {
+    display: "flex", alignItems: "center", justifyContent: "space-between",
+    gap: 10, padding: "10px 12px", minHeight: 44,
+    border: `1px solid ${G.border}`, borderRadius: 9,
+    background: G.white, cursor: "pointer",
+    textAlign: "left", fontFamily: "inherit",
+  };
+
+  const inputStyle = {
+    width: "100%", boxSizing: "border-box",
+    borderRadius: 9, border: `1.5px solid ${G.border}`,
+    padding: "11px 13px", fontSize: 15, fontFamily: "'DM Sans',sans-serif",
+    fontWeight: 500, background: G.cream, color: G.text,
+    outline: "none", minHeight: 44,
+  };
+
+  const canCreate = !!newName.trim() && !!newTeam;
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)",
+        zIndex: 200, display: "flex", alignItems: "center",
+        justifyContent: "center", padding: 16,
+      }}>
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: G.white, borderRadius: 16, padding: 20,
+          maxWidth: 460, width: "100%",
+          maxHeight: "calc(100vh - 32px)",
+          display: "flex", flexDirection: "column", gap: 12,
+          boxShadow: "0 8px 40px rgba(0,0,0,0.22)",
+        }}>
+
+        {/* Header */}
+        <div style={{display: "flex", alignItems: "flex-start", gap: 8}}>
+          <div style={{flex: 1, minWidth: 0}}>
+            <div style={{fontWeight: 900, fontSize: 16, color: G.text, lineHeight: 1.3}}>
+              Link a child to {parentMember.name}
+            </div>
+            <div style={{fontSize: 12, color: G.muted, marginTop: 2}}>
+              Find an existing junior member or create a new one
+            </div>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close"
+            style={{
+              background: "transparent", border: "none", cursor: "pointer",
+              color: G.muted, fontSize: 22, lineHeight: 1, padding: "2px 6px",
+              fontFamily: "inherit",
+            }}>×</button>
+        </div>
+
+        {/* Search */}
+        <input
+          autoFocus
+          type="search"
+          placeholder="Search children by name…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={inputStyle}
+        />
+
+        {/* Candidate list */}
+        <div style={{
+          display: "flex", flexDirection: "column", gap: 6,
+          maxHeight: 280, overflowY: "auto",
+          paddingRight: 2,
+        }}>
+          {candidates.length === 0 ? (
+            <div style={{
+              padding: "16px 12px", textAlign: "center",
+              color: G.muted, fontSize: 13, fontStyle: "italic",
+            }}>
+              No matches. Want to add a new child?
+            </div>
+          ) : (
+            candidates.map(c => {
+              const childTeams = (c.teams || []).filter(JUNIOR_TEAM_MATCH);
+              return (
+                <button key={c.id} type="button" onClick={() => onLink(c)} style={rowStyle}>
+                  <span style={{fontWeight: 700, fontSize: 14, color: G.text}}>
+                    {c.name}
+                  </span>
+                  <span style={{display: "flex", gap: 4, flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end"}}>
+                    {childTeams.map(t => <TeamPill key={t} team={t}/>)}
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        {/* OR divider */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10,
+          color: G.muted, fontSize: 11, fontWeight: 700,
+          letterSpacing: 1.5, textTransform: "uppercase",
+        }}>
+          <span style={{flex: 1, height: 1, background: G.border}}/>
+          OR
+          <span style={{flex: 1, height: 1, background: G.border}}/>
+        </div>
+
+        {/* Create-new toggle / form */}
+        {!showCreateForm ? (
+          <button type="button" onClick={() => setShowCreateForm(true)}
+            style={{
+              minHeight: 44, padding: "10px 14px",
+              borderRadius: 10, fontFamily: "inherit",
+              border: "1.5px solid #f59e0b", background: "#fffbeb",
+              color: "#92400e", fontSize: 14, fontWeight: 800,
+              cursor: "pointer",
+            }}>
+            + Create new child
+          </button>
+        ) : (
+          <div style={{
+            border: `1px solid ${G.border}`, borderRadius: 12,
+            padding: 12, background: G.cream,
+            display: "flex", flexDirection: "column", gap: 8,
+          }}>
+            <div style={{
+              fontSize: 11, fontWeight: 800, color: G.muted,
+              letterSpacing: 1.3, textTransform: "uppercase",
+            }}>
+              New child
+            </div>
+            <input
+              autoFocus
+              type="text"
+              placeholder="Name (required)"
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              style={{...inputStyle, background: G.white}}
+            />
+            <select
+              value={newTeam}
+              onChange={e => setNewTeam(e.target.value)}
+              style={{...inputStyle, background: G.white, cursor: "pointer"}}>
+              {juniorTeams.length === 0 && <option value="">(no junior teams configured)</option>}
+              {juniorTeams.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <input
+              type="email"
+              placeholder="Email (optional)"
+              value={newEmail}
+              onChange={e => setNewEmail(e.target.value)}
+              style={{...inputStyle, background: G.white}}
+            />
+            <div style={{fontSize: 11, color: G.muted, lineHeight: 1.5, fontStyle: "italic"}}>
+              Used to verify the child's account at first login. Often the parent's email.
+            </div>
+            <div style={{display: "flex", gap: 8}}>
+              <button type="button"
+                onClick={() => {
+                  setShowCreateForm(false);
+                  setNewName("");
+                  setNewTeam(juniorTeams[0] || "");
+                  setNewEmail(parentMember.email || "");
+                }}
+                style={{
+                  flex: 1, minHeight: 44, padding: "10px",
+                  borderRadius: 10, border: `1.5px solid ${G.border}`,
+                  background: G.white, color: G.text,
+                  fontSize: 14, fontWeight: 700,
+                  cursor: "pointer", fontFamily: "inherit",
+                }}>
+                Cancel
+              </button>
+              <button type="button"
+                onClick={handleCreateAndLink}
+                disabled={!canCreate}
+                style={{
+                  flex: 1, minHeight: 44, padding: "10px",
+                  borderRadius: 10, border: "none",
+                  background: canCreate ? G.green : "#cbd5e1",
+                  color: canCreate ? G.lime : "#64748b",
+                  fontSize: 14, fontWeight: 800,
+                  cursor: canCreate ? "pointer" : "not-allowed",
+                  fontFamily: "inherit",
+                }}>
+                Create &amp; link
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Footer reassurance */}
+        <div style={{
+          fontSize: 11, color: G.muted, lineHeight: 1.5,
+          paddingTop: 4,
+        }}>
+          Linking creates a relationship between this parent and child.
+          The child's account can use the email above to verify at first login.
         </div>
       </div>
     </div>
@@ -404,6 +663,31 @@ export default function AdminView() {
   const [newCustomRole, setNewCustomRole] = useState("");
   // { childMember } when open, null when closed
   const [linkParentModal, setLinkParentModal] = useState(null);
+  // { parentMember } when open, null when closed
+  const [linkChildModal, setLinkChildModal] = useState(null);
+
+  // Jump to a member's expanded card. Used by the linked-name pills on
+  // parent/child cards so admin can hop between related profiles.
+  // If the target isn't visible under the current sub-tab/search/team filter,
+  // we reset those filters first so the card actually renders.
+  const jumpToMember = (targetId) => {
+    if (!targetId) return;
+    const target = members.find(x => x.id === targetId);
+    if (!target) return;
+    const currentlyVisible = adminVisible.some(x => x.id === targetId);
+    if (!currentlyVisible) {
+      setASubTab("all");
+      setASearch("");
+      setAFilter("All");
+    }
+    // Flip to flat view so the card structure with the badge row is in scope.
+    if (adminListMode !== "flat") setAdminListMode("flat");
+    setSelMember(target);
+    setTimeout(() => {
+      const el = document.querySelector(`[data-member-id="${targetId}"]`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
+  };
 
   const iSt = (extra={}) => ({
     width:"100%", borderRadius:9, border:`1.5px solid ${G.border}`,
@@ -3003,6 +3287,14 @@ export default function AdminView() {
               `[parents-tab] memberType-undefined members with children: ${undefinedTypeParents.length}`,
               undefinedTypeParents.map(m => m.name)
             );
+            // Junior teams available for the LinkChildModal team dropdown.
+            const juniorTeamNames = (teams || [])
+              .map(t => t.name)
+              .filter(n => n.startsWith("U") || n.includes("Girls"));
+            console.log(
+              `[link-child] junior teams available (${juniorTeamNames.length}):`,
+              juniorTeamNames
+            );
             window.__parentsTabDiagLogged = true;
           }
 
@@ -3134,7 +3426,7 @@ export default function AdminView() {
                 const teamChips=(m.teams||[]).slice(0,3);
                 const isExpanded = selMember?.id===m.id;
                 return (
-                  <div key={m.id}>
+                  <div key={m.id} data-member-id={m.id}>
                     {aSubTab === "attention" && (
                       <div style={{
                         background:"#fef2f2",borderBottom:"1px solid #fecaca",
@@ -3340,8 +3632,42 @@ export default function AdminView() {
                                 padding:"4px 10px",borderRadius:6,fontSize:11,fontWeight:700,
                               }}>
                                 {m.memberType === "parent" ? "👨‍👧 Parent" : "🏏 Player"}
-                                {(m.children||[]).length > 0 && ` (${(m.children||[]).length} linked)`}
                               </span>
+
+                              {/* Linked children pill — names + first team for fast hop */}
+                              {(() => {
+                                const linkedChildren = (m.children || [])
+                                  .map(cid => members.find(x => x.id === cid))
+                                  .filter(Boolean);
+                                if (linkedChildren.length === 0) return null;
+                                const first = linkedChildren[0];
+                                const firstTeam = (first.teams || [])[0] || "";
+                                const label = linkedChildren.length === 1
+                                  ? `${first.name}${firstTeam ? ` · ${firstTeam}` : ""}`
+                                  : linkedChildren.length === 2
+                                    ? `${first.name.split(" ")[0]} · ${linkedChildren[1].name.split(" ")[0]}`
+                                    : `${first.name.split(" ")[0]} +${linkedChildren.length - 1} more`;
+                                return (
+                                  <button type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (first.id === m.id) return; // defensive: no self-jump
+                                      jumpToMember(first.id);
+                                    }}
+                                    title={linkedChildren.map(c => c.name).join(", ")}
+                                    style={{
+                                      background: "#dbeafe", color: "#1e40af",
+                                      padding: "4px 10px", borderRadius: 6,
+                                      fontSize: 11, fontWeight: 700,
+                                      border: "1px solid #93c5fd",
+                                      cursor: "pointer", fontFamily: "inherit",
+                                      display: "inline-flex", alignItems: "center", gap: 4,
+                                      maxWidth: "100%",
+                                    }}>
+                                    👨‍👧 {label}
+                                  </button>
+                                );
+                              })()}
 
                               {/* PIN status pill — admin can see at a glance who's set up */}
                               <span style={{
@@ -3351,6 +3677,54 @@ export default function AdminView() {
                               }}>
                                 {pins[m.id] ? "🔑 PIN set" : "⏳ No PIN yet"}
                               </span>
+
+                              {/* Junior + Linked/NoParent pills — surface link health */}
+                              {(() => {
+                                const isJunior = (m.teams || []).some(t =>
+                                  t.startsWith("U") || t.includes("Girls")
+                                );
+                                if (!isJunior) return null;
+                                const linked = !!m.parentId;
+                                const parent = linked
+                                  ? members.find(x => x.id === m.parentId)
+                                  : null;
+                                return (
+                                  <>
+                                    <span style={{
+                                      background: "#ffedd5", color: "#c2410c",
+                                      padding:"4px 10px",borderRadius:6,fontSize:11,fontWeight:700,
+                                    }}>
+                                      🧒 Junior
+                                    </span>
+                                    {linked && parent ? (
+                                      <button type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (parent.id === m.id) return;
+                                          jumpToMember(parent.id);
+                                        }}
+                                        title={`Linked to ${parent.name}`}
+                                        style={{
+                                          background: "#dcfce7", color: "#166534",
+                                          padding: "4px 10px", borderRadius: 6,
+                                          fontSize: 11, fontWeight: 700,
+                                          border: "1px solid #86efac",
+                                          cursor: "pointer", fontFamily: "inherit",
+                                        }}>
+                                        🔗 {parent.name}
+                                      </button>
+                                    ) : (
+                                      <span style={{
+                                        background: linked ? "#dcfce7" : "#fef3c7",
+                                        color: linked ? "#166534" : "#92400e",
+                                        padding:"4px 10px",borderRadius:6,fontSize:11,fontWeight:700,
+                                      }}>
+                                        {linked ? "🔗 Linked" : "⚠ No parent"}
+                                      </span>
+                                    )}
+                                  </>
+                                );
+                              })()}
 
                               {/* Duty count pill — only on Parents tab */}
                               {aSubTab === "parents" && (() => {
@@ -3384,44 +3758,7 @@ export default function AdminView() {
                               {/* Link Child button - for adults (not in junior teams) */}
                               {!(m.teams||[]).some(t => t.startsWith("U") || t.includes("Girls") || t.includes("Kvinder")) && (
                                 <button
-                                  onClick={() => {
-                                    // Find unlinked junior players
-                                    const unlinkedJuniors = members.filter(c => 
-                                      c.id !== m.id &&
-                                      !c.parentId &&
-                                      (c.teams||[]).some(t => t.startsWith("U") || t.includes("Girls") || t.includes("Kvinder"))
-                                    );
-                                    const childName = prompt(
-                                      `Link a child to ${m.name}'s account.\n\nAvailable children:\n${unlinkedJuniors.slice(0,10).map(c=>c.name).join("\n")}${unlinkedJuniors.length>10?`\n...and ${unlinkedJuniors.length-10} more`:""}\n\nEnter child's name:`
-                                    );
-                                    if (!childName?.trim()) return;
-                                    const child = members.find(c => 
-                                      c.name.toLowerCase() === childName.trim().toLowerCase() &&
-                                      (c.teams||[]).some(t => t.startsWith("U") || t.includes("Girls") || t.includes("Kvinder"))
-                                    );
-                                    if (!child) {
-                                      showToast("Child not found in junior teams");
-                                      return;
-                                    }
-                                    if (child.parentId) {
-                                      showToast(`${child.name} is already linked to another parent`);
-                                      return;
-                                    }
-                                    // Link them
-                                    const updated = members.map(x => {
-                                      if (x.id === m.id) {
-                                        return { ...x, children: [...(x.children||[]), child.id], memberType: "parent" };
-                                      }
-                                      if (x.id === child.id) {
-                                        return { ...x, parentId: m.id, parentName: m.name };
-                                      }
-                                      return x;
-                                    });
-                                    saveMembers(updated);
-                                    setSelMember({...m, children: [...(m.children||[]), child.id], memberType: "parent"});
-                                    logAction("member", `Linked child ${child.name} to parent ${m.name}`);
-                                    showToast(`${child.name} linked to ${m.name} ✓`);
-                                  }}
+                                  onClick={() => setLinkChildModal({ parentMember: m })}
                                   style={{
                                     border:"1px solid #3b82f6",borderRadius:6,padding:"4px 8px",
                                     fontSize:10,fontWeight:700,fontFamily:"inherit",
@@ -3808,6 +4145,66 @@ export default function AdminView() {
             logAction("member", `Created parent ${newParent.name} and linked child ${child.name}`);
             showToast(`${child.name} linked to new parent ${newParent.name} ✓`);
             setLinkParentModal(null);
+          }}
+        />
+      )}
+
+      {/* ── Link Child picker modal ─────────────────────── */}
+      {linkChildModal && (
+        <LinkChildModal
+          parentMember={linkChildModal.parentMember}
+          members={members}
+          teams={teams}
+          G={G}
+          onClose={() => setLinkChildModal(null)}
+          onLink={(child) => {
+            const parent = linkChildModal.parentMember;
+            const updated = members.map(x => {
+              if (x.id === parent.id) {
+                return { ...x, children: [...(x.children || []), child.id], memberType: "parent" };
+              }
+              if (x.id === child.id) {
+                return { ...x, parentId: parent.id, parentName: parent.name };
+              }
+              return x;
+            });
+            saveMembers(updated);
+            if (selMember && selMember.id === parent.id) {
+              setSelMember({
+                ...parent,
+                children: [...(parent.children || []), child.id],
+                memberType: "parent",
+              });
+            }
+            logAction("member", `Linked child ${child.name} to parent ${parent.name}`);
+            showToast(`${child.name} linked to ${parent.name} ✓`);
+            setLinkChildModal(null);
+          }}
+          onCreateAndLink={(newChild) => {
+            const parent = linkChildModal.parentMember;
+            const updated = [
+              ...members.map(x =>
+                x.id === parent.id
+                  ? {
+                      ...x,
+                      children: [...(x.children || []), newChild.id],
+                      memberType: "parent",
+                    }
+                  : x
+              ),
+              newChild,
+            ];
+            saveMembers(updated);
+            if (selMember && selMember.id === parent.id) {
+              setSelMember({
+                ...parent,
+                children: [...(parent.children || []), newChild.id],
+                memberType: "parent",
+              });
+            }
+            logAction("member", `Created child ${newChild.name} and linked to parent ${parent.name}`);
+            showToast(`${newChild.name} created and linked ✓`);
+            setLinkChildModal(null);
           }}
         />
       )}
