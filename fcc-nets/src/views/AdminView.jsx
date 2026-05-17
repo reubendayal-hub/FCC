@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAppContext } from "../context/AppContext";
 import Shell from "../ui/Shell";
 import BotNav from "../ui/BotNav";
@@ -105,6 +105,251 @@ function Stepper({ value, min = 0, max = 99, onChange }) {
   );
 }
 
+// ─── Link Parent picker modal ─────────────────────────────────────────────
+// Replaces the old window.prompt() that listed names statically and required
+// typing. Tap to link; inline "+ Create new parent" creates the member and
+// links the child in one step. Kept in this file for v1 — extract to
+// src/components if reused.
+function LinkParentModal({ childMember, members, G, showToast, onClose, onLink, onCreateAndLink }) {
+  const [search, setSearch] = useState("");
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+
+  // Defensive: if the child somehow already has a parent when the modal opens,
+  // bail. The button shouldn't render in that case but race conditions happen.
+  useEffect(() => {
+    if (childMember?.parentId) {
+      showToast?.("Already linked.");
+      onClose();
+    }
+  }, [childMember, showToast, onClose]);
+
+  const candidates = members
+    .filter(p =>
+      p.id !== childMember.id &&
+      !(p.teams || []).some(t =>
+        t.startsWith("U") || t.includes("Girls") || t.includes("Kvinder")
+      )
+    )
+    .filter(p =>
+      !search.trim() || p.name.toLowerCase().includes(search.toLowerCase().trim())
+    )
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const childTeam = (childMember.teams || [])[0] || null;
+
+  const handleCreateAndLink = () => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    const newParent = normMember({
+      id: uid(),
+      name: trimmed,
+      phone: newPhone.trim() || null,
+      email: null,
+      teams: [],
+      memberType: "parent",
+      role: "member",
+      children: [childMember.id],
+    });
+    onCreateAndLink(newParent);
+  };
+
+  const rowStyle = {
+    display: "flex", alignItems: "center", justifyContent: "space-between",
+    gap: 10, padding: "10px 12px", minHeight: 44,
+    border: `1px solid ${G.border}`, borderRadius: 9,
+    background: G.white, cursor: "pointer",
+    textAlign: "left", fontFamily: "inherit",
+  };
+
+  const inputStyle = {
+    width: "100%", boxSizing: "border-box",
+    borderRadius: 9, border: `1.5px solid ${G.border}`,
+    padding: "11px 13px", fontSize: 15, fontFamily: "'DM Sans',sans-serif",
+    fontWeight: 500, background: G.cream, color: G.text,
+    outline: "none", minHeight: 44,
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)",
+        zIndex: 200, display: "flex", alignItems: "center",
+        justifyContent: "center", padding: 16,
+      }}>
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: G.white, borderRadius: 16, padding: 20,
+          maxWidth: 460, width: "100%",
+          maxHeight: "calc(100vh - 32px)",
+          display: "flex", flexDirection: "column", gap: 12,
+          boxShadow: "0 8px 40px rgba(0,0,0,0.22)",
+        }}>
+
+        {/* Header */}
+        <div style={{display: "flex", alignItems: "flex-start", gap: 8}}>
+          <div style={{flex: 1, minWidth: 0}}>
+            <div style={{fontWeight: 900, fontSize: 16, color: G.text, lineHeight: 1.3}}>
+              Link {childMember.name} to a parent
+            </div>
+            {childTeam && (
+              <div style={{fontSize: 12, color: G.muted, marginTop: 2}}>
+                {childTeam}
+              </div>
+            )}
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close"
+            style={{
+              background: "transparent", border: "none", cursor: "pointer",
+              color: G.muted, fontSize: 22, lineHeight: 1, padding: "2px 6px",
+              fontFamily: "inherit",
+            }}>×</button>
+        </div>
+
+        {/* Search */}
+        <input
+          autoFocus
+          type="search"
+          placeholder="Search parents by name…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={inputStyle}
+        />
+
+        {/* Candidate list */}
+        <div style={{
+          display: "flex", flexDirection: "column", gap: 6,
+          maxHeight: 280, overflowY: "auto",
+          paddingRight: 2,
+        }}>
+          {candidates.length === 0 ? (
+            <div style={{
+              padding: "16px 12px", textAlign: "center",
+              color: G.muted, fontSize: 13, fontStyle: "italic",
+            }}>
+              No matches. Want to add a new parent?
+            </div>
+          ) : (
+            candidates.map(p => {
+              const isParent = p.memberType === "parent" || (p.children || []).length > 0;
+              return (
+                <button key={p.id} type="button" onClick={() => onLink(p)} style={rowStyle}>
+                  <span style={{fontWeight: 700, fontSize: 14, color: G.text}}>
+                    {p.name}
+                  </span>
+                  <span style={{
+                    background: isParent ? "#dbeafe" : "#dcfce7",
+                    color: isParent ? "#1e40af" : "#166534",
+                    padding: "3px 8px", borderRadius: 6,
+                    fontSize: 10, fontWeight: 700, flexShrink: 0,
+                  }}>
+                    {isParent ? "👨‍👧 Parent" : "🏏 Player"}
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        {/* OR divider */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10,
+          color: G.muted, fontSize: 11, fontWeight: 700,
+          letterSpacing: 1.5, textTransform: "uppercase",
+        }}>
+          <span style={{flex: 1, height: 1, background: G.border}}/>
+          OR
+          <span style={{flex: 1, height: 1, background: G.border}}/>
+        </div>
+
+        {/* Create-new toggle / form */}
+        {!showCreateForm ? (
+          <button type="button" onClick={() => setShowCreateForm(true)}
+            style={{
+              minHeight: 44, padding: "10px 14px",
+              borderRadius: 10, fontFamily: "inherit",
+              border: "1.5px solid #f59e0b", background: "#fffbeb",
+              color: "#92400e", fontSize: 14, fontWeight: 800,
+              cursor: "pointer",
+            }}>
+            + Create new parent
+          </button>
+        ) : (
+          <div style={{
+            border: `1px solid ${G.border}`, borderRadius: 12,
+            padding: 12, background: G.cream,
+            display: "flex", flexDirection: "column", gap: 8,
+          }}>
+            <div style={{
+              fontSize: 11, fontWeight: 800, color: G.muted,
+              letterSpacing: 1.3, textTransform: "uppercase",
+            }}>
+              New parent
+            </div>
+            <input
+              type="text"
+              placeholder="Name (required)"
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              style={{...inputStyle, background: G.white}}
+            />
+            <input
+              type="tel"
+              placeholder="Phone (optional)"
+              value={newPhone}
+              onChange={e => setNewPhone(e.target.value)}
+              style={{...inputStyle, background: G.white}}
+            />
+            <div style={{display: "flex", gap: 8}}>
+              <button type="button"
+                onClick={() => {
+                  setShowCreateForm(false);
+                  setNewName("");
+                  setNewPhone("");
+                }}
+                style={{
+                  flex: 1, minHeight: 44, padding: "10px",
+                  borderRadius: 10, border: `1.5px solid ${G.border}`,
+                  background: G.white, color: G.text,
+                  fontSize: 14, fontWeight: 700,
+                  cursor: "pointer", fontFamily: "inherit",
+                }}>
+                Cancel
+              </button>
+              <button type="button"
+                onClick={handleCreateAndLink}
+                disabled={!newName.trim()}
+                style={{
+                  flex: 1, minHeight: 44, padding: "10px",
+                  borderRadius: 10, border: "none",
+                  background: newName.trim() ? G.green : "#cbd5e1",
+                  color: newName.trim() ? G.lime : "#64748b",
+                  fontSize: 14, fontWeight: 800,
+                  cursor: newName.trim() ? "pointer" : "not-allowed",
+                  fontFamily: "inherit",
+                }}>
+                Create &amp; link
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Footer reassurance */}
+        <div style={{
+          fontSize: 11, color: G.muted, lineHeight: 1.5,
+          paddingTop: 4,
+        }}>
+          Linking creates a relationship between this child and a parent member.
+          The parent's account can later set a PIN to log in.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminView() {
   const {
     G, view, setView, userRole, currentUser, teams, members,
@@ -157,6 +402,8 @@ export default function AdminView() {
   const [dutyEditTeam, setDutyEditTeam] = useState(null);
   const [dutyOversightTeam, setDutyOversightTeam] = useState("U11");
   const [newCustomRole, setNewCustomRole] = useState("");
+  // { childMember } when open, null when closed
+  const [linkParentModal, setLinkParentModal] = useState(null);
 
   const iSt = (extra={}) => ({
     width:"100%", borderRadius:9, border:`1.5px solid ${G.border}`,
@@ -3187,38 +3434,7 @@ export default function AdminView() {
                               {/* Link to Parent button - for juniors without parent */}
                               {(m.teams||[]).some(t => t.startsWith("U") || t.includes("Girls") || t.includes("Kvinder")) && !m.parentId && (
                                 <button
-                                  onClick={() => {
-                                    // Find potential parents (adults)
-                                    const potentialParents = members.filter(p => 
-                                      p.id !== m.id &&
-                                      !(p.teams||[]).some(t => t.startsWith("U") || t.includes("Girls") || t.includes("Kvinder"))
-                                    );
-                                    const parentName = prompt(
-                                      `Link ${m.name} to a parent account.\n\nPotential parents:\n${potentialParents.slice(0,10).map(p=>p.name).join("\n")}${potentialParents.length>10?`\n...and ${potentialParents.length-10} more`:""}\n\nEnter parent's name:`
-                                    );
-                                    if (!parentName?.trim()) return;
-                                    const parent = potentialParents.find(p => 
-                                      p.name.toLowerCase() === parentName.trim().toLowerCase()
-                                    );
-                                    if (!parent) {
-                                      showToast("Parent not found");
-                                      return;
-                                    }
-                                    // Link them
-                                    const updated = members.map(x => {
-                                      if (x.id === parent.id) {
-                                        return { ...x, children: [...(x.children||[]), m.id], memberType: "parent" };
-                                      }
-                                      if (x.id === m.id) {
-                                        return { ...x, parentId: parent.id, parentName: parent.name };
-                                      }
-                                      return x;
-                                    });
-                                    saveMembers(updated);
-                                    setSelMember({...m, parentId: parent.id, parentName: parent.name});
-                                    logAction("member", `Linked child ${m.name} to parent ${parent.name}`);
-                                    showToast(`${m.name} linked to ${parent.name} ✓`);
-                                  }}
+                                  onClick={() => setLinkParentModal({ childMember: m })}
                                   style={{
                                     border:"1px solid #f59e0b",borderRadius:6,padding:"4px 8px",
                                     fontSize:10,fontWeight:700,fontFamily:"inherit",
@@ -3547,6 +3763,54 @@ export default function AdminView() {
       </div>
       <BotNav view="admin" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams} G={G}/>
       {toast&&<Toast msg={toast} G={G}/>}
+
+      {/* ── Link Parent picker modal ─────────────────────── */}
+      {linkParentModal && (
+        <LinkParentModal
+          childMember={linkParentModal.childMember}
+          members={members}
+          G={G}
+          showToast={showToast}
+          onClose={() => setLinkParentModal(null)}
+          onLink={(parent) => {
+            const child = linkParentModal.childMember;
+            const updated = members.map(x => {
+              if (x.id === parent.id) {
+                return { ...x, children: [...(x.children || []), child.id], memberType: "parent" };
+              }
+              if (x.id === child.id) {
+                return { ...x, parentId: parent.id, parentName: parent.name };
+              }
+              return x;
+            });
+            saveMembers(updated);
+            if (selMember && selMember.id === child.id) {
+              setSelMember({ ...child, parentId: parent.id, parentName: parent.name });
+            }
+            logAction("member", `Linked child ${child.name} to parent ${parent.name}`);
+            showToast(`${child.name} linked to ${parent.name} ✓`);
+            setLinkParentModal(null);
+          }}
+          onCreateAndLink={(newParent) => {
+            const child = linkParentModal.childMember;
+            const updated = [
+              ...members.map(x =>
+                x.id === child.id
+                  ? { ...x, parentId: newParent.id, parentName: newParent.name }
+                  : x
+              ),
+              newParent,
+            ];
+            saveMembers(updated);
+            if (selMember && selMember.id === child.id) {
+              setSelMember({ ...child, parentId: newParent.id, parentName: newParent.name });
+            }
+            logAction("member", `Created parent ${newParent.name} and linked child ${child.name}`);
+            showToast(`${child.name} linked to new parent ${newParent.name} ✓`);
+            setLinkParentModal(null);
+          }}
+        />
+      )}
 
       {/* ── Invite code modal ────────────────────────────── */}
       {codeModal&&(
