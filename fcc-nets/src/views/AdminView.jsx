@@ -17,12 +17,14 @@ import { getCoachTeams, getMemberRoleChips, maskEmail, isCoachMember } from "../
 import { EMAIL_SEED, normMember, uid } from "../constants/seeds";
 import {
   DEFAULT_DUTY_CONFIG, DEFAULT_TEAM_CONFIG, STANDARD_ROLES,
+  TRAINING_ROLE,
   getEffectiveConfig, isDutyEnabled,
-  getSupportParents, getSlotCount, countDuties, getSeasonYear,
+  getSupportParents, setSupportParents, getSlotCount, countDuties, getSeasonYear,
   slugifyRoleId,
   buildTeamParentList, getTeamCoachNames,
-  sessionBelongsToDutyTeam,
+  sessionBelongsToDutyTeam, isMatchSession,
   resolveDutyTeam, getRollupTeams,
+  getMatchRoles, resolveRoleIcon, resolveRoleShort, resolveRoleLabel,
 } from "../constants/parent-duty";
 import {
   getUnsyncedFixtures,
@@ -609,6 +611,386 @@ function LinkChildModal({ parentMember, members, teams, G, onClose, onLink, onCr
   );
 }
 
+// ─── Assign-duty modal (candidate picker → notification preview) ──────────
+// Two screens in one modal: tap a candidate to write the assignment, then a
+// pre-filled notification template appears with WhatsApp / Email toggle.
+// Eligibility mirrors ProfileView self-signup: parents whose kids are on
+// the session's team or a rollup-mapped team.
+function AssignDutyModal({
+  session, sessionTeam, role, roleLabel,
+  members, sessions, teams, currentUser, parentDutyConfig,
+  G, showToast,
+  onAssign, // (parent) => bool — performs the write, returns success
+  onClose,
+}) {
+  const [screen, setScreen] = useState("candidates"); // "candidates" | "notify"
+  const [search, setSearch] = useState("");
+  const [assignedParent, setAssignedParent] = useState(null);
+
+  // Notification state — preserved across channel toggles
+  const [messageText, setMessageText] = useState("");
+  const [channel, setChannel] = useState("whatsapp");
+
+  const dutyTeam = resolveDutyTeam(sessionTeam);
+  const rollupTeams = getRollupTeams(dutyTeam);
+  const seasonYear = getSeasonYear(session.date);
+
+  // Eligible parents: a parent member whose linked kid is on any rollup team.
+  // We display duty count per parent for the team so admin can pick fairly.
+  const eligible = members
+    .filter(m => {
+      if (m.memberType !== "parent" && (m.children || []).length === 0) return false;
+      const kids = (m.children || [])
+        .map(cid => members.find(x => x.id === cid))
+        .filter(Boolean);
+      return kids.some(k => (k.teams || []).some(t => rollupTeams.includes(t)));
+    })
+    .map(p => {
+      const count = countDuties(p, sessions, rollupTeams, seasonYear);
+      const kidNames = (p.children || [])
+        .map(cid => members.find(x => x.id === cid)?.name)
+        .filter(Boolean);
+      return { ...p, _dutyCount: count, _kidNames: kidNames };
+    })
+    .filter(p => {
+      if (!search.trim()) return true;
+      const q = search.toLowerCase().trim();
+      return p.name.toLowerCase().includes(q)
+        || p._kidNames.some(n => n.toLowerCase().includes(q));
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const cfg = getEffectiveConfig(dutyTeam, parentDutyConfig);
+  const minDuties = cfg?.minDuties || 0;
+
+  const inputStyle = {
+    width: "100%", boxSizing: "border-box",
+    borderRadius: 9, border: `1.5px solid ${G.border}`,
+    padding: "11px 13px", fontSize: 15, fontFamily: "'DM Sans',sans-serif",
+    fontWeight: 500, background: G.cream, color: G.text,
+    outline: "none", minHeight: 44,
+  };
+
+  const rowStyle = {
+    display: "flex", alignItems: "center", justifyContent: "space-between",
+    gap: 10, padding: "10px 12px", minHeight: 48,
+    border: `1px solid ${G.border}`, borderRadius: 9,
+    background: G.white, cursor: "pointer",
+    textAlign: "left", fontFamily: "inherit",
+  };
+
+  const dateLabel = new Date(session.date).toLocaleDateString("en-GB", {
+    weekday: "short", day: "numeric", month: "short"
+  });
+  const timeStr = session.from || session.matchTime || "";
+  const venuePhrase = session.venue ? ` at ${session.venue}` : "";
+  const opponentPhrase = session.isMatch && session.matchOpponent
+    ? ` vs ${session.matchOpponent}` : "";
+  const sessionType = isMatchSession(session) ? "match" : "training";
+  const sessionLabel = session.label || (session.isMatch ? "Match" : "Training");
+
+  // Build message template once per assigned-parent change.
+  // Admin can then edit freely in the textarea; we don't overwrite.
+  const buildTemplate = (parent) => {
+    const adminName = currentUser?.name || "FCC Admin";
+    const firstName = parent.name.split(" ")[0];
+    return (
+      `Hi ${firstName},\n\n` +
+      `You've been assigned to ${roleLabel} duty for ${sessionTeam} ${sessionType}${opponentPhrase} on ${dateLabel} at ${timeStr}${venuePhrase}.\n\n` +
+      `Could you confirm? If you can't make it, please let me know ASAP.\n\n` +
+      `— ${adminName}`
+    );
+  };
+
+  const tapCandidate = (parent) => {
+    const ok = onAssign(parent);
+    if (!ok) return;
+    setAssignedParent(parent);
+    setMessageText(buildTemplate(parent));
+    // Default channel: WhatsApp if phone, else email if email, else copy-only
+    const hasPhone = !!(parent.phone || "").replace(/\D/g, "");
+    const hasEmail = !!parent.email;
+    setChannel(hasPhone ? "whatsapp" : hasEmail ? "email" : "whatsapp");
+    setScreen("notify");
+  };
+
+  const handleSend = () => {
+    if (!assignedParent) return;
+    if (channel === "whatsapp") {
+      const phoneDigits = (assignedParent.phone || "").replace(/\D/g, "");
+      const url = phoneDigits
+        ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(messageText)}`
+        : `https://wa.me/?text=${encodeURIComponent(messageText)}`;
+      window.open(url, "_blank");
+      showToast?.(phoneDigits
+        ? `WhatsApp opened for ${assignedParent.name.split(" ")[0]}`
+        : `WhatsApp opened — pick contact`);
+      onClose();
+    } else if (channel === "email") {
+      if (!assignedParent.email) {
+        showToast?.("No email on file for this parent");
+        return;
+      }
+      const subject = `${roleLabel} duty for ${sessionTeam} on ${dateLabel}`;
+      fetch("/api/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "duty-assigned",
+          data: {
+            to: assignedParent.email,
+            subject,
+            body: messageText,
+            parentName: assignedParent.name,
+          },
+        }),
+      })
+        .then(r => r.ok ? r.json() : r.json().then(e => { throw e; }))
+        .then(() => showToast?.(`Email sent to ${assignedParent.email}`))
+        .catch(err => {
+          console.error("[duty-assigned] email send failed:", err);
+          showToast?.("Email send failed — see console");
+        });
+      onClose();
+    }
+  };
+
+  const handleCopy = () => {
+    if (!messageText) return;
+    navigator.clipboard.writeText(messageText)
+      .then(() => showToast?.("✓ Message copied"))
+      .catch(() => showToast?.("Copy failed — select & copy manually"));
+  };
+
+  const handleSkip = () => {
+    onClose();
+  };
+
+  const hasPhone = !!(assignedParent?.phone || "").replace(/\D/g, "");
+  const hasEmail = !!assignedParent?.email;
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)",
+        zIndex: 200, display: "flex", alignItems: "center",
+        justifyContent: "center", padding: 16,
+      }}>
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: G.white, borderRadius: 16, padding: 20,
+          maxWidth: 480, width: "100%",
+          maxHeight: "calc(100vh - 32px)",
+          display: "flex", flexDirection: "column", gap: 12,
+          boxShadow: "0 8px 40px rgba(0,0,0,0.22)",
+        }}>
+
+        {/* Header — shared across both screens */}
+        <div style={{display: "flex", alignItems: "flex-start", gap: 8}}>
+          <div style={{flex: 1, minWidth: 0}}>
+            <div style={{fontWeight: 900, fontSize: 16, color: G.text, lineHeight: 1.3}}>
+              {screen === "candidates"
+                ? `Assign ${roleLabel} · ${sessionTeam}`
+                : `Notify ${assignedParent?.name}?`}
+            </div>
+            <div style={{fontSize: 12, color: G.muted, marginTop: 2}}>
+              {screen === "candidates"
+                ? `${sessionLabel} · ${dateLabel}${timeStr ? ` · ${timeStr}` : ""}${venuePhrase}`
+                : `${roleLabel} · ${sessionTeam} · ${dateLabel}${timeStr ? ` · ${timeStr}` : ""}`}
+            </div>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close"
+            style={{
+              background: "transparent", border: "none", cursor: "pointer",
+              color: G.muted, fontSize: 22, lineHeight: 1, padding: "2px 6px",
+              fontFamily: "inherit",
+            }}>×</button>
+        </div>
+
+        {/* ─── Screen 1: Candidate picker ─────────────────────── */}
+        {screen === "candidates" && (
+          <>
+            <input
+              autoFocus
+              type="search"
+              placeholder="Search parents or kids by name…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={inputStyle}
+            />
+
+            <div style={{
+              display: "flex", flexDirection: "column", gap: 6,
+              maxHeight: 320, overflowY: "auto",
+              paddingRight: 2,
+            }}>
+              {eligible.length === 0 ? (
+                <div style={{
+                  padding: "16px 12px", textAlign: "center",
+                  color: G.muted, fontSize: 13, fontStyle: "italic",
+                }}>
+                  No eligible parents for {sessionTeam}.
+                </div>
+              ) : (
+                eligible.map(p => {
+                  const c = p._dutyCount;
+                  const m = minDuties;
+                  const badgeBg = c >= m && m > 0 ? "#dcfce7" : c > 0 ? "#fef3c7" : "#fee2e2";
+                  const badgeCol = c >= m && m > 0 ? "#166534" : c > 0 ? "#92400e" : "#991b1b";
+                  const kidsSummary = p._kidNames.length === 0
+                    ? ""
+                    : p._kidNames.length === 1
+                      ? `— ${p._kidNames[0]}`
+                      : `— ${p._kidNames[0].split(" ")[0]} +${p._kidNames.length - 1} more`;
+                  return (
+                    <button key={p.id} type="button" onClick={() => tapCandidate(p)} style={rowStyle}>
+                      <div style={{display: "flex", flexDirection: "column", gap: 2, flex: 1, minWidth: 0}}>
+                        <span style={{fontWeight: 700, fontSize: 14, color: G.text}}>
+                          {p.name}
+                        </span>
+                        {kidsSummary && (
+                          <span style={{fontSize: 11, color: G.muted}}>
+                            {kidsSummary}
+                          </span>
+                        )}
+                      </div>
+                      <span style={{
+                        background: badgeBg, color: badgeCol,
+                        padding: "3px 8px", borderRadius: 6,
+                        fontSize: 10, fontWeight: 700, flexShrink: 0,
+                      }}>
+                        {c}/{m || "—"}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            <div style={{
+              fontSize: 11, color: G.muted, lineHeight: 1.5,
+              paddingTop: 4,
+            }}>
+              Tap a parent to assign this duty. You'll get a chance to notify them
+              before the modal closes.
+            </div>
+          </>
+        )}
+
+        {/* ─── Screen 2: Notification preview ──────────────────── */}
+        {screen === "notify" && assignedParent && (
+          <>
+            <div style={{
+              fontSize: 11, color: "#166534", background: "#dcfce7",
+              borderRadius: 8, padding: "6px 10px", fontWeight: 700,
+            }}>
+              ✓ Assignment saved
+            </div>
+
+            {/* Channel toggle */}
+            <div style={{display: "flex", gap: 6}}>
+              <button type="button"
+                disabled={!hasEmail}
+                onClick={() => setChannel("email")}
+                style={{
+                  flex: 1, minHeight: 44, borderRadius: 10,
+                  border: channel === "email" ? `1.5px solid ${G.green}` : `1px solid ${G.border}`,
+                  background: channel === "email" ? `${G.green}14` : G.white,
+                  color: !hasEmail ? G.muted : channel === "email" ? G.green : G.text,
+                  fontSize: 13, fontWeight: 800,
+                  cursor: hasEmail ? "pointer" : "not-allowed",
+                  fontFamily: "inherit",
+                  opacity: hasEmail ? 1 : 0.55,
+                }}>
+                📧 Email{!hasEmail ? " (none)" : ""}
+              </button>
+              <button type="button"
+                onClick={() => setChannel("whatsapp")}
+                style={{
+                  flex: 1, minHeight: 44, borderRadius: 10,
+                  border: channel === "whatsapp" ? `1.5px solid ${G.green}` : `1px solid ${G.border}`,
+                  background: channel === "whatsapp" ? `${G.green}14` : G.white,
+                  color: channel === "whatsapp" ? G.green : G.text,
+                  fontSize: 13, fontWeight: 800,
+                  cursor: "pointer", fontFamily: "inherit",
+                }}>
+                💬 WhatsApp{!hasPhone ? " (pick contact)" : ""}
+              </button>
+            </div>
+
+            {!hasPhone && !hasEmail && (
+              <div style={{
+                fontSize: 11, color: "#92400e", background: "#fffbeb",
+                border: "1px solid #fde68a", borderRadius: 8,
+                padding: "8px 10px", lineHeight: 1.5,
+              }}>
+                This parent has no email or phone on file. Copy the message and
+                send via your preferred channel.
+              </div>
+            )}
+
+            <textarea
+              value={messageText}
+              onChange={e => setMessageText(e.target.value)}
+              rows={6}
+              style={{
+                ...inputStyle, minHeight: 140,
+                fontFamily: "'DM Sans', sans-serif",
+                lineHeight: 1.5, resize: "vertical",
+              }}
+            />
+
+            <div style={{display: "flex", gap: 8, flexWrap: "wrap"}}>
+              <button type="button" onClick={handleSkip}
+                style={{
+                  flex: 1, minHeight: 44, padding: "10px",
+                  borderRadius: 10, border: `1.5px solid ${G.border}`,
+                  background: G.white, color: G.text,
+                  fontSize: 13, fontWeight: 700,
+                  cursor: "pointer", fontFamily: "inherit",
+                }}>
+                Skip
+              </button>
+              <button type="button" onClick={handleCopy}
+                style={{
+                  flex: 1, minHeight: 44, padding: "10px",
+                  borderRadius: 10, border: `1.5px solid ${G.border}`,
+                  background: G.white, color: G.text,
+                  fontSize: 13, fontWeight: 700,
+                  cursor: "pointer", fontFamily: "inherit",
+                }}>
+                Copy
+              </button>
+              <button type="button"
+                onClick={handleSend}
+                disabled={channel === "email" && !hasEmail}
+                style={{
+                  flex: 1.5, minHeight: 44, padding: "10px",
+                  borderRadius: 10, border: "none",
+                  background: (channel === "email" && !hasEmail) ? "#cbd5e1" : "#f59e0b",
+                  color: (channel === "email" && !hasEmail) ? "#64748b" : "#fff",
+                  fontSize: 13, fontWeight: 800,
+                  cursor: (channel === "email" && !hasEmail) ? "not-allowed" : "pointer",
+                  fontFamily: "inherit",
+                }}>
+                Send
+              </button>
+            </div>
+
+            <div style={{
+              fontSize: 11, color: G.muted, lineHeight: 1.5, paddingTop: 4,
+            }}>
+              Assignment is saved either way. Skip if you'll notify them yourself.
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminView() {
   const {
     G, view, setView, userRole, currentUser, teams, members,
@@ -665,6 +1047,11 @@ export default function AdminView() {
   const [linkParentModal, setLinkParentModal] = useState(null);
   // { parentMember } when open, null when closed
   const [linkChildModal, setLinkChildModal] = useState(null);
+
+  // ASSIGN DUTIES — currently selected team (null = empty state) and modal payload
+  const [assignDutyTeam, setAssignDutyTeam] = useState(null);
+  // { session, sessionTeam, role, roleLabel } when open, null when closed
+  const [assignDutyModal, setAssignDutyModal] = useState(null);
 
   // Jump to a member's expanded card. Used by the linked-name pills on
   // parent/child cards so admin can hop between related profiles.
@@ -2076,6 +2463,285 @@ export default function AdminView() {
                   );
                 })}
               </div>
+            </div>
+          );
+        })()}
+
+        {/* ── Assign Duties (admin write surface) ─────────────── */}
+        {adminSec.dutyoversight && (() => {
+          const enabledTeams = Object.keys({
+            ...DEFAULT_DUTY_CONFIG, ...parentDutyConfig
+          }).filter(t => isDutyEnabled(t, parentDutyConfig));
+          if (enabledTeams.length === 0) return null;
+
+          const today = new Date().toISOString().slice(0, 10);
+          const lookaheadDate = new Date();
+          lookaheadDate.setDate(lookaheadDate.getDate() + 84); // 12 weeks
+          const lookaheadStr = lookaheadDate.toISOString().slice(0, 10);
+
+          const activeTeam = assignDutyTeam;
+
+          let upcomingTraining = [];
+          let upcomingMatches = [];
+          if (activeTeam) {
+            const teamUpcoming = sessions
+              .filter(s => sessionBelongsToDutyTeam(s, activeTeam))
+              .filter(s => s.date >= today && s.date <= lookaheadStr)
+              .filter(s => getSlotCount(s, parentDutyConfig) > 0)
+              .sort((a, b) => a.date.localeCompare(b.date) || (a.from || "").localeCompare(b.from || ""));
+            upcomingTraining = teamUpcoming.filter(s => !isMatchSession(s));
+            upcomingMatches = teamUpcoming.filter(s => isMatchSession(s));
+            // One-shot diagnostic: confirms the calendar isn't empty for the picked team.
+            if (typeof window !== "undefined") {
+              const key = `__assignDutyDiag_${activeTeam}`;
+              if (!window[key]) {
+                console.log(
+                  `[assign-duty] team=${activeTeam} sessions in next 12w: training=${upcomingTraining.length} match=${upcomingMatches.length}`
+                );
+                window[key] = true;
+              }
+            }
+          }
+
+          const renderChip = (s, roleId, label, icon) => {
+            const filled = getSupportParents(s);
+            const claimed = filled.find(sp => sp.role === roleId);
+            if (claimed) {
+              return (
+                <span
+                  key={roleId}
+                  title={`Already assigned to ${claimed.memberName}. They need to unclaim before reassignment.`}
+                  style={{
+                    fontSize: 11, fontWeight: 700,
+                    background: "#E1F5EE", color: "#085041",
+                    border: "1px solid #9FE1CB",
+                    borderRadius: 8, padding: "5px 10px",
+                    display: "inline-flex", alignItems: "center", gap: 4,
+                    cursor: "not-allowed", fontFamily: "inherit",
+                  }}>
+                  {icon} {claimed.memberName.split(" ")[0]}
+                </span>
+              );
+            }
+            return (
+              <button key={roleId} type="button"
+                onClick={() => setAssignDutyModal({
+                  session: s,
+                  sessionTeam: activeTeam,
+                  role: roleId,
+                  roleLabel: label,
+                })}
+                style={{
+                  fontSize: 11, fontWeight: 700,
+                  background: "#FFFFFF", color: G.text,
+                  border: `1px dashed ${G.border}`,
+                  borderRadius: 8, padding: "5px 10px",
+                  cursor: "pointer", fontFamily: "inherit",
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                }}>
+                {icon} + {label}
+              </button>
+            );
+          };
+
+          return (
+            <div style={{
+              background: G.white, borderRadius: 14, border: `1.5px solid ${G.border}`,
+              padding: "16px 18px", marginBottom: 16,
+            }}>
+              <div style={{
+                fontSize: 11, fontWeight: 900, letterSpacing: 1.5,
+                textTransform: "uppercase", color: G.muted, marginBottom: 10,
+              }}>
+                Assign duties
+              </div>
+
+              {/* Team chip picker */}
+              <div style={{display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12}}>
+                {enabledTeams.map(t => {
+                  const active = t === activeTeam;
+                  return (
+                    <button key={t} type="button"
+                      onClick={() => setAssignDutyTeam(active ? null : t)}
+                      style={{
+                        padding: "6px 12px", borderRadius: 99,
+                        fontSize: 12, fontWeight: 700,
+                        cursor: "pointer", fontFamily: "inherit",
+                        border: active ? `1.5px solid ${G.green}` : `1px solid ${G.border}`,
+                        background: active ? `${G.green}14` : G.white,
+                        color: active ? G.green : G.text,
+                      }}>
+                      {t}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Empty state — no team picked */}
+              {!activeTeam && (
+                <div style={{
+                  padding: "16px 14px", textAlign: "center",
+                  color: G.muted, fontSize: 13, fontStyle: "italic",
+                  border: `1px dashed ${G.border}`, borderRadius: 10,
+                }}>
+                  Pick a team above to see the upcoming roster and assign parents.
+                </div>
+              )}
+
+              {/* Calendar */}
+              {activeTeam && upcomingTraining.length === 0 && upcomingMatches.length === 0 && (
+                <div style={{
+                  padding: "16px 14px", textAlign: "center",
+                  color: G.muted, fontSize: 13, fontStyle: "italic",
+                  border: `1px dashed ${G.border}`, borderRadius: 10,
+                }}>
+                  No upcoming sessions for {activeTeam} in the next 12 weeks.
+                </div>
+              )}
+
+              {activeTeam && upcomingTraining.length > 0 && (
+                <>
+                  <div style={{
+                    fontSize: 10, fontWeight: 700, letterSpacing: 1,
+                    textTransform: "uppercase", color: G.muted,
+                    marginBottom: 6, marginTop: 4,
+                  }}>
+                    🎯 Upcoming training
+                  </div>
+                  <div style={{display: "flex", flexDirection: "column", gap: 6, marginBottom: 14}}>
+                    {upcomingTraining.map(s => {
+                      const slots = getSlotCount(s, parentDutyConfig);
+                      const filled = getSupportParents(s);
+                      const dateLabel = new Date(s.date).toLocaleDateString("en-GB", {
+                        weekday: "short", day: "numeric", month: "short"
+                      });
+                      // Training: render one chip per support slot
+                      const chips = [];
+                      for (let i = 0; i < slots; i++) {
+                        const sp = filled[i];
+                        const key = sp ? `claimed-${i}` : `empty-${i}`;
+                        if (sp) {
+                          chips.push(
+                            <span key={key}
+                              title={`Already assigned to ${sp.memberName}. They need to unclaim before reassignment.`}
+                              style={{
+                                fontSize: 11, fontWeight: 700,
+                                background: "#E1F5EE", color: "#085041",
+                                border: "1px solid #9FE1CB",
+                                borderRadius: 8, padding: "5px 10px",
+                                display: "inline-flex", alignItems: "center", gap: 4,
+                                cursor: "not-allowed", fontFamily: "inherit",
+                              }}>
+                              {resolveRoleIcon("support")} {sp.memberName.split(" ")[0]}
+                            </span>
+                          );
+                        } else {
+                          chips.push(
+                            <button key={key} type="button"
+                              onClick={() => setAssignDutyModal({
+                                session: s,
+                                sessionTeam: activeTeam,
+                                role: "support",
+                                roleLabel: TRAINING_ROLE.label,
+                              })}
+                              style={{
+                                fontSize: 11, fontWeight: 700,
+                                background: "#FFFFFF", color: G.text,
+                                border: `1px dashed ${G.border}`,
+                                borderRadius: 8, padding: "5px 10px",
+                                cursor: "pointer", fontFamily: "inherit",
+                                display: "inline-flex", alignItems: "center", gap: 4,
+                              }}>
+                              {resolveRoleIcon("support")} + {TRAINING_ROLE.short}
+                            </button>
+                          );
+                        }
+                      }
+                      return (
+                        <div key={s.id} style={{
+                          display: "flex", alignItems: "center", gap: 10,
+                          background: G.cream, border: `1px solid ${G.border}`,
+                          borderRadius: 8, padding: "8px 10px",
+                        }}>
+                          <div style={{fontSize: 16, flexShrink: 0}}>🎯</div>
+                          <div style={{flex: 1, minWidth: 0}}>
+                            <div style={{fontSize: 12, fontWeight: 700, color: G.text}}>
+                              {dateLabel}{s.from ? ` · ${s.from}` : ""}{s.label ? ` · ${s.label}` : ""}
+                            </div>
+                            <div style={{fontSize: 10, color: G.muted, marginTop: 2}}>
+                              {filled.length}/{slots} filled
+                            </div>
+                          </div>
+                          <div style={{display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "flex-end"}}>
+                            {chips}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {activeTeam && upcomingMatches.length > 0 && (
+                <>
+                  <div style={{
+                    fontSize: 10, fontWeight: 700, letterSpacing: 1,
+                    textTransform: "uppercase", color: G.muted, marginBottom: 6,
+                  }}>
+                    🏏 Match days
+                  </div>
+                  <div style={{display: "flex", flexDirection: "column", gap: 8}}>
+                    {upcomingMatches.map(s => {
+                      const slots = getSlotCount(s, parentDutyConfig);
+                      const filled = getSupportParents(s);
+                      const matchRoles = getMatchRoles(s.restrictedTo || activeTeam, parentDutyConfig);
+                      const dateLabel = new Date(s.date).toLocaleDateString("en-GB", {
+                        weekday: "short", day: "numeric", month: "short"
+                      });
+                      const opp = s.matchOpponent ? ` v ${s.matchOpponent}` : "";
+                      const isFull = filled.length >= slots;
+                      const sessionLabel = s.label ? ` · ${s.label}` : "";
+                      // Render one chip per configured role; mark claimed roles as locked.
+                      return (
+                        <div key={s.id} style={{
+                          background: G.cream, border: `1px solid ${G.border}`,
+                          borderLeft: `4px solid ${isFull ? "#5DCAA5" : "#D3D1C7"}`,
+                          borderRadius: 8, padding: "10px 12px",
+                        }}>
+                          <div style={{
+                            display: "flex", justifyContent: "space-between",
+                            gap: 8, marginBottom: 8, alignItems: "baseline", flexWrap: "wrap",
+                          }}>
+                            <div>
+                              <div style={{fontSize: 13, fontWeight: 800, color: G.text}}>
+                                🏏 {dateLabel}{opp}{sessionLabel}
+                              </div>
+                              {((s.from || s.matchTime) || s.venue) && (
+                                <div style={{fontSize: 11, color: G.muted, marginTop: 2}}>
+                                  {(s.from || s.matchTime) || ""}{s.venue ? ` · ${s.venue}` : ""}
+                                </div>
+                              )}
+                            </div>
+                            <span style={{
+                              fontSize: 10, fontWeight: 800,
+                              background: isFull ? "#E1F5EE" : "#FAEEDA",
+                              color: isFull ? "#085041" : "#854F0B",
+                              padding: "2px 8px", borderRadius: 10,
+                            }}>
+                              {filled.length}/{slots} covered
+                            </span>
+                          </div>
+                          <div style={{display: "flex", flexWrap: "wrap", gap: 4}}>
+                            {matchRoles.map(r =>
+                              renderChip(s, r.id, r.label, resolveRoleIcon(r.id))
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           );
         })()}
@@ -4205,6 +4871,54 @@ export default function AdminView() {
             logAction("member", `Created child ${newChild.name} and linked to parent ${parent.name}`);
             showToast(`${newChild.name} created and linked ✓`);
             setLinkChildModal(null);
+          }}
+        />
+      )}
+
+      {/* ── Assign-duty modal ──────────────────────────────── */}
+      {assignDutyModal && (
+        <AssignDutyModal
+          session={assignDutyModal.session}
+          sessionTeam={assignDutyModal.sessionTeam}
+          role={assignDutyModal.role}
+          roleLabel={assignDutyModal.roleLabel}
+          members={members}
+          sessions={sessions}
+          teams={teams}
+          currentUser={currentUser}
+          parentDutyConfig={parentDutyConfig}
+          G={G}
+          showToast={showToast}
+          onClose={() => setAssignDutyModal(null)}
+          onAssign={(parent) => {
+            const { session: s, sessionTeam, role, roleLabel } = assignDutyModal;
+            const fresh = sessions.find(x => x.id === s.id) || s;
+            const existing = getSupportParents(fresh);
+            const slots = getSlotCount(fresh, parentDutyConfig);
+            if (existing.length >= slots) {
+              showToast("All slots already filled");
+              return false;
+            }
+            if (existing.some(sp => sp.memberId === parent.id && sp.role === role)) {
+              showToast(`${parent.name.split(" ")[0]} is already on this duty`);
+              return false;
+            }
+            const newEntry = {
+              memberId: parent.id,
+              memberName: parent.name,
+              role,
+              roleLabel,
+              unlinked: false,
+              assignedBy: currentUser?.name || "admin",
+              assignedAt: new Date().toISOString(),
+            };
+            const updated = setSupportParents(fresh, [...existing, newEntry]);
+            saveSessions(sessions.map(x => x.id === fresh.id ? updated : x));
+            logAction("duty",
+              `Admin assigned ${parent.name} to ${roleLabel} for ${sessionTeam} ${s.date}` +
+              (currentUser?.name ? ` (by ${currentUser.name})` : "")
+            );
+            return true;
           }}
         />
       )}
