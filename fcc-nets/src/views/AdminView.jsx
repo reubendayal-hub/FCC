@@ -22,6 +22,7 @@ import {
   slugifyRoleId,
   buildTeamParentList, getTeamCoachNames,
   sessionBelongsToDutyTeam,
+  resolveDutyTeam, getRollupTeams,
 } from "../constants/parent-duty";
 import {
   getUnsyncedFixtures,
@@ -118,6 +119,7 @@ export default function AdminView() {
     newLinkParent, setNewLinkParent,
     newGenCode, setNewGenCode,
     aSearch, setASearch, aFilter, setAFilter,
+    aSubTab, setASubTab,
     adminListMode, setAdminListMode,
     selMember, setSelMember,
     expandedSessions, setExpandedSessions,
@@ -2727,6 +2729,92 @@ export default function AdminView() {
         })()}
         </>}
 
+        {/* ── Sub-tab filter (Parents tab) ─────────────────────── */}
+        {(() => {
+          const parentCount = members.filter(m =>
+            m.memberType === "parent" || (m.children || []).length > 0
+          ).length;
+          const childCount = members.filter(m =>
+            (m.teams || []).some(t => t.startsWith("U") || t.includes("Girls"))
+          ).length;
+          const orphanCount = members.filter(m =>
+            (m.teams || []).some(t => t.startsWith("U") || t.includes("Girls"))
+            && !m.parentId && m.memberType !== "parent"
+          ).length;
+          const parentsWithoutPin = members.filter(m =>
+            (m.memberType === "parent" || (m.children || []).length > 0) && !pins[m.id]
+          ).length;
+          const nonParentCount = members.length - parentCount;
+
+          // Diagnostic: how many parents have memberType undefined but children linked?
+          // Tells admin if normMember backfill missed anyone in production data.
+          if (typeof window !== "undefined" && !window.__parentsTabDiagLogged) {
+            const undefinedTypeParents = members.filter(m =>
+              !m.memberType && (m.children || []).length > 0
+            );
+            console.log(
+              `[parents-tab] memberType-undefined members with children: ${undefinedTypeParents.length}`,
+              undefinedTypeParents.map(m => m.name)
+            );
+            window.__parentsTabDiagLogged = true;
+          }
+
+          const tabs = [
+            { id: "all",       label: "All",         count: members.length },
+            { id: "players",   label: "🏏 Players",  count: nonParentCount },
+            { id: "parents",   label: "👨‍👧 Parents", count: parentCount },
+            { id: "attention", label: "⚠ Orphans",   count: orphanCount, tint: "red" },
+          ];
+          return (
+            <>
+              <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>
+                {tabs.map(tab => {
+                  const active = aSubTab === tab.id;
+                  const red = tab.tint === "red";
+                  return (
+                    <button key={tab.id} type="button"
+                      onClick={()=>setASubTab(tab.id)}
+                      style={{
+                        padding:"6px 12px",borderRadius:99,
+                        fontSize:12,fontWeight:700,
+                        cursor:"pointer",fontFamily:"inherit",
+                        border: active
+                          ? `1.5px solid ${red ? "#dc2626" : G.green}`
+                          : `1px solid ${G.border}`,
+                        background: active
+                          ? (red ? "#fef2f2" : `${G.green}14`)
+                          : G.white,
+                        color: active
+                          ? (red ? "#991b1b" : G.green)
+                          : G.text,
+                      }}>
+                      {tab.label}
+                      {tab.count > 0 && (
+                        <span style={{marginLeft:6,opacity:0.7}}>({tab.count})</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{
+                fontSize:11,color:G.muted,marginBottom:12,fontStyle:"italic",
+              }}>
+                {members.length} members · {parentCount} parents · {childCount} children
+                {orphanCount > 0 && (
+                  <span style={{color:"#dc2626",fontWeight:700}}>
+                    {" · "}{orphanCount} unlinked
+                  </span>
+                )}
+                {parentsWithoutPin > 0 && (
+                  <span style={{color:"#92400e"}}>
+                    {" · "}{parentsWithoutPin} parents not on app yet
+                  </span>
+                )}
+              </div>
+            </>
+          );
+        })()}
+
         {/* ── View mode toggle + Team jump bar ─────────────────── */}
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
           <div style={{display:"flex",gap:4,background:G.cream,borderRadius:20,
@@ -2783,13 +2871,8 @@ export default function AdminView() {
 
         {/* ── Flat "All Members" view ──────────────────────────── */}
         {adminListMode==="flat"&&(()=>{
-          const flatList = members
-            .filter(m=>{
-              const q=!aSearch||m.name.toLowerCase().includes(aSearch.toLowerCase());
-              const t=aFilter==="All"||(aFilter==="Unassigned"&&(m.teams||[]).length===0)||(m.teams||[]).includes(aFilter);
-              return q&&t;
-            })
-            .sort((a,b)=>a.name.localeCompare(b.name));
+          // adminVisible already applies search + team-filter + sub-tab filter
+          const flatList = [...adminVisible].sort((a,b)=>a.name.localeCompare(b.name));
           return (
             <div style={{display:"flex",flexDirection:"column",gap:0,
               background:G.white,border:`1.5px solid ${G.border}`,borderRadius:14,
@@ -2805,6 +2888,15 @@ export default function AdminView() {
                 const isExpanded = selMember?.id===m.id;
                 return (
                   <div key={m.id}>
+                    {aSubTab === "attention" && (
+                      <div style={{
+                        background:"#fef2f2",borderBottom:"1px solid #fecaca",
+                        padding:"5px 14px",
+                        fontSize:11,fontWeight:700,color:"#991b1b",
+                      }}>
+                        ⚠ No parent linked — tap to expand &amp; use "Link Parent"
+                      </div>
+                    )}
                     {/* Member row */}
                     <div onClick={()=>setSelMember(isExpanded?null:m)}
                       style={{display:"flex",alignItems:"center",gap:10,
@@ -3003,7 +3095,45 @@ export default function AdminView() {
                                 {m.memberType === "parent" ? "👨‍👧 Parent" : "🏏 Player"}
                                 {(m.children||[]).length > 0 && ` (${(m.children||[]).length} linked)`}
                               </span>
-                              
+
+                              {/* PIN status pill — admin can see at a glance who's set up */}
+                              <span style={{
+                                background: pins[m.id] ? "#dcfce7" : "#fef3c7",
+                                color: pins[m.id] ? "#166534" : "#92400e",
+                                padding:"4px 10px",borderRadius:6,fontSize:11,fontWeight:700,
+                              }}>
+                                {pins[m.id] ? "🔑 PIN set" : "⏳ No PIN yet"}
+                              </span>
+
+                              {/* Duty count pill — only on Parents tab */}
+                              {aSubTab === "parents" && (() => {
+                                const dutyTeams = Array.from(new Set(
+                                  (m.children || []).flatMap(cid => {
+                                    const child = members.find(x => x.id === cid);
+                                    return (child?.teams || [])
+                                      .filter(t => t.startsWith("U") || t.includes("Girls"))
+                                      .map(t => resolveDutyTeam(t));
+                                  })
+                                ));
+                                if (dutyTeams.length === 0) return null;
+                                const rollupTeams = dutyTeams.flatMap(dt => getRollupTeams(dt));
+                                const done = countDuties(m, sessions, rollupTeams);
+                                const min = dutyTeams.reduce(
+                                  (sum, dt) => sum + (getEffectiveConfig(dt, parentDutyConfig)?.minDuties || 0),
+                                  0
+                                );
+                                const bg = done >= min ? "#dcfce7" : done > 0 ? "#fef3c7" : "#fee2e2";
+                                const col = done >= min ? "#166534" : done > 0 ? "#92400e" : "#991b1b";
+                                return (
+                                  <span style={{
+                                    background: bg, color: col,
+                                    padding:"4px 10px",borderRadius:6,fontSize:11,fontWeight:700,
+                                  }}>
+                                    {done}/{min} duties
+                                  </span>
+                                );
+                              })()}
+
                               {/* Link Child button - for adults (not in junior teams) */}
                               {!(m.teams||[]).some(t => t.startsWith("U") || t.includes("Girls") || t.includes("Kvinder")) && (
                                 <button
@@ -3203,6 +3333,16 @@ export default function AdminView() {
                 background: isFem ? "#fff5f9" : G.bg,
                 border: `1px solid ${isFem ? "#fbcfe8" : G.border}`,
                 borderRadius:10,padding:"10px 14px"}}>
+
+                {aSubTab === "attention" && (
+                  <div style={{
+                    background:"#fef2f2",border:"1px solid #fecaca",
+                    borderRadius:6,padding:"6px 10px",marginBottom:8,
+                    fontSize:11,fontWeight:700,color:"#991b1b",
+                  }}>
+                    ⚠ No parent linked — use the "Link Parent" button below
+                  </div>
+                )}
 
                 {/* Top row: name + pencil + delete */}
                 <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
