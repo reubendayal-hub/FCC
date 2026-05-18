@@ -4779,7 +4779,7 @@ export default function AdminView() {
             const child = linkParentModal.childMember;
             const updated = members.map(x => {
               if (x.id === parent.id) {
-                return { ...x, children: [...(x.children || []), child.id], memberType: "parent" };
+                return { ...x, children: [...new Set([...(x.children || []), child.id])], memberType: "parent" };
               }
               if (x.id === child.id) {
                 return { ...x, parentId: parent.id, parentName: parent.name };
@@ -4827,7 +4827,7 @@ export default function AdminView() {
             const parent = linkChildModal.parentMember;
             const updated = members.map(x => {
               if (x.id === parent.id) {
-                return { ...x, children: [...(x.children || []), child.id], memberType: "parent" };
+                return { ...x, children: [...new Set([...(x.children || []), child.id])], memberType: "parent" };
               }
               if (x.id === child.id) {
                 return { ...x, parentId: parent.id, parentName: parent.name };
@@ -4838,7 +4838,7 @@ export default function AdminView() {
             if (selMember && selMember.id === parent.id) {
               setSelMember({
                 ...parent,
-                children: [...(parent.children || []), child.id],
+                children: [...new Set([...(parent.children || []), child.id])],
                 memberType: "parent",
               });
             }
@@ -4853,7 +4853,7 @@ export default function AdminView() {
                 x.id === parent.id
                   ? {
                       ...x,
-                      children: [...(x.children || []), newChild.id],
+                      children: [...new Set([...(x.children || []), newChild.id])],
                       memberType: "parent",
                     }
                   : x
@@ -4864,7 +4864,7 @@ export default function AdminView() {
             if (selMember && selMember.id === parent.id) {
               setSelMember({
                 ...parent,
-                children: [...(parent.children || []), newChild.id],
+                children: [...new Set([...(parent.children || []), newChild.id])],
                 memberType: "parent",
               });
             }

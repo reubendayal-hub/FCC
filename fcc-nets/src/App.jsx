@@ -522,6 +522,36 @@ export default function App() {
   // showToast moved up to be available to useAuth (Pass 4).
   // cachedCurrentUser sync moved to useAuth (Pass 4).
 
+  // ── One-time cleanup: dedupe parent.children arrays ──────────
+  // Kids on multiple teams could end up listed N times in a parent's
+  // children array if linked via different admin flows. The write
+  // sites are now dedupe-on-insert; this scrub repairs any historic
+  // duplicates already in Firestore. Idempotent — re-runs are no-ops.
+  // Gated to superadmin to avoid concurrent writes from multiple sessions.
+  useEffect(() => {
+    if (!members.length) return;
+    if (userRole !== "superadmin") return;
+
+    let dirty = false;
+    let dirtyCount = 0;
+    const cleaned = members.map(m => {
+      const children = m.children || [];
+      const unique = [...new Set(children)];
+      if (unique.length !== children.length) {
+        dirty = true;
+        dirtyCount++;
+        return { ...m, children: unique };
+      }
+      return m;
+    });
+
+    if (dirty) {
+      console.log("[CLEANUP] Deduplicating duplicate child IDs in members[], affecting " + dirtyCount + " member(s)");
+      saveMembers(cleaned);
+      logAction("system", `Auto-cleanup: deduplicated child IDs in members.children (${dirtyCount} members updated)`);
+    }
+  }, [members.length, userRole]);
+
 
   // ── Invite code helpers ───────────────────────────────────────
   // Generate a short human-readable code: FCC-XXXX (letters+digits, no ambiguous chars)
@@ -949,9 +979,9 @@ export default function App() {
     // If linking child to a parent, also update the parent's children array
     let updatedMembers = [...members, newMember];
     if (newMemberType==="child" && newLinkParent) {
-      updatedMembers = updatedMembers.map(m => 
-        m.id === newLinkParent 
-          ? { ...m, children: [...(m.children||[]), newId], memberType: "parent" }
+      updatedMembers = updatedMembers.map(m =>
+        m.id === newLinkParent
+          ? { ...m, children: [...new Set([...(m.children||[]), newId])], memberType: "parent" }
           : m
       );
     }
