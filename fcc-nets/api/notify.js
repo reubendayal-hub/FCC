@@ -1,9 +1,10 @@
 // Vercel Serverless Function — /api/notify.js
 // Sends email notifications via Resend for:
-//   - "help"        → member help message → emails Reuben
-//   - "joinrequest" → new join request    → emails Reuben
-//   - "approved"    → request approved    → emails the new member
-//   - "declined"    → request declined    → emails the new member
+//   - "help"          → member help message → emails Reuben
+//   - "joinrequest"   → new join request    → emails Reuben
+//   - "approved"      → request approved    → emails the new member
+//   - "declined"      → request declined    → emails the new member
+//   - "duty-assigned" → admin-assigned duty → emails the parent
 //
 // Environment variable required in Vercel dashboard:
 //   RESEND_API_KEY = re_xxxxxxxxxxxxxxxxxxxx  (from resend.com)
@@ -144,6 +145,26 @@ export default async function handler(req, res) {
         style="display:inline-block;background:#15803d;
         color:#fff;text-decoration:none;padding:12px 24px;
         border-radius:20px;font-size:14px;font-weight:700;">
+        Open the App →
+      </a>`);
+
+  // ── Admin assigned a duty → email the parent ────────────────
+  } else if (type === "duty-assigned") {
+    const { to: recipient, subject: subj, body: messageBody, parentName } = data;
+    if (!recipient) return res.status(400).json({ error: "Missing recipient email for duty assignment" });
+    to = [recipient];
+    subject = subj || `Duty assignment for ${parentName || "you"}`;
+    const safeBody = String(messageBody || "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/\n/g, "<br/>");
+    html = wrapHtml("Duty assignment", `
+      <p style="font-size:14px;line-height:1.65;color:#1e3a5f;margin:0 0 16px;">
+        ${safeBody}
+      </p>
+      <a href="${APP_URL}"
+        style="display:inline-block;background:#1e3a5f;
+        color:#fbbf24;text-decoration:none;padding:10px 20px;
+        border-radius:20px;font-size:13px;font-weight:700;">
         Open the App →
       </a>`);
 

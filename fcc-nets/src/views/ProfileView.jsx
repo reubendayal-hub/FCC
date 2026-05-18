@@ -301,7 +301,7 @@ export default function ProfileView() {
                   parentName: me.name,
                   joinedAt: new Date().toISOString(),
                 };
-                const updatedMe = { ...me, children: [...(me.children||[]), childId] };
+                const updatedMe = { ...me, children: [...new Set([...(me.children||[]), childId])] };
                 const updated = members.map(m => m.id === currentUser.id ? updatedMe : m);
                 updated.push(child);
                 saveMembers(updated);
