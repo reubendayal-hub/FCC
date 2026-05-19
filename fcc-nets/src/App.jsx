@@ -320,9 +320,15 @@ export default function App() {
   const [view,     setView]     = useState(initialView);
   const [selSess,  setSelSess]  = useState(null);
   const [toast,    setToast]    = useState(null);
-  // showToast defined here (used by useAuth and elsewhere) — moved up from
-  // its old location below the auth state during Pass 4.
-  const showToast = m => { setToast(m); setTimeout(()=>setToast(null),2700); };
+  const toastTimerRef = useRef(null);
+  const showToast = m => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast(m);
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+      toastTimerRef.current = null;
+    }, 2700);
+  };
 
   // ── Pass 4: Auth state + handlers via custom hook ─────────────
   const authState = useAuth({

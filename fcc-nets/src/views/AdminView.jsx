@@ -1337,23 +1337,6 @@ export default function AdminView() {
         {can(userRole,"addMember")&&joinRequests.filter(r=>r.status==="pending").length>0&&(()=>{
           const pending = joinRequests.filter(r=>r.status==="pending");
 
-          // TEMP DIAG — triage pair/team/toast issues on preview.
-          if (typeof window !== "undefined" && !window.__queueDiagLogged) {
-            console.log("[QUEUE DIAG] Pending requests:", pending.map(r => ({
-              id: r.id,
-              playerName: r.playerName,
-              parentName: r.parentName,
-              forChild: r.forChild,
-              parentLinkId: r.parentLinkId,
-              playerTeam: r.playerTeam,
-              pendingTeam: r.pendingTeam,
-              emailVerified: r.emailVerified,
-              submittedAt: r.submittedAt,
-              matchedMemberId: r.matchedMemberId,
-            })));
-            window.__queueDiagLogged = true;
-          }
-
           // Pair parent + child requests via parentLinkId. Parents render once
           // with their linked child(ren) inline; child requests are not rendered
           // separately. Unpaired requests (single adult, or legacy joins) keep
@@ -1648,7 +1631,7 @@ export default function AdminView() {
 
                     {/* Parent / single row */}
                     <div style={{display:"flex",alignItems:"flex-start",gap:8,flexWrap:"wrap"}}>
-                      <div style={{flex:1, minWidth: 200}}>
+                      <div style={{flex:1, minWidth: 140}}>
                         <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:3}}>
                           <span style={{fontWeight:800,fontSize:14,color:G.text}}>
                             {isPair || isParentReq ? "👨‍👧 " : (isChildReq ? "👶 " : "🙋 ")}{req.playerName}
@@ -1700,7 +1683,7 @@ export default function AdminView() {
                             display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
                             marginBottom: 6,
                           }}>
-                            <div style={{flex: 1, minWidth: 180}}>
+                            <div style={{flex: 1, minWidth: 120}}>
                               <div style={{fontSize: 13, fontWeight: 700, color: G.text,
                                 display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap"}}>
                                 👶 {c.playerName}
