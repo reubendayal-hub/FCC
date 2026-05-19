@@ -230,7 +230,7 @@ export default function ScheduleView() {
                 🔐 A quick note about your data
               </div>
               <div style={{fontSize:12,color:"#78350f",lineHeight:1.6,marginBottom:12}}>
-                Fredensborg CC stores your name, email and phone to manage your membership
+                Fredensborg Cricket Club stores your name, email and phone to manage your membership
                 and communicate about training. Your data stays within the club and is never
                 shared externally.
               </div>

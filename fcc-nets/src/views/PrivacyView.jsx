@@ -57,7 +57,7 @@ export default function PrivacyView() {
   return (
     <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
         currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO}/>} G={G}>
-      <AppHeader title="Privacy & Your Data" sub="How Fredensborg CC uses your information"
+      <AppHeader title="Privacy & Your Data" sub="How Fredensborg Cricket Club uses your information"
         onBack={()=>setView("profile")}/>
       <div style={{padding:"16px 16px 100px"}}>
 

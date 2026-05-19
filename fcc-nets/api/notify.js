@@ -110,12 +110,25 @@ export default async function handler(req, res) {
       </a>`);
 
   // ── Request approved → email the new member ───────────────────
+  // data.playerTeam is the ADMIN's final team pick (may differ from requested).
+  // data.isPair + data.children: paired parent+child(ren) approval.
   } else if (type === "approved") {
-    const { name, email, playerTeam } = data;
+    const { name, email, playerTeam, isPair, children } = data;
     if (!email) return res.status(400).json({ error: "Missing member email for approval notification" });
-    const firstName = name.split(" ")[0];
+    const firstName = (name || "").split(" ")[0] || "there";
     to = [email];
-    subject = `You're in! Welcome to Fredensborg CC 🏏`;
+    const teamSuffix = playerTeam ? ` — ${playerTeam}` : "";
+    subject = isPair
+      ? `Welcome to Fredensborg Cricket Club${teamSuffix}`
+      : `You're in! Welcome to Fredensborg Cricket Club 🏏`;
+
+    const childrenHtml = (isPair && Array.isArray(children) && children.length > 0)
+      ? `<p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">
+          Your ${children.length > 1 ? "children have" : "child has"} also been added:
+          <strong>${children.map(c => `${c.name}${c.team ? ` (${c.team})` : ""}`).join(", ")}</strong>.
+        </p>`
+      : "";
+
     html = wrapHtml("Your account has been approved", `
       <p style="font-size:15px;color:#111827;margin:0 0 12px;">
         Hi ${firstName},
@@ -125,6 +138,7 @@ export default async function handler(req, res) {
         has been approved${playerTeam ? ` for <strong>${playerTeam}</strong>` : ""}!
         You can now log in to the training app.
       </p>
+      ${childrenHtml}
       <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;
         padding:16px 20px;margin-bottom:20px;">
         <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#14532d;">

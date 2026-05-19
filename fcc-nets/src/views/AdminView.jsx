@@ -1053,6 +1053,11 @@ export default function AdminView() {
   // { session, sessionTeam, role, roleLabel } when open, null when closed
   const [assignDutyModal, setAssignDutyModal] = useState(null);
 
+  // Admin's per-request team overrides on the Join Requests queue.
+  // Shape: { [requestId]: teamName }. Cleared from this state when request
+  // is approved/declined (the request leaves the queue).
+  const [overrideTeams, setOverrideTeams] = useState({});
+
   // Jump to a member's expanded card. Used by the linked-name pills on
   // parent/child cards so admin can hop between related profiles.
   // If the target isn't visible under the current sub-tab/search/team filter,
@@ -1331,49 +1336,243 @@ export default function AdminView() {
         <div id="sec-members"/>
         {can(userRole,"addMember")&&joinRequests.filter(r=>r.status==="pending").length>0&&(()=>{
           const pending = joinRequests.filter(r=>r.status==="pending");
-          function approveRequest(req) {
-            const playerTeam = req.playerTeam && req.playerTeam !== "I don't play / I'm a parent"
-              ? req.playerTeam : null;
-            const newMember = normMember({
+
+          // TEMP DIAG — triage pair/team/toast issues on preview.
+          if (typeof window !== "undefined" && !window.__queueDiagLogged) {
+            console.log("[QUEUE DIAG] Pending requests:", pending.map(r => ({
+              id: r.id,
+              playerName: r.playerName,
+              parentName: r.parentName,
+              forChild: r.forChild,
+              parentLinkId: r.parentLinkId,
+              playerTeam: r.playerTeam,
+              pendingTeam: r.pendingTeam,
+              emailVerified: r.emailVerified,
+              submittedAt: r.submittedAt,
+              matchedMemberId: r.matchedMemberId,
+            })));
+            window.__queueDiagLogged = true;
+          }
+
+          // Pair parent + child requests via parentLinkId. Parents render once
+          // with their linked child(ren) inline; child requests are not rendered
+          // separately. Unpaired requests (single adult, or legacy joins) keep
+          // the single-card flow.
+          const childByParentId = new Map();
+          pending.forEach(r => {
+            if (r.parentLinkId) {
+              const arr = childByParentId.get(r.parentLinkId) || [];
+              arr.push(r);
+              childByParentId.set(r.parentLinkId, arr);
+            }
+          });
+          const cards = pending.filter(r => !r.parentLinkId);
+
+          // Team lists for the per-request override dropdown. Senior = adult/
+          // non-junior, junior = U* / Girls. Mirrors SignupFlow conventions.
+          const isJuniorName = n => n.startsWith("U") || n.includes("Girls");
+          const seniorTeamList = teams
+            .filter(t => t.senior || !isJuniorName(t.name))
+            .map(t => t.name)
+            .filter(n => !isJuniorName(n))
+            .sort();
+          const juniorTeamList = teams
+            .map(t => t.name)
+            .filter(isJuniorName)
+            .sort();
+
+          // Resolve admin's final team pick for a request:
+          // 1. explicit override (admin tapped the dropdown) ─►
+          // 2. requested team (req.playerTeam) ─►
+          // 3. null (must be picked before approve).
+          const finalTeam = (req) => {
+            const ov = overrideTeams[req.id];
+            if (ov !== undefined) return ov || null;
+            return req.playerTeam || null;
+          };
+
+          // Build a single member record using the admin's final team pick.
+          function buildMember(req, teamPick) {
+            return normMember({
               id: uid(),
               name: req.playerName,
-              team: playerTeam,
-              teams: playerTeam ? [playerTeam] : [],
+              team: teamPick,
+              teams: teamPick ? [teamPick] : [],
               role: "member",
               email: req.email||null,
               phone: req.contact||null,
               emailVerified: req.emailVerified||false,
               consentGiven: req.consentGiven||false,
               consentDate: req.consentDate||null,
+              pendingTeam: false, // resolved at approval time
               note: req.parentName
                 ? `Parent: ${req.parentName}${req.contact ? " · " + req.contact : ""}`
                 : req.contact || null,
             });
+          }
+
+          function approvePair(parentReq, childReqs) {
+            const parentTeam = finalTeam(parentReq);
+            if (!parentTeam) {
+              showToast(`Pick a team for ${parentReq.playerName} first`);
+              return;
+            }
+            for (const c of childReqs) {
+              if (!finalTeam(c)) {
+                showToast(`Pick a team for ${c.playerName} first`);
+                return;
+              }
+            }
+
+            const newPairMembers = [];
+            let parentMember = null;
+            if (parentReq.matchedMemberId) {
+              parentMember = members.find(m => m.id === parentReq.matchedMemberId) || null;
+            }
+            if (!parentMember) {
+              parentMember = buildMember(parentReq, parentTeam);
+              newPairMembers.push(parentMember);
+            }
+            const childMembers = [];
+            childReqs.forEach(creq => {
+              const cTeam = finalTeam(creq);
+              if (creq.matchedMemberId) {
+                const existing = members.find(m => m.id === creq.matchedMemberId);
+                if (existing) {
+                  // Update existing junior with admin's team pick if different.
+                  const merged = {
+                    ...existing,
+                    teams: cTeam ? [...new Set([...(existing.teams || []), cTeam])] : (existing.teams || []),
+                    pendingTeam: false,
+                  };
+                  childMembers.push(merged);
+                  return;
+                }
+              }
+              const cm = buildMember(creq, cTeam);
+              childMembers.push(cm);
+              newPairMembers.push(cm);
+            });
+
+            const childIds = childMembers.map(c => c.id);
+            const linkedParent = {
+              ...parentMember,
+              memberType: "parent",
+              children: [...new Set([...(parentMember.children || []), ...childIds])],
+              emailVerified: parentMember.emailVerified || parentReq.emailVerified || false,
+              pendingTeam: false,
+            };
+            const linkedChildren = childMembers.map(c => ({
+              ...c,
+              parentId: linkedParent.id,
+              parentName: linkedParent.name,
+            }));
+
+            // Merge into canonical members array.
+            const existingIds = new Set(members.map(m => m.id));
+            let updatedMembers = members.map(m => {
+              if (m.id === linkedParent.id) return linkedParent;
+              const c = linkedChildren.find(x => x.id === m.id);
+              return c || m;
+            });
+            newPairMembers.forEach(nm => {
+              if (existingIds.has(nm.id)) return;
+              if (nm.id === linkedParent.id) updatedMembers.push(linkedParent);
+              else {
+                const c = linkedChildren.find(x => x.id === nm.id);
+                updatedMembers.push(c || nm);
+              }
+            });
+            saveMembers(updatedMembers);
+
+            const approvedIds = new Set([parentReq.id, ...childReqs.map(c => c.id)]);
+            saveJoinRequests(joinRequests.map(r => approvedIds.has(r.id) ? {...r, status: "approved"} : r));
+
+            // Drop overrides for resolved requests.
+            setOverrideTeams(prev => {
+              const next = { ...prev };
+              approvedIds.forEach(id => { delete next[id]; });
+              return next;
+            });
+
+            const isNewParent = newPairMembers.some(nm => nm.id === linkedParent.id);
+            if (isNewParent && parentReq.emailVerified && linkedParent.id) {
+              setTimeout(() => generateInviteCode(linkedParent.id), 500);
+            }
+
+            logAction("request",
+              `Approved pair: ${parentReq.playerName} → ${parentTeam}` +
+              (childReqs.length ? ` + ${childReqs.length} child${childReqs.length > 1 ? "ren" : ""}: ${childReqs.map(c => `${c.playerName} (${finalTeam(c)})`).join(", ")}` : "")
+            );
+
+            if (parentReq.email) {
+              fetch("/api/notify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  type: "approved",
+                  data: {
+                    name: linkedParent.name,
+                    email: parentReq.email,
+                    playerTeam: parentTeam, // admin's final pick
+                    isPair: childReqs.length > 0,
+                    children: linkedChildren.map(c => ({ name: c.name, team: (c.teams || [])[0] || null })),
+                  },
+                }),
+              }).catch(()=>{});
+            }
+            showToast(`${linkedParent.name}${childReqs.length ? ` + ${childReqs.length} child${childReqs.length > 1 ? "ren" : ""}` : ""} added ✓`);
+          }
+
+          function approveRequest(req) {
+            // If part of a pair, bundle its children.
+            const children = childByParentId.get(req.id) || [];
+            if (children.length > 0) {
+              approvePair(req, children);
+              return;
+            }
+            // Solo request.
+            const teamPick = finalTeam(req);
+            if (!teamPick) {
+              showToast(`Pick a team for ${req.playerName} first`);
+              return;
+            }
+            const newMember = buildMember(req, teamPick);
             saveMembers([...members, newMember]);
-            // Auto-generate invite code if email was verified
-            if(req.emailVerified && newMember.id) {
+            if (req.emailVerified && newMember.id) {
               setTimeout(()=>generateInviteCode(newMember.id),500);
             }
             saveJoinRequests(joinRequests.map(r=>r.id===req.id ? {...r,status:"approved"} : r));
-            logAction("request", `Approved join request: ${req.playerName}${req.playerTeam?" → "+req.playerTeam:""}${req.forChild&&req.parentName?" (parent: "+req.parentName+")":""}`);
-            // Notify the member by email if we have their address
-            if(req.email) {
+            setOverrideTeams(prev => {
+              const next = { ...prev };
+              delete next[req.id];
+              return next;
+            });
+            logAction("request", `Approved join request: ${req.playerName} → ${teamPick}${req.forChild&&req.parentName?" (parent: "+req.parentName+")":""}`);
+            if (req.email) {
               fetch("/api/notify", {
                 method:"POST",
                 headers:{"Content-Type":"application/json"},
                 body: JSON.stringify({
                   type: "approved",
-                  data: { name: req.playerName, email: req.email, playerTeam },
+                  data: { name: req.playerName, email: req.email, playerTeam: teamPick },
                 }),
               }).catch(()=>{});
             }
             showToast(`${req.playerName} added ✓`);
           }
+
           function declineRequest(req) {
-            saveJoinRequests(joinRequests.map(r=>r.id===req.id ? {...r,status:"declined"} : r));
-            logAction("request", `Declined join request: ${req.playerName}`);
-            // Notify the member by email if we have their address
-            if(req.email) {
+            const children = childByParentId.get(req.id) || [];
+            const ids = new Set([req.id, ...children.map(c => c.id)]);
+            saveJoinRequests(joinRequests.map(r => ids.has(r.id) ? {...r, status: "declined"} : r));
+            setOverrideTeams(prev => {
+              const next = { ...prev };
+              ids.forEach(id => { delete next[id]; });
+              return next;
+            });
+            logAction("request", `Declined join request: ${req.playerName}${children.length ? ` + child${children.length > 1 ? "ren" : ""}` : ""}`);
+            if (req.email) {
               fetch("/api/notify", {
                 method:"POST",
                 headers:{"Content-Type":"application/json"},
@@ -1385,6 +1584,38 @@ export default function AdminView() {
             }
             showToast("Request declined");
           }
+
+          // Per-request team-override dropdown. junior/senior list selected
+          // based on whether the request is for a child.
+          const TeamPicker = ({ req, isChild }) => {
+            const opts = isChild ? juniorTeamList : seniorTeamList;
+            const value = finalTeam(req) || "";
+            const requested = req.playerTeam || "";
+            const pending = !!req.pendingTeam;
+            return (
+              <select
+                value={value}
+                onChange={e => setOverrideTeams(prev => ({ ...prev, [req.id]: e.target.value }))}
+                style={{
+                  fontSize: 12, fontWeight: 700,
+                  padding: "6px 9px", borderRadius: 8,
+                  border: `1.5px solid ${value ? G.green : "#dc2626"}`,
+                  background: value ? "#f0fdf4" : "#fef2f2",
+                  color: value ? G.green : "#991b1b",
+                  fontFamily: "inherit",
+                  cursor: "pointer",
+                  maxWidth: 200,
+                }}>
+                <option value="">— Pick a team —</option>
+                {opts.map(t => (
+                  <option key={t} value={t}>
+                    {t}{t === requested && !pending ? " (requested)" : ""}
+                  </option>
+                ))}
+              </select>
+            );
+          };
+
           return (
             <>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,marginTop:4}}>
@@ -1398,47 +1629,135 @@ export default function AdminView() {
                 <div style={{flex:1,height:1,background:G.border}}/>
               </div>
 
-              {pending.map(req=>(
-                <div key={req.id} style={{background:"#fff7ed",border:"1.5px solid #fed7aa",
-                  borderRadius:12,padding:"12px 14px",marginBottom:10}}>
-                  <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8}}>
-                    <div style={{flex:1}}>
-                      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:3}}>
-                        <span style={{fontWeight:800,fontSize:14,color:G.text}}>
-                          {req.forChild ? "👶 " : "🙋 "}{req.playerName}
-                        </span>
-                        {req.emailVerified&&<span style={{fontSize:10,fontWeight:700,
-                          padding:"1px 7px",borderRadius:20,background:"#dcfce7",
-                          color:"#166534",border:"0.5px solid #86efac"}}>✅ email verified</span>}
+              {cards.map(req => {
+                const linkedChildren = childByParentId.get(req.id) || [];
+                const isPair = linkedChildren.length > 0;
+                const verified = !!req.emailVerified;
+                const parentTeamReady = !!finalTeam(req);
+                const allChildrenTeamsReady = linkedChildren.every(c => !!finalTeam(c));
+                const canApprove = parentTeamReady && allChildrenTeamsReady;
+                const missingFor = !parentTeamReady
+                  ? req.playerName
+                  : linkedChildren.find(c => !finalTeam(c))?.playerName;
+                const isParentReq = isPair || (req.memberType === "parent");
+                const isChildReq = req.forChild && !isPair;
+
+                return (
+                  <div key={req.id} style={{background:"#fff7ed",border:"1.5px solid #fed7aa",
+                    borderRadius:12,padding:"12px 14px",marginBottom:10}}>
+
+                    {/* Parent / single row */}
+                    <div style={{display:"flex",alignItems:"flex-start",gap:8,flexWrap:"wrap"}}>
+                      <div style={{flex:1, minWidth: 200}}>
+                        <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:3}}>
+                          <span style={{fontWeight:800,fontSize:14,color:G.text}}>
+                            {isPair || isParentReq ? "👨‍👧 " : (isChildReq ? "👶 " : "🙋 ")}{req.playerName}
+                          </span>
+                          <span style={{fontSize:10,fontWeight:700,
+                            padding:"1px 7px",borderRadius:20,
+                            background: verified ? "#dcfce7" : "#fee2e2",
+                            color: verified ? "#166534" : "#991b1b",
+                            border: `0.5px solid ${verified ? "#86efac" : "#fca5a5"}`}}>
+                            {verified ? "✓ email verified" : "✗ not verified"}
+                          </span>
+                          {isPair && (
+                            <span style={{fontSize:10,fontWeight:700,
+                              padding:"1px 7px",borderRadius:20,
+                              background:"#dbeafe",color:"#1e40af",
+                              border:"0.5px solid #93c5fd"}}>
+                              Parent + {linkedChildren.length} child{linkedChildren.length > 1 ? "ren" : ""}
+                            </span>
+                          )}
+                          {req.pendingTeam && (
+                            <span style={{fontSize:10,fontWeight:700,
+                              padding:"1px 7px",borderRadius:20,
+                              background:"#fef3c7",color:"#92400e",
+                              border:"0.5px solid #fde68a"}}>
+                              ❓ needs team
+                            </span>
+                          )}
+                        </div>
+                        <div style={{fontSize:11,color:G.muted,lineHeight:1.6}}>
+                          {req.forChild && req.parentName && `Parent: ${req.parentName}`}
+                          {req.forChild && req.parentName && (req.email || req.contact) && " · "}
+                          {req.email && `${req.email}`}
+                          {req.email && req.contact && " · "}
+                          {req.contact && `${req.contact}`}
+                          <br/>
+                          <span style={{color:"#9ca3af",fontSize:10}}>
+                            {new Date(req.submittedAt).toLocaleDateString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}
+                          </span>
+                        </div>
                       </div>
-                      <div style={{fontSize:11,color:G.muted,lineHeight:1.6}}>
-                        {req.playerTeam ? `Team: ${req.playerTeam}` : "No team specified"}
-                        {req.forChild && req.parentName && ` · Parent: ${req.parentName}`}
-                        {req.email && ` · ${req.email}`}
-                        {req.contact && ` · ${req.contact}`}
-                        <br/>
-                        <span style={{color:"#9ca3af",fontSize:10}}>
-                          {new Date(req.submittedAt).toLocaleDateString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}
-                        </span>
+                      <TeamPicker req={req} isChild={!!req.forChild && !isPair}/>
+                    </div>
+
+                    {/* Linked child rows — each with its own team picker */}
+                    {linkedChildren.length > 0 && (
+                      <div style={{marginTop: 10, paddingLeft: 12, borderLeft: "2px solid #fed7aa"}}>
+                        {linkedChildren.map(c => (
+                          <div key={c.id} style={{
+                            display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+                            marginBottom: 6,
+                          }}>
+                            <div style={{flex: 1, minWidth: 180}}>
+                              <div style={{fontSize: 13, fontWeight: 700, color: G.text,
+                                display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap"}}>
+                                👶 {c.playerName}
+                                {c.matchedMemberId && (
+                                  <span style={{fontSize: 9, fontWeight: 700,
+                                    background: "#e0e7ff", color: "#3730a3",
+                                    padding: "1px 6px", borderRadius: 6}}>
+                                    existing record
+                                  </span>
+                                )}
+                                {c.pendingTeam && (
+                                  <span style={{fontSize: 9, fontWeight: 700,
+                                    background: "#fef3c7", color: "#92400e",
+                                    padding: "1px 6px", borderRadius: 6}}>
+                                    ❓ needs team
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <TeamPicker req={c} isChild={true}/>
+                          </div>
+                        ))}
                       </div>
+                    )}
+
+                    <div style={{display:"flex",gap:8,marginTop:12}}>
+                      <button onClick={()=>{
+                        if (!canApprove) {
+                          showToast(`Pick a team for ${missingFor} first`);
+                          return;
+                        }
+                        if (!verified) {
+                          if (!window.confirm(`${req.playerName} hasn't verified their email. Approve anyway?`)) return;
+                        }
+                        approveRequest(req);
+                      }}
+                        disabled={!canApprove}
+                        title={!canApprove ? `Pick a team for ${missingFor} first` : (isPair ? "Approve pair" : "Approve & add")}
+                        style={{flex:1,
+                          background: canApprove ? "#16a34a" : "#cbd5e1",
+                          color: canApprove ? "#fff" : "#64748b",
+                          border:"none",
+                          borderRadius:9,padding:"9px 0",fontFamily:"inherit",
+                          fontWeight:800,fontSize:12,
+                          cursor: canApprove ? "pointer" : "not-allowed"}}>
+                        ✓ Approve{isPair ? " pair" : " & Add"}
+                      </button>
+                      <button onClick={()=>declineRequest(req)}
+                        style={{background:"#fee2e2",color:"#dc2626",border:"none",
+                          borderRadius:9,padding:"9px 14px",fontFamily:"inherit",
+                          fontWeight:800,fontSize:12,cursor:"pointer"}}>
+                        ✗ Decline{isPair ? " pair" : ""}
+                      </button>
                     </div>
                   </div>
-                  <div style={{display:"flex",gap:8,marginTop:10}}>
-                    <button onClick={()=>approveRequest(req)}
-                      style={{flex:1,background:"#16a34a",color:"#fff",border:"none",
-                        borderRadius:9,padding:"9px 0",fontFamily:"inherit",
-                        fontWeight:800,fontSize:12,cursor:"pointer"}}>
-                      ✓ Approve &amp; Add
-                    </button>
-                    <button onClick={()=>declineRequest(req)}
-                      style={{background:"#fee2e2",color:"#dc2626",border:"none",
-                        borderRadius:9,padding:"9px 14px",fontFamily:"inherit",
-                        fontWeight:800,fontSize:12,cursor:"pointer"}}>
-                      ✗ Decline
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </>
           );
         })()}
@@ -1459,7 +1778,7 @@ export default function AdminView() {
         {adminSec.addmember&&<>
           <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,
             padding:"10px 14px",marginBottom:10,fontSize:12,color:"#1e40af",lineHeight:1.5}}>
-            💡 New members can also self-register via <b>"Join Fredensborg CC"</b> on the login screen. Use the form below for admin-initiated additions only.
+            💡 New members can also self-register via <b>"I'm new to the club"</b> on the login screen. Use the form below for admin-initiated additions only.
           </div>
           <form onSubmit={addMember} style={{background:G.white,borderRadius:12,
             border:`1.5px solid ${G.border}`,padding:14,marginBottom:20,

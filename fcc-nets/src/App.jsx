@@ -76,6 +76,7 @@ import SessionDetailView from "./views/SessionDetailView";
 import ProfileView from "./views/ProfileView";
 import CaptainXIView from "./views/CaptainXIView";
 import AdminView from "./views/AdminView";
+import SignupFlow from "./views/SignupFlow";
 import MatchesView from "./views/MatchesView";
 import ScorecardView from "./views/ScorecardView";
 import LiveScorerView from "./views/LiveScorerView";
@@ -470,6 +471,10 @@ export default function App() {
   const [jrForChild,setJrForChild]=useState(false);
   const [jrChildName,setJrChildName]=useState("");
   const [jrChildTeam,setJrChildTeam]=useState("");
+  // Idle screen — inline FCC-XXXX invite code expander
+  const [inviteExpanded, setInviteExpanded] = useState(false);
+  const [inlineInviteCode, setInlineInviteCode] = useState("");
+  const [inlineInviteError, setInlineInviteError] = useState("");
 
   // ── Profile tabs for player-parent hybrid ────────────────────
   const [profileTab, setProfileTab] = useState("profile"); // profile|family
@@ -549,6 +554,38 @@ export default function App() {
       console.log("[CLEANUP] Deduplicating duplicate child IDs in members[], affecting " + dirtyCount + " member(s)");
       saveMembers(cleaned);
       logAction("system", `Auto-cleanup: deduplicated child IDs in members.children (${dirtyCount} members updated)`);
+    }
+  }, [members.length, userRole]);
+
+  // ── One-time cleanup: strip legacy "unsure" team values ─────
+  // Old signup paths sometimes wrote teams: ["unsure"] when admin
+  // had to pick later. New flow uses pendingTeam: true + teams: [].
+  // This migration migrates the legacy shape so the rest of the app
+  // never sees "unsure" as a real team. Idempotent — no-op after.
+  useEffect(() => {
+    if (!members.length) return;
+    if (userRole !== "superadmin") return;
+
+    let dirty = false;
+    let unsureCount = 0;
+    const cleaned = members.map(m => {
+      const teams = m.teams || [];
+      if (teams.includes("unsure")) {
+        dirty = true;
+        unsureCount++;
+        return {
+          ...m,
+          teams: teams.filter(t => t !== "unsure"),
+          pendingTeam: true,
+        };
+      }
+      return m;
+    });
+
+    if (dirty) {
+      console.log(`[CLEANUP] Migrated ${unsureCount} 'unsure' member(s) to pendingTeam flag`);
+      saveMembers(cleaned);
+      logAction("system", `Auto-cleanup: migrated ${unsureCount} 'unsure' members to pendingTeam flag`);
     }
   }, [members.length, userRole]);
 
@@ -1425,49 +1462,86 @@ export default function App() {
       : [];
     const hasQuery = pickSearch.trim().length >= 1;
 
+    function submitInlineInvite() {
+      const code = inlineInviteCode.trim().toUpperCase();
+      if (!code) {
+        setInlineInviteError("Enter the FCC-XXXX code your admin shared");
+        return;
+      }
+      const hashed = hashCode(code);
+      const matchedId = Object.keys(inviteCodes).find(id => inviteCodes[id] === hashed);
+      const matchedMember = matchedId ? members.find(m => m.id === matchedId) : null;
+      if (!matchedMember) {
+        setInlineInviteError("Code not recognised. Check it with your admin.");
+        return;
+      }
+      // Single-use: clear the code now.
+      const remaining = { ...inviteCodes };
+      delete remaining[matchedId];
+      saveInviteCodes(remaining);
+      setInlineInviteError("");
+      setInlineInviteCode("");
+      setInviteExpanded(false);
+      setPendingMember(matchedMember);
+      setEmailInput("");
+      setEmailError("");
+      setAuthView("newpin");
+    }
+
+    function startSignup() {
+      // Reset legacy jr* form state defensively even though SignupFlow doesn't read it.
+      setJrName(""); setJrTeam(""); setJrContact(""); setJrPhone("");
+      setJrForChild(false); setJrChildName(""); setJrChildTeam("");
+      setAuthView("joinrequest");
+    }
+
     return (
       <Shell G={G}>
-        {/* Header */}
-        <div style={{background:G.green, padding:"36px 24px 32px", textAlign:"center"}}>
-          <img src={FCC_LOGO} alt="FCC" style={{width:88,height:88,borderRadius:"50%",
+        {/* Header — logo + brand */}
+        <div style={{padding:"36px 24px 22px", textAlign:"center"}}>
+          <img src={FCC_LOGO} alt="FCC" style={{width:112,height:112,borderRadius:"50%",
             objectFit:"cover",margin:"0 auto 14px",display:"block",
-            border:"3px solid rgba(255,255,255,0.25)",
-            boxShadow:"0 4px 20px rgba(0,0,0,0.3)"}}/>
-          <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
-            fontSize:28,fontWeight:900,letterSpacing:"-.5px",lineHeight:1}}>FCC Training</div>
-          <div style={{color:"rgba(255,255,255,0.45)",fontSize:11,fontWeight:700,
-            letterSpacing:2.5,textTransform:"uppercase",marginTop:5}}>Fredensborg CC</div>
+            border:`3px solid ${G.green}22`,
+            boxShadow:"0 6px 18px rgba(20,83,45,.18)"}}/>
+          <div style={{color:G.text,fontFamily:"'Playfair Display',serif",
+            fontSize:26,fontWeight:900,letterSpacing:"-.5px",lineHeight:1.1}}>
+            FCC Training
+          </div>
+          <div style={{color:G.muted,fontSize:12,fontWeight:600,
+            letterSpacing:1.4,marginTop:6}}>
+            Fredensborg Cricket Club
+          </div>
         </div>
 
-        <div style={{padding:"24px 20px 40px"}}>
-          {/* Prompt text */}
-          <div style={{textAlign:"center",marginBottom:20}}>
-            <div style={{fontSize:15,fontWeight:800,color:G.text}}>Enter your name to find your profile and log in</div>
-            <div style={{fontSize:12,color:G.muted,marginTop:4}}>
-              Not listed? Ask an admin to add you.
-            </div>
-          </div>
+        <div style={{padding:"0 20px 40px", maxWidth:460, margin:"0 auto"}}>
 
-          {/* Search input */}
-          <div style={{position:"relative",marginBottom:16}}>
-            <span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",
-              fontSize:18,pointerEvents:"none"}}>🔍</span>
+          {/* Search — cream/amber tinted */}
+          <div style={{
+            background:"#fffbeb",
+            border:"1.5px solid #fde68a",
+            borderRadius:14,
+            padding:"4px",
+            boxShadow:"0 2px 10px rgba(245,158,11,.08)",
+          }}>
             <input
-              style={{...iSt({background:G.white,paddingLeft:44,fontSize:16,
-                borderRadius:14,padding:"14px 14px 14px 44px",
-                boxShadow:"0 2px 12px rgba(0,0,0,0.07)"}),}}
-              placeholder="Start typing your name…"
+              autoFocus type="text" autoComplete="off"
+              placeholder="🔍  Start typing your name…"
               value={pickSearch}
               onChange={e=>setPickSearch(e.target.value)}
-              autoComplete="off"
-              autoFocus
+              style={{
+                width:"100%", boxSizing:"border-box",
+                background:"transparent", border:"none",
+                padding:"12px 14px", fontSize:16,
+                fontFamily:"'DM Sans',sans-serif", fontWeight:600,
+                color:G.text, outline:"none",
+              }}
             />
           </div>
 
           {/* Results as chips */}
           {hasQuery && filtered.length > 0 && (
-            <div style={{display:"flex",flexWrap:"wrap",gap:9,justifyContent:"center",
-              marginTop:8}}>
+            <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",
+              marginTop:14}}>
               {filtered.map(m=>{
                 const tm = m.team ? getTeamMeta(m.team) : null;
                 return (
@@ -1505,69 +1579,107 @@ export default function App() {
             </div>
           )}
 
-          {/* No results — offer Request to Join */}
+          {/* Zero results — inline guidance */}
           {hasQuery && filtered.length === 0 && (
-            <div style={{textAlign:"center",padding:"24px 0 8px"}}>
-              <div style={{fontSize:32,marginBottom:8}}>🤔</div>
-              <div style={{fontWeight:800,color:G.text,fontSize:15}}>Not found</div>
-              <div style={{fontSize:13,color:G.muted,marginTop:4,marginBottom:18,lineHeight:1.6}}>
-                Not in the app yet? Submit a request<br/>and an admin will add you.
-              </div>
-              <button onClick={()=>{
-                  setJrName(pickSearch.trim());
-                  setJrTeam(""); setJrContact(""); setJrPhone(""); setJrForChild(false);
-                  setJrChildName(""); setJrChildTeam("");
-                  setAuthView("joinrequest");
-                }}
-                style={{background:G.green,color:G.lime,border:"none",borderRadius:12,
-                  padding:"12px 24px",fontFamily:"inherit",fontWeight:800,fontSize:14,
-                  cursor:"pointer",boxShadow:"0 3px 12px rgba(20,83,45,.3)"}}>
-                ✋ Request to Join
-              </button>
+            <div style={{
+              marginTop:14, padding:"10px 14px",
+              background:"#fffbeb", border:"1px solid #fde68a",
+              borderRadius:10, fontSize:13, color:"#78350f",
+              lineHeight:1.6,
+            }}>
+              No match found. Try a different spelling, or tap <b>"I'm new to the club"</b> below to sign up.
             </div>
           )}
 
-          {/* Idle hint */}
-          {!hasQuery && (
-            <div style={{textAlign:"center",padding:"20px 0 0"}}>
-              <div style={{fontSize:40,marginBottom:10,opacity:.4}}>🏏</div>
-              <div style={{fontSize:13,color:G.muted,lineHeight:1.7}}>
-                {members.length} members registered<br/>
-                <span style={{fontWeight:700,color:G.text}}>Start typing</span> to find your name
+          {/* OR divider */}
+          <div style={{
+            display:"flex", alignItems:"center", gap:10,
+            margin:"26px 0",
+          }}>
+            <div style={{flex:1, height:1, background:G.border}}/>
+            <div style={{
+              fontSize:10, fontWeight:800, color:G.muted,
+              letterSpacing:2, textTransform:"uppercase",
+            }}>OR</div>
+            <div style={{flex:1, height:1, background:G.border}}/>
+          </div>
+
+          {/* New-to-club CTA card */}
+          <button onClick={startSignup}
+            style={{
+              width:"100%", display:"flex", alignItems:"center", gap:14,
+              background:"#1e3a5f", color:"#fbbf24",
+              border:"none", borderRadius:14,
+              padding:"16px 18px",
+              cursor:"pointer", fontFamily:"inherit",
+              textAlign:"left",
+              boxShadow:"0 4px 16px rgba(30,58,95,.25)",
+              minHeight:64,
+            }}>
+            <div style={{fontSize:26, flexShrink:0}}>✋</div>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:900, fontSize:15, lineHeight:1.2}}>
+                I'm new to the club
               </div>
-              <div style={{marginTop:20,paddingTop:20,borderTop:`1px solid ${G.border}`}}>
-                {/* Two-button row: existing members + new members */}
-                <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                  <div style={{fontSize:12,color:G.muted,marginBottom:2}}>
-                    Already a member?
-                  </div>
-                  <button onClick={()=>{setVfStep("search");setVfSearch("");setVfMatch(null);setVfEmail("");setVfPhone("");setVfCode("");setVfError("");setVfConsent(false);setVfIsParent(false);setAuthView("verify");}}
-                    style={{background:G.white,color:G.green,border:`1.5px solid ${G.green}`,
-                      borderRadius:20,padding:"9px 22px",fontSize:13,fontWeight:800,
-                      cursor:"pointer",fontFamily:"inherit"}}>
-                    ✅ Find My Account
-                  </button>
-                  <div style={{fontSize:10,color:G.muted,lineHeight:1.5}}>
-                    Have an <b>FCC-XXXX</b> code from your admin?<br/>
-                    Find your name first, then enter it.
-                  </div>
-                  <div style={{height:1,background:G.border,margin:"4px 0"}}/>
-                  <div style={{fontSize:12,color:G.muted,marginBottom:2}}>
-                    New to Fredensborg CC?
-                  </div>
-                  <button onClick={()=>{
-                      setJrName(""); setJrTeam(""); setJrContact(""); setJrPhone("");
-                      setJrForChild(false); setJrChildName(""); setJrChildTeam("");
-                      setAuthView("joinrequest");
-                    }}
-                    style={{background:G.green,color:G.lime,border:"none",
-                      borderRadius:20,padding:"9px 22px",fontSize:13,fontWeight:800,
-                      cursor:"pointer",fontFamily:"inherit",
-                      boxShadow:"0 3px 12px rgba(20,83,45,.25)"}}>
-                    ✋ Join Fredensborg CC
-                  </button>
+              <div style={{fontSize:12, color:"rgba(251,191,36,.78)", marginTop:2}}>
+                Sign up to join
+              </div>
+            </div>
+            <div style={{fontSize:20, color:"#fbbf24"}}>→</div>
+          </button>
+
+          {/* FCC-XXXX invite code — small link, inline expander */}
+          <div style={{textAlign:"center", marginTop:18}}>
+            <button onClick={()=>setInviteExpanded(v=>!v)}
+              style={{
+                background:"transparent", border:"none",
+                fontSize:12, color:G.muted,
+                cursor:"pointer", fontFamily:"inherit",
+                padding:"4px 8px",
+              }}>
+              Have an <b style={{color:G.text}}>FCC-XXXX</b> code?{" "}
+              <span style={{color:"#1e40af", textDecoration:"underline"}}>
+                Tap here
+              </span>
+            </button>
+          </div>
+
+          {inviteExpanded && (
+            <div style={{
+              marginTop:10,
+              background:G.white, border:`1.5px solid ${G.border}`,
+              borderRadius:12, padding:"14px 16px",
+              display:"flex", flexDirection:"column", gap:10,
+            }}>
+              <input
+                autoFocus type="text" autoCapitalize="characters" spellCheck={false}
+                placeholder="FCC-XXXX"
+                value={inlineInviteCode}
+                onChange={e=>{setInlineInviteCode(e.target.value.toUpperCase()); setInlineInviteError("");}}
+                onKeyDown={e=>e.key==="Enter" && submitInlineInvite()}
+                style={{
+                  width:"100%", boxSizing:"border-box",
+                  borderRadius:10, border:`1.5px solid ${inlineInviteError?"#ef4444":G.border}`,
+                  padding:"12px 14px", fontSize:18,
+                  fontFamily:"'DM Sans',sans-serif", fontWeight:700,
+                  background:G.cream, color:G.text, outline:"none",
+                  letterSpacing:3, textAlign:"center",
+                }}
+              />
+              {inlineInviteError && (
+                <div style={{fontSize:12, color:"#dc2626", fontWeight:700}}>
+                  ⚠️ {inlineInviteError}
                 </div>
-              </div>
+              )}
+              <button onClick={submitInlineInvite}
+                style={{
+                  background:G.green, color:G.lime, border:"none",
+                  borderRadius:10, padding:"12px",
+                  fontSize:14, fontWeight:800,
+                  cursor:"pointer", fontFamily:"inherit",
+                }}>
+                Verify code →
+              </button>
             </div>
           )}
         </div>
@@ -1579,150 +1691,7 @@ export default function App() {
   // RENDER: Auth — Request to Join
   // ════════════════════════════════════════════════════════════
   if(!currentUser && authView==="joinrequest") {
-    const nonPlayerOption = "I don't play / I'm a parent";
-    const teamOptions = [...ALL_TEAMS.filter(t=>t!=="Unassigned"), nonPlayerOption];
-
-    function submitJoinRequest() {
-      const nameToCheck = jrForChild ? jrChildName.trim() : jrName.trim();
-      if(!nameToCheck) { showToast("Please enter a name"); return; }
-      const teamVal = jrForChild ? jrChildTeam : jrTeam;
-      const req = {
-        id: uid(),
-        submittedAt: new Date().toISOString(),
-        forChild: jrForChild,
-        playerName: jrForChild ? jrChildName.trim() : jrName.trim(),
-        playerTeam: teamVal==="unsure" ? null : (teamVal||null),
-        parentName: jrForChild ? jrName.trim() : null,
-        email: jrContact.trim()||null,      // stored as email not contact
-        contact: jrPhone.trim()||null,       // phone in contact
-        status: "pending",
-      };
-      saveJoinRequests([...joinRequests, req]);
-      fetch("/api/notify", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-          type:"joinrequest",
-          data:{
-            name: req.playerName,
-            playerTeam: req.playerTeam||"Not sure yet",
-            message: req.parentName
-              ? `Parent: ${req.parentName}${req.email?" · "+req.email:""}${req.contact?" · "+req.contact:""}`
-              : `${req.email||""}${req.contact?" · "+req.contact:""}`
-          }
-        })
-      }).catch(()=>{});
-      setAuthView("joinrequestdone");
-    }
-
-    return (
-      <Shell G={G}>
-        <div style={{background:G.green,padding:"20px 20px 16px",textAlign:"center"}}>
-          <div style={{fontSize:26,marginBottom:4}}>✋</div>
-          <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
-            fontSize:19,fontWeight:900}}>Request to Join</div>
-          <div style={{color:"rgba(255,255,255,0.6)",fontSize:12,marginTop:3}}>
-            An admin will review and add you shortly
-          </div>
-        </div>
-
-        <div style={{padding:"20px 20px 100px",display:"flex",flexDirection:"column",gap:14}}>
-
-          {/* Registering for yourself or a child? */}
-          <div style={{background:"#fff",border:`1.5px solid ${G.border}`,borderRadius:12,
-            padding:"14px 16px"}}>
-            <div style={{fontSize:11,fontWeight:900,letterSpacing:1.5,color:G.muted,
-              textTransform:"uppercase",marginBottom:10}}>Who are you registering?</div>
-            <div style={{display:"flex",gap:8}}>
-              {[{v:false,label:"🙋 Myself"},{v:true,label:"👶 My child"}].map(opt=>(
-                <button key={String(opt.v)} onClick={()=>{
-                    if(opt.v && !jrForChild) {
-                      // Switching TO child tab — move typed name to child field
-                      if(jrName.trim()) { setJrChildName(jrName.trim()); setJrName(""); }
-                    } else if(!opt.v && jrForChild) {
-                      // Switching BACK to myself — move child name back if parent name empty
-                      if(!jrName.trim() && jrChildName.trim()) { setJrName(jrChildName.trim()); setJrChildName(""); }
-                    }
-                    setJrForChild(opt.v);
-                  }}
-                  style={{flex:1,padding:"10px 0",borderRadius:10,border:"none",
-                    cursor:"pointer",fontFamily:"inherit",fontWeight:700,fontSize:13,
-                    background:jrForChild===opt.v ? G.green : G.bg,
-                    color:jrForChild===opt.v ? G.lime : G.muted,
-                    transition:"all .12s"}}>
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Your name (always shown — either player or parent) */}
-          <div style={{background:"#fff",border:`1.5px solid ${G.border}`,borderRadius:12,
-            padding:"14px 16px",display:"flex",flexDirection:"column",gap:10}}>
-            <FFld G={G} label={jrForChild ? "Your Name (Parent / Guardian)" : "Your Full Name"}>
-              <input placeholder={jrForChild ? "e.g. Priya Sharma" : "e.g. Arjun Sharma"}
-                style={iSt()} value={jrName}
-                onChange={e=>setJrName(e.target.value)}/>
-            </FFld>
-            {!jrForChild&&(
-              <FFld G={G} label="Your Team / Group">
-                <select style={iSt()} value={jrTeam} onChange={e=>setJrTeam(e.target.value)}>
-                  <option value="">— Select your team —</option>
-                  {teamOptions.map(t=><option key={t} value={t}>{t}</option>)}
-                </select>
-              </FFld>
-            )}
-            <FFld G={G} label="Your Email">
-              <input type="email" placeholder="your@email.com"
-                style={iSt()} value={jrContact}
-                onChange={e=>setJrContact(e.target.value)}/>
-            </FFld>
-            <FFld G={G} label="Your Phone (optional)">
-              <input type="tel" placeholder="+45 XX XX XX XX"
-                style={iSt()} value={jrPhone||""}
-                onChange={e=>setJrPhone?.(e.target.value)}/>
-            </FFld>
-          </div>
-
-          {/* Child details — only if registering for child */}
-          {jrForChild&&(
-            <div style={{background:"#fdf2f8",border:"1.5px solid #f9a8d4",borderRadius:12,
-              padding:"14px 16px",display:"flex",flexDirection:"column",gap:10}}>
-              <div style={{fontSize:11,fontWeight:900,letterSpacing:1.5,
-                color:"#be185d",textTransform:"uppercase",marginBottom:2}}>
-                👶 Child's Details
-              </div>
-              <FFld G={G} label="Child's Full Name">
-                <input placeholder="Child's full name"
-                  style={iSt()} value={jrChildName}
-                  onChange={e=>setJrChildName(e.target.value)}/>
-              </FFld>
-              <FFld G={G} label="Child's Team / Group">
-                <select style={iSt()} value={jrChildTeam} onChange={e=>setJrChildTeam(e.target.value)}>
-                  <option value="">— Select team —</option>
-                  <option value="unsure">I'm not sure</option>
-                  {teamOptions.filter(t=>t!==nonPlayerOption).map(t=>(
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </FFld>
-            </div>
-          )}
-
-          <button onClick={submitJoinRequest}
-            style={{background:G.green,color:G.lime,border:"none",borderRadius:12,
-              padding:"15px",fontSize:15,fontWeight:800,cursor:"pointer",
-              fontFamily:"inherit",boxShadow:"0 3px 14px rgba(20,83,45,.3)"}}>
-            Submit Request →
-          </button>
-          <button onClick={()=>setAuthView("pick")}
-            style={{background:"transparent",color:G.muted,border:"none",
-              fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",padding:"6px"}}>
-            ← Back to login
-          </button>
-        </div>
-      </Shell>
-    );
+    return <SignupFlow />;
   }
 
   // ════════════════════════════════════════════════════════════
@@ -2038,7 +2007,7 @@ export default function App() {
     // ── Step: notfound — new member/parent ────────────────────
     if(vfStep==="notfound") return (
       <Shell G={G}>
-        {hdr("Join Fredensborg CC","Set up your account")}
+        {hdr("Join Fredensborg Cricket Club","Set up your account")}
         <div style={{padding:"20px 20px 40px"}}>
           {/* Privacy notice */}
           <div style={{background:G.cream,border:`1px solid ${G.border}`,borderRadius:10,

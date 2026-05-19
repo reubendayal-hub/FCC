@@ -199,7 +199,7 @@ function buildHtml24hr(name, sessions, targetDate) {
     <div style="background:#b91c1c;color:#fff;padding:20px;border-radius:14px 14px 0 0;text-align:center;">
       <div style="font-size:28px;margin-bottom:6px;">🏏</div>
       <div style="font-size:20px;font-weight:900;">TOMORROW!</div>
-      <div style="font-size:13px;color:#fecaca;">Final Reminder · Fredensborg CC</div>
+      <div style="font-size:13px;color:#fecaca;">Final Reminder · Fredensborg Cricket Club</div>
     </div>
     <div style="background:#fff;padding:20px;border-radius:0 0 14px 14px;">
       <div style="font-size:15px;color:#334155;margin-bottom:16px;">

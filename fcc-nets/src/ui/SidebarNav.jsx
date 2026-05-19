@@ -23,7 +23,7 @@ export default function SidebarNav({view, setView, userRole, currentUser, onLogo
       <img src={logo} alt="FCC" className="fcc-sidebar-logo"/>
       <div>
         <div className="fcc-sidebar-title">FCC Training</div>
-        <div className="fcc-sidebar-sub" style={{marginTop:4}}>Fredensborg CC</div>
+        <div className="fcc-sidebar-sub" style={{marginTop:4}}>Fredensborg Cricket Club</div>
       </div>
       <div className="fcc-sidebar-links">
         {navBtn("schedule","📅","Schedule")}
