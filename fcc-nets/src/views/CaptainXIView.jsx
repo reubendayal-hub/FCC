@@ -249,7 +249,7 @@ export default function CaptainXIView() {
     };
     
     return (
-      <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole} currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO}/>} G={G}>
+      <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole} currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO} joinRequests={joinRequests}/>} G={G}>
         <AppHeader title="Captain's XI" sub="Select your playing eleven" onBack={()=>setView("schedule")}/>
         
         {/* Superadmin selective reset button — opens modal to pick specific matches */}
