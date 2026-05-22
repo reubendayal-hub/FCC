@@ -134,7 +134,7 @@ function formatMatchSchedule(match) {
 
 export default function MatchesView({
   view, setView, userRole, currentUser,
-  members = [], teams = [], pendingCount = 0,
+  members = [], teams = [], pendingCount = 0, joinRequests = [],
   toast, showToast, SidebarNav, handleLogout,
 }) {
   const [matches,       setMatches]       = useState([]);
@@ -259,7 +259,7 @@ export default function MatchesView({
           setScreen("scorer");
         }}
         SidebarNav={SidebarNav} view={view} setView={setView}
-        userRole={userRole} pendingCount={pendingCount}
+        userRole={userRole} pendingCount={pendingCount} joinRequests={joinRequests}
         handleLogout={handleLogout} toast={toast}
       />
     );
@@ -278,7 +278,7 @@ export default function MatchesView({
   return (
     <Shell G={G} sidebar={
       <SidebarNav view={view} setView={setView} userRole={userRole}
-        currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO} />
+        currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO} joinRequests={joinRequests} />
     }>
       <AppHeader title="ScorePro" sub="Score · Watch · Stats"
         currentUser={currentUser} handleLogout={handleLogout} />
@@ -906,7 +906,7 @@ function RecomputeStatsSheet({ G, match, recomputing, onCancel, onConfirm }) {
 
 function CreateMatchScreen({
   teams, members, currentUser, onBack, onCreated,
-  SidebarNav, view, setView, userRole, pendingCount, handleLogout, toast,
+  SidebarNav, view, setView, userRole, pendingCount, joinRequests=[], handleLogout, toast,
 }) {
   const [step,   setStep]   = useState(1);
   const [saving, setSaving] = useState(false);
@@ -987,7 +987,7 @@ function CreateMatchScreen({
   return (
     <Shell G={G} sidebar={
       <SidebarNav view={view} setView={setView} userRole={userRole}
-        currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO} />
+        currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO} joinRequests={joinRequests} />
     }>
       <AppHeader title="New Match" sub="Step by step setup"
         currentUser={currentUser} handleLogout={handleLogout} onBack={onBack} />

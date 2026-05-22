@@ -76,7 +76,7 @@ export default function AvailabilityView() {
 
   return (
     <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
-        currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO}/>} G={G}>
+        currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO} joinRequests={joinRequests}/>} G={G}>
       <AppHeader title="Team Availability" sub="Full 2026 Season"
         onBack={()=>setView("schedule")}/>
       <div style={{padding:"14px 16px 100px"}}>

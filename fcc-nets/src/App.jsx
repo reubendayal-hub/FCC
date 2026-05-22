@@ -2761,6 +2761,7 @@ export default function App() {
             members={members}
             teams={teams}
             pendingCount={joinRequests.filter(r => r.status === "pending").length}
+            joinRequests={joinRequests}
             toast={toast}
             showToast={showToast}
             SidebarNav={SidebarNav}

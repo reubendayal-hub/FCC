@@ -2,12 +2,13 @@ import React from "react";
 import { can } from "../constants/roles";
 import { isCoachMember } from "../utils/members";
 
-export default function SidebarNav({view, setView, userRole, currentUser, onLogout, teams=[], logo}) {
+export default function SidebarNav({view, setView, userRole, currentUser, onLogout, teams=[], logo, joinRequests=[]}) {
   const isAdmin = can(userRole,"accessMembers");
   const isCaptain = teams.some(t => t.senior && (t.captain === currentUser?.name || t.vicecaptain === currentUser?.name));
   const active = view==="session"?"schedule":view==="roleAdmin"?"admin":view;
+  const pendingCount = joinRequests.filter(r => r.status === "pending").length;
 
-  const navBtn = (v, icon, label) => (
+  const navBtn = (v, icon, label, badge=0) => (
     <button key={v} onClick={()=>setView(v)} style={{
       display:"flex",alignItems:"center",gap:12,width:"100%",
       padding:"11px 14px",borderRadius:10,border:"none",cursor:"pointer",
@@ -15,7 +16,14 @@ export default function SidebarNav({view, setView, userRole, currentUser, onLogo
       background: active===v ? "rgba(255,255,255,.18)" : "transparent",
       color: active===v ? "#fff" : "rgba(255,255,255,.6)",
       transition:"all .15s",textAlign:"left",
-    }}>{icon} {label}</button>
+    }}>
+      <span>{icon} {label}</span>
+      {badge > 0 && (
+        <span style={{marginLeft:"auto",background:"#ef4444",color:"#fff",
+          borderRadius:99,fontSize:11,fontWeight:900,padding:"1px 7px",
+          minWidth:18,textAlign:"center",lineHeight:"16px"}}>{badge}</span>
+      )}
+    </button>
   );
 
   return (
@@ -31,7 +39,7 @@ export default function SidebarNav({view, setView, userRole, currentUser, onLogo
         {navBtn("scorelive", "💯", "ScorePro")}
         {(isAdmin || isCoachMember(currentUser?.name,teams)) && navBtn("coachhq","🧢","Coach HQ")}
         {(isCaptain || isAdmin) && navBtn("captainxi","⚓","Captain's XI")}
-        {isAdmin && navBtn("admin","👥","Admin Panel")}
+        {isAdmin && navBtn("admin","👥","Admin Panel",pendingCount)}
         {(isAdmin || isCoachMember(currentUser?.name,[])) && navBtn("availability","📊","Team Availability")}
         {navBtn("profile","👤","My Profile")}
       </div>

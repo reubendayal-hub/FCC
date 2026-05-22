@@ -24,7 +24,7 @@ export default function CoachHQView() {
 
   return (
     <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
-        currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO}/>} G={G}>
+        currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO} joinRequests={joinRequests}/>} G={G}>
       <AppHeader onBack={()=>setView("schedule")}
         title="Coach HQ" sub="Tools for coaches"/>
       <div style={{padding:"16px"}}>

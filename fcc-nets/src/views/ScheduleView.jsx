@@ -43,7 +43,7 @@ export default function ScheduleView() {
 
   return (
     <Shell sidebar={<SidebarNav view={view} setView={setView} userRole={userRole}
-        currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO}/>} G={G}>
+        currentUser={currentUser} onLogout={handleLogout} teams={teams} logo={FCC_LOGO} joinRequests={joinRequests}/>} G={G}>
       {/* ── Schedule header — B+D hybrid ── */}
       <div style={{background:G.green,position:"sticky",top:0,zIndex:100}}>
         {/* Compact single bar: logo · date+title · avatar */}
