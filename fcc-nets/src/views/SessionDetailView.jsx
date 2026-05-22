@@ -626,7 +626,7 @@ export default function SessionDetailView() {
                         fontSize: 12, fontWeight: 700, cursor: "pointer",
                         fontFamily: "inherit", marginBottom: showAssignUI ? 8 : 0
                       }}>
-                      {showAssignUI ? "▲ Hide assign panel" : `▼ Assign or check fairness (${teamParents.length} parents)`}
+                      {showAssignUI ? "▲ Hide assign panel" : `▼ Assign or check fairness (${teamRoster.length} parents)`}
                     </button>
 
                     {showAssignUI && (
