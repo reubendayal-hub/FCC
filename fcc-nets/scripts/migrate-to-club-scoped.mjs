@@ -43,6 +43,10 @@ function initAdmin() {
     process.exit(1);
   }
   const sa = JSON.parse(saJson);
+  if (sa.project_id !== "cricops-staging") {
+    console.error(`ABORT: service account project_id is "${sa.project_id}", expected "cricops-staging". Refusing to run against any other project.`);
+    process.exit(1);
+  }
   admin.initializeApp({ credential: admin.credential.cert(sa) });
 }
 
