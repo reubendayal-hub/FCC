@@ -5,8 +5,9 @@
 // reorganisation — no behaviour changes.
 
 import { useState, useEffect } from "react";
-import { db } from "../firebase";
+import { db, auth } from "../firebase";
 import { doc, getDoc } from "firebase/firestore";
+import { signInWithCustomToken, signOut } from "firebase/auth";
 import { hashPin } from "../utils/crypto";
 import { EMAIL_SEED } from "../constants/seeds";
 
@@ -59,6 +60,19 @@ export function useAuth({
   // hashCode — small helper used by handleVerifyCode (mirrors the
   // copy still in App.jsx for generateInviteCode).
   function hashCode(code) { return hashPin(code.toUpperCase()); }
+
+  // Fire-and-forget: get a Firebase custom token and sign in.
+  // Non-blocking — the existing localStorage currentUser flow is unaffected if this fails.
+  function mintFirebaseToken(memberId, pin) {
+    fetch("/api/auth-token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ memberId, pin }),
+    })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(({ token }) => signInWithCustomToken(auth, token))
+      .catch(err => console.warn("auth-token:", err));
+  }
 
   // ── Auth flow handlers ──────────────────────────────────────
   async function handlePickMember(member) {
@@ -126,12 +140,15 @@ export function useAuth({
     savePins(updated);
     setCurrentUser(pendingMember);
     localStorage.setItem("fcc-current-user", JSON.stringify(pendingMember));
+    const { id: memberId, name } = pendingMember;
     setPendingMember(null);
     setAuthView("pick");
-    showToast(`Welcome, ${pendingMember.name.split(" ")[0]}! PIN set ✓`);
+    showToast(`Welcome, ${name.split(" ")[0]}! PIN set ✓`);
+    mintFirebaseToken(memberId, pin);
   }
 
   function handleEnterPin(pin) {
+    const { id: memberId, name } = pendingMember;
     // EMERGENCY: Allow 0000 as universal PIN for ALL members during recovery
     // This lets everyone back in after the data incident
     if(pin === "0000") {
@@ -140,17 +157,19 @@ export function useAuth({
       setPendingMember(null);
       setPinError("");
       setAuthView("pick");
-      showToast(`Welcome, ${pendingMember.name.split(" ")[0]}! 👋`);
+      showToast(`Welcome, ${name.split(" ")[0]}! 👋`);
+      mintFirebaseToken(memberId, pin);
       return;
     }
     // Normal PIN check
-    if(hashPin(pin) === pins[pendingMember.id]) {
+    if(hashPin(pin) === pins[memberId]) {
       setCurrentUser(pendingMember);
       localStorage.setItem("fcc-current-user", JSON.stringify(pendingMember));
       setPendingMember(null);
       setPinError("");
       setAuthView("pick");
-      showToast(`Welcome back, ${pendingMember.name.split(" ")[0]}! 👋`);
+      showToast(`Welcome back, ${name.split(" ")[0]}! 👋`);
+      mintFirebaseToken(memberId, pin);
     } else {
       setPinError("Wrong PIN, try again");
       setTimeout(()=>setPinError(""),2000);
@@ -163,6 +182,7 @@ export function useAuth({
     setAuthView("pick");
     setPickSearch("");
     setView("schedule");
+    signOut(auth).catch(err => console.warn("signOut:", err));
   }
 
   return {
