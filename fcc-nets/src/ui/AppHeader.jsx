@@ -11,7 +11,8 @@ export default function AppHeader({ onBack, title, sub, children }) {
   const G = ctx.G || { green:"#1a6b38", white:"#fff", lime:"#84cc16" };
   const { currentUser, handleLogout } = ctx;
   return (
-    <div style={{background:G.green,padding:"12px 16px",
+    <div style={{background:G.green,
+      padding:"calc(12px + env(safe-area-inset-top)) 16px 12px",
       position:"sticky",top:0,zIndex:100}}>
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:children?10:0}}>
         {onBack
