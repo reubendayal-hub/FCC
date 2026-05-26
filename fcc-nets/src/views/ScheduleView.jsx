@@ -47,7 +47,7 @@ export default function ScheduleView() {
       {/* ── Schedule header — B+D hybrid ── */}
       <div style={{background:G.green,position:"sticky",top:0,zIndex:100}}>
         {/* Compact single bar: logo · date+title · avatar */}
-        <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+        <div style={{padding:"calc(10px + env(safe-area-inset-top)) 14px 10px",display:"flex",alignItems:"center",gap:10}}>
           <img src={FCC_LOGO} alt="FCC" className="fcc-header-logo"
             style={{width:30,height:30,borderRadius:"50%",objectFit:"cover",flexShrink:0,
               border:"1.5px solid rgba(255,255,255,0.3)"}}/>
