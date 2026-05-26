@@ -3190,6 +3190,7 @@ export default function AdminView() {
               }
 
               const teamsCount = new Set(unsynced.map(u => u.team)).size;
+              const pendingTeams = [...new Set(unsynced.map(u => u.team))].sort().join(", ");
               return (
                 <div style={{
                   background: "#eff6ff",
@@ -3211,6 +3212,9 @@ export default function AdminView() {
                       <div style={{ fontSize: 11, color: "#3b82f6", marginTop: 2 }}>
                         {unsynced.length} match{unsynced.length > 1 ? "es" : ""} for {teamsCount} team{teamsCount > 1 ? "s" : ""} —
                         enables parent duty sign-up, captain XI, and scoring
+                      </div>
+                      <div style={{ fontSize: 10, color: "#60a5fa", marginTop: 3 }}>
+                        Pending: {pendingTeams}
                       </div>
                     </div>
                     <button
