@@ -22,6 +22,12 @@ const RECURRING_KEY = "recurring";
 const JOINREQS_KEY  = "joinrequests";
 const AUDITLOG_KEY  = "auditlog";
 
+// Hardcoded for now; becomes a resolver in the multi-club open-up stage.
+const CLUB_ID = import.meta.env.VITE_CLUB_ID || "fredensborg";
+
+// Club-scoped doc helper — replaces all cdoc(key) calls.
+const cdoc = (key) => doc(db, "clubs", CLUB_ID, "data", key);
+
 export function useFirestore({ currentUserRef }) {
   // ── Core data state ──────────────────────────────────────────
   const [sessions, setSessions] = useState([]);
@@ -54,24 +60,24 @@ export function useFirestore({ currentUserRef }) {
   // ── Load + real-time sync via Firestore ──────────────────────
   useEffect(()=>{
     const refs = {
-      sessions:    doc(db,"fccnets","sessions"),
-      members:     doc(db,"fccnets","members"),
-      pins:        doc(db,"fccnets","pins"),
-      teams:       doc(db,"fccnets","teams"),
-      recurring:   doc(db,"fccnets",RECURRING_KEY),
-      blockcals:   doc(db,"fccnets","blockcals"),
-      invitecodes: doc(db,"fccnets","invitecodes"),
-      joinrequests:doc(db,"fccnets",JOINREQS_KEY),
-      auditlog:    doc(db,"fccnets",AUDITLOG_KEY),
-      reminderlogs:doc(db,"fccnets","reminderlogs"),
-      cancelledsessions: doc(db,"fccnets","cancelledsessions"),
-      seasonplans: doc(db,"fccnets","seasonplans"),
-      attendance:  doc(db,"fccnets","attendance"),      // {sessionId: {playerId: true/false}}
-      sessionnotes:doc(db,"fccnets","sessionnotes"),    // [{sessionId, playerId, text, coach, date}]
-      playerprogress:doc(db,"fccnets","playerprogress"),// {playerId: {snapshots, currentPhase}}
-      coachoverrides:doc(db,"fccnets","coachoverrides"),// {date-sessionId: {newCoach, oldCoach}}
-      matchselections:doc(db,"fccnets","matchselections"),// {matchId: {players, captain, vc, wk, note, reportTime}}
-      notetemplates:doc(db,"fccnets","captainnotes_templates"), // [{id, text, createdBy, createdAt, updatedAt}]
+      sessions:    cdoc("sessions"),
+      members:     cdoc("members"),
+      pins:        cdoc("pins"),
+      teams:       cdoc("teams"),
+      recurring:   cdoc(RECURRING_KEY),
+      blockcals:   cdoc("blockcals"),
+      invitecodes: cdoc("invitecodes"),
+      joinrequests:cdoc(JOINREQS_KEY),
+      auditlog:    cdoc(AUDITLOG_KEY),
+      reminderlogs:cdoc("reminderlogs"),
+      cancelledsessions: cdoc("cancelledsessions"),
+      seasonplans: cdoc("seasonplans"),
+      attendance:  cdoc("attendance"),      // {sessionId: {playerId: true/false}}
+      sessionnotes:cdoc("sessionnotes"),    // [{sessionId, playerId, text, coach, date}]
+      playerprogress:cdoc("playerprogress"),// {playerId: {snapshots, currentPhase}}
+      coachoverrides:cdoc("coachoverrides"),// {date-sessionId: {newCoach, oldCoach}}
+      matchselections:cdoc("matchselections"),// {matchId: {players, captain, vc, wk, note, reportTime}}
+      notetemplates:cdoc("captainnotes_templates"), // [{id, text, createdBy, createdAt, updatedAt}]
     };
     (async()=>{
       try {
@@ -147,7 +153,7 @@ export function useFirestore({ currentUserRef }) {
             updatedAt: nowIso,
           }));
           setNoteTemplates(seeded);
-          setDoc(doc(db,"fccnets","captainnotes_templates"), {value: JSON.stringify(seeded)}).catch(()=>{});
+          setDoc(cdoc("captainnotes_templates"), {value: JSON.stringify(seeded)}).catch(()=>{});
         }
       } catch(e) {
         setMembers(SEED_MEMBERS.map(normMember)); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]); recurringRef.current=[]; setBlockCals([]); setInviteCodes({}); setJoinRequests([]); setAuditLog([]); setReminderLogs([]); setCancelledSessions([]);
@@ -166,7 +172,7 @@ export function useFirestore({ currentUserRef }) {
 
   // ── Parent-duty config: live listener ────────────────────────
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, "fccnets", "parentdutyconfig"), (snap) => {
+    const unsub = onSnapshot(cdoc("parentdutyconfig"), (snap) => {
       if (!snap.exists()) {
         setParentDutyConfig({});
         return;
@@ -184,7 +190,7 @@ export function useFirestore({ currentUserRef }) {
   }, []);
 
   // ── Save functions ───────────────────────────────────────────
-  const saveSessions  = async u => { setSessions(u); sessionsRef.current=u; await setDoc(doc(db,"fccnets","sessions"), {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveSessions  = async u => { setSessions(u); sessionsRef.current=u; await setDoc(cdoc("sessions"), {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveMembers   = async u => {
     // Version protection: don't save if new data has fewer members than before (possible corruption)
     const currentCount = membersRef.current?.length || 0;
@@ -200,7 +206,7 @@ export function useFirestore({ currentUserRef }) {
     membersRef.current=u;
 
     // Save with version metadata
-    await setDoc(doc(db,"fccnets","members"), {
+    await setDoc(cdoc("members"), {
       value: JSON.stringify(u),
       _version: Date.now(),
       _count: u.length
@@ -208,29 +214,29 @@ export function useFirestore({ currentUserRef }) {
 
     // Auto-backup: save timestamped snapshot daily
     const backupKey = `members_backup_${new Date().toISOString().slice(0,10)}`;
-    await setDoc(doc(db,"fccnets",backupKey), {
+    await setDoc(cdoc(backupKey), {
       value: JSON.stringify(u),
       savedAt: new Date().toISOString(),
       memberCount: u.length
     }).catch(()=>{});
   };
-  const savePins      = async u => { setPins(u);      await setDoc(doc(db,"fccnets","pins"),     {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveTeams     = async u => { setTeams(u); teamsRef.current=u; await setDoc(doc(db,"fccnets","teams"),    {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveRecurring = async u => { setRecurring(u); recurringRef.current=u; await setDoc(doc(db,"fccnets",RECURRING_KEY),{value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveBlockCals   = async u => { setBlockCals(u);   await setDoc(doc(db,"fccnets","blockcals"),   {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveCancelledSessions = async u => { setCancelledSessions(u); await setDoc(doc(db,"fccnets","cancelledsessions"), {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveInviteCodes = async u => { setInviteCodes(u);  await setDoc(doc(db,"fccnets","invitecodes"), {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveJoinRequests= async u => { setJoinRequests(u); await setDoc(doc(db,"fccnets",JOINREQS_KEY),  {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveSeasonPlans = async u => { setSeasonPlans(u); await setDoc(doc(db,"fccnets","seasonplans"), {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveAllAttendance   = async u => { setAllAttendance(u);   await setDoc(doc(db,"fccnets","attendance"),     {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveAllSessionNotes = async u => { setAllSessionNotes(u); await setDoc(doc(db,"fccnets","sessionnotes"),   {value:JSON.stringify(u)}).catch(()=>{}); };
-  const savePlayerProgress  = async u => { setPlayerProgress(u);  await setDoc(doc(db,"fccnets","playerprogress"), {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveCoachOverrides  = async u => { setCoachOverrides(u);  await setDoc(doc(db,"fccnets","coachoverrides"), {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveMatchSelections = async u => { setMatchSelections(u); await setDoc(doc(db,"fccnets","matchselections"), {value:JSON.stringify(u)}).catch(()=>{});};
-  const saveNoteTemplates   = async u => { setNoteTemplates(u);   await setDoc(doc(db,"fccnets","captainnotes_templates"), {value:JSON.stringify(u)}).catch(()=>{});};
+  const savePins      = async u => { setPins(u);      await setDoc(cdoc("pins"),     {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveTeams     = async u => { setTeams(u); teamsRef.current=u; await setDoc(cdoc("teams"),    {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveRecurring = async u => { setRecurring(u); recurringRef.current=u; await setDoc(cdoc(RECURRING_KEY),{value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveBlockCals   = async u => { setBlockCals(u);   await setDoc(cdoc("blockcals"),   {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveCancelledSessions = async u => { setCancelledSessions(u); await setDoc(cdoc("cancelledsessions"), {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveInviteCodes = async u => { setInviteCodes(u);  await setDoc(cdoc("invitecodes"), {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveJoinRequests= async u => { setJoinRequests(u); await setDoc(cdoc(JOINREQS_KEY),  {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveSeasonPlans = async u => { setSeasonPlans(u); await setDoc(cdoc("seasonplans"), {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveAllAttendance   = async u => { setAllAttendance(u);   await setDoc(cdoc("attendance"),     {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveAllSessionNotes = async u => { setAllSessionNotes(u); await setDoc(cdoc("sessionnotes"),   {value:JSON.stringify(u)}).catch(()=>{}); };
+  const savePlayerProgress  = async u => { setPlayerProgress(u);  await setDoc(cdoc("playerprogress"), {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveCoachOverrides  = async u => { setCoachOverrides(u);  await setDoc(cdoc("coachoverrides"), {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveMatchSelections = async u => { setMatchSelections(u); await setDoc(cdoc("matchselections"), {value:JSON.stringify(u)}).catch(()=>{});};
+  const saveNoteTemplates   = async u => { setNoteTemplates(u);   await setDoc(cdoc("captainnotes_templates"), {value:JSON.stringify(u)}).catch(()=>{});};
   const saveParentDutyConfig = async (config) => {
     try {
-      await setDoc(doc(db,"fccnets","parentdutyconfig"), {
+      await setDoc(cdoc("parentdutyconfig"), {
         value: JSON.stringify(config || {}),
       });
       setParentDutyConfig(config || {});
@@ -244,7 +250,7 @@ export function useFirestore({ currentUserRef }) {
   // Cap at 500 entries; newest first. Only superadmin can read.
   const saveAuditLog = async u => {
     setAuditLog(u);
-    await setDoc(doc(db,"fccnets",AUDITLOG_KEY), {value:JSON.stringify(u)}).catch(()=>{});
+    await setDoc(cdoc(AUDITLOG_KEY), {value:JSON.stringify(u)}).catch(()=>{});
   };
   function logAction(category, detail) {
     const cu = currentUserRef?.current;
@@ -260,7 +266,7 @@ export function useFirestore({ currentUserRef }) {
     };
     setAuditLog(prev => {
       const next = [entry, ...prev].slice(0, 500);
-      setDoc(doc(db,"fccnets",AUDITLOG_KEY), {value:JSON.stringify(next)}).catch(()=>{});
+      setDoc(cdoc(AUDITLOG_KEY), {value:JSON.stringify(next)}).catch(()=>{});
       return next;
     });
   }

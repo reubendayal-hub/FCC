@@ -1,4 +1,5 @@
 // /api/send-reminders.js — Sends reminders 48hrs AND 24hrs before sessions
+// TODO (Stage 5 prod cutover): update fccnets/* REST paths to clubs/fredensborg/data/* before prod migration.
 import { createSign } from "node:crypto";
 
 function getAccessToken(clientEmail, privateKey) {

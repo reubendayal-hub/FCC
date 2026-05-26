@@ -9,10 +9,9 @@
 
 import admin from "firebase-admin";
 
-// Path constants — change PINS_PATH here when Stage 2 migrates to club-scoped paths.
-const PINS_PATH    = "fccnets/pins";
-const MEMBERS_PATH = "fccnets/members";
 const CLUB_ID      = "fredensborg";
+const PINS_PATH    = `clubs/${CLUB_ID}/data/pins`;
+const MEMBERS_PATH = `clubs/${CLUB_ID}/data/members`;
 
 // djb2 — must stay identical to src/utils/crypto.js hashPin.
 function hashPin(pin) {

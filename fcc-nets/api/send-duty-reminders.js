@@ -1,4 +1,5 @@
 // /api/send-duty-reminders.js
+// TODO (Stage 5 prod cutover): update fccnets/* REST paths to clubs/fredensborg/data/* before prod migration.
 // Sends parent duty reminders for ALL teams with parent duty enabled.
 //
 // Runs daily at 08:00 UTC (configured in vercel.json).

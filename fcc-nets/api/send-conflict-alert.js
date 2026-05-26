@@ -1,4 +1,5 @@
 // /api/send-conflict-alert.js
+// TODO (Stage 5 prod cutover): update fccnets/* REST paths to clubs/fredensborg/data/* before prod migration.
 // Daily cron job to check for coach conflicts this week
 // Sends email to reuben.dayal@gmail.com if unresolved conflicts exist
 // Called by cron-job.org daily at 8am
