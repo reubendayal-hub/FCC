@@ -71,6 +71,12 @@ export function useAuth({
     })
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(({ token }) => signInWithCustomToken(auth, token))
+      .then(async () => {
+        const result = await auth.currentUser.getIdTokenResult();
+        console.log("[AUTH DEBUG] uid:", result.claims.sub ?? auth.currentUser.uid);
+        console.log("[AUTH DEBUG] clubId:", result.claims.clubId);
+        console.log("[AUTH DEBUG] role:", result.claims.role);
+      })
       .catch(err => console.warn("auth-token:", err));
   }
 
