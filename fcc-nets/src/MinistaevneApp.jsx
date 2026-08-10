@@ -268,7 +268,11 @@ export default function MinistaevneApp() {
 
   const ALL_CLUBS = [...INVITED, ...extraClubs];
   const confirmedNames = new Set(confirmedList.map((r) => r.clubName));
-  const waiting = ALL_CLUBS.filter((c) => !confirmedNames.has(c.name) && !c.host);
+  // Host clubs are hidden from the public "tap to register" pool (they're
+  // not meant to self-serve join their own event) but admin still needs a
+  // way to add/fix their registration through the same form — so surface
+  // them here only once admin mode is unlocked.
+  const waiting = ALL_CLUBS.filter((c) => !confirmedNames.has(c.name) && (!c.host || adminUnlocked));
   const confirmedClubs = ALL_CLUBS.filter((c) => confirmedNames.has(c.name));
   const teamsTotal = confirmedList.reduce((n, r) => n + (Number(r.teams) || 1), 0);
   const clubCount = confirmedClubs.length;
