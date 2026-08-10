@@ -1,4 +1,11 @@
 {
+  "redirects": [
+    { "source": "/ministaevne/live", "destination": "/ministaevne", "permanent": false }
+  ],
+  "rewrites": [
+    { "source": "/ministaevne", "destination": "/ministaevne-live.html" },
+    { "source": "/ministaevne/register", "destination": "/ministaevne.html" }
+  ],
   "crons": [
     {
       "path": "/api/send-reminders",
