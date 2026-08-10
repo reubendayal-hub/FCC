@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 
 // Shared design tokens, static club data, and small presentational pieces
 // used by both /ministaevne/register (MinistaevneApp.jsx) and
-// /ministaevne/live (MinistaevneLive.jsx) — keeps the two pages visually
+// /ministaevne (MinistaevneLive.jsx) — keeps the two pages visually
 // in lockstep without register's form/admin logic leaking into the
 // read-only spectator bundle.
 

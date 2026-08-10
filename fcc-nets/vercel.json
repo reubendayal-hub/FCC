@@ -1,10 +1,10 @@
 {
   "redirects": [
-    { "source": "/ministaevne", "destination": "/ministaevne/register", "permanent": false }
+    { "source": "/ministaevne/live", "destination": "/ministaevne", "permanent": false }
   ],
   "rewrites": [
-    { "source": "/ministaevne/register", "destination": "/ministaevne.html" },
-    { "source": "/ministaevne/live", "destination": "/ministaevne-live.html" }
+    { "source": "/ministaevne", "destination": "/ministaevne-live.html" },
+    { "source": "/ministaevne/register", "destination": "/ministaevne.html" }
   ],
   "crons": [
     {
