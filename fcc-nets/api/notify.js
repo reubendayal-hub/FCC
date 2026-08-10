@@ -236,7 +236,7 @@ export default async function handler(req, res) {
         This club registered via "not listed" and is awaiting approval in the
         Ministaevne admin table.
       </p>
-      <a href="${APP_URL}/ministaevne"
+      <a href="${APP_URL}/ministaevne/register"
         style="display:inline-block;background:#1e3a5f;
         color:#fbbf24;text-decoration:none;padding:10px 20px;
         border-radius:20px;font-size:13px;font-weight:700;">

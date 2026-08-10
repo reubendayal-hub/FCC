@@ -11,7 +11,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
-        ministaevne: resolve(__dirname, 'ministaevne.html'),
+        ministaevneRegister: resolve(__dirname, 'ministaevne.html'),
+        ministaevneLive: resolve(__dirname, 'ministaevne-live.html'),
       },
     },
   },
