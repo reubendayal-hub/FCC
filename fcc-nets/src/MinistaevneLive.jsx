@@ -47,6 +47,22 @@ function badgeSizeFor(players, isHost) {
   return Math.round(Math.max(46, Math.min(size, 80)));
 }
 
+// Gentle, per-club drift so the cluster feels alive rather than pasted in
+// place — amplitude/timing seeded off the name (salted differently from
+// clusterPosition so the float direction isn't correlated with where the
+// badge sits) so it's still stable across reloads, just not static.
+function floatParamsFor(name, isHost) {
+  const rng = mulberry32(hashString(name + "::float"));
+  const amp = isHost ? 0.5 : 1;
+  return {
+    fx: (rng() - 0.5) * 16 * amp,
+    fy: -(8 + rng() * 10) * amp,
+    fr: (rng() - 0.5) * 6,
+    duration: 3.4 + rng() * 2.6,
+    delay: -(rng() * 4), // negative delay staggers starting phase, not just start time
+  };
+}
+
 export default function MinistaevneLive() {
   const target = useMemo(() => new Date("2026-08-16T11:00:00+02:00").getTime(), []);
   const { d, h, m, s } = useCountdown(target);
@@ -106,7 +122,8 @@ export default function MinistaevneLive() {
     const r = registrationsByClub[c.name];
     const pos = c.host ? { x: 50, y: 50, rotation: 0 } : clusterPosition(c.name);
     const size = badgeSizeFor(r?.players, c.host);
-    return { ...c, ...pos, size, zIndex: c.host ? 1000 : Math.round(size) };
+    const float = floatParamsFor(c.name, c.host);
+    return { ...c, ...pos, size, float, zIndex: c.host ? 1000 : Math.round(size) };
   }), [confirmedClubs, registrationsByClub]);
 
   const shareUrl = typeof window !== "undefined" ? window.location.href : "";
@@ -149,6 +166,11 @@ export default function MinistaevneLive() {
         @keyframes floodSweep { 0%{ opacity:.35;} 50%{ opacity:.6;} 100%{ opacity:.35;} }
         @keyframes ticker { from{ transform: translateX(0);} to{ transform: translateX(-50%);} }
         @keyframes pulseRing { 0%{ transform: scale(1); opacity: .55; } 100%{ transform: scale(1.7); opacity: 0; } }
+        @keyframes floatDrift {
+          0%, 100% { transform: translate(0, 0) rotate(0deg); }
+          33% { transform: translate(var(--fx), calc(var(--fy) * 0.6)) rotate(var(--fr)); }
+          66% { transform: translate(calc(var(--fx) * -0.7), var(--fy)) rotate(calc(var(--fr) * -1)); }
+        }
       `}</style>
 
       <div style={{ position: "absolute", top: -80, left: "10%", width: 300, height: 500, background: `conic-gradient(from 200deg, ${C.gold2}22, transparent 40%)`, filter: "blur(30px)", animation: "floodSweep 6s ease-in-out infinite", pointerEvents: "none" }} />
@@ -240,29 +262,39 @@ export default function MinistaevneLive() {
           )}
 
           {clusterClubs.map((c) => (
+            // Nested so each animated layer owns its own `transform` and none
+            // stomp on each other: outer = fixed anchor position + rotation,
+            // then a one-shot entrance (scale), then a continuous float
+            // (translate/rotate drift) wrapping the actual badge + hover state.
             <div key={c.name} style={{
-              position: "absolute", left: `${c.x}%`, top: `${c.y}%`,
+              position: "absolute", left: `${c.x}%`, top: `${c.y}%`, zIndex: c.zIndex,
               transform: `translate(-50%,-50%) rotate(${c.rotation}deg)`,
-              zIndex: c.zIndex, animation: "popIn 0.5s cubic-bezier(.2,1.4,.4,1)",
-            }}
-              onMouseEnter={() => setHovered(c.name)} onMouseLeave={() => setHovered("")}>
-              <div style={{ position: "relative" }}>
-                <Tooltip text={`${c.name} — ${registrationsByClub[c.name]?.teamName || `${c.name} U11`}`} show={hovered === c.name} />
-                <ClubBadge
-                  size={c.size} ringWidth={c.host ? 4 : 2.5} bg={c.bg} img={c.host ? FCC_LOGO : undefined}
-                  onClick={() => setHovered(hovered === c.name ? "" : c.name)}
-                  title={c.name}
-                >
-                  {c.short}
-                </ClubBadge>
-                {c.host && (
-                  <span style={{
-                    position: "absolute", bottom: -6, left: "50%", transform: "translateX(-50%)",
-                    fontSize: 8.5, backgroundImage: GOLD, color: "#3a2a04", fontWeight: 900,
-                    padding: "2px 8px", borderRadius: 99, whiteSpace: "nowrap",
-                    boxShadow: "0 3px 8px rgba(0,0,0,0.4)",
-                  }}>HOST</span>
-                )}
+            }}>
+              <div style={{ animation: "popIn 0.5s cubic-bezier(.2,1.4,.4,1)" }}>
+                <div style={{
+                  animation: `floatDrift ${c.float.duration}s ease-in-out ${c.float.delay}s infinite`,
+                  "--fx": `${c.float.fx}px`, "--fy": `${c.float.fy}px`, "--fr": `${c.float.fr}deg`,
+                }}
+                  onMouseEnter={() => setHovered(c.name)} onMouseLeave={() => setHovered("")}>
+                  <div style={{ position: "relative" }}>
+                    <Tooltip text={`${c.name} — ${registrationsByClub[c.name]?.teamName || `${c.name} U11`}`} show={hovered === c.name} />
+                    <ClubBadge
+                      size={c.size} ringWidth={c.host ? 4 : 2.5} bg={c.bg} img={c.host ? FCC_LOGO : undefined}
+                      onClick={() => setHovered(hovered === c.name ? "" : c.name)}
+                      title={c.name}
+                    >
+                      {c.short}
+                    </ClubBadge>
+                    {c.host && (
+                      <span style={{
+                        position: "absolute", bottom: -6, left: "50%", transform: "translateX(-50%)",
+                        fontSize: 8.5, backgroundImage: GOLD, color: "#3a2a04", fontWeight: 900,
+                        padding: "2px 8px", borderRadius: 99, whiteSpace: "nowrap",
+                        boxShadow: "0 3px 8px rgba(0,0,0,0.4)",
+                      }}>HOST</span>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           ))}
