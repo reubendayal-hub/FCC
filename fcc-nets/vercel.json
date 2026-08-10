@@ -1,4 +1,7 @@
 {
+  "rewrites": [
+    { "source": "/ministaevne", "destination": "/ministaevne.html" }
+  ],
   "crons": [
     {
       "path": "/api/send-reminders",

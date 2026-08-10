@@ -5,6 +5,7 @@
 //   - "approved"      → request approved    → emails the new member
 //   - "declined"      → request declined    → emails the new member
 //   - "duty-assigned" → admin-assigned duty → emails the parent
+//   - "pending-club"  → Ministaevne club pending review → emails Reuben
 //
 // Environment variable required in Vercel dashboard:
 //   RESEND_API_KEY = re_xxxxxxxxxxxxxxxxxxxx  (from resend.com)
@@ -18,6 +19,9 @@ const headerHtml = (subtitle) => `
     <h2 style="color:#fbbf24;margin:0;font-size:18px;">🏏 FCC Training App</h2>
     <p style="color:rgba(255,255,255,.6);margin:4px 0 0;font-size:13px;">${subtitle}</p>
   </div>`;
+
+const escapeHtml = (s) => String(s ?? "")
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 const wrapHtml = (subtitle, body) => `
   <div style="font-family:sans-serif;max-width:520px;margin:0 auto;">
@@ -203,6 +207,41 @@ export default async function handler(req, res) {
         contact us at
         <a href="https://fredensborgcricket.dk" style="color:#1e3a5f;">fredensborgcricket.dk</a>.
       </p>`);
+
+  // ── Ministaevne "+ not listed" club → email Reuben for review ──
+  } else if (type === "pending-club") {
+    const { clubName, contact, email: contactEmail, phone } = data;
+    to = [ADMIN_EMAIL];
+    subject = `FCC App — New club pending review: ${clubName}`;
+    html = wrapHtml("Ministaevne — pending registration", `
+      <table style="width:100%;border-collapse:collapse;font-size:14px;">
+        <tr>
+          <td style="color:#6b7280;padding:6px 0;width:100px;">Club</td>
+          <td style="color:#111827;font-weight:600;padding:6px 0;">${escapeHtml(clubName)}</td>
+        </tr>
+        <tr>
+          <td style="color:#6b7280;padding:6px 0;">Contact</td>
+          <td style="color:#111827;padding:6px 0;">${escapeHtml(contact)}</td>
+        </tr>
+        <tr>
+          <td style="color:#6b7280;padding:6px 0;">Email</td>
+          <td style="color:#111827;padding:6px 0;">${escapeHtml(contactEmail)}</td>
+        </tr>
+        <tr>
+          <td style="color:#6b7280;padding:6px 0;">Phone</td>
+          <td style="color:#111827;padding:6px 0;">${escapeHtml(phone) || "—"}</td>
+        </tr>
+      </table>
+      <p style="margin:16px 0 8px;font-size:13px;color:#6b7280;">
+        This club registered via "not listed" and is awaiting approval in the
+        Ministaevne admin table.
+      </p>
+      <a href="${APP_URL}/ministaevne"
+        style="display:inline-block;background:#1e3a5f;
+        color:#fbbf24;text-decoration:none;padding:10px 20px;
+        border-radius:20px;font-size:13px;font-weight:700;">
+        Review →
+      </a>`);
 
   } else {
     return res.status(400).json({ error: `Unknown notification type: ${type}` });
