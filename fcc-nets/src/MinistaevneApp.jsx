@@ -449,6 +449,18 @@ export default function MinistaevneApp() {
 
       {/* ── Hero ─────────────────────────────────────────── */}
       <div style={{ textAlign: "center", padding: "40px 20px 18px", position: "relative" }}>
+        <Trophy size={36} color={C.gold2} style={{
+          position: "absolute", top: 20, left: 20,
+          filter: `drop-shadow(0 4px 10px ${C.gold3}aa)`,
+        }} />
+
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+          <img src={FCC_LOGO} alt="Fredensborg Cricket Club" style={{
+            width: 64, height: 64, borderRadius: "50%", objectFit: "cover",
+            border: `3px solid ${C.gold2}`, boxShadow: `0 6px 20px rgba(0,0,0,0.5), 0 0 16px ${C.gold2}55`,
+          }} />
+        </div>
+
         <div style={{
           display: "inline-flex", alignItems: "center", gap: 6,
           background: `linear-gradient(90deg, ${C.ember}, #ff7a52)`, color: "#fff", fontSize: 11, fontWeight: 800,
@@ -456,19 +468,10 @@ export default function MinistaevneApp() {
           boxShadow: `0 4px 14px ${C.ember}55`,
         }}><Sparkles size={13} /> Our First Ever</div>
 
-        <Trophy size={40} color={C.gold2} style={{ filter: `drop-shadow(0 4px 10px ${C.gold3}aa)`, marginBottom: 6 }} />
-
         <h1 style={{ fontSize: 46, fontWeight: 900, letterSpacing: -1.5, margin: 0, lineHeight: 1, textTransform: "uppercase" }}>
           <span style={{ color: C.cream }}>U11 </span>
           <span style={{ backgroundImage: GOLD, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", filter: `drop-shadow(0 2px 6px ${C.gold3}66)` }}>Ministævne</span>
         </h1>
-
-        <div style={{ display: "flex", justifyContent: "center", marginTop: 10 }}>
-          <img src={FCC_LOGO} alt="Fredensborg Cricket Club" style={{
-            width: 64, height: 64, borderRadius: "50%", objectFit: "cover",
-            border: `3px solid ${C.gold2}`, boxShadow: `0 6px 20px rgba(0,0,0,0.5), 0 0 16px ${C.gold2}55`,
-          }} />
-        </div>
 
         <div style={{ marginTop: 14, display: "flex", justifyContent: "center", gap: 16, flexWrap: "wrap", fontSize: 12.5, color: C.muted, fontWeight: 700 }}>
           <span style={{ display: "flex", alignItems: "center", gap: 5 }}><Calendar size={13} color={C.gold2} /> Sun 16 Aug 2026</span>
