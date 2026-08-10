@@ -5,21 +5,25 @@
 // Requires FIREBASE_ADMIN_SA_PROD in Vercel env (prod fcc-nets service
 // account JSON, stringified).
 
-import admin from "firebase-admin";
+import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 
 const REGISTRATIONS_PATH = "ministaevne2026/registrations";
 
+// Native ESM (this project runs "type": "module") does not expose the
+// classic admin.apps/admin.app()/admin.firestore() namespace that only
+// works under CommonJS require() — use the modular API instead.
 function initAdmin() {
-  if (admin.apps.length > 0) return admin.app();
+  if (getApps().length > 0) return getApps()[0];
   const raw = process.env.FIREBASE_ADMIN_SA_PROD;
   if (!raw) throw new Error("FIREBASE_ADMIN_SA_PROD not configured");
   const sa = JSON.parse(raw);
-  return admin.initializeApp({ credential: admin.credential.cert(sa) });
+  return initializeApp({ credential: cert(sa) });
 }
 
 export function getDb() {
-  initAdmin();
-  return admin.firestore();
+  const app = initAdmin();
+  return getFirestore(app);
 }
 
 export async function getRegistrations(db) {
