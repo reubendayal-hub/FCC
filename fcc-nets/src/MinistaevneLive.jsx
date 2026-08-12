@@ -171,6 +171,8 @@ export default function MinistaevneLive() {
           33% { transform: translate(var(--fx), calc(var(--fy) * 0.6)) rotate(var(--fr)); }
           66% { transform: translate(calc(var(--fx) * -0.7), var(--fy)) rotate(calc(var(--fr) * -1)); }
         }
+        @keyframes shine { 0%{ transform: translateX(-120%) rotate(20deg);} 100%{ transform: translateX(220%) rotate(20deg);} }
+        .badge-shine::after { content: ""; position: absolute; top: -50%; left: -20%; width: 40%; height: 200%; background: linear-gradient(120deg, transparent, rgba(255,255,255,0.55), transparent); animation: shine 3.2s ease-in-out infinite; }
       `}</style>
 
       <div style={{ position: "absolute", top: -80, left: "10%", width: 300, height: 500, background: `conic-gradient(from 200deg, ${C.gold2}22, transparent 40%)`, filter: "blur(30px)", animation: "floodSweep 6s ease-in-out infinite", pointerEvents: "none" }} />
@@ -274,17 +276,27 @@ export default function MinistaevneLive() {
                 <div style={{
                   animation: `floatDrift ${c.float.duration}s ease-in-out ${c.float.delay}s infinite`,
                   "--fx": `${c.float.fx}px`, "--fy": `${c.float.fy}px`, "--fr": `${c.float.fr}deg`,
-                }}
-                  onMouseEnter={() => setHovered(c.name)} onMouseLeave={() => setHovered("")}>
+                }}>
+                  {/* Click-to-toggle only (not hover) — the badge is
+                      continuously drifting, so a stationary cursor would
+                      fire a spurious mouseleave the instant it floats away. */}
                   <div style={{ position: "relative" }}>
-                    <Tooltip text={`${c.name} — ${registrationsByClub[c.name]?.teamName || `${c.name} U11`}`} show={hovered === c.name} />
+                    <Tooltip text={`${c.name} — ${registrationsByClub[c.name]?.teamName || `${c.name} U11`} · ${registrationsByClub[c.name]?.players || "—"} players`} show={hovered === c.name} />
                     <ClubBadge
-                      size={c.size} ringWidth={c.host ? 4 : 2.5} bg={c.bg} img={c.host ? FCC_LOGO : undefined}
+                      size={c.size} ringWidth={c.host ? 4 : 3.5} bg={c.bg} img={c.host ? FCC_LOGO : undefined}
                       onClick={() => setHovered(hovered === c.name ? "" : c.name)}
                       title={c.name}
                     >
-                      {c.short}
+                      <span className="badge-shine" style={{ position: "relative", width: "100%", height: "100%", borderRadius: "50%", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>{c.short}</span>
                     </ClubBadge>
+                    <span style={{
+                      position: "absolute", top: -4, right: -4, minWidth: 22, height: 22, padding: "0 5px",
+                      borderRadius: 99, backgroundImage: GOLD, color: "#3a2a04", fontWeight: 900, fontSize: 10.5,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      border: "1.5px solid #0B121C", boxShadow: "0 3px 8px rgba(0,0,0,0.5)",
+                    }} title={`${registrationsByClub[c.name]?.players || 0} players`}>
+                      {registrationsByClub[c.name]?.players ?? "—"}
+                    </span>
                     {c.host && (
                       <span style={{
                         position: "absolute", bottom: -6, left: "50%", transform: "translateX(-50%)",
