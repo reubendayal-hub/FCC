@@ -4278,6 +4278,12 @@ export default function AdminView() {
               desc:"Weekly automated email flagging potential coach scheduling conflicts." },
             { key:"dutyAssigned", label:"Duty assignment notices",
               desc:"Sent to a parent when assigned a match duty via the email channel." },
+            { key:"dutyReminder24h", label:"Duty reminder (24h)",
+              desc:"Sent to a parent the day before a duty slot they're signed up for." },
+            { key:"dutyDigest", label:"Duty roster digest (Mondays)",
+              desc:"Weekly per-team coverage roster to superadmin + that team's coaches." },
+            { key:"dutyZeroNudge", label:"Zero-duty nudge (Mondays)",
+              desc:"Sent to parents with 0 duties logged this season, asking them to sign up." },
           ];
           return (
             <div style={{background:G.white,border:`1.5px solid ${G.border}`,
