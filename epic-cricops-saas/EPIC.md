@@ -1,7 +1,20 @@
 # CricOps Multi-Tenant SaaS — Epic Plan
 
-**Status:** Scoping. No code work starts yet. This is the strategic plan, not a build spec.
+**Status:** Scoping restart. See "Prior attempt" below — this is not a from-scratch start.
 **What this is:** Turning the single-club FCC Training App into CricOps — a multi-tenant product where any club runs on shared infrastructure with isolated data and per-club branding.
+
+---
+
+## Prior attempt (discovered 2026-08-17, not reflected in the rest of this doc)
+
+Two stages of this migration were already built and pushed, staging-only, in May 2026 — then stalled with no Stage 3+ and no merge. Found via Vercel deployment history while debugging an unrelated broken link; this doc previously said "no code work starts yet," which was wrong.
+
+- `feature-auth-foundation` (Stage 0, 2026-05-26): server-side PIN check + Firebase custom-token mint against a separate `cricops-staging` Firebase project. Has an open, never-answered decision point (keep the emergency `0000` PIN bypass server-side or drop it) and an un-stripped debug commit logging uid + custom claims.
+- `feature-club-scoped-data` (Stage 2, off Stage 0, 2026-05-27): adds a `cdoc()` helper to `useFirestore.js` and repoints all ~40 `doc(db,"fccnets",key)` calls to `clubs/fredensborg/data/{key}`, plus a one-time migration script. Explicitly scoped staging-only; explicitly deferred updating the prod-facing serverless email functions (`send-reminders.js`, `send-conflict-alert.js`, `send-duty-reminders.js`) to Stage 5.
+
+Neither branch touched production or `main`. Both are now stale — `main` has since gained an unrelated ~4,500-line feature (Ministaevne registration) that these branches don't have, so a straight merge isn't realistic without reconciling that first. The `fccnets/notifsettings` doc added on 2026-08-17 (`fix-notification-plumbing`) also predates this migration and would need the same `cdoc()` treatment if Stage 2 is ever resumed.
+
+Decide before writing new plan content below: resume this chain (rebase Stage 2 onto current `main`, answer the `0000`-bypass question, continue to Stage 3+), or treat it as abandoned and start over. The rest of this document was written without knowing this existed and may need reconciling either way.
 
 ---
 
