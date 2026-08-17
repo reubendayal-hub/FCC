@@ -63,17 +63,17 @@ export default async function handler(req, res) {
       <table style="width:100%;border-collapse:collapse;font-size:14px;">
         <tr>
           <td style="color:#6b7280;padding:6px 0;width:100px;">From</td>
-          <td style="color:#111827;font-weight:600;padding:6px 0;">${name}</td>
+          <td style="color:#111827;font-weight:600;padding:6px 0;">${escapeHtml(name)}</td>
         </tr>
         <tr>
           <td style="color:#6b7280;padding:6px 0;">Category</td>
-          <td style="color:#111827;padding:6px 0;">${category}</td>
+          <td style="color:#111827;padding:6px 0;">${escapeHtml(category)}</td>
         </tr>
       </table>
       <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;
         padding:14px 16px;margin-top:16px;">
         <p style="margin:0;color:#374151;font-size:14px;line-height:1.65;
-          white-space:pre-wrap;">${message}</p>
+          white-space:pre-wrap;">${escapeHtml(message)}</p>
       </div>
       <a href="${APP_URL}"
         style="display:inline-block;margin-top:20px;background:#1e3a5f;
@@ -91,16 +91,16 @@ export default async function handler(req, res) {
       <table style="width:100%;border-collapse:collapse;font-size:14px;">
         <tr>
           <td style="color:#6b7280;padding:6px 0;width:120px;">Name</td>
-          <td style="color:#111827;font-weight:600;padding:6px 0;">${name}</td>
+          <td style="color:#111827;font-weight:600;padding:6px 0;">${escapeHtml(name)}</td>
         </tr>
         <tr>
           <td style="color:#6b7280;padding:6px 0;">Team</td>
-          <td style="color:#111827;padding:6px 0;">${playerTeam || "Not specified"}</td>
+          <td style="color:#111827;padding:6px 0;">${escapeHtml(playerTeam) || "Not specified"}</td>
         </tr>
         ${note ? `
         <tr>
           <td style="color:#6b7280;padding:6px 0;vertical-align:top;">Note</td>
-          <td style="color:#111827;padding:6px 0;">${note}</td>
+          <td style="color:#111827;padding:6px 0;">${escapeHtml(note)}</td>
         </tr>` : ""}
       </table>
       <p style="margin:16px 0 8px;font-size:13px;color:#6b7280;">
@@ -119,9 +119,9 @@ export default async function handler(req, res) {
   } else if (type === "approved") {
     const { name, email, playerTeam, isPair, children } = data;
     if (!email) return res.status(400).json({ error: "Missing member email for approval notification" });
-    const firstName = (name || "").split(" ")[0] || "there";
+    const firstName = escapeHtml((name || "").split(" ")[0] || "there");
     to = [email];
-    const teamSuffix = playerTeam ? ` — ${playerTeam}` : "";
+    const teamSuffix = playerTeam ? ` — ${escapeHtml(playerTeam)}` : "";
     subject = isPair
       ? `Welcome to Fredensborg Cricket Club${teamSuffix}`
       : `You're in! Welcome to Fredensborg Cricket Club 🏏`;
@@ -129,7 +129,7 @@ export default async function handler(req, res) {
     const childrenHtml = (isPair && Array.isArray(children) && children.length > 0)
       ? `<p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">
           Your ${children.length > 1 ? "children have" : "child has"} also been added:
-          <strong>${children.map(c => `${c.name}${c.team ? ` (${c.team})` : ""}`).join(", ")}</strong>.
+          <strong>${children.map(c => `${escapeHtml(c.name)}${c.team ? ` (${escapeHtml(c.team)})` : ""}`).join(", ")}</strong>.
         </p>`
       : "";
 
@@ -139,7 +139,7 @@ export default async function handler(req, res) {
       </p>
       <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">
         Great news — your request to join <strong>Fredensborg Cricket Club</strong>
-        has been approved${playerTeam ? ` for <strong>${playerTeam}</strong>` : ""}!
+        has been approved${playerTeam ? ` for <strong>${escapeHtml(playerTeam)}</strong>` : ""}!
         You can now log in to the training app.
       </p>
       ${childrenHtml}
@@ -190,7 +190,7 @@ export default async function handler(req, res) {
   } else if (type === "declined") {
     const { name, email } = data;
     if (!email) return res.status(400).json({ error: "Missing member email for decline notification" });
-    const firstName = name.split(" ")[0];
+    const firstName = escapeHtml((name || "").split(" ")[0]);
     to = [email];
     subject = `Your FCC app request — update`;
     html = wrapHtml("Request update", `

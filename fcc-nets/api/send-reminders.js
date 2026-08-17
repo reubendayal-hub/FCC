@@ -69,6 +69,30 @@ function toFv(v) {
   return { stringValue: String(v) };
 }
 
+// Reads today's reminderlogs entries and returns the {date}_{type} keys
+// already recorded as sent, so a same-day re-run (duplicate cron fire,
+// accidental manual hit) doesn't re-send. Best-effort: any read failure
+// just means no dedup this run, not a hard failure of the whole job.
+async function getTodaysSentKeys(base, headers) {
+  try {
+    const lr = await fetch(`${base}/fccnets/reminderlogs`, { headers });
+    if (!lr.ok) return new Set();
+    const lDoc = parseDoc(await lr.json());
+    const list = Array.isArray(lDoc.list) ? lDoc.list : [];
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const sentKeys = new Set();
+    for (const entry of list) {
+      if (!entry.runAt || entry.runAt.slice(0, 10) !== todayStr) continue;
+      for (const r of entry.reminders || []) {
+        if (r.sent > 0) sentKeys.add(`${r.date}_${r.type}`);
+      }
+    }
+    return sentKeys;
+  } catch {
+    return new Set();
+  }
+}
+
 function getDatePlusDays(days) {
   const d = new Date(); 
   d.setDate(d.getDate() + days);
@@ -289,11 +313,19 @@ export default async function handler(req, res) {
 
     let totalSent = 0, totalSkipped = 0;
     const allResults = [];
-    
+
+    // Dedup guard: skip a {date,type} batch already sent earlier today.
+    // ?date= testing bypasses this so manual test hits always fire.
+    const alreadySentKeys = testDate ? new Set() : await getTodaysSentKeys(base, headers);
+
     // Helper to add delay between emails (Resend allows 5/sec, we do 3/sec to be safe)
     const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     for (const reminder of remindersToSend) {
+      if (alreadySentKeys.has(`${reminder.date}_${reminder.type}`)) {
+        allResults.push({ date: reminder.date, type: reminder.type, sent: 0, skipped: "already-sent-today" });
+        continue;
+      }
       const sessions = allSessions.filter(s => s.date === reminder.date);
       
       if (sessions.length === 0) {

@@ -75,6 +75,8 @@ function fmtDate(dateStr) {
 }
 
 // ─── Coach-Team Mapping (hardcoded for now) ──────────────────────────────────
+// TODO: hardcoded + stale. Client derives this dynamically from members
+// (CoachCoordination.jsx:297-324). Extract to a shared module both consume.
 const COACH_PLAYS_IN = {
   "Zeb Pirzada": ["Div 4", "OB"],
   "Rajesh Muthukumar": [],
@@ -85,6 +87,9 @@ const COACH_PLAYS_IN = {
 };
 
 // Session templates (same as CoachCoordination)
+// TODO: hardcoded + stale, same as COACH_PLAYS_IN above. Conflict rule below
+// (~line 169) also flags EVERY weekend session for a coach with any weekend
+// commitment — no real fixture-clash check against actual match dates.
 const SESSION_TEMPLATES = [
   { id: "u11-sat", team: "U11", day: 6, time: "14:00–15:30" },
   { id: "u13-wed", team: "U13", day: 3, time: "16:30–18:00" },
@@ -126,7 +131,9 @@ export default async function handler(req, res) {
     const teamsData = teamsRes.ok ? parseDoc(await teamsRes.json()) : {};
     const overridesData = overridesRes.ok ? parseDoc(await overridesRes.json()) : {};
     
-    const teams = teamsData.list || teamsData.value ? JSON.parse(teamsData.value || "[]") : [];
+    const teams = teamsData.value ? JSON.parse(teamsData.value)
+                : Array.isArray(teamsData.list) ? teamsData.list
+                : [];
     const coachOverrides = overridesData.value ? JSON.parse(overridesData.value) : {};
 
     // Build sessions with coaches from teams

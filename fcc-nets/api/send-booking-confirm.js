@@ -1,6 +1,9 @@
 // /api/send-booking-confirm.js
 // Sends a booking confirmation email to a member after they join/book a session
 
+const escapeHtml = (s) => String(s ?? "")
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
 export default async function handler(req, res) {
   if(req.method !== "POST") return res.status(405).json({error:"Method not allowed"});
   const apiKey = process.env.RESEND_API_KEY;
@@ -12,7 +15,8 @@ export default async function handler(req, res) {
   // Format date nicely
   const d = new Date(date);
   const fmtDate = d.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-  const sessionTitle = label || "Training Session";
+  const sessionTitle = label || "Training Session"; // raw — used in plain-text subject too
+  const sessionTitleSafe = escapeHtml(sessionTitle); // HTML-escaped for the email body
   const netLabel = net==="both" ? "Both Nets" : net ? `Net ${net}` : "";
   const otherPlayers = (players||[]).filter(p=>p!==name);
 
@@ -27,7 +31,7 @@ export default async function handler(req, res) {
       <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;
         padding:28px 24px;border-radius:0 0 10px 10px;">
         <p style="font-size:15px;color:#111827;margin:0 0 6px;">
-          Hi ${name.split(" ")[0]}, you're booked in! ✅
+          Hi ${escapeHtml(name.split(" ")[0])}, you're booked in! ✅
         </p>
         <p style="font-size:13px;color:#6b7280;margin:0 0 20px;">
           Here are the details for your upcoming session.
@@ -36,7 +40,7 @@ export default async function handler(req, res) {
         <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;
           padding:16px 18px;margin-bottom:20px;">
           <div style="font-size:17px;font-weight:900;color:#14532d;margin-bottom:10px;">
-            ${sessionTitle}
+            ${sessionTitleSafe}
           </div>
           <table style="font-size:13px;color:#374151;width:100%;border-collapse:collapse;">
             <tr><td style="padding:3px 0;color:#6b7280;width:80px;">📅 Date</td>
@@ -59,7 +63,7 @@ export default async function handler(req, res) {
             ${otherPlayers.slice(0,10).map(p=>`
               <span style="background:#f3f4f6;color:#374151;font-size:12px;
                 padding:3px 10px;border-radius:20px;font-weight:600;">
-                ${p.split(" ")[0]}
+                ${escapeHtml(p.split(" ")[0])}
               </span>`).join("")}
             ${otherPlayers.length>10?`<span style="font-size:12px;color:#9ca3af;">
               +${otherPlayers.length-10} more</span>`:""}
