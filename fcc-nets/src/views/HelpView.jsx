@@ -11,8 +11,10 @@ export default function HelpView() {
   const {
     G, view, setView, userRole, currentUser, handleLogout, teams,
     members, helpMsg, setHelpMsg, helpCat, setHelpCat,
-    showToast, joinRequests, toast,
+    showToast, joinRequests, toast, notifSettings,
   } = useAppContext();
+  // Club-level master switch — default-on when unset.
+  const notifOn = k => notifSettings[k] !== false;
 
   const CATS = [
     {id:"general",   label:"💬 General question"},
@@ -26,14 +28,16 @@ export default function HelpView() {
     if(!helpMsg.trim()) { showToast("Please write a message first"); return; }
     const cat = CATS.find(c=>c.id===helpCat)?.label || helpCat;
     // Fire email notification silently (no await — don't block the user)
-    fetch("/api/notify", {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({
-        type:"help",
-        data:{ name:me.name, category:cat, message:helpMsg.trim() }
-      })
-    }).catch(()=>{}); // silent — member shouldn't see API errors
+    if (notifOn("memberHelp")) {
+      fetch("/api/notify", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          type:"help",
+          data:{ name:me.name, category:cat, message:helpMsg.trim() }
+        })
+      }).catch(()=>{}); // silent — member shouldn't see API errors
+    }
     const subject = encodeURIComponent(`FCC Training App — ${cat} — from ${me.name}`);
     const body = encodeURIComponent(
       `Hi Reuben,\n\nA message from the FCC Training app:\n\n`+

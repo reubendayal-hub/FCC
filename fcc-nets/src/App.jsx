@@ -282,6 +282,7 @@ export default function App() {
     coachOverrides, setCoachOverrides,
     matchSelections, setMatchSelections,
     noteTemplates, setNoteTemplates,
+    notifSettings,
     loading,
     saveSessions, saveMembers, savePins, saveTeams, saveRecurring,
     saveBlockCals, saveCancelledSessions, saveInviteCodes, saveJoinRequests,
@@ -289,6 +290,9 @@ export default function App() {
     saveCoachOverrides, saveMatchSelections, saveNoteTemplates, saveAuditLog,
     logAction,
   } = firestoreState;
+  // Club-level master switch (fccnets/notifsettings) — default-on when unset.
+  // Global OFF = nobody gets that type. Global ON = per-member prefs still apply.
+  const notifOn = k => notifSettings[k] !== false;
 
   // Theme
   const [themeKey, setThemeKey] = useState(_themeKey);
@@ -446,7 +450,8 @@ export default function App() {
   const [adminSec, setAdminSec] = useState({
     members:true, addmember:true, groups:false,
     coaches:false, parentduty:false, dutyoversight:false,
-    blocknets:false, recurring:false, backup:false, auditlog:false, reminderlogs:false
+    blocknets:false, recurring:false, backup:false, auditlog:false, reminderlogs:false,
+    notifsettings:false
   });
   const toggleAdminSec = k => setAdminSec(s=>({...s,[k]:!s[k]}));
   const [editingName, setEditingName] = useState(null); // {id, value}
@@ -943,6 +948,7 @@ export default function App() {
   // Send booking confirmation email if member has it enabled
   function sendBookingConfirm(member, sess, updatedPlayers) {
     if(!member?.email) return;
+    if(!notifOn("bookingConfirm")) return;
     if(!(member.emailBookingConfirm??true)) return;
     fetch("/api/send-booking-confirm",{
       method:"POST",
@@ -1825,7 +1831,7 @@ export default function App() {
             status:"pending",
           };
           saveJoinRequests([...joinRequests, req]);
-          fetch("/api/notify",{method:"POST",headers:{"Content-Type":"application/json"},
+          if (notifOn("joinRequest")) fetch("/api/notify",{method:"POST",headers:{"Content-Type":"application/json"},
             body:JSON.stringify({type:"joinrequest",data:{
               name:req.playerName, playerTeam:req.playerTeam,
               message:`Parent signup (child not found): ${vfNewName} registering ${vfChildName}`
@@ -1849,7 +1855,7 @@ export default function App() {
           status:"pending",
         };
         saveJoinRequests([...joinRequests, req]);
-        fetch("/api/notify",{method:"POST",headers:{"Content-Type":"application/json"},
+        if (notifOn("joinRequest")) fetch("/api/notify",{method:"POST",headers:{"Content-Type":"application/json"},
           body:JSON.stringify({type:"joinrequest",data:{
             name:req.playerName, playerTeam:req.playerTeam,
             message:`Email verified: ${vfEmail}`

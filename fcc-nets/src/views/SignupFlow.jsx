@@ -85,8 +85,10 @@ export default function SignupFlow() {
   const ctx = useAppContext();
   const {
     G, members, teams, joinRequests, saveJoinRequests,
-    setAuthView, showToast, toast,
+    setAuthView, showToast, toast, notifSettings,
   } = ctx;
+  // Club-level master switch — default-on when unset.
+  const notifOn = k => notifSettings[k] !== false;
 
   const [state, setState] = useState(() => {
     try {
@@ -232,7 +234,7 @@ export default function SignupFlow() {
         : state.who === "both"
           ? `${parentReq.playerName} (+ child ${childReq.playerName})`
           : parentReq.playerName;
-      fetch("/api/notify", {
+      if (notifOn("joinRequest")) fetch("/api/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

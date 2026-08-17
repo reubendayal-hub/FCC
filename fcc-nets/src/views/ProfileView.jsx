@@ -896,7 +896,7 @@ export default function ProfileView() {
                       ?{...m,emailDayBeforeReminder:!(me.emailDayBeforeReminder??true)}:m);
                     saveMembers(updated);
                     showToast((me.emailDayBeforeReminder??true)
-                      ?"Day-before reminders off":"Day-before reminders on ✓");
+                      ?"Session reminders off":"Session reminders on ✓");
                   }}
                   style={{width:44,height:24,borderRadius:20,border:"none",cursor:"pointer",
                     background:(me.emailDayBeforeReminder??true)&&me.email?G.green:"#d1d5db",
@@ -910,10 +910,11 @@ export default function ProfileView() {
               </div>
               <div>
                 <div style={{fontWeight:700,fontSize:13,color:G.text}}>
-                  Day-before reminders
+                  Session reminders
                 </div>
                 <div style={{fontSize:11,color:G.muted,marginTop:2,lineHeight:1.5}}>
-                  Get an email at 5pm the evening before any session you're booked into.
+                  Get two reminder emails for any session you're booked into —
+                  one a couple of days before, one the evening before.
                   Helps you not forget and plan transport in time.
                 </div>
               </div>

@@ -75,6 +75,8 @@ function fmtDate(dateStr) {
 }
 
 // ─── Coach-Team Mapping (hardcoded for now) ──────────────────────────────────
+// TODO: hardcoded + stale. Client derives this dynamically from members
+// (CoachCoordination.jsx:297-324). Extract to a shared module both consume.
 const COACH_PLAYS_IN = {
   "Zeb Pirzada": ["Div 4", "OB"],
   "Rajesh Muthukumar": [],
@@ -85,6 +87,9 @@ const COACH_PLAYS_IN = {
 };
 
 // Session templates (same as CoachCoordination)
+// TODO: hardcoded + stale, same as COACH_PLAYS_IN above. Conflict rule below
+// (~line 169) also flags EVERY weekend session for a coach with any weekend
+// commitment — no real fixture-clash check against actual match dates.
 const SESSION_TEMPLATES = [
   { id: "u11-sat", team: "U11", day: 6, time: "14:00–15:30" },
   { id: "u13-wed", team: "U13", day: 3, time: "16:30–18:00" },
@@ -117,6 +122,18 @@ export default async function handler(req, res) {
     const base  = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
     const headers = { Authorization: `Bearer ${token}` };
 
+    // Club-level master switch (Admin → Notification Controls). Missing doc
+    // or missing key = enabled by default, same convention as the client's
+    // notifOn() helper. Early-return before touching teams/overrides or
+    // building the email — this is also what silences the false-positive
+    // "every weekend session" spam (see TODOs on COACH_PLAYS_IN above).
+    const nsRes = await fetch(`${base}/fccnets/notifsettings`, { headers });
+    const notifSettingsDoc = nsRes.ok ? parseDoc(await nsRes.json()) : {};
+    const notifSettings = notifSettingsDoc.value ? JSON.parse(notifSettingsDoc.value) : {};
+    if (notifSettings.conflictAlert === false) {
+      return res.status(200).json({ ok: true, skipped: "conflictAlert disabled by admin" });
+    }
+
     // Fetch teams and coach overrides
     const [teamsRes, overridesRes] = await Promise.all([
       fetch(`${base}/fccnets/teams`, { headers }),
@@ -126,7 +143,9 @@ export default async function handler(req, res) {
     const teamsData = teamsRes.ok ? parseDoc(await teamsRes.json()) : {};
     const overridesData = overridesRes.ok ? parseDoc(await overridesRes.json()) : {};
     
-    const teams = teamsData.list || teamsData.value ? JSON.parse(teamsData.value || "[]") : [];
+    const teams = teamsData.value ? JSON.parse(teamsData.value)
+                : Array.isArray(teamsData.list) ? teamsData.list
+                : [];
     const coachOverrides = overridesData.value ? JSON.parse(overridesData.value) : {};
 
     // Build sessions with coaches from teams
