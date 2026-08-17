@@ -562,9 +562,14 @@ export default async function handler(req, res) {
 
     // ─── 2. Monday digest (admins + youth coaches per team) ──────────────────
     if (isMonday() || forceDigest) {
-      // Build recipient list: admin + coaches assigned to each duty-enabled team
+      // Build recipient list: superadmin (club-wide oversight) + coaches assigned
+      // to each duty-enabled team. NOT the general "admin" role — that's held by
+      // several senior-team captains/players for unrelated permissions (match
+      // lineups, roster access), not junior parent-duty oversight, and CC'ing
+      // all of them on every team's digest was spamming people with no
+      // connection to that team.
       const adminEmails = members
-        .filter(m => m.email && (m.role === "admin" || m.role === "superadmin"))
+        .filter(m => m.email && m.role === "superadmin")
         .map(m => m.email);
 
       for (const team of enabledTeams) {
