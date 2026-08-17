@@ -458,25 +458,31 @@ export default async function handler(req, res) {
     const base    = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
     const headers = { Authorization: `Bearer ${token}` };
 
-    // Fetch members, sessions, config, teams (for coach emails)
-    const [mRes, sRes, cRes, tRes] = await Promise.all([
+    // Fetch members, sessions, config, teams (for coach emails), notif switches
+    const [mRes, sRes, cRes, tRes, nRes] = await Promise.all([
       fetch(`${base}/fccnets/members`,            { headers }),
       fetch(`${base}/fccnets/sessions`,           { headers }),
       fetch(`${base}/fccnets/parentdutyconfig`,   { headers }),
       fetch(`${base}/fccnets/teams`,              { headers }),
+      fetch(`${base}/fccnets/notifsettings`,      { headers }),
     ]);
     if (!mRes.ok) throw new Error(`Members fetch ${mRes.status}: ${await mRes.text()}`);
     if (!sRes.ok) throw new Error(`Sessions fetch ${sRes.status}: ${await sRes.text()}`);
-    // Config and teams may not exist yet — that's fine, fall back to defaults
+    // Config, teams, and notif switches may not exist yet — fall back to defaults
     const mDoc = parseDoc(await mRes.json());
     const sDoc = parseDoc(await sRes.json());
     const cDoc = cRes.ok ? parseDoc(await cRes.json()) : {};
     const tDoc = tRes.ok ? parseDoc(await tRes.json()) : {};
+    const nDoc = nRes.ok ? parseDoc(await nRes.json()) : {};
 
     const members      = mDoc.value ? JSON.parse(mDoc.value) : [];
     const allSessions  = sDoc.value ? JSON.parse(sDoc.value) : [];
     const savedConfig  = cDoc.value ? JSON.parse(cDoc.value) : {};
     const teamsList    = tDoc.value ? JSON.parse(tDoc.value) : [];
+    // Club-level master switches (Admin → Notification Controls). Missing doc
+    // or missing key = enabled by default, same convention as the client's
+    // notifOn() helper.
+    const notifSettings = nDoc.value ? JSON.parse(nDoc.value) : {};
 
     // Determine enabled teams
     const allTeamNames = [
@@ -506,62 +512,64 @@ export default async function handler(req, res) {
     };
 
     // ─── 1. 24hr reminders ───────────────────────────────────────────────────
-    const targetDate = overrideDate || getDatePlusDays(1);
-    const sessionTeams = new Set();
-    enabledTeams.forEach(t => {
-      getRollupTeams(t).forEach(sub => sessionTeams.add(sub));
-    });
-    const tomorrowSessions = allSessions.filter(s =>
-      s.date === targetDate &&
-      sessionTeams.has(getSessionTeam(s)) &&
-      getSlotCount(s, savedConfig) > 0 &&
-      getSupportParents(s).length > 0
-    );
+    if (notifSettings.dutyReminder24h !== false) {
+      const targetDate = overrideDate || getDatePlusDays(1);
+      const sessionTeams = new Set();
+      enabledTeams.forEach(t => {
+        getRollupTeams(t).forEach(sub => sessionTeams.add(sub));
+      });
+      const tomorrowSessions = allSessions.filter(s =>
+        s.date === targetDate &&
+        sessionTeams.has(getSessionTeam(s)) &&
+        getSlotCount(s, savedConfig) > 0 &&
+        getSupportParents(s).length > 0
+      );
 
-    // Group duties by parent (combine across teams/sessions for one email)
-    const dutiesByParent = {}; // { parentKey: { name, email, dutiesByTeam: {team: [{session,role}]} } }
+      // Group duties by parent (combine across teams/sessions for one email)
+      const dutiesByParent = {}; // { parentKey: { name, email, dutiesByTeam: {team: [{session,role}]} } }
 
-    for (const s of tomorrowSessions) {
-      const sps = getSupportParents(s);
-      for (const sp of sps) {
-        // Find email — linked members only (unlinked parents skipped, no email)
-        if (!sp.memberId) continue;
-        const member = members.find(m => m.id === sp.memberId);
-        if (!member || !member.email) continue;
-        if (testOnly && !member.name.toLowerCase().includes(testOnly.toLowerCase())) continue;
+      for (const s of tomorrowSessions) {
+        const sps = getSupportParents(s);
+        for (const sp of sps) {
+          // Find email — linked members only (unlinked parents skipped, no email)
+          if (!sp.memberId) continue;
+          const member = members.find(m => m.id === sp.memberId);
+          if (!member || !member.email) continue;
+          if (testOnly && !member.name.toLowerCase().includes(testOnly.toLowerCase())) continue;
 
-        const key = sp.memberId;
-        if (!dutiesByParent[key]) {
-          dutiesByParent[key] = {
-            name: member.name,
-            email: member.email,
-            dutiesByTeam: {}
-          };
+          const key = sp.memberId;
+          if (!dutiesByParent[key]) {
+            dutiesByParent[key] = {
+              name: member.name,
+              email: member.email,
+              dutiesByTeam: {}
+            };
+          }
+          const team = getSessionTeam(s);
+          if (!dutiesByParent[key].dutiesByTeam[team]) {
+            dutiesByParent[key].dutiesByTeam[team] = [];
+          }
+          dutiesByParent[key].dutiesByTeam[team].push({
+            session: s,
+            role: sp.role,
+            roleLabel: sp.roleLabel,
+          });
         }
-        const team = getSessionTeam(s);
-        if (!dutiesByParent[key].dutiesByTeam[team]) {
-          dutiesByParent[key].dutiesByTeam[team] = [];
-        }
-        dutiesByParent[key].dutiesByTeam[team].push({
-          session: s,
-          role: sp.role,
-          roleLabel: sp.roleLabel,
-        });
+      }
+
+      for (const [key, info] of Object.entries(dutiesByParent)) {
+        const subject = `Reminder: parent duty tomorrow (${fmtDateShort(targetDate)})`;
+        const html = build24hrEmail(info.name, info.dutiesByTeam, targetDate);
+        const result = await sendEmail(apiKey, info.email, subject, html, dryRun);
+        results.reminders24hr.push({ ...result, name: info.name });
+        if (result.error) results.totalErrors++;
+        else results.totalSent++;
+        await delay(350); // ~3/sec rate-limit cushion
       }
     }
 
-    for (const [key, info] of Object.entries(dutiesByParent)) {
-      const subject = `Reminder: parent duty tomorrow (${fmtDateShort(targetDate)})`;
-      const html = build24hrEmail(info.name, info.dutiesByTeam, targetDate);
-      const result = await sendEmail(apiKey, info.email, subject, html, dryRun);
-      results.reminders24hr.push({ ...result, name: info.name });
-      if (result.error) results.totalErrors++;
-      else results.totalSent++;
-      await delay(350); // ~3/sec rate-limit cushion
-    }
-
     // ─── 2. Monday digest (admins + youth coaches per team) ──────────────────
-    if (isMonday() || forceDigest) {
+    if ((isMonday() || forceDigest) && notifSettings.dutyDigest !== false) {
       // Build recipient list: superadmin (club-wide oversight) + coaches assigned
       // to each duty-enabled team. NOT the general "admin" role — that's held by
       // several senior-team captains/players for unrelated permissions (match
@@ -610,7 +618,7 @@ export default async function handler(req, res) {
     }
 
     // ─── 3. Zero-duty nudges (Mondays only) ──────────────────────────────────
-    if (isMonday() || forceDigest) {
+    if ((isMonday() || forceDigest) && notifSettings.dutyZeroNudge !== false) {
       const seasonYear = getSeasonYear();
 
       // For each parent, find teams where they have 0 duties this season
