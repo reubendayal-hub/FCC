@@ -619,7 +619,7 @@ function LinkChildModal({ parentMember, members, teams, G, onClose, onLink, onCr
 function AssignDutyModal({
   session, sessionTeam, role, roleLabel,
   members, sessions, teams, currentUser, parentDutyConfig,
-  G, showToast,
+  G, showToast, notifOn,
   onAssign, // (parent) => bool — performs the write, returns success
   onClose,
 }) {
@@ -729,6 +729,11 @@ function AssignDutyModal({
     } else if (channel === "email") {
       if (!assignedParent.email) {
         showToast?.("No email on file for this parent");
+        return;
+      }
+      if (!notifOn?.("dutyAssigned")) {
+        showToast?.("Duty-assignment emails are turned off (Admin → Notification Controls)");
+        onClose();
         return;
       }
       const subject = `${roleLabel} duty for ${sessionTeam} on ${dateLabel}`;
@@ -995,6 +1000,7 @@ export default function AdminView() {
   const {
     G, view, setView, userRole, currentUser, teams, members,
     sessions, recurring, blockCals, inviteCodes, joinRequests, auditLog, reminderLogs,
+    notifSettings, saveNotifSettings,
     pins, resetPin,
     saveMembers, saveTeams, saveBlockCals, saveJoinRequests, saveSessions,
     showToast, logAction, joinRequests: _joinReq, toast,
@@ -1039,6 +1045,11 @@ export default function AdminView() {
     toggleMemberTeam, updateRole,
     parentDutyConfig, saveParentDutyConfig,
   } = useAppContext();
+
+  // Club-level master switches (fccnets/notifsettings) — default-on when unset.
+  // Global OFF = nobody gets that type. Global ON = each member's own
+  // per-member preference (bookingConfirm / reminders) still applies on top.
+  const notifOn = k => notifSettings[k] !== false;
 
   const [dutyEditTeam, setDutyEditTeam] = useState(null);
   const [dutyOversightTeam, setDutyOversightTeam] = useState("U11");
@@ -1220,6 +1231,7 @@ export default function AdminView() {
             {label:"🔁 Recurring",  id:"sec-recurring",  key:"recurring"},
             {label:"👑 Audit Log",  id:"sec-auditlog",   key:"auditlog"},
             {label:"📧 Reminder Logs", id:"sec-reminderlogs", key:"reminderlogs"},
+            {label:"🔔 Notification Controls", id:"sec-notifcontrols", key:"notifsettings"},
           ].map(({label,id,key})=>(
             <button key={id}
               onClick={()=>{
@@ -1488,7 +1500,7 @@ export default function AdminView() {
               (childReqs.length ? ` + ${childReqs.length} child${childReqs.length > 1 ? "ren" : ""}: ${childReqs.map(c => `${c.playerName} (${finalTeam(c)})`).join(", ")}` : "")
             );
 
-            if (parentReq.email) {
+            if (parentReq.email && notifOn("approval")) {
               fetch("/api/notify", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -1532,7 +1544,7 @@ export default function AdminView() {
               return next;
             });
             logAction("request", `Approved join request: ${req.playerName} → ${teamPick}${req.forChild&&req.parentName?" (parent: "+req.parentName+")":""}`);
-            if (req.email) {
+            if (req.email && notifOn("approval")) {
               fetch("/api/notify", {
                 method:"POST",
                 headers:{"Content-Type":"application/json"},
@@ -1555,7 +1567,7 @@ export default function AdminView() {
               return next;
             });
             logAction("request", `Declined join request: ${req.playerName}${children.length ? ` + child${children.length > 1 ? "ren" : ""}` : ""}`);
-            if (req.email) {
+            if (req.email && notifOn("approval")) {
               fetch("/api/notify", {
                 method:"POST",
                 headers:{"Content-Type":"application/json"},
@@ -4232,6 +4244,88 @@ export default function AdminView() {
         })()}
         </>}
 
+        {/* ══════════════════════════════════════════════════════════ */}
+        {/* NOTIFICATION CONTROLS — Superadmin only                    */}
+        {/* Club-level master switches, layered over per-member prefs. */}
+        {/* Global OFF = nobody gets that type. Global ON = each       */}
+        {/* member's own preference (bookingConfirm/reminders) still   */}
+        {/* applies on top — see notifOn() near the top of this file.  */}
+        {/* ══════════════════════════════════════════════════════════ */}
+        {userRole==="superadmin"&&<>
+        <div id="sec-notifcontrols"/>
+        <button onClick={()=>toggleAdminSec("notifsettings")}
+          style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
+            background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",
+            padding:"8px 0",marginBottom:adminSec.notifsettings?8:14}}>
+          <span style={{fontWeight:900,fontSize:13,color:G.text}}>🔔 Notification Controls</span>
+          <span style={{fontSize:12,color:G.muted,fontWeight:700}}>
+            {adminSec.notifsettings?"▲ collapse":"▼ show"}
+          </span>
+        </button>
+        {adminSec.notifsettings&&(()=>{
+          const SWITCHES = [
+            { key:"bookingConfirm", label:"Booking confirmation emails",
+              desc:"Sent to a member when they join or book a session. Enforced client-side." },
+            { key:"reminders", label:"Session reminders (48h + 24h)",
+              desc:"Automated pre-session reminder emails, sent by the daily cron." },
+            { key:"memberHelp", label:"Member help messages",
+              desc:"Sent to your inbox when a member submits a help request." },
+            { key:"joinRequest", label:"New join request alerts",
+              desc:"Sent to your inbox when someone requests to join." },
+            { key:"approval", label:"Approved / declined notices",
+              desc:"Sent to the member when their join request is approved or declined." },
+            { key:"conflictAlert", label:"Coach conflict alerts",
+              desc:"Weekly automated email flagging potential coach scheduling conflicts." },
+            { key:"dutyAssigned", label:"Duty assignment notices",
+              desc:"Sent to a parent when assigned a match duty via the email channel." },
+          ];
+          return (
+            <div style={{background:G.white,border:`1.5px solid ${G.border}`,
+              borderRadius:12,padding:"14px 16px",marginBottom:20}}>
+              <div style={{fontSize:11,color:G.muted,marginBottom:12,lineHeight:1.5,
+                background:G.cream,borderRadius:8,padding:"8px 10px",
+                border:`1px solid ${G.border}`}}>
+                Master switches. <b>ON</b> = each member's own preference still applies.
+                <b> OFF</b> = nobody receives that type.
+              </div>
+              {SWITCHES.map((sw, i) => {
+                const on = notifOn(sw.key);
+                return (
+                  <div key={sw.key}>
+                    <label style={{display:"flex",alignItems:"flex-start",gap:12,cursor:"pointer"}}>
+                      <div style={{paddingTop:1}}>
+                        <button onClick={()=>{
+                            saveNotifSettings({ ...notifSettings, [sw.key]: !on });
+                            showToast(on ? `${sw.label} off` : `${sw.label} on ✓`);
+                          }}
+                          style={{width:44,height:24,borderRadius:20,border:"none",cursor:"pointer",
+                            background: on?G.green:"#d1d5db",
+                            transition:"background .2s",position:"relative",flexShrink:0,
+                            display:"block"}}>
+                          <span style={{position:"absolute",top:2,
+                            left: on?22:2,
+                            width:20,height:20,borderRadius:"50%",background:"#fff",
+                            transition:"left .2s",display:"block"}}/>
+                        </button>
+                      </div>
+                      <div>
+                        <div style={{fontWeight:700,fontSize:13,color:G.text}}>
+                          {sw.label}
+                        </div>
+                        <div style={{fontSize:11,color:G.muted,marginTop:2,lineHeight:1.5}}>
+                          {sw.desc}
+                        </div>
+                      </div>
+                    </label>
+                    {i < SWITCHES.length-1 && <div style={{height:1,background:G.border,margin:"10px 0"}}/>}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+        </>}
+
         {/* ── Sub-tab filter (Parents tab) ─────────────────────── */}
         {(() => {
           const parentCount = members.filter(m =>
@@ -5195,6 +5289,7 @@ export default function AdminView() {
           parentDutyConfig={parentDutyConfig}
           G={G}
           showToast={showToast}
+          notifOn={notifOn}
           onClose={() => setAssignDutyModal(null)}
           onAssign={(parent) => {
             const { session: s, sessionTeam, role, roleLabel } = assignDutyModal;

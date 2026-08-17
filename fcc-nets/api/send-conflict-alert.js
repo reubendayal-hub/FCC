@@ -122,6 +122,18 @@ export default async function handler(req, res) {
     const base  = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
     const headers = { Authorization: `Bearer ${token}` };
 
+    // Club-level master switch (Admin → Notification Controls). Missing doc
+    // or missing key = enabled by default, same convention as the client's
+    // notifOn() helper. Early-return before touching teams/overrides or
+    // building the email — this is also what silences the false-positive
+    // "every weekend session" spam (see TODOs on COACH_PLAYS_IN above).
+    const nsRes = await fetch(`${base}/fccnets/notifsettings`, { headers });
+    const notifSettingsDoc = nsRes.ok ? parseDoc(await nsRes.json()) : {};
+    const notifSettings = notifSettingsDoc.value ? JSON.parse(notifSettingsDoc.value) : {};
+    if (notifSettings.conflictAlert === false) {
+      return res.status(200).json({ ok: true, skipped: "conflictAlert disabled by admin" });
+    }
+
     // Fetch teams and coach overrides
     const [teamsRes, overridesRes] = await Promise.all([
       fetch(`${base}/fccnets/teams`, { headers }),

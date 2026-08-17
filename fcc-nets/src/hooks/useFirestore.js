@@ -43,6 +43,7 @@ export function useFirestore({ currentUserRef }) {
   const [matchSelections,setMatchSelections]= useState({});
   const [noteTemplates,  setNoteTemplates]  = useState([]);
   const [parentDutyConfig, setParentDutyConfig] = useState({});
+  const [notifSettings, setNotifSettings] = useState({});
   const [loading, setLoading] = useState(true);
 
   // Refs that always hold the latest values — avoid stale closures
@@ -72,10 +73,11 @@ export function useFirestore({ currentUserRef }) {
       coachoverrides:doc(db,"fccnets","coachoverrides"),// {date-sessionId: {newCoach, oldCoach}}
       matchselections:doc(db,"fccnets","matchselections"),// {matchId: {players, captain, vc, wk, note, reportTime}}
       notetemplates:doc(db,"fccnets","captainnotes_templates"), // [{id, text, createdBy, createdAt, updatedAt}]
+      notifsettings:doc(db,"fccnets","notifsettings"), // {[switchKey]: boolean} club-level master switches
     };
     (async()=>{
       try {
-        const [sr,mr,pr,tr,rr,br,ir,jr,ar,rlr,csr,spr,attr,snr,ppr,cor,msr,ntr] = await Promise.all([
+        const [sr,mr,pr,tr,rr,br,ir,jr,ar,rlr,csr,spr,attr,snr,ppr,cor,msr,ntr,nsr] = await Promise.all([
           getDoc(refs.sessions),
           getDoc(refs.members),
           getDoc(refs.pins),
@@ -94,6 +96,7 @@ export function useFirestore({ currentUserRef }) {
           getDoc(refs.coachoverrides),
           getDoc(refs.matchselections),
           getDoc(refs.notetemplates),
+          getDoc(refs.notifsettings),
         ]);
         // Sessions MUST be loaded before setLoading(false) so sessionsRef is
         // populated before the recurring useEffect runs — prevents lifts being wiped
@@ -149,9 +152,10 @@ export function useFirestore({ currentUserRef }) {
           setNoteTemplates(seeded);
           setDoc(doc(db,"fccnets","captainnotes_templates"), {value: JSON.stringify(seeded)}).catch(()=>{});
         }
+        setNotifSettings(nsr.exists() ? JSON.parse(nsr.data().value) : {});
       } catch(e) {
         setMembers(SEED_MEMBERS.map(normMember)); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]); recurringRef.current=[]; setBlockCals([]); setInviteCodes({}); setJoinRequests([]); setAuditLog([]); setReminderLogs([]); setCancelledSessions([]);
-        setAllAttendance({}); setAllSessionNotes([]); setPlayerProgress({}); setCoachOverrides({}); setMatchSelections({}); setNoteTemplates([]);
+        setAllAttendance({}); setAllSessionNotes([]); setPlayerProgress({}); setCoachOverrides({}); setMatchSelections({}); setNoteTemplates([]); setNotifSettings({});
       }
       setLoading(false);
     })();
@@ -238,6 +242,10 @@ export function useFirestore({ currentUserRef }) {
       console.error("Failed to save parentdutyconfig:", e);
       throw e;
     }
+  };
+  const saveNotifSettings = async u => {
+    setNotifSettings(u);
+    await setDoc(doc(db,"fccnets","notifsettings"), { value: JSON.stringify(u) }).catch(()=>{});
   };
 
   // ── Audit log ─────────────────────────────────────────────────
@@ -367,12 +375,13 @@ export function useFirestore({ currentUserRef }) {
     matchSelections, setMatchSelections,
     noteTemplates, setNoteTemplates,
     parentDutyConfig, setParentDutyConfig,
+    notifSettings, setNotifSettings,
     loading,
     saveSessions, saveMembers, savePins, saveTeams, saveRecurring,
     saveBlockCals, saveCancelledSessions, saveInviteCodes, saveJoinRequests,
     saveSeasonPlans, saveAllAttendance, saveAllSessionNotes, savePlayerProgress,
     saveCoachOverrides, saveMatchSelections, saveNoteTemplates, saveAuditLog,
-    saveParentDutyConfig,
+    saveParentDutyConfig, saveNotifSettings,
     logAction,
   };
 }

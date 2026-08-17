@@ -295,6 +295,16 @@ export default async function handler(req, res) {
     const members = mDoc.value ? JSON.parse(mDoc.value) : [];
     const allSessions = sDoc.value ? JSON.parse(sDoc.value) : [];
 
+    // Club-level master switch (Admin → Notification Controls). Missing doc
+    // or missing key = enabled by default, same convention as the client's
+    // notifOn() helper.
+    const nsRes = await fetch(`${base}/fccnets/notifsettings`, { headers });
+    const notifSettings = nsRes.ok ? parseDoc(await nsRes.json()) : {};
+    const parsedNotifSettings = notifSettings.value ? JSON.parse(notifSettings.value) : {};
+    if (parsedNotifSettings.reminders === false) {
+      return res.status(200).json({ ok: true, skipped: "reminders disabled by admin" });
+    }
+
     // Allow ?date=YYYY-MM-DD for testing a specific date, otherwise send for both +1 and +2 days
     const testDate = req.query.date;
     
