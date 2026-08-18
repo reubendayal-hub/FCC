@@ -15,6 +15,8 @@ import { TEAM_META, getTeamMeta } from "../constants/teams";
 import { fmtShort, todayStr, isFuture } from "../utils/time";
 import { getCoachTeams, getMemberRoleChips, maskEmail, isCoachMember } from "../utils/members";
 import { EMAIL_SEED, normMember, uid } from "../constants/seeds";
+import { db } from "../firebase";
+import { resetAllCricketStats } from "../utils/resetCricketStats";
 import {
   DEFAULT_DUTY_CONFIG, DEFAULT_TEAM_CONFIG, STANDARD_ROLES,
   TRAINING_ROLE,
@@ -1030,6 +1032,8 @@ export default function AdminView() {
     editingSlot, setEditingSlot,
     logFilter, setLogFilter, logOpen, setLogOpen,
     confirmDelete, setConfirmDelete,
+    confirmResetStats, setConfirmResetStats,
+    resettingStats, setResettingStats,
     codeModal, setCodeModal,
     showAllBlocks, setShowAllBlocks,
     xlsParsed, setXlsParsed, xlsError, setXlsError,
@@ -1053,7 +1057,7 @@ export default function AdminView() {
     people:   ["members", "addmember", "groups", "coaches"],
     sessions: ["blocknets", "recurring", "parentduty", "dutyoversight"],
     comms:    ["reminderlogs", "notifsettings"],
-    system:   ["backup", "auditlog"],
+    system:   ["backup", "auditlog", "scorepro"],
   };
   const sectionInTab = (key) => TAB_SECTIONS[adminTab]?.includes(key);
 
@@ -4141,6 +4145,39 @@ export default function AdminView() {
         </>}
 
         {/* ══════════════════════════════════════════════════════════ */}
+        {/* SCOREPRO — Superadmin only (one-time stats reset)         */}
+        {/* ══════════════════════════════════════════════════════════ */}
+        {sectionInTab("scorepro") && userRole==="superadmin"&&<>
+        <div id="sec-scorepro"/>
+        <button onClick={()=>toggleAdminSec("scorepro")}
+          style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
+            background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",
+            padding:"8px 0",marginBottom:adminSec.scorepro?8:14}}>
+          <span style={{fontWeight:900,fontSize:13,color:G.text}}>🏏 ScorePro</span>
+          <span style={{fontSize:12,color:G.muted,fontWeight:700}}>
+            {adminSec.scorepro?"▲ collapse":"▼ show"}
+          </span>
+        </button>
+        {adminSec.scorepro&&(
+          <div style={{background:"#fef2f2",border:"1.5px solid #fca5a5",borderRadius:12,
+            padding:"14px 16px",marginBottom:20}}>
+            <div style={{fontWeight:900,fontSize:13,color:"#991b1b",marginBottom:6}}>
+              ⚠️ Reset all cricket stats
+            </div>
+            <div style={{fontSize:12,color:"#7f1d1d",lineHeight:1.5,marginBottom:10}}>
+              Wipes every member's <code>career</code> aggregates and <code>matchAppearances</code>
+              {" "}history. Use this only while no real match data has been recorded — typically
+              for clearing test runs before going live.
+            </div>
+            <Btn bg="#991b1b" col="#fff"
+              onClick={()=>setConfirmResetStats(true)}>
+              Reset all cricket stats
+            </Btn>
+          </div>
+        )}
+        </>}
+
+        {/* ══════════════════════════════════════════════════════════ */}
         {/* REMINDER LOGS — Superadmin only                           */}
         {/* ══════════════════════════════════════════════════════════ */}
         {sectionInTab("reminderlogs") && userRole==="superadmin"&&<>
@@ -5393,6 +5430,58 @@ export default function AdminView() {
                 fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
               Done
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── ScorePro: Reset all cricket stats confirmation ── */}
+      {confirmResetStats&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",
+          zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+          <div style={{background:G.white,borderRadius:16,padding:28,maxWidth:360,width:"100%",
+            boxShadow:"0 8px 40px rgba(0,0,0,0.18)"}}>
+            <div style={{fontSize:22,marginBottom:8}}>🏏</div>
+            <div style={{fontWeight:900,fontSize:17,color:G.text,marginBottom:8}}>
+              Reset all cricket stats?
+            </div>
+            <div style={{color:"#b91c1c",fontSize:13,marginBottom:22,
+              background:G.redBg,borderRadius:8,padding:"10px 12px",lineHeight:1.5}}>
+              ⚠️ This will wipe all batting, bowling and match history for all members. Are you sure?
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button type="button"
+                disabled={resettingStats}
+                onClick={()=>setConfirmResetStats(false)}
+                style={{flex:1,padding:"11px 0",borderRadius:10,border:`1.5px solid ${G.border}`,
+                  background:G.cream,color:G.text,fontWeight:800,fontSize:14,
+                  cursor:resettingStats?"default":"pointer",opacity:resettingStats?0.5:1,
+                  fontFamily:"inherit"}}>
+                Cancel
+              </button>
+              <button type="button"
+                disabled={resettingStats}
+                onClick={async()=>{
+                  if(resettingStats) return;
+                  setResettingStats(true);
+                  try {
+                    const r = await resetAllCricketStats({ db });
+                    showToast(`✓ Reset cricket stats for ${r.membersReset} member${r.membersReset===1?"":"s"}`);
+                    setConfirmResetStats(false);
+                  } catch (e) {
+                    console.error("Reset stats error:", e);
+                    showToast(`Reset failed: ${e.message||e.code||"error"}`);
+                  } finally {
+                    setResettingStats(false);
+                  }
+                }}
+                style={{flex:1,padding:"11px 0",borderRadius:10,border:"none",
+                  background:resettingStats?"#e2e8f0":"#991b1b",
+                  color:resettingStats?"#94a3b8":"#fff",
+                  fontWeight:800,fontSize:14,
+                  cursor:resettingStats?"default":"pointer",fontFamily:"inherit"}}>
+                {resettingStats?"Resetting…":"Yes, reset all"}
+              </button>
+            </div>
           </div>
         </div>
       )}

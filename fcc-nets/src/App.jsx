@@ -451,7 +451,7 @@ export default function App() {
     members:true, addmember:true, groups:false,
     coaches:false, parentduty:false, dutyoversight:false,
     blocknets:false, recurring:false, backup:false, auditlog:false, reminderlogs:false,
-    notifsettings:false
+    notifsettings:false, scorepro:false
   });
   const toggleAdminSec = k => setAdminSec(s=>({...s,[k]:!s[k]}));
   const [editingName, setEditingName] = useState(null); // {id, value}
@@ -1050,6 +1050,8 @@ export default function App() {
   }
 
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [confirmResetStats, setConfirmResetStats] = useState(false);
+  const [resettingStats, setResettingStats] = useState(false);
   const [codeModal, setCodeModal] = useState(null); // {name, code} — invite code display modal
   const [schedFilter,   setSchedFilter]   = useState("all"); // "all" | "mine"
   const [blocksExpanded, setBlocksExpanded] = useState(false);
@@ -1403,6 +1405,8 @@ export default function App() {
     vfNewName, setVfNewName, vfNewTeam, setVfNewTeam,
     // ── confirm/code/sched/availability state ──────────────────
     confirmDelete, setConfirmDelete,
+    confirmResetStats, setConfirmResetStats,
+    resettingStats, setResettingStats,
     codeModal, setCodeModal,
     schedFilter, setSchedFilter,
     blocksExpanded, setBlocksExpanded,
