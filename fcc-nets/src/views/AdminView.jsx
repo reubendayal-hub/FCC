@@ -1046,6 +1046,17 @@ export default function AdminView() {
     parentDutyConfig, saveParentDutyConfig,
   } = useAppContext();
 
+  // Top-level admin tabs — replaces the old flat "jump to section" chip strip,
+  // which had grown to 11 chips across a 5000+ line file.
+  const [adminTab, setAdminTab] = useState("people"); // people | sessions | comms | system
+  const TAB_SECTIONS = {
+    people:   ["members", "addmember", "groups", "coaches"],
+    sessions: ["blocknets", "recurring", "parentduty", "dutyoversight"],
+    comms:    ["reminderlogs", "notifsettings"],
+    system:   ["backup", "auditlog"],
+  };
+  const sectionInTab = (key) => TAB_SECTIONS[adminTab]?.includes(key);
+
   // Club-level master switches (fccnets/notifsettings) — default-on when unset.
   // Global OFF = nobody gets that type. Global ON = each member's own
   // per-member preference (bookingConfirm / reminders) still applies on top.
@@ -1212,48 +1223,47 @@ export default function AdminView() {
         sub={`${members.length} members · ${teams.length} groups`}
         onBack={()=>setView("schedule")}/>
 
-      {/* ── Admin section index ─────────────────────────────── */}
+      {/* ── Admin top-level tabs ─────────────────────────────── */}
       <div style={{padding:"10px 16px 12px",borderBottom:`1px solid ${G.border}`,
         background:G.cream}}>
-        <div style={{fontSize:10,fontWeight:900,letterSpacing:1.5,color:G.muted,
-          textTransform:"uppercase",marginBottom:8}}>
-          Jump to section
-        </div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
           {[
-            {label:"👥 Members",    id:"sec-members",    key:"members"},
-            {label:"➕ Add Member", id:"sec-add-member", key:"addmember"},
-            {label:"🏏 Groups",     id:"sec-groups",     key:"groups"},
-            {label:"🧢 Coaches & Captains", id:"sec-coaches", key:"coaches"},
-            {label:"⚙️ Duty config", id:"sec-parentduty", key:"parentduty"},
-            {label:"🙋 Duty roster", id:"sec-dutyoversight", key:"dutyoversight"},
-            {label:"🚫 Block Nets", id:"sec-blocknets",  key:"blocknets"},
-            {label:"🔁 Recurring",  id:"sec-recurring",  key:"recurring"},
-            {label:"👑 Audit Log",  id:"sec-auditlog",   key:"auditlog"},
-            {label:"📧 Reminder Logs", id:"sec-reminderlogs", key:"reminderlogs"},
-            {label:"🔔 Notification Controls", id:"sec-notifcontrols", key:"notifsettings"},
-          ].map(({label,id,key})=>(
-            <button key={id}
-              onClick={()=>{
-                // Open the section then scroll to it
-                setAdminSec(s=>({...s,[key]:true}));
-                setTimeout(()=>document.getElementById(id)?.scrollIntoView({behavior:"smooth",block:"start"}),50);
-              }}
-              style={{padding:"5px 12px",borderRadius:20,
-                border:`1px solid ${adminSec[key]?G.green:G.border}`,
-                background:adminSec[key]?`${G.green}12`:G.white,
-                color:adminSec[key]?G.green:G.text,
-                fontSize:11,fontWeight:700,cursor:"pointer",
-                fontFamily:"inherit",whiteSpace:"nowrap",transition:"all .13s"}}>
-              {label}
-            </button>
-          ))}
+            {key:"people",   label:"👥 People",   countFn: () => joinRequests.filter(r=>r.status==="pending").length},
+            {key:"sessions", label:"🏏 Sessions", countFn: () => 0},
+            {key:"comms",    label:"📧 Comms",    countFn: () => 0},
+            {key:"system",   label:"⚙️ System",   countFn: () => 0},
+          ].map(({key,label,countFn})=>{
+            const active = adminTab === key;
+            const count = countFn();
+            return (
+              <button key={key}
+                onClick={()=>{
+                  setAdminTab(key);
+                  window.scrollTo({top:0, behavior:"smooth"});
+                }}
+                style={{padding:"7px 16px",borderRadius:20,
+                  border:`1.5px solid ${active?G.green:G.border}`,
+                  background:active?`${G.green}12`:G.white,
+                  color:active?G.green:G.text,
+                  fontSize:12,fontWeight:800,cursor:"pointer",
+                  fontFamily:"inherit",whiteSpace:"nowrap",transition:"all .13s",
+                  display:"flex",alignItems:"center",gap:6,flex:"0 0 auto"}}>
+                {label}
+                {count > 0 && (
+                  <span style={{background:"#ef4444",color:"#fff",borderRadius:99,
+                    fontSize:10,fontWeight:900,padding:"1px 7px",minWidth:18,
+                    textAlign:"center"}}>{count}</span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       <div style={{padding:"14px 16px 20px"}}>
 
         {/* ── Members section ─────────────────────────────────── */}
+        {sectionInTab("members") && (<>
         <div id="sec-members"/>
         <button onClick={()=>toggleAdminSec("members")}
           style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
@@ -1345,7 +1355,6 @@ export default function AdminView() {
         })()}
 
         {/* ── Join Requests ──────────────────────────────────── */}
-        <div id="sec-members"/>
         {can(userRole,"addMember")&&joinRequests.filter(r=>r.status==="pending").length>0&&(()=>{
           const pending = joinRequests.filter(r=>r.status==="pending");
 
@@ -1757,9 +1766,10 @@ export default function AdminView() {
           );
         })()}
         </>}
+        </>)}
 
         {/* ── Add Member section ──────────────────────────────── */}
-        {can(userRole,"addMember")&&<>
+        {sectionInTab("addmember") && can(userRole,"addMember")&&<>
         <div id="sec-add-member"/>
         <button onClick={()=>toggleAdminSec("addmember")}
           style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
@@ -1886,6 +1896,9 @@ export default function AdminView() {
         </>}{/* end adminSec.addmember */}
         </>}{/* end can addMember for addmember section */}
 
+        {/* ── Member-related banners (People tab only) ─────────── */}
+        {adminTab === "people" && (<>
+
         {/* Role legend */}
         <div style={{background:G.white,borderRadius:10,border:`1.5px solid ${G.border}`,
           padding:"10px 14px",marginBottom:14}}>
@@ -1915,8 +1928,76 @@ export default function AdminView() {
           </div>
         )}
 
+        {/* ── Fix Names (superadmin only) ───────────────────── */}
+        {(namesNeedFix.length>0||namesAmbiguous.length>0)&&(
+          <div style={{background:"#fffbeb",border:"1.5px solid #fbbf24",borderRadius:12,
+            padding:"14px 16px",marginBottom:16}}>
+            <div style={{fontWeight:900,fontSize:13,color:"#92400e",marginBottom:6}}>
+              ⚠️ Members with incomplete names detected
+            </div>
+            {namesNeedFix.length>0&&<>
+              <div style={{fontSize:12,color:"#78350f",marginBottom:10}}>
+                <b>{namesNeedFix.length}</b> member{namesNeedFix.length>1?"s":""} can be auto-fixed:{" "}
+                {namesNeedFix.map(m=>m.name).join(", ")}
+              </div>
+              <Btn bg="#d97706" col="#fff" onClick={fixAllNames}>
+                Fix {namesNeedFix.length} Name{namesNeedFix.length>1?"s":""} Automatically
+              </Btn>
+            </>}
+            {namesAmbiguous.length>0&&(
+              <div style={{fontSize:12,color:"#78350f",marginTop:namesNeedFix.length?10:0}}>
+                <b>{namesAmbiguous.length}</b> need manual fix (ambiguous — use ✏️ pencil below):{" "}
+                {namesAmbiguous.map(m=>m.name).join(", ")}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Seed Emails (superadmin only) ─────────────────── */}
+        {emailsToSeed.length > 0 && (
+          <div style={{background:"#eff6ff",border:"1.5px solid #93c5fd",borderRadius:12,
+            padding:"14px 16px",marginBottom:16}}>
+            <div style={{fontWeight:900,fontSize:13,color:"#1e3a5f",marginBottom:6}}>
+              📧 Email addresses ready to import
+            </div>
+            <div style={{fontSize:12,color:"#1e40af",marginBottom:10,lineHeight:1.5}}>
+              <b>{emailsToSeed.length}</b> member{emailsToSeed.length>1?"s":""} have email data from the uniform order form that can be imported now.
+              This will also enable secure first-time login verification for those members.
+            </div>
+            <div style={{fontSize:11,color:"#3b82f6",marginBottom:10}}>
+              {emailsToSeed.map(m=>m.name).join(", ")}
+            </div>
+            <Btn bg="#1e3a5f" col="#93c5fd" onClick={seedAllEmails}>
+              Import {emailsToSeed.length} Email{emailsToSeed.length>1?"s":""} from Uniform Form
+            </Btn>
+          </div>
+        )}
+
+        {/* ── Division Team Assignments ──────────────────────── */}
+        {divisionUpdates.length > 0 && (
+          <div style={{background:"#eff6ff",border:"1.5px solid #93c5fd",
+            borderRadius:12,padding:"14px 16px",marginBottom:16}}>
+            <div style={{fontWeight:900,fontSize:13,color:"#1e3a5f",marginBottom:6}}>
+              🏏 Division team assignments ready
+            </div>
+            <div style={{fontSize:12,color:"#1e40af",marginBottom:10,lineHeight:1.5}}>
+              <b>{divisionUpdates.length}</b> member{divisionUpdates.length>1?"s":""} have a division squad assignment not yet reflected in the app.
+              This will add their division group without removing any existing groups.
+            </div>
+            <div style={{fontSize:11,background:"#1e3a5f",color:"#93c5fd",
+              borderRadius:7,padding:"7px 10px",marginBottom:10,lineHeight:1.8}}>
+              {divisionUpdates.map(m=>`${m.name} → ${DIVISION_TEAMS[m.name]}`).join(" · ")}
+            </div>
+            <Btn bg="#1e3a5f" col="#93c5fd" onClick={applyDivisionTeams}>
+              Assign Division Teams to {divisionUpdates.length} Member{divisionUpdates.length>1?"s":""}
+            </Btn>
+          </div>
+        )}
+
+        </>)}{/* end Member-related banners (People tab only) */}
+
         {/* ── Manage Groups ─────────────────────────────────── */}
-        {can(userRole,"addMember")&&<>
+        {sectionInTab("groups") && can(userRole,"addMember")&&<>
         <div id="sec-groups"/>
         <button onClick={()=>toggleAdminSec("groups")}
           style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
@@ -2000,7 +2081,7 @@ export default function AdminView() {
         </>}
 
         {/* ── Team Coaches ────────────────────────────────────── */}
-        {can(userRole,"addMember")&&<>
+        {sectionInTab("coaches") && can(userRole,"addMember")&&<>
         <div id="sec-coaches"/>
         <button onClick={()=>toggleAdminSec("coaches")}
           style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
@@ -2220,7 +2301,7 @@ export default function AdminView() {
         </>}
 
         {/* ── Parent duty config (super-admin only) ────────────── */}
-        {userRole === "superadmin" && <>
+        {sectionInTab("parentduty") && userRole === "superadmin" && <>
         <div id="sec-parentduty"/>
         <button onClick={()=>toggleAdminSec("parentduty")}
           style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
@@ -2521,7 +2602,7 @@ export default function AdminView() {
         </>}
 
         {/* ── Duty roster oversight (admin + coaches) ───────────── */}
-        {(can(userRole, "accessMembers") || isCoachMember(currentUser?.name, teams)) && <>
+        {sectionInTab("dutyoversight") && (can(userRole, "accessMembers") || isCoachMember(currentUser?.name, teams)) && <>
         <div id="sec-dutyoversight"/>
         <button onClick={()=>toggleAdminSec("dutyoversight")}
           style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
@@ -3062,7 +3143,7 @@ export default function AdminView() {
         </>}
 
         {/* ── Block Nets Sessions ────────────────────────────── */}
-        {can(userRole,"addMember")&&<>
+        {sectionInTab("blocknets") && can(userRole,"addMember")&&<>
         <div id="sec-blocknets"/>
         <button onClick={()=>toggleAdminSec("blocknets")}
           style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
@@ -3570,7 +3651,7 @@ export default function AdminView() {
         </>}
 
         {/* ── Recurring Slots ───────────────────────────────── */}
-        {can(userRole,"addMember")&&<>
+        {sectionInTab("recurring") && can(userRole,"addMember")&&<>
         <div id="sec-recurring"/>
         <button onClick={()=>toggleAdminSec("recurring")}
           style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
@@ -3833,76 +3914,10 @@ export default function AdminView() {
           </div>
         </>}
 
-        {/* ── Fix Names (superadmin only) ───────────────────── */}
-        {(namesNeedFix.length>0||namesAmbiguous.length>0)&&(
-          <div style={{background:"#fffbeb",border:"1.5px solid #fbbf24",borderRadius:12,
-            padding:"14px 16px",marginBottom:16}}>
-            <div style={{fontWeight:900,fontSize:13,color:"#92400e",marginBottom:6}}>
-              ⚠️ Members with incomplete names detected
-            </div>
-            {namesNeedFix.length>0&&<>
-              <div style={{fontSize:12,color:"#78350f",marginBottom:10}}>
-                <b>{namesNeedFix.length}</b> member{namesNeedFix.length>1?"s":""} can be auto-fixed:{" "}
-                {namesNeedFix.map(m=>m.name).join(", ")}
-              </div>
-              <Btn bg="#d97706" col="#fff" onClick={fixAllNames}>
-                Fix {namesNeedFix.length} Name{namesNeedFix.length>1?"s":""} Automatically
-              </Btn>
-            </>}
-            {namesAmbiguous.length>0&&(
-              <div style={{fontSize:12,color:"#78350f",marginTop:namesNeedFix.length?10:0}}>
-                <b>{namesAmbiguous.length}</b> need manual fix (ambiguous — use ✏️ pencil below):{" "}
-                {namesAmbiguous.map(m=>m.name).join(", ")}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Seed Emails (superadmin only) ─────────────────── */}
-        {emailsToSeed.length > 0 && (
-          <div style={{background:"#eff6ff",border:"1.5px solid #93c5fd",borderRadius:12,
-            padding:"14px 16px",marginBottom:16}}>
-            <div style={{fontWeight:900,fontSize:13,color:"#1e3a5f",marginBottom:6}}>
-              📧 Email addresses ready to import
-            </div>
-            <div style={{fontSize:12,color:"#1e40af",marginBottom:10,lineHeight:1.5}}>
-              <b>{emailsToSeed.length}</b> member{emailsToSeed.length>1?"s":""} have email data from the uniform order form that can be imported now.
-              This will also enable secure first-time login verification for those members.
-            </div>
-            <div style={{fontSize:11,color:"#3b82f6",marginBottom:10}}>
-              {emailsToSeed.map(m=>m.name).join(", ")}
-            </div>
-            <Btn bg="#1e3a5f" col="#93c5fd" onClick={seedAllEmails}>
-              Import {emailsToSeed.length} Email{emailsToSeed.length>1?"s":""} from Uniform Form
-            </Btn>
-          </div>
-        )}
-
-        {/* ── Division Team Assignments ──────────────────────── */}
-        {divisionUpdates.length > 0 && (
-          <div style={{background:"#eff6ff",border:"1.5px solid #93c5fd",
-            borderRadius:12,padding:"14px 16px",marginBottom:16}}>
-            <div style={{fontWeight:900,fontSize:13,color:"#1e3a5f",marginBottom:6}}>
-              🏏 Division team assignments ready
-            </div>
-            <div style={{fontSize:12,color:"#1e40af",marginBottom:10,lineHeight:1.5}}>
-              <b>{divisionUpdates.length}</b> member{divisionUpdates.length>1?"s":""} have a division squad assignment not yet reflected in the app.
-              This will add their division group without removing any existing groups.
-            </div>
-            <div style={{fontSize:11,background:"#1e3a5f",color:"#93c5fd",
-              borderRadius:7,padding:"7px 10px",marginBottom:10,lineHeight:1.8}}>
-              {divisionUpdates.map(m=>`${m.name} → ${DIVISION_TEAMS[m.name]}`).join(" · ")}
-            </div>
-            <Btn bg="#1e3a5f" col="#93c5fd" onClick={applyDivisionTeams}>
-              Assign Division Teams to {divisionUpdates.length} Member{divisionUpdates.length>1?"s":""}
-            </Btn>
-          </div>
-        )}
-
         </>}
 
         {/* ── Data Backup & Export (superadmin only) ───────────────────── */}
-        {userRole==="superadmin"&&<>
+        {sectionInTab("backup") && userRole==="superadmin"&&<>
         <div id="sec-backup"/>
         <button onClick={()=>toggleAdminSec("backup")}
           style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
@@ -3993,7 +4008,7 @@ export default function AdminView() {
         </>}
 
         {/* ── Audit Log (superadmin only) ───────────────────── */}
-        {userRole==="superadmin"&&<>
+        {sectionInTab("auditlog") && userRole==="superadmin"&&<>
         <div id="sec-auditlog"/>
         <button onClick={()=>toggleAdminSec("auditlog")}
           style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
@@ -4128,7 +4143,7 @@ export default function AdminView() {
         {/* ══════════════════════════════════════════════════════════ */}
         {/* REMINDER LOGS — Superadmin only                           */}
         {/* ══════════════════════════════════════════════════════════ */}
-        {userRole==="superadmin"&&<>
+        {sectionInTab("reminderlogs") && userRole==="superadmin"&&<>
         <div id="sec-reminderlogs"/>
         <button onClick={()=>toggleAdminSec("reminderlogs")}
           style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
@@ -4251,7 +4266,7 @@ export default function AdminView() {
         {/* member's own preference (bookingConfirm/reminders) still   */}
         {/* applies on top — see notifOn() near the top of this file.  */}
         {/* ══════════════════════════════════════════════════════════ */}
-        {userRole==="superadmin"&&<>
+        {sectionInTab("notifsettings") && userRole==="superadmin"&&<>
         <div id="sec-notifcontrols"/>
         <button onClick={()=>toggleAdminSec("notifsettings")}
           style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
@@ -4331,6 +4346,9 @@ export default function AdminView() {
           );
         })()}
         </>}
+
+        {/* ── Members list browser (People tab only) ─────────────── */}
+        {adminTab === "people" && (<>
 
         {/* ── Sub-tab filter (Parents tab) ─────────────────────── */}
         {(() => {
@@ -5169,6 +5187,8 @@ export default function AdminView() {
           </div>
           );
         })}
+
+        </>)}{/* end Members list browser (People tab only) */}
       </div>
       <BotNav view="admin" setView={setView} userRole={userRole} pendingCount={joinRequests.filter(r=>r.status==="pending").length} currentUser={currentUser} teams={teams} G={G}/>
       {toast&&<Toast msg={toast} G={G}/>}
