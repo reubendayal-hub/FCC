@@ -81,12 +81,12 @@ export default function ProfileView() {
     // Use the resolved member's `.id` from context first (guaranteed to
     // match the scorer's writes), with `currentUser.id` / `.uid` as
     // fallbacks for users without a roster entry (parents etc.).
+    // Match by id only — never by name (names are not unique).
     const [careerDoc, setCareerDoc] = useState(null);
     const [careerLoading, setCareerLoading] = useState(false);
     const myMemberFromBlob = members.find(m =>
       m.id === currentUser?.id ||
-      m.id === currentUser?.uid ||
-      (currentUser?.name && m.name?.trim().toLowerCase() === currentUser.name.trim().toLowerCase())
+      m.id === currentUser?.uid
     );
     const playerId = myMemberFromBlob?.id || currentUser?.id || currentUser?.uid || null;
     useEffect(() => {
@@ -407,7 +407,6 @@ export default function ProfileView() {
                     saveMembers(updated);
                     const fresh = updated.find(m=>m.id===currentUser.id);
                     setCurrentUser(fresh);
-                    localStorage.setItem("fcc-current-user",JSON.stringify(fresh));
                     showToast("Details confirmed ✓");
                   }}
                   style={{marginTop:12,width:"100%",padding:"11px 0",borderRadius:10,
@@ -466,7 +465,6 @@ export default function ProfileView() {
                     saveMembers(updated);
                     const fresh = updated.find(m=>m.id===currentUser.id);
                     setCurrentUser(fresh);
-                    localStorage.setItem("fcc-current-user",JSON.stringify(fresh));
                     setProfileEditing(false);
                     showToast(emailOk&&phoneOk ? "Profile complete ✓" : "Saved ✓");
                   }}>Save</Btn>
@@ -594,7 +592,6 @@ export default function ProfileView() {
                     saveMembers(updated);
                     const fresh = updated.find(m=>m.id===currentUser.id);
                     setCurrentUser(fresh);
-                    localStorage.setItem("fcc-current-user",JSON.stringify(fresh));
                     setProfileAttrsEditing(false);
                     showToast("Attributes saved ✓");
                   }}>Save</Btn>
