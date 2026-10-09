@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>FCC Club Handbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;0,700;1,400;1,500&family=Source+Sans+3:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Layout: club-letter reading column (820px) under a navy crest hero; role cards with navy headers, red rule and gold detail */
+:root{
+  --bg:#EEF1F8; --surface:#FFFFFF; --surface-2:#F5F7FC; --line:#DCE2EF;
+  --ink:#0F1A3A; --body:#26344F; --muted:#5D6E99; --head:#1B2A5C;
+  --navy:#1B2A5C; --navy-2:#2A3D7A; --on-navy:#FFFFFF; --on-navy-muted:#AEBAE0;
+  --red:#CC1B33; --red-soft:#FDEEF0; --red-ink:#A3142A;
+  --gold:#D4A217; --gold-soft:#FFF8E5; --gold-ink:#6E5000;
+  --ok:#1F7A4D;
+  --f-display:'Lora', Georgia, 'Times New Roman', serif;
+  --f-body:'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0A1029; --surface:#111A3C; --surface-2:#16204A; --line:#26326160;
+    --ink:#EEF1FA; --body:#CFD6EC; --muted:#97A5CF; --head:#E3E9FF;
+    --navy:#18265A; --navy-2:#24367A; --on-navy:#FFFFFF; --on-navy-muted:#AEBAE0;
+    --red:#E3394F; --red-soft:#2B1426; --red-ink:#FF8A99;
+    --gold:#E2B33B; --gold-soft:#2A2411; --gold-ink:#EAC560;
+    --ok:#4CC28A;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0A1029; --surface:#111A3C; --surface-2:#16204A; --line:#26326160;
+  --ink:#EEF1FA; --body:#CFD6EC; --muted:#97A5CF; --head:#E3E9FF;
+  --navy:#18265A; --navy-2:#24367A; --on-navy:#FFFFFF; --on-navy-muted:#AEBAE0;
+  --red:#E3394F; --red-soft:#2B1426; --red-ink:#FF8A99;
+  --gold:#E2B33B; --gold-soft:#2A2411; --gold-ink:#EAC560;
+  --ok:#4CC28A;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--body);font-family:var(--f-body);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px;border-radius:6px}
+
+/* Hero */
+.hero{background:linear-gradient(135deg,var(--navy) 0%,var(--navy-2) 100%);color:var(--on-navy);padding-inline:16px}
+.hero-in{max-width:820px;margin:0 auto;padding-block:40px 34px;display:grid;grid-template-columns:auto 1fr;gap:22px;align-items:center}
+.crest{width:104px;height:auto;flex-shrink:0;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35))}
+.badge{display:inline-block;background:rgba(255,255,255,.12);padding:5px 12px;border-radius:20px;font-size:11.5px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}
+.hero h1{font-family:var(--f-display);font-weight:600;font-size:clamp(28px,5vw,40px);line-height:1.15;margin:0 0 8px;text-wrap:balance}
+.hero h1 span{color:var(--gold)}
+.hero-sub{color:var(--on-navy-muted);font-size:15px;margin:0}
+.motto{font-family:var(--f-display);font-style:italic;color:var(--gold);font-size:17px;margin:10px 0 0}
+.bars{height:6px;background:linear-gradient(to right,var(--gold) 0 50%,var(--red) 50% 100%)}
+@media (max-width:520px){.hero-in{grid-template-columns:1fr;gap:14px}.crest{width:80px}}
+
+/* Sticky nav */
+.nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line);box-shadow:0 2px 10px rgba(15,26,58,.06)}
+.nav-in{max-width:852px;margin:0 auto;display:flex;gap:6px;overflow-x:auto;padding:10px 16px;scrollbar-width:thin}
+.nav a{flex-shrink:0;text-decoration:none;font-size:13px;font-weight:600;color:var(--head);padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);white-space:nowrap}
+.nav a:hover{border-color:var(--red);color:var(--red-ink)}
+
+/* Page */
+.wrap{max-width:820px;margin:0 auto;padding-inline:16px;padding-block:28px 64px;display:flex;flex-direction:column;gap:56px}
+section{scroll-margin-top:70px;display:flex;flex-direction:column;gap:18px}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--red-ink);margin:0}
+h2{font-family:var(--f-display);font-weight:600;color:var(--head);font-size:clamp(24px,4vw,30px);line-height:1.2;margin:4px 0 0;text-wrap:balance}
+h3{font-family:var(--f-display);font-weight:600;font-size:20px;line-height:1.25;margin:0;text-wrap:balance}
+h4{font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+p{margin:0;max-width:68ch}
+.lead{font-size:17px;color:var(--body)}
+.sec-head{display:flex;flex-direction:column;gap:6px;padding-bottom:12px;border-bottom:2px solid var(--line);position:relative}
+.sec-head::after{content:"";position:absolute;left:0;bottom:-2px;width:64px;height:2px;background:var(--red)}
+strong{color:var(--ink);font-weight:700}
+
+/* Callouts */
+.draft{background:var(--red-soft);border:2px solid var(--red);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:6px}
+.draft h3{font-family:var(--f-body);font-size:15px;font-weight:800;color:var(--red-ink)}
+.draft p{font-size:15px}
+.note{background:var(--gold-soft);border-left:4px solid var(--gold);border-radius:0 12px 12px 0;padding:12px 16px;font-size:14.5px;color:var(--body)}
+.note b{color:var(--gold-ink)}
+.navy-box{background:linear-gradient(135deg,var(--navy) 0%,var(--navy-2) 100%);color:rgba(255,255,255,.92);border-radius:14px;padding:20px 22px;border-bottom:3px solid var(--red);display:flex;flex-direction:column;gap:10px}
+.navy-box h3{color:var(--gold)}
+.navy-box p{font-size:15px}
+.navy-box strong{color:#fff}
+
+/* Contents */
+.toc{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.toc a{display:flex;gap:12px;align-items:center;text-decoration:none;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.toc a:hover{border-color:var(--red)}
+.toc .n{width:34px;height:34px;border-radius:9px;background:var(--navy);color:var(--gold);font-weight:800;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;font-variant-numeric:tabular-nums}
+.toc .t{font-weight:700;color:var(--head);font-size:15px;line-height:1.25}
+.toc .s{font-size:12.5px;color:var(--muted);line-height:1.3}
+
+/* Values */
+.values{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px}
+.value{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--red);border-radius:12px;padding:14px}
+.value b{display:block;font-family:var(--f-display);font-size:17px;color:var(--head);margin-bottom:4px}
+.value span{font-size:13.5px;color:var(--muted);line-height:1.45;display:block}
+
+/* Structure diagram */
+.org{display:flex;flex-direction:column;align-items:stretch;gap:0}
+.tier{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.tier.top{border:2px solid var(--navy)}
+.tier.board{background:linear-gradient(135deg,var(--navy) 0%,var(--navy-2) 100%);border:none;color:#fff}
+.tier-label{font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--red-ink)}
+.tier.board .tier-label{color:var(--gold)}
+.tier-title{font-family:var(--f-display);font-size:19px;font-weight:600;color:var(--head)}
+.tier.board .tier-title{color:#fff}
+.tier-text{font-size:14px;color:var(--muted)}
+.tier.board .tier-text{color:var(--on-navy-muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);color:var(--head)}
+.tier.board .chip{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.18);color:#fff}
+.link{width:4px;height:40px;background:var(--red);margin:0 auto;position:relative;border-radius:2px 2px 0 0;margin-bottom:6px}
+.link::after{content:"";position:absolute;left:50%;bottom:-12px;transform:translateX(-50%);border-left:12px solid transparent;border-right:12px solid transparent;border-top:14px solid var(--red)}
+.org-row{display:grid;grid-template-columns:1fr 230px;gap:12px;align-items:stretch}
+.side{background:var(--gold-soft);border:1px dashed var(--gold);border-radius:14px;padding:12px 14px;font-size:13.5px;color:var(--body);display:flex;flex-direction:column;gap:4px}
+.side b{color:var(--gold-ink);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+@media (max-width:620px){.org-row{grid-template-columns:1fr}}
+
+/* Table */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:14px}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+thead th{background:var(--navy);color:#fff;font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
+thead th:not(:first-child),tbody td:not(:first-child){text-align:center}
+tbody tr:last-child td{border-bottom:none}
+tbody td:first-child{color:var(--ink);font-weight:600}
+.D,.I{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:22px;padding:0 7px;border-radius:6px;font-size:11.5px;font-weight:800}
+.D{background:var(--red);color:#fff}
+.I{background:var(--surface-2);color:var(--head);border:1px solid var(--line)}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);align-items:center}
+.money td:not(:first-child){font-variant-numeric:tabular-nums}
+
+/* Role cards */
+.role{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(15,26,58,.05)}
+.role-head{background:linear-gradient(135deg,var(--navy) 0%,var(--navy-2) 100%);border-bottom:3px solid var(--red);padding:16px 20px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.role-head h3{color:#fff}
+.role-head .tags{display:flex;flex-wrap:wrap;gap:6px}
+.role-head .tags span{font-size:11.5px;font-weight:700;letter-spacing:.04em;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.12);color:var(--gold)}
+.role-body{padding:18px 20px 20px;display:flex;flex-direction:column;gap:18px}
+.purpose{font-family:var(--f-display);font-style:italic;font-size:17px;color:var(--head);line-height:1.45;max-width:66ch}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.fact{background:var(--surface-2);padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.fact small{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.fact span{font-size:14px;font-weight:600;color:var(--ink);line-height:1.35}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px}
+.cols > div{min-width:0}
+ul.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
+ul.list li{position:relative;padding-left:20px;font-size:15px;line-height:1.5}
+ul.list li::before{content:"";position:absolute;left:2px;top:.62em;width:8px;height:8px;border-radius:2px;background:var(--navy-2);transform:rotate(45deg)}
+ul.do li::before{content:"✓";background:none;transform:none;top:0;left:0;width:auto;height:auto;color:var(--ok);font-weight:800}
+ul.dont li::before{content:"✕";background:none;transform:none;top:0;left:1px;width:auto;height:auto;color:var(--red);font-weight:800}
+.split{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.split > div{border-radius:12px;padding:14px 16px;min-width:0}
+.split .yes{background:var(--surface-2);border:1px solid var(--line)}
+.split .no{background:var(--red-soft);border:1px solid color-mix(in srgb,var(--red) 35%,transparent)}
+.split .no h4{color:var(--red-ink)}
+
+/* Timeline */
+.timeline{border-left:2px solid var(--line);margin-left:8px;padding-left:22px;display:flex;flex-direction:column;gap:16px}
+.ti{position:relative}
+.ti::before{content:"";position:absolute;left:-30px;top:5px;width:14px;height:14px;border-radius:50%;background:var(--gold);border:3px solid var(--surface)}
+.ti.red::before{background:var(--red)}
+.ti .when{font-size:12.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gold-ink)}
+.ti.red .when{color:var(--red-ink)}
+.ti .what{font-weight:700;color:var(--ink);font-size:15.5px}
+.ti p{font-size:14.5px;color:var(--body)}
+
+/* Committee grid */
+.cgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.ccard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.ccard h3{font-size:17px;color:var(--head)}
+.ccard p{font-size:14px;color:var(--muted)}
+.ccard ul.list li{font-size:14px}
+.ccard .on-board{align-self:flex-start;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:var(--gold-soft);color:var(--gold-ink);border:1px solid color-mix(in srgb,var(--gold) 45%,transparent)}
+
+/* Steps (discipline) */
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;counter-reset:s}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:6px}
+.step .k{width:30px;height:30px;border-radius:8px;background:var(--navy);color:var(--gold);font-weight:800;display:flex;align-items:center;justify-content:center;font-size:14px}
+.step.hot .k{background:var(--red);color:#fff}
+.step b{color:var(--head);font-size:15px}
+.step span{font-size:13.5px;color:var(--muted);line-height:1.45}
+
+footer{border-top:2px solid var(--line);padding-top:18px;font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-in">
+    <img class="crest" src="data:image/webp;base64,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" alt="Fredensborg Cricket Club logo" width="330" height="360">
+    <div>
+      <div class="badge">Fredensborg Cricket Club · Club Handbook</div>
+      <h1>How We Run <span>Our Club</span></h1>
+      <p class="hero-sub">Structure, roles, rules and code of conduct · Draft v0.3 · October 2026</p>
+      <p class="motto">"One FCC, One Community"</p>
+    </div>
+  </div>
+</header>
+<div class="bars" aria-hidden="true"></div>
+
+<nav class="nav" aria-label="Sections">
+  <div class="nav-in">
+    <a href="#structure">Structure</a>
+    <a href="#decisions">Who decides</a>
+    <a href="#conduct">Code of conduct</a>
+    <a href="#board">Board</a>
+    <a href="#officers">Officers</a>
+    <a href="#committees">Committees</a>
+    <a href="#selection">Selection</a>
+    <a href="#coaching">Coaching</a>
+    <a href="#captains">Captains</a>
+    <a href="#money">Money</a>
+    <a href="#discipline">Discipline</a>
+    <a href="#onefcc">One FCC</a>
+    <a href="#adoption">Adoption</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <section id="intro" aria-label="Introduction">
+    <div class="draft">
+      <h3>Draft for board review</h3>
+      <p>Nothing in this handbook is in force until the board adopts it. Where it differs from the club's statutes (<em>vedtægter</em>), the statutes apply until the AGM changes them. Amounts and dates marked <b>proposed</b> are for the board to confirm.</p>
+    </div>
+    <p class="lead">FCC has grown faster than its rulebook. Today most of the club runs on goodwill and on a handful of people who know how things are done. This handbook writes that down, so every member knows <strong>who does what, who decides what, and what we expect of each other</strong>.</p>
+    <p>Each role has the same layout: its purpose, who can hold it, what it covers, and what it does not. Read the parts that apply to you. The code of conduct applies to everyone.</p>
+    <div class="toc">
+      <a href="#structure"><span class="n">1</span><span><span class="t">How the club is run</span><br><span class="s">Members, board, committees</span></span></a>
+      <a href="#decisions"><span class="n">2</span><span><span class="t">Who decides what</span><br><span class="s">Decision rights at a glance</span></span></a>
+      <a href="#conduct"><span class="n">3</span><span><span class="t">Code of conduct</span><br><span class="s">For every member</span></span></a>
+      <a href="#board"><span class="n">4</span><span><span class="t">The board</span><br><span class="s">Terms, elections, Advisory Council</span></span></a>
+      <a href="#officers"><span class="n">5</span><span><span class="t">Club officers</span><br><span class="s">Chair, treasurer, secretary, auditor</span></span></a>
+      <a href="#committees"><span class="n">6</span><span><span class="t">Committees</span><br><span class="s">How every committee works</span></span></a>
+      <a href="#selection"><span class="n">7</span><span><span class="t">Selection committee</span><br><span class="s">Code, independence, timeline</span></span></a>
+      <a href="#coaching"><span class="n">8</span><span><span class="t">Coaching committee</span><br><span class="s">Standards and safeguarding</span></span></a>
+      <a href="#captains"><span class="n">9</span><span><span class="t">Captains &amp; vice-captains</span><br><span class="s">Code, independence, match week</span></span></a>
+      <a href="#money"><span class="n">10</span><span><span class="t">Money rules</span><br><span class="s">Spending limits and controls</span></span></a>
+      <a href="#discipline"><span class="n">11</span><span><span class="t">Complaints &amp; discipline</span><br><span class="s">A fair, stepped process</span></span></a>
+      <a href="#onefcc"><span class="n">12</span><span><span class="t">One FCC development</span><br><span class="s">Who builds this framework</span></span></a>
+      <a href="#adoption"><span class="n">13</span><span><span class="t">Adopting this handbook</span><br><span class="s">From draft to club rules</span></span></a>
+    </div>
+  </section>
+
+  <!-- 1 STRUCTURE -->
+  <section id="structure">
+    <div class="sec-head"><p class="eyebrow">Part 1 · Structure</p><h2>How the club is run</h2></div>
+    <p>Power in FCC flows from the members. The members elect the board at the Annual General Meeting. The board sets direction and appoints committee chairs. Committees do the work, with helpers from across the club.</p>
+    <div class="org">
+      <div class="org-row">
+        <div class="tier top">
+          <span class="tier-label">Highest authority</span>
+          <span class="tier-title">Members · Annual General Meeting</span>
+          <span class="tier-text">Every paid-up member over 18 votes (one vote each). Elects the board, the auditor and the selection committee, approves the accounts and budget, and changes the statutes.</span>
+        </div>
+        <div class="side"><b>Independent of the board</b><span><strong>Auditor:</strong> checks the accounts.</span><span><strong>Selection committee:</strong> picks captains and squads.</span><span>Both are elected by, and report to, the AGM.</span><span><strong>Advisory Council:</strong> former chairs and founders advise and mediate, with no vote.</span></div>
+      </div>
+      <div class="link" aria-hidden="true"></div>
+      <div class="tier board">
+        <span class="tier-label">Elected by the AGM</span>
+        <span class="tier-title">The Board</span>
+        <span class="tier-text">Runs the club, not the teams and players. Sets direction, owns the budget, appoints committee chairs, and is accountable for how the club is run.</span>
+        <div class="chips"><span class="chip">Chairman</span><span class="chip">Vice Chairman</span><span class="chip">Treasurer</span><span class="chip">Secretary</span><span class="chip">Committee chairs with a board seat</span></div>
+      </div>
+      <div class="link" aria-hidden="true"></div>
+      <div class="tier">
+        <span class="tier-label">Appointed by the board</span>
+        <span class="tier-title">Committees</span>
+        <span class="tier-text">Each committee has a chair, a written purpose and a budget. The chair recruits members and helpers.</span>
+        <div class="chips"><span class="chip">Youth</span><span class="chip">Matches</span><span class="chip">Coaching</span><span class="chip">Finance &amp; Sponsorship</span><span class="chip">Comms &amp; Growth</span><span class="chip">Equipment &amp; Grounds</span><span class="chip">Events &amp; Social</span></div>
+      </div>
+      <div class="link" aria-hidden="true"></div>
+      <div class="tier">
+        <span class="tier-label">Everyone else</span>
+        <span class="tier-title">Captains, coaches, helpers and members</span>
+        <span class="tier-text">The One FCC Lead and Co-Lead develop the club's framework. Captains run teams on match day. Coaches run training. Every member is expected to help with at least one task a season.</span>
+      </div>
+    </div>
+    <div class="navy-box">
+      <h3>Separation of roles</h3>
+      <p>The Club keeps four jobs apart: <strong>governance</strong> (the Board), <strong>player selection</strong> (the selection committee), <strong>coaching</strong> (the coaching committee) and <strong>team leadership</strong> (captains). No one holds two of these at once, so every decision is fair, transparent and accountable. Any temporary exception must be approved and recorded: by the selection chair for selection matters, or by the Board for governance matters.</p>
+    </div>
+  </section>
+
+  <!-- 2 DECISIONS -->
+  <section id="decisions">
+    <div class="sec-head"><p class="eyebrow">Part 2 · Decision rights</p><h2>Who decides what</h2></div>
+    <p>Most friction in a volunteer club comes from not knowing who has the final say. This table settles it. If a decision is not listed, it belongs to the board.</p>
+    <div class="legend"><span><span class="D">D</span> Decides</span><span><span class="I">I</span> Gives input or is consulted</span></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Decision</th><th>AGM</th><th>Board</th><th>Chairman</th><th>Committee chair</th><th>Captain</th></tr></thead>
+        <tbody>
+          <tr><td>Change the statutes</td><td><span class="D">D</span></td><td><span class="I">I</span></td><td></td><td></td><td></td></tr>
+          <tr><td>Elect the board and auditor</td><td><span class="D">D</span></td><td></td><td></td><td></td><td></td></tr>
+          <tr><td>Elect the selection committee</td><td><span class="D">D</span></td><td></td><td></td><td></td><td></td></tr>
+          <tr><td>Approve accounts and membership fees</td><td><span class="D">D</span></td><td><span class="I">I</span></td><td></td><td></td><td></td></tr>
+          <tr><td>Annual budget and club priorities</td><td><span class="I">I</span></td><td><span class="D">D</span></td><td><span class="I">I</span></td><td><span class="I">I</span></td><td></td></tr>
+          <tr><td>Appoint or remove a committee chair (except Selection)</td><td></td><td><span class="D">D</span></td><td><span class="I">I</span></td><td></td><td></td></tr>
+          <tr><td>Spending within a committee budget</td><td></td><td></td><td></td><td><span class="D">D</span></td><td></td></tr>
+          <tr><td>Captains, vice-captains and squads</td><td></td><td></td><td></td><td><span class="D">D</span><br><small>Selection, collectively</small></td><td><span class="I">I</span></td></tr>
+          <tr><td>Playing XI, batting order, bowling and field</td><td></td><td></td><td></td><td></td><td><span class="D">D</span></td></tr>
+          <tr><td>Training plans and coach assignments</td><td></td><td></td><td></td><td><span class="D">D</span><br><small>Coaching</small></td><td><span class="I">I</span></td></tr>
+          <tr><td>Disciplinary sanctions</td><td></td><td><span class="D">D</span></td><td><span class="I">I</span></td><td><span class="I">I</span></td><td><span class="I">I</span></td></tr>
+          <tr><td>Urgent decisions between board meetings</td><td></td><td><span class="I">I</span></td><td><span class="D">D</span><br><small>reported at next meeting</small></td><td></td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 3 CONDUCT -->
+  <section id="conduct">
+    <div class="sec-head"><p class="eyebrow">Part 3 · Applies to everyone</p><h2>Code of conduct</h2></div>
+    <p>These standards apply to every member, player, parent, coach, captain and board member, on and off the field, in person and in our WhatsApp groups. Joining FCC means agreeing to them.</p>
+    <div class="values">
+      <div class="value"><b>Respect</b><span>Teammates, opponents, umpires, volunteers and neighbours.</span></div>
+      <div class="value"><b>Fair play</b><span>Play within the Laws and the Spirit of Cricket, and accept the umpire's decision.</span></div>
+      <div class="value"><b>Inclusion</b><span>Every nationality, age, gender and ability is welcome.</span></div>
+      <div class="value"><b>Commitment</b><span>Turn up when you say you will. Tell us early when you can't.</span></div>
+      <div class="value"><b>Contribution</b><span>The club runs on volunteers. Everyone gives something back.</span></div>
+      <div class="value"><b>Dignity</b><span>Praise in public, correct in private. No one is embarrassed in front of others.</span></div>
+    </div>
+    <div class="split">
+      <div class="yes">
+        <h4>Every member will</h4>
+        <ul class="list do">
+          <li>Pay membership fees by the deadline set each season</li>
+          <li>Reply to availability requests by the captain's deadline</li>
+          <li>Take on <strong>at least one helper task per season</strong>, from scoring a game to helping at an event</li>
+          <li>Look after club kit and return it in the condition it was lent</li>
+          <li>Raise disagreements privately with the person concerned, or with the relevant chair</li>
+          <li>Follow the club's safeguarding rules around children</li>
+          <li>Keep selection, disciplinary and personal matters confidential</li>
+        </ul>
+      </div>
+      <div class="no">
+        <h4>No member will</h4>
+        <ul class="list dont">
+          <li>Abuse, threaten or harass anyone, in person or online</li>
+          <li>Discriminate by nationality, ethnicity, language, region, religion, caste, gender, age or ability</li>
+          <li>Argue with or show dissent towards an umpire</li>
+          <li>Criticise teammates, captains or volunteers in group chats</li>
+          <li>Drink alcohol at youth sessions or before playing</li>
+          <li>Post photos of children without parental consent</li>
+          <li>Make public statements or posts that damage the Club's reputation</li>
+        </ul>
+      </div>
+    </div>
+    <div class="role">
+      <div class="role-head"><h3>WhatsApp and social media</h3><div class="tags"><span>All club groups</span></div></div>
+      <div class="role-body">
+        <div class="cols">
+          <ul class="list">
+            <li>Club groups are for club business: training, matches, events and announcements.</li>
+            <li>Festival greetings are welcome. Political or religious debate, chain forwards and advertising are not.</li>
+            <li>Club groups use English (or Danish), so every member can follow.</li>
+            <li>Disagree in private. A complaint posted to a group is handled as a conduct issue.</li>
+          </ul>
+          <ul class="list">
+            <li>Group admins may remove messages and, after one warning, members.</li>
+            <li>Only the Comms committee posts on the club's official social media.</li>
+            <li>Member contact details stay inside the club and are never shared outside it.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="role">
+      <div class="role-head"><h3>Community &amp; inclusion</h3><div class="tags"><span>How we look after each other</span></div></div>
+      <div class="role-body">
+        <p class="purpose">FCC brings together members from many countries, languages, faiths and generations. These everyday rules make sure everyone feels at home.</p>
+        <div class="cols">
+          <div><h4>Calendar, food and kit</h4>
+            <ul class="list">
+              <li>The club calendar marks major festivals such as Diwali, Eid, Holi and Christmas. The AGM and club events avoid those dates where possible</li>
+              <li>Training times take account of fasting periods where they can</li>
+              <li>Every club event offers a vegetarian option. Food is labelled: vegetarian, non-vegetarian, halal, beef or pork, and common allergens</li>
+              <li>Modest kit (long sleeves, leggings, head coverings) is always fine, as long as it is safe to play in</li>
+            </ul></div>
+          <div><h4>Language and respect</h4>
+            <ul class="list">
+              <li>Club groups and documents use English, with Danish for official matters, so every member can follow. Private chats can be in any language</li>
+              <li>We respect experience, but decisions are made on merit and due process, not seniority</li>
+              <li>Women and girls get equal access to nets, kit and coaching time</li>
+              <li>New members and families are welcomed personally, not just added to a group</li>
+            </ul></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 BOARD -->
+  <section id="board">
+    <div class="sec-head"><p class="eyebrow">Part 4 · Governance</p><h2>The board</h2></div>
+    <div class="role">
+      <div class="role-head"><h3>Board of Directors</h3><div class="tags"><span>Elected by the AGM</span><span>2-year terms</span></div></div>
+      <div class="role-body">
+        <p class="purpose">The board holds the club in trust for its members. It runs the club, not the teams and players. It sets direction, controls the money, and delegates the day-to-day work to committees.</p>
+        <div class="facts">
+          <div class="fact"><small>Size</small><span>5 to 9 members, ideally an odd number</span></div>
+          <div class="fact"><small>Core seats</small><span>Chairman, Vice Chairman, Treasurer, Secretary</span></div>
+          <div class="fact"><small>Meets</small><span>At least every 6 to 8 weeks</span></div>
+          <div class="fact"><small>Accountable to</small><span>The members, at the AGM</span></div>
+        </div>
+        <div class="cols">
+          <div>
+            <h4>Who can stand</h4>
+            <ul class="list">
+              <li>A member aged 18 or over who has paid this season's fees</li>
+              <li>A member for at least one full season before standing</li>
+              <li>Holds a valid child certificate (<em>børneattest</em>) if the role involves youth</li>
+              <li>Not currently a team captain or vice-captain</li>
+              <li>Not a member of the selection committee</li>
+              <li>Not related to, or living with, the auditor</li>
+            </ul>
+          </div>
+          <div>
+            <h4>Terms and elections</h4>
+            <ul class="list">
+              <li>Terms are 2 years and staggered, so about half the board is elected each year</li>
+              <li>A member may serve <strong>at most 2 consecutive terms in the same officer role</strong>, then step out of it for one term <b>(proposed, from the 2027 AGM)</b></li>
+              <li>A vacancy between AGMs is filled by the board until the next AGM</li>
+              <li>A member who misses 3 meetings in a row without notice is treated as having resigned</li>
+            </ul>
+          </div>
+        </div>
+        <div class="cols">
+          <div>
+            <h4>How the board meets</h4>
+            <ul class="list">
+              <li>The agenda and papers go out 7 days before each meeting</li>
+              <li>Quorum is more than half the board, including the Chairman or Vice Chairman</li>
+              <li>Decisions are made by simple majority. The Chairman has the casting vote on a tie</li>
+              <li>A summary of decisions is shared with members within 14 days</li>
+              <li>Each committee chair gives a short written update before every meeting</li>
+            </ul>
+          </div>
+          <div>
+            <h4>Board member duties</h4>
+            <ul class="list">
+              <li>Act in the interest of the whole club, not one team or group</li>
+              <li><strong>Declare any conflict of interest</strong> and leave the room for that item</li>
+              <li>Support board decisions in public once they are made (collective responsibility)</li>
+              <li>Keep confidential matters confidential, especially about individuals</li>
+              <li>Delegate to committees rather than doing their work for them</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="role">
+      <div class="role-head"><h3>AGM, elections &amp; voting</h3><div class="tags"><span>Fair, predictable elections</span></div></div>
+      <div class="role-body">
+        <p class="purpose">Elections should be decided by the members who are genuinely part of the club, with no surprises on the night.</p>
+        <div class="cols">
+          <div><h4>Before the AGM</h4>
+            <ul class="list">
+              <li>Notice and agenda go out as the statutes require</li>
+              <li>Nominations for the board and the selection committee close <strong>14 days before</strong> the AGM and are published to members <b>(proposed)</b>. Nominations on the night are taken only for a seat with no candidate</li>
+              <li>Proposals from members for the agenda are submitted in writing by the deadline in the statutes</li>
+            </ul></div>
+          <div><h4>Who votes, and how</h4>
+            <ul class="list">
+              <li>Members aged 18+ who have been members for at least 3 months, with fees paid at least 30 days before the AGM <b>(proposed)</b>. This stops last-minute sign-ups swinging a vote</li>
+              <li>One member, one vote. Parents of youth players vote only if they are members themselves</li>
+              <li>Proxy votes only if the statutes allow them</li>
+              <li><strong>Secret ballot</strong> for any contested election, or whenever a member asks for one</li>
+            </ul></div>
+        </div>
+      </div>
+    </div>
+    <div class="role">
+      <div class="role-head"><h3>Advisory Council &amp; honorary members</h3><div class="tags"><span>Experience without authority</span></div></div>
+      <div class="role-body">
+        <p class="purpose">The people who built FCC keep an honoured place in it. Their experience stays with the club, without anyone having to hold a role for ever.</p>
+        <div class="cols">
+          <div><h4>Who and what</h4>
+            <ul class="list">
+              <li>Former chairmen, founders and long-serving members, invited by the board</li>
+              <li>Advise the board when asked, and keep the club's history</li>
+              <li>Act as neutral <strong>mediators</strong> in disputes (Part 11)</li>
+              <li>Take ceremonial roles, such as presenting awards at awards night</li>
+            </ul></div>
+          <div class="split" style="grid-template-columns:1fr">
+            <div class="no"><h4>The Council does not</h4>
+              <ul class="list dont">
+                <li>Vote on board decisions or direct committees</li>
+                <li>Influence selection</li>
+              </ul></div>
+          </div>
+        </div>
+        <div class="note"><b>Honorary life membership</b> may be awarded by the AGM for outstanding service to the club.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 OFFICERS -->
+  <section id="officers">
+    <div class="sec-head"><p class="eyebrow">Part 5 · Role cards</p><h2>Club officers</h2></div>
+    <p>Four elected officers run the board, plus an independent auditor. Each card sets out what the role owns, and also what it does not, so work doesn't drift back to one person.</p>
+
+    <div class="role">
+      <div class="role-head"><h3>Chairman</h3><div class="tags"><span>Board officer</span><span>Elected by the AGM</span><span>~3 hrs/week</span></div></div>
+      <div class="role-body">
+        <p class="purpose">Leads the board and the club's direction, and makes sure every part of the club has an owner.</p>
+        <div class="cols">
+          <div><h4>Responsibilities</h4>
+            <ul class="list">
+              <li>Chairs board meetings and the AGM</li>
+              <li>Agrees the season plan and priorities with the board</li>
+              <li>Makes sure every committee has a chair and a working plan</li>
+              <li>Represents FCC to DCF, the kommune, sponsors and other clubs</li>
+              <li>Makes urgent decisions between meetings and reports them at the next one</li>
+              <li>Prepares a successor and a handover file</li>
+            </ul></div>
+          <div class="split" style="grid-template-columns:1fr">
+            <div class="no"><h4>Does not</h4>
+              <ul class="list dont">
+                <li>Run committees' work for them</li>
+                <li>Spend beyond the limits in Part 10</li>
+                <li>Select teams or captains</li>
+                <li>Hold the Treasurer role at the same time</li>
+              </ul></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="role">
+      <div class="role-head"><h3>Vice Chairman</h3><div class="tags"><span>Board officer</span><span>Elected by the AGM</span><span>~1–2 hrs/week</span></div></div>
+      <div class="role-body">
+        <p class="purpose">Deputises for the Chairman and keeps the committees on track.</p>
+        <div class="cols">
+          <div><h4>Responsibilities</h4>
+            <ul class="list">
+              <li>Steps in for the Chairman when they are absent or conflicted</li>
+              <li>Holds a short check-in with each committee chair every month</li>
+              <li>Flags stalled committees and vacant roles to the board</li>
+              <li>Leads the annual review of this handbook</li>
+            </ul></div>
+          <div><h4>Typical profile</h4>
+            <ul class="list">
+              <li>Organised, well connected across teams</li>
+              <li>A likely future Chairman. The role is the club's succession plan</li>
+            </ul></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="role">
+      <div class="role-head"><h3>Treasurer</h3><div class="tags"><span>Board officer</span><span>Elected by the AGM</span><span>2–3 hrs/month</span></div></div>
+      <div class="role-body">
+        <p class="purpose">Looks after the club's money, so every krone can be accounted for and the club stays solvent.</p>
+        <div class="facts">
+          <div class="fact"><small>Reports to</small><span>Board monthly, AGM yearly</span></div>
+          <div class="fact"><small>Works with</small><span>Registrar, Finance &amp; Sponsorship, Auditor</span></div>
+          <div class="fact"><small>Keeps records</small><span>At least 5 years (Danish bookkeeping rules)</span></div>
+        </div>
+        <div class="cols">
+          <div><h4>Responsibilities</h4>
+            <ul class="list">
+              <li>Drafts the annual budget for the board before the season starts</li>
+              <li>Keeps the books, with a receipt or invoice behind every entry</li>
+              <li>Collects membership fees with the Membership Registrar</li>
+              <li>Pays approved invoices and reimbursements within 30 days</li>
+              <li>Gives the board a monthly balance and budget-vs-actual update</li>
+              <li>Hands the annual accounts to the auditor at least 4 weeks before the AGM</li>
+              <li>Prepares the financial reporting for kommune grants</li>
+            </ul></div>
+          <div class="split" style="grid-template-columns:1fr">
+            <div class="no"><h4>Does not</h4>
+              <ul class="list dont">
+                <li>Approve their own expenses</li>
+                <li>Make payments above the dual-approval limit alone</li>
+                <li>Hold cash without a receipt trail</li>
+                <li>Decide the budget. The board decides</li>
+              </ul></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="role">
+      <div class="role-head"><h3>Secretary</h3><div class="tags"><span>Board officer</span><span>Elected by the AGM</span><span>~2 hrs/month</span></div></div>
+      <div class="role-body">
+        <p class="purpose">The club's memory. Keeps meetings organised, decisions recorded and documents in order.</p>
+        <div class="cols">
+          <div><h4>Responsibilities</h4>
+            <ul class="list">
+              <li>Sends board agendas 7 days ahead and minutes within 7 days</li>
+              <li>Keeps a log of every board decision, numbered and dated</li>
+              <li>Issues the AGM notice within the period set by the statutes</li>
+              <li>Keeps the statutes, this handbook and all policies current and in one shared folder</li>
+              <li>Receives formal complaints and logs them (see Part 11)</li>
+              <li>Handles official correspondence with DCF and the kommune</li>
+            </ul></div>
+          <div><h4>Good practice</h4>
+            <ul class="list">
+              <li>Minutes record decisions and owners, not every word said</li>
+              <li>Use one simple template for every meeting</li>
+              <li>Archive the previous season's papers each autumn</li>
+            </ul></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="role">
+      <div class="role-head"><h3>Auditor</h3><div class="tags"><span>Independent</span><span>Elected by the AGM</span><span>A few days a year</span></div></div>
+      <div class="role-body">
+        <p class="purpose">Gives the members an independent assurance that the accounts are true and the money was spent as the board decided.</p>
+        <div class="cols">
+          <div><h4>Responsibilities</h4>
+            <ul class="list">
+              <li>Reviews the annual accounts against bank statements and receipts</li>
+              <li>Checks that larger payments match a board decision or the budget</li>
+              <li>May carry out one unannounced check during the year</li>
+              <li>Signs the accounts, or explains to the AGM why they cannot</li>
+              <li>Reports findings directly to the AGM</li>
+            </ul></div>
+          <div class="split" style="grid-template-columns:1fr">
+            <div class="no"><h4>Independence rules</h4>
+              <ul class="list dont">
+                <li>Cannot sit on the board</li>
+                <li>Cannot be related to, or live with, the Treasurer</li>
+                <li>Cannot approve or make payments</li>
+              </ul></div>
+          </div>
+        </div>
+        <div class="note"><b>Recommended:</b> the AGM also elects a deputy auditor, who steps in if the auditor is unavailable or conflicted.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 COMMITTEES -->
+  <section id="committees">
+    <div class="sec-head"><p class="eyebrow">Part 6 · Getting things done</p><h2>How every committee works</h2></div>
+    <p>Committees are where the club's work happens. All of them follow the same simple rules, so members know what to expect wherever they help.</p>
+    <div class="timeline">
+      <div class="ti"><div class="when">Plan &amp; organise</div><div class="what">A one-page charter</div><p>Each committee writes down its purpose, scope, members (2 to 6 people), season goals and budget request. The board approves it.</p></div>
+      <div class="ti"><div class="when">Lead &amp; recruit</div><div class="what">A named chair who builds a team</div><p>The board appoints the chair for one season, renewable. The one exception is the selection committee, which the AGM elects. The chair recruits committee members and one-off helpers, and no one person holds more than two chair roles.</p></div>
+      <div class="ti"><div class="when">Approve &amp; execute</div><div class="what">Decide within scope, report back</div><p>The committee decides anything within its charter and budget. It sends a short update before each board meeting and escalates anything outside its scope.</p></div>
+      <div class="ti red"><div class="when">End of season</div><div class="what">Review and hand over</div><p>The chair reports what worked, what didn't and what's needed next year, and leaves a handover note for whoever follows.</p></div>
+    </div>
+    <div class="role">
+      <div class="role-head"><h3>Committee chair: role &amp; code</h3><div class="tags"><span>Applies to every chair</span><span>Signed appointment</span></div></div>
+      <div class="role-body">
+        <p class="purpose">Every committee chair owns one area of the club, builds a team around it, and is accountable for delivering it.</p>
+        <div class="cols">
+          <div><h4>Responsibilities</h4>
+            <ul class="list">
+              <li>Writes and keeps the committee's charter: purpose, scope, goals and budget</li>
+              <li>Recruits committee members and helpers, and delegates real tasks to them</li>
+              <li>Spends only within the committee budget and the limits in Part 10</li>
+              <li>Sends a short written update before each board meeting</li>
+              <li>Keeps simple notes of committee decisions</li>
+              <li>Leaves a handover note at the end of the season</li>
+            </ul></div>
+          <div><h4>Code</h4>
+            <ul class="list">
+              <li>Acts in the interest of the whole club</li>
+              <li>Declares any conflict of interest and steps out of that decision</li>
+              <li>Decides only within the committee's scope, and escalates anything outside it</li>
+              <li>Respects the remit of other committees, the selection committee in particular</li>
+              <li>Includes new members, rather than keeping the work in a small circle</li>
+            </ul></div>
+        </div>
+        <div class="note"><b>Coming next:</b> each committee gets its own detailed role and code, as Selection, Coaching and Captains already have.</div>
+      </div>
+    </div>
+    <div class="cgrid">
+      <div class="ccard"><span class="on-board">Board seat</span><h3>Youth</h3><p>Grows youth cricket and keeps it safe and well organised.</p><ul class="list"><li>Parent duty roster and team parents</li><li>Youth tournaments, including the Ministævne</li><li>Welfare officer and child certificates</li></ul></div>
+      <div class="ccard"><h3>Matches</h3><p>Makes match days happen for every team.</p><ul class="list"><li>Fixtures and reschedules with DCF</li><li>Umpire and scorer cover</li><li>Results submitted on time</li></ul></div>
+      <div class="ccard"><span class="on-board">Board seat</span><h3>Coaching</h3><p>Sets coaching standards across all ages. See Part 8.</p><ul class="list"><li>Season training plan</li><li>Coach development</li><li>Player progress tracking</li></ul></div>
+      <div class="ccard"><span class="on-board">Elected by the AGM</span><h3>Selection</h3><p>Independent of the board. Picks captains and squads fairly. See Part 7.</p><ul class="list"><li>Captaincy nominations</li><li>Balanced squads</li><li>Mid-season review</li></ul></div>
+      <div class="ccard"><h3>Finance &amp; Sponsorship</h3><p>Brings money in. Works alongside the Treasurer, who keeps the books.</p><ul class="list"><li>Sponsors and grants</li><li>Fundraising events</li><li>Fee follow-up</li></ul></div>
+      <div class="ccard"><h3>Comms &amp; Growth</h3><p>Gives the club one clear voice and brings in new members.</p><ul class="list"><li>Social media and newsletter</li><li>WhatsApp administration</li><li>Recruitment and outreach</li></ul></div>
+      <div class="ccard"><span class="on-board">Board seat</span><h3>Equipment &amp; Grounds</h3><p>Keeps kit, nets and the ground fit to play.</p><ul class="list"><li>Kit inventory and ordering</li><li>Ground markings and mowing</li><li>Kommune liaison on facilities</li></ul></div>
+      <div class="ccard"><h3>Events &amp; Social</h3><p>Brings members and families together.</p><ul class="list"><li>Events calendar</li><li>Awards night</li><li>Festival get-togethers</li></ul></div>
+    </div>
+  </section>
+
+  <!-- 7 SELECTION -->
+  <section id="selection">
+    <div class="sec-head"><p class="eyebrow">Part 7 · Committee framework</p><h2>Selection committee</h2></div>
+    <div class="role">
+      <div class="role-head"><h3>Selection Committee</h3><div class="tags"><span>New for 2027</span><span>Elected by the AGM</span><span>Chair + 4 selectors</span></div></div>
+      <div class="role-body">
+        <p class="purpose">The selection committee picks players and team leaders in a fair, transparent and consistent way. It supports both winning cricket and the Club's long-term development, and it acts independently, objectively and in the Club's best interests.</p>
+        <div class="facts">
+          <div class="fact"><small>Members</small><span>Chair + 4 selectors, one per division</span></div>
+          <div class="fact"><small>Decides</small><span>Squads, captains and vice-captains</span></div>
+          <div class="fact"><small>Does not decide</small><span>The playing XI. That is the captain's call</span></div>
+          <div class="fact"><small>Coaches</small><span>Give input, but have no vote</span></div>
+          <div class="fact"><small>Captains</small><span>Share team needs. The final decision is the committee's and must be respected</span></div>
+          <div class="fact"><small>Elected by</small><span>The AGM, and independent of the board</span></div>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="color:var(--head)">What the committee is responsible for</h3>
+    <div class="cgrid">
+      <div class="ccard"><h3>Player selection</h3><p>Picks each team's squad on agreed principles: performance, ability, availability, commitment, development, fitness and team needs. The captain then picks the XI from the squad.</p></div>
+      <div class="ccard"><h3>Team balance</h3><p>Builds balanced, competitive teams with the right mix of batting, bowling, wicketkeeping, fielding and leadership.</p></div>
+      <div class="ccard"><h3>Captains and vice-captains</h3><p>Asks for proposals from players who want to captain, considers all of them, then appoints on leadership, experience, conduct, commitment and suitability.</p></div>
+      <div class="ccard"><h3>Player development</h3><p>Weighs long-term development in every decision, with real chances for emerging and developing players.</p></div>
+      <div class="ccard"><h3>Consistent selection</h3><p>Applies the same principles across all teams and players. No arbitrary decisions or personal preferences.</p></div>
+      <div class="ccard"><h3>Availability and commitment</h3><p>Takes account of availability, training attendance, commitment to the Club and reliability.</p></div>
+      <div class="ccard"><h3>Communication</h3><p>Tells players, captains and coaches about decisions clearly, respectfully and on time.</p></div>
+      <div class="ccard"><h3>Confidentiality</h3><p>Keeps discussions, individual assessments, player information and committee deliberations confidential.</p></div>
+      <div class="ccard"><h3>Selection records</h3><p>Records selections, and the reasons behind significant decisions, for consistency and accountability.</p></div>
+      <div class="ccard"><h3>Review and adjust</h3><p>Reviews team make-up and player development during the season, and adjusts for performance, availability, development and changing team needs.</p></div>
+    </div>
+
+    <div class="role">
+      <div class="role-head"><h3>Selection committee policy</h3><div class="tags"><span>Independence &amp; fairness</span></div></div>
+      <div class="role-body">
+        <div class="cols">
+          <div><h4>Who cannot be a selector</h4>
+            <ul class="list dont">
+              <li><strong>Board members.</strong> This keeps governance and selection independent</li>
+              <li><strong>Captains of any FCC team</strong>, and vice-captains</li>
+              <li>Anyone who wants to be considered for captaincy that season</li>
+            </ul></div>
+          <div><h4>Conflicts of interest</h4>
+            <ul class="list">
+              <li>A selector takes no part in decisions about their own selection, playing position or team placement</li>
+              <li>Any actual, possible or perceived conflict, including a family member, is declared to the committee, and the selector withdraws from that decision</li>
+              <li>No gifts, favours or pressure from players or families. Any attempt is reported to the selection chair</li>
+            </ul></div>
+        </div>
+        <div class="split">
+          <div class="yes"><h4>How decisions are made</h4>
+            <ul class="list do">
+              <li><strong>Collectively</strong>, by the committee, never by one person</li>
+              <li><strong>Independently</strong>, free from pressure by board members, captains, coaches, players or other members</li>
+              <li><strong>Without favouritism</strong>: friendships, family, disagreements, seniority, nationality and social ties play no part</li>
+              <li><strong>Supported once made.</strong> Selectors back a collective decision and never undermine it in public or in a team</li>
+            </ul></div>
+          <div class="yes"><h4>Feedback and changes</h4>
+            <ul class="list">
+              <li>Each decision is announced with a short reason</li>
+              <li>A player can ask the chair for feedback within 7 days, and gets a reply within 7 more</li>
+              <li>Moving a player between teams mid-season: the committee, after hearing from the captains involved</li>
+              <li>A captain steps down or is removed: a replacement is appointed within 7 days</li>
+              <li>Complaints about the process go to the board, which can ask the committee to re-run it but cannot change a selection decision</li>
+              <li>A vacancy between AGMs is filled by the committee, and announced to members</li>
+            </ul></div>
+        </div>
+        <div class="note"><b>Why independent:</b> keeping selection outside the board removes any conflict, or appearance of collusion. The board runs the club, and the selection committee picks the teams. <b>Separation of roles:</b> the selection committee decides who is selected and who leads each team. Captains lead and manage the selected team in matches. Coaches support player development and performance.</div>
+      </div>
+    </div>
+
+    <h4>Season timeline (proposed)</h4>
+    <div class="timeline">
+      <div class="ti"><div class="when">January</div><div class="what">Captaincy proposals open</div><p>Players who want to captain put themselves forward. Members can also propose others, with a short reason.</p></div>
+      <div class="ti"><div class="when">February</div><div class="what">Evaluate every proposal</div><p>The committee assesses all candidates against the criteria and meets each one briefly.</p></div>
+      <div class="ti"><div class="when">By mid-March</div><div class="what">Captains, vice-captains and squads announced</div><p>Announced to all members at the same time, with the reasons.</p></div>
+      <div class="ti"><div class="when">Late June</div><div class="what">Mid-season review</div><p>Squad balance, player development, captain check-ins and any player moves.</p></div>
+      <div class="ti red"><div class="when">September</div><div class="what">End-of-season review</div><p>Feedback from captains and players feeds into next season.</p></div>
+    </div>
+    <div class="note"><b>Legends and Old Boys teams</b> may agree their own captain each season, provided the selection chair is told and the team follows this handbook.</div>
+
+    <div class="role">
+      <div class="role-head"><h3>Selector's commitment</h3><div class="tags"><span>Signed at appointment</span></div></div>
+      <div class="role-body">
+        <p>Each selector signs the <strong>Selection Committee Appointment &amp; Code of Conduct</strong>, confirming they will act fairly, independently and in the Club's best interests. A seat on the committee is a position of trust, and decisions and conduct must protect the Club's integrity, fairness and reputation. The Club may review or withdraw an appointment after a serious or repeated breach of this code, Club policies or the principles of fair and independent selection.</p>
+        <div class="facts">
+          <div class="fact"><small>Season</small><span>________</span></div>
+          <div class="fact"><small>Committee member · signature · date</small><span>________</span></div>
+          <div class="fact"><small>For FCC: name, position, signature, date</small><span>________</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 COACHING -->
+  <section id="coaching">
+    <div class="sec-head"><p class="eyebrow">Part 8 · Committee framework</p><h2>Coaching committee</h2></div>
+    <div class="role">
+      <div class="role-head"><h3>Coaching Committee</h3><div class="tags"><span>Head coach chairs</span><span>All age groups</span><span>Appointed by the board</span></div></div>
+      <div class="role-body">
+        <p class="purpose">Makes every training session at FCC safe, planned and worth turning up for, from U11 to the senior teams.</p>
+        <div class="facts">
+          <div class="fact"><small>Chair</small><span>Head coach</span></div>
+          <div class="fact"><small>Members</small><span>Lead coach per age group, senior training lead</span></div>
+          <div class="fact"><small>Helpers</small><span>Assistant coaches: parents or senior players</span></div>
+          <div class="fact"><small>Works with</small><span>Youth, Selection, Equipment &amp; Grounds</span></div>
+        </div>
+        <div class="cols">
+          <div><h4>Requirements for every coach</h4>
+            <ul class="list">
+              <li><strong>Valid child certificate (<em>børneattest</em>)</strong> before working with anyone under 15. This is a legal requirement</li>
+              <li>Signs this code of conduct and the safeguarding rules</li>
+              <li>Completes a DCF coaching course within the first season <b>(proposed)</b></li>
+              <li>Knows the first-aid kit location and the emergency procedure at each venue</li>
+            </ul></div>
+          <div><h4>Committee responsibilities</h4>
+            <ul class="list">
+              <li>A season training plan per age group, shared before the season</li>
+              <li>Assigns coaches to sessions and covers absences</li>
+              <li>Records attendance for every session in the club app</li>
+              <li>Two progress updates per player per season (youth)</li>
+              <li>Gives player input to the selection committee. A coach never gives input on, or decides team roles for, their own child</li>
+              <li>Identifies coach training needs and books courses</li>
+            </ul></div>
+        </div>
+        <div class="split">
+          <div class="yes"><h4>Session standards</h4>
+            <ul class="list do">
+              <li>Every session has a plan with one clear goal</li>
+              <li>Warm-up first. Helmets for batters facing a hard ball and for close fielders</li>
+              <li>Players are assessed against their own previous performance</li>
+              <li>Ratio of at least 1 adult per 8 youth players <b>(proposed)</b></li>
+            </ul></div>
+          <div class="no"><h4>Safeguarding: never</h4>
+            <ul class="list dont">
+              <li>Be alone with one child. Keep two adults present or stay in sight of others</li>
+              <li>Message a child one-to-one. Use the parent or team group</li>
+              <li>Use physical punishment or humiliating language</li>
+              <li>Ignore a concern. Report it to the welfare officer the same day</li>
+            </ul></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 CAPTAINS -->
+  <section id="captains">
+    <div class="sec-head"><p class="eyebrow">Part 9 · Team leadership</p><h2>Captains &amp; vice-captains</h2></div>
+    <div class="role">
+      <div class="role-head"><h3>Team Captain &amp; Vice-Captain</h3><div class="tags"><span>Appointed by Selection</span><span>One season</span><span>Signed agreement</span></div></div>
+      <div class="role-body">
+        <p class="purpose">The captain leads and represents Fredensborg Cricket Club. The role carries responsibility for the team's performance, conduct, discipline, player welfare and team environment, and the captain leads by example in line with the Club's values and the Spirit of Cricket.</p>
+        <div class="facts">
+          <div class="fact"><small>Appointed by</small><span>Selection committee, for one season</span></div>
+          <div class="fact"><small>Decides</small><span>XI, batting order, bowling changes, field placings, tactics</span></div>
+          <div class="fact"><small>Escalates to</small><span>Selection chair or Chairman of the Board</span></div>
+          <div class="fact"><small>Agreement</small><span>Signs the Captain's Appointment &amp; Code of Conduct</span></div>
+        </div>
+        <div class="cols">
+          <div><h4>Eligibility</h4>
+            <ul class="list">
+              <li>A paid-up playing member</li>
+              <li>Not a member of the Board while serving as captain</li>
+              <li>Not a member of the selection committee while serving as captain</li>
+              <li>Signs the captain's agreement before the season</li>
+            </ul></div>
+          <div><h4>The vice-captain</h4>
+            <ul class="list">
+              <li>Is bound by the same code and independence rules as the captain</li>
+              <li>Steps in whenever the captain is unavailable</li>
+              <li>Shares the admin, such as rosters and availability</li>
+              <li>Is consulted on the XI</li>
+            </ul></div>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="color:var(--head)">The captain's code of conduct</h3>
+    <p>Ten commitments every captain and vice-captain signs up to.</p>
+    <div class="cgrid">
+      <div class="ccard"><h3>Lead by example</h3><p>Show professionalism, respect, integrity, discipline and sportsmanship on and off the field.</p></div>
+      <div class="ccard"><h3>Uphold the Spirit of Cricket</h3><p>Make sure the team plays within the Laws of Cricket, DCF and competition regulations, and the Spirit of Cricket.</p></div>
+      <div class="ccard"><h3>Respect officials and opponents</h3><p>Respect umpires, opponents, coaches, officials and spectators. Accept decisions without intimidation, abuse, confrontation or dissent.</p></div>
+      <div class="ccard"><h3>Set the team standard</h3><p>Build a positive team culture where players behave respectfully, responsibly and to Club standards.</p></div>
+      <div class="ccard"><h3>Treat players fairly</h3><p>Treat every player with dignity. No favouritism, discrimination, bullying, harassment or personal conflicts in decisions.</p></div>
+      <div class="ccard"><h3>Communicate responsibly</h3><p>Communicate clearly and respectfully with players, coaches, Club officials and opponents, and share team information on time.</p></div>
+      <div class="ccard"><h3>Handle conflict professionally</h3><p>Deal with disagreements and discipline calmly and in private. Escalate serious or unresolved matters to the selection committee or the Chairman.</p></div>
+      <div class="ccard"><h3>Protect the Club's reputation</h3><p>No behaviour, public statements or social media activity that could damage the Club or the game.</p></div>
+      <div class="ccard"><h3>Take responsibility</h3><p>Own your conduct, and take reasonable steps to deal with inappropriate behaviour in your team.</p></div>
+      <div class="ccard"><h3>Support the Club</h3><p>Work with the Board, the selection and coaching committees and other Club representatives, and help the wider Club develop.</p></div>
+    </div>
+
+    <div class="role">
+      <div class="role-head"><h3>Governance &amp; independence</h3><div class="tags"><span>Captaincy policy</span></div></div>
+      <div class="role-body">
+        <p class="purpose">Accepting the captaincy is a commitment to lead the team independently and fairly, in the Club's best interests. These rules keep roles clear and avoid any real or perceived conflict of interest.</p>
+        <div class="cols">
+          <div><h4>Independence</h4>
+            <ul class="list">
+              <li><strong>From selection.</strong> A serving captain is not on the selection committee. The captain may tell the committee what type of player, or which specific player, the team needs. The committee's final decision must be respected</li>
+              <li><strong>From the Board.</strong> A serving captain does not sit on the Board. The Board governs and oversees, and the captain carries out team-level decisions within that framework</li>
+              <li><strong>No personal interest.</strong> A captain takes no part in decisions about their own selection, team placement, playing position, or anything else they have a direct personal interest in</li>
+            </ul></div>
+          <div><h4>Fairness and trust</h4>
+            <ul class="list">
+              <li><strong>No retaliation or favouritism.</strong> A captain never uses the position to favour, disadvantage, exclude or retaliate against a player over personal disagreements, selection decisions or other non-sporting matters</li>
+              <li><strong>Confidentiality.</strong> Selection, disciplinary, personal and confidential Club matters stay within the proper Club structures</li>
+              <li><strong>Temporary exceptions.</strong> Any temporary exception to these rules must be approved by the selection chair (selection matters) or the Board (governance matters), and recorded</li>
+            </ul></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="role">
+      <div class="role-head"><h3>Team leadership &amp; player management</h3><div class="tags"><span>Before and during the season</span></div></div>
+      <div class="role-body">
+        <p class="purpose">The captain creates a fair, well-organised team where every player knows their role and has a real chance to contribute.</p>
+        <div class="cols">
+          <div><h4>Before the season</h4>
+            <ul class="list">
+              <li><strong>Clear roles.</strong> Every player knows their expected batting position, bowling and fielding responsibilities, and match-day duties</li>
+              <li><strong>Clear communication.</strong> Roles are shared before the season. Changes are explained before the match wherever possible, so players can prepare</li>
+              <li><strong>Fair opportunities.</strong> With the selection and coaching committees, make sure squad players get fair, meaningful chances across the season, based on availability, performance, development and team needs</li>
+            </ul></div>
+          <div><h4>Throughout the season</h4>
+            <ul class="list">
+              <li><strong>No personal favouritism.</strong> Roles, chances and match decisions are never shaped by friendships, disagreements or other non-sporting reasons</li>
+              <li><strong>Develop players.</strong> Give players chances to take responsibility, try new roles and grow</li>
+              <li><strong>Equal respect.</strong> Every player is treated the same, whatever their batting position, role, seniority or experience</li>
+              <li><strong>Constructive feedback.</strong> Give honest, constructive feedback on performance and behaviour, and keep team communication open and respectful</li>
+            </ul></div>
+        </div>
+        <h4>Match-week framework</h4>
+        <div class="timeline">
+          <div class="ti"><div class="when">Early in the week</div><div class="what">Availability poll</div><p>Sent in the team group or app, with a clear reply deadline.</p></div>
+          <div class="ti"><div class="when">At least 48 hrs before</div><div class="what">XI and duty roster announced</div><p>Playing XI, plus the scorer, ground set-up, tea and transport duties. Every player takes a turn, the captain included. A dropped player hears it from the captain in private, with the reason, before the XI is published.</p></div>
+          <div class="ti"><div class="when">Match day</div><div class="what">Lead the team</div><p>Arrive 1 hour before start. Greet the opposition and umpires, and make sure umpiring and scoring duties are covered. The captain sets the field, bowling changes, batting order and tactics, within the Club's framework.</p></div>
+          <div class="ti red"><div class="when">Within 24 hrs after</div><div class="what">Close the match</div><p>Scorecard submitted to DCF and kit returned. A short <strong>match report</strong> goes to the Matches chair: result, key observations, player contributions, notable incidents and anything needing follow-up. Any significant disciplinary, behaviour, safety, injury, umpiring or player issue is reported promptly to the Board.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="role">
+      <div class="role-head"><h3>Captain's commitment</h3><div class="tags"><span>Signed at appointment</span></div></div>
+      <div class="role-body">
+        <p>Each captain signs the <strong>Captain's Appointment &amp; Code of Conduct</strong> before the season, confirming they have read and understood the responsibilities above and will uphold them for the whole appointment. The Club may review or withdraw the captaincy if the captain does not follow this code, the Club's policies or the Spirit of Cricket. Disciplinary action follows the process in Part 11.</p>
+        <div class="facts">
+          <div class="fact"><small>Season</small><span>________</span></div>
+          <div class="fact"><small>Team</small><span>________</span></div>
+          <div class="fact"><small>Captain · signature · date</small><span>________</span></div>
+          <div class="fact"><small>For FCC: name, position, signature, date</small><span>________</span></div>
+        </div>
+        <div class="note"><b>Accountability:</b> a mid-season check-in with the selection chair. A captain who breaches this code is warned once, then the selection committee may review the appointment.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10 MONEY -->
+  <section id="money">
+    <div class="sec-head"><p class="eyebrow">Part 10 · Financial controls</p><h2>Money rules</h2></div>
+    <p>Clear limits protect the club and the volunteers handling its money. No one should ever be the only person who can see or move the club's money.</p>
+    <div class="tbl-wrap">
+      <table class="money">
+        <thead><tr><th>Spend (DKK, proposed)</th><th>Who approves</th><th>Condition</th></tr></thead>
+        <tbody>
+          <tr><td>Up to 1,000</td><td>Committee chair</td><td>Within the committee's budget</td></tr>
+          <tr><td>1,001 – 5,000</td><td>Committee chair + Treasurer</td><td>Within budget, logged</td></tr>
+          <tr><td>Over 5,000</td><td>Board decision</td><td>Recorded in the minutes</td></tr>
+          <tr><td>Anything not in the budget</td><td>Board decision</td><td>Recorded in the minutes, with a funding source</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="cols">
+      <ul class="list">
+        <li><strong>Two people approve</strong> every bank payment above 5,000 DKK (dual approval in online banking)</li>
+        <li>At least two board members can see the bank account at all times</li>
+        <li>Reimbursements need a receipt and are claimed within 30 days</li>
+      </ul>
+      <ul class="list">
+        <li>No cash without a receipt. Event cash is counted by two people</li>
+        <li>Sponsorship deals over 10,000 DKK are signed off by the board</li>
+        <li>Buying from a member's or relative's business (catering, kit, printing) is declared first, and needs two quotes above 5,000 DKK</li>
+        <li>Fee reductions or hardship support follow published rules (such as a family discount), are approved by the Treasurer and Chairman, and stay confidential</li>
+        <li>Members can ask to see the approved budget at any time</li>
+        <li><strong>All club money goes into club accounts</strong>, including the club MobilePay. Never into a personal account, not even temporarily</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 11 DISCIPLINE -->
+  <section id="discipline">
+    <div class="sec-head"><p class="eyebrow">Part 11 · When things go wrong</p><h2>Complaints &amp; discipline</h2></div>
+    <p>Most issues are solved with a conversation. When they aren't, this stepped process makes sure everyone is treated the same way and gets a fair hearing.</p>
+    <div class="steps">
+      <div class="step"><span class="k">1</span><b>Informal word</b><span>The captain, coach or committee chair talks to the member calmly and privately. A short note is kept. Captains escalate serious or unresolved matters to the selection committee or the Chairman.</span></div>
+      <div class="step"><span class="k">M</span><b>Mediation (optional)</b><span>If both sides agree, a neutral, respected member, for example from the Advisory Council, helps them settle it.</span></div>
+      <div class="step"><span class="k">2</span><b>Written warning</b><span>Issued by the board if the behaviour continues. States what must change.</span></div>
+      <div class="step"><span class="k">3</span><b>Hearing</b><span>A panel of 3 board members not involved in the matter. The member is heard and may bring a supporter.</span></div>
+      <div class="step hot"><span class="k">!</span><b>Serious misconduct</b><span>Violence, abuse or a safeguarding concern goes straight to step 3, with interim suspension.</span></div>
+    </div>
+    <div class="cols">
+      <div><h4>Possible outcomes</h4>
+        <ul class="list">
+          <li>No further action</li>
+          <li>Formal warning</li>
+          <li>Suspension from matches or training</li>
+          <li>Removal from a role</li>
+          <li>Suspension or exclusion from membership, as set by the statutes</li>
+        </ul></div>
+      <div><h4>Making a complaint</h4>
+        <ul class="list">
+          <li>Send it in writing to the Secretary, or to the Chairman if it concerns the Secretary</li>
+          <li>Acknowledged within 7 days, resolved within 30 days</li>
+          <li>Concerns can also be raised through a confidential form. <strong>No one is penalised for raising a concern in good faith</strong></li>
+          <li><strong>Safeguarding concerns go directly to the welfare officer and the Chairman, the same day</strong></li>
+        </ul></div>
+    </div>
+  </section>
+
+  <!-- 12 ONE FCC -->
+  <section id="onefcc">
+    <div class="sec-head"><p class="eyebrow">Part 12 · Club development</p><h2>One FCC: Club Development &amp; Coordination</h2></div>
+    <p>Someone has to build and look after this framework. The Board gives that job a formal mandate, so members know who is developing the Club's structures, and on whose authority.</p>
+    <div class="role">
+      <div class="role-head"><h3>Club Development &amp; Coordination Lead</h3><div class="tags"><span>Lead + Co-Lead</span><span>Appointed by the Board</span><span>Appointment letter</span></div></div>
+      <div class="role-body">
+        <p class="purpose">Helps FCC grow from an informally run club into a structured, transparent, well-documented and member-driven one, with clear responsibilities, processes and accountability.</p>
+        <div class="facts">
+          <div class="fact"><small>Holders</small><span>A Lead and a Co-Lead, who deputises and shares the mandate</span></div>
+          <div class="fact"><small>Reports to</small><span>The Chairman, following any collective Board decision</span></div>
+          <div class="fact"><small>Board member?</small><span>No, and no vote on Board decisions</span></div>
+          <div class="fact"><small>Term</small><span>Until the Board ends it. The holder may step down with 7 days' notice</span></div>
+        </div>
+        <div class="cols">
+          <div><h4>Responsibilities</h4>
+            <ul class="list">
+              <li><strong>Governance framework:</strong> propose how the Board, committees, working groups, coaches and captains relate, and who holds what authority</li>
+              <li><strong>Committee development:</strong> help set up and run committees, including their purpose, leadership and reporting</li>
+              <li><strong>Policies and procedures:</strong> draft policies, codes of conduct, role descriptions, appointment letters and procedures</li>
+              <li><strong>Roles and responsibilities:</strong> set clear expectations for board members, committee leads, captains, coaches and volunteers</li>
+              <li><strong>Operational improvement:</strong> find practical ways to make club activities more organised, efficient and transparent</li>
+            </ul></div>
+          <div><h4>&nbsp;</h4>
+            <ul class="list">
+              <li><strong>Documentation:</strong> make sure key decisions, roles, processes and policies are written down, so the Club depends less on what individuals know</li>
+              <li><strong>Implementation support:</strong> once approved, coordinate putting changes into practice across committees and teams</li>
+              <li><strong>Member participation:</strong> create ways for more members to give their skills, experience and time</li>
+              <li><strong>Continuous development:</strong> review how well the structures work and recommend improvements to the Board</li>
+              <li><strong>Strategic initiatives:</strong> support Club-wide projects when the Board asks</li>
+            </ul></div>
+        </div>
+        <div class="split">
+          <div class="yes"><h4>Mandate from the Board</h4>
+            <ul class="list do">
+              <li><strong>Develop and propose</strong> new structures, policies, procedures, committees and frameworks</li>
+              <li><strong>Consult</strong> board members, committee leads, captains, coaches and members</li>
+              <li><strong>Coordinate</strong> agreed frameworks and support their roll-out</li>
+              <li><strong>Recommend</strong> directly to the Board on governance, organisation, policy and operations</li>
+              <li><strong>Implement</strong> approved changes</li>
+              <li><strong>Access</strong> the club information and documents the role reasonably needs, within confidentiality rules</li>
+            </ul></div>
+          <div class="no"><h4>Limits of authority: cannot alone</h4>
+            <ul class="list dont">
+              <li>Make decisions reserved for the Board or the AGM</li>
+              <li>Select players or teams</li>
+              <li>Appoint captains or vice-captains</li>
+              <li>Override the selection or coaching committees</li>
+              <li>Commit the Club to spending or contracts without approval</li>
+              <li>Change club policies without approval from the right body</li>
+            </ul></div>
+        </div>
+        <p>The role develops, coordinates, recommends and supports. It has no authority over any committee. The Board gives direction, considers proposals, approves changes within its authority, may assign projects, and may invite the Lead or Co-Lead to Board or committee meetings. Because the role is not on the Board or the selection committee, its holders may hold other club roles where there is no conflict. Any actual or possible conflict is declared to the Board.</p>
+        <h4>Principles</h4>
+        <div class="values">
+          <div class="value"><b>Transparency</b><span>Clear, understandable processes.</span></div>
+          <div class="value"><b>Participation</b><span>More members contributing.</span></div>
+          <div class="value"><b>Accountability</b><span>Clear ownership for everything.</span></div>
+          <div class="value"><b>Consistency</b><span>Common standards across teams and committees.</span></div>
+          <div class="value"><b>Collaboration</b><span>Work constructively with everyone.</span></div>
+          <div class="value"><b>Continuous improvement</b><span>Practical changes that make the Club stronger.</span></div>
+          <div class="value"><b>Club first</b><span>The Club's long-term interest over any person, team or group.</span></div>
+        </div>
+        <div class="note"><b>Recommended:</b> a short progress update to members each quarter, and a review of the role at each AGM, in line with the rest of this handbook. Changes to the mandate are agreed in writing.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12 ADOPTION -->
+  <section id="adoption">
+    <div class="sec-head"><p class="eyebrow">Part 13 · Next steps</p><h2>Adopting this handbook</h2></div>
+    <div class="timeline">
+      <div class="ti"><div class="when">October</div><div class="what">Draft by the One FCC Lead and Co-Lead</div><p>This document: one framework, available to every member.</p></div>
+      <div class="ti"><div class="when">November</div><div class="what">Board review</div><p>The board confirms amounts, dates and roles, and marks anything that needs an AGM vote.</p></div>
+      <div class="ti"><div class="when">2 weeks</div><div class="what">Member consultation</div><p>Shared with all members for comments.</p></div>
+      <div class="ti"><div class="when">Before the season</div><div class="what">Board adopts policies</div><p>Code of conduct, role cards, committees, money rules and discipline take effect.</p></div>
+      <div class="ti red"><div class="when">Next AGM</div><div class="what">Statute changes voted on</div><p>Term limits, board composition and anything else the statutes must cover. The handbook is reviewed at every AGM after that.</p></div>
+    </div>
+    <div class="navy-box">
+      <h3>A club is what its members build</h3>
+      <p>None of this works on paper alone. It works when <strong>more people take a role, and every role has a clear owner</strong>. If a part of this handbook doesn't fit how FCC really works, say so during the consultation. That is exactly what it is for.</p>
+    </div>
+  </section>
+
+  <footer>
+    <span>Fredensborg Cricket Club · Club Handbook · Draft v0.3</span>
+    <span>Prepared by One FCC Club Development &amp; Coordination · October 2026</span>
+  </footer>
+</main>
+</body>
+</html>
