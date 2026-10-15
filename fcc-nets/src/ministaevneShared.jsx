@@ -91,42 +91,8 @@ export function ClubBadge({ size = 66, ringWidth = 3, bg, img, children, onClick
   );
 }
 
-export function useCountdown(target) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  const diff = Math.max(0, target - now);
-  return {
-    d: Math.floor(diff / 86400000),
-    h: Math.floor((diff / 3600000) % 24),
-    m: Math.floor((diff / 60000) % 60),
-    s: Math.floor((diff / 1000) % 60),
-  };
-}
-
-export function ScoreTile({ value, label, flashKey, accent }) {
-  return (
-    <div style={{ textAlign: "center" }}>
-      <div style={{
-        position: "relative", width: 68, height: 78, borderRadius: 14,
-        background: `linear-gradient(180deg, #1a2333 0%, #070B12 100%)`,
-        border: `1px solid ${accent}55`,
-        boxShadow: `inset 0 2px 4px rgba(0,0,0,0.6), inset 0 -1px 0 rgba(255,255,255,0.05), 0 0 16px ${accent}33, 0 8px 24px rgba(0,0,0,0.5)`,
-        display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden",
-      }}>
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: accent, boxShadow: `0 0 8px ${accent}` }} />
-        <div key={flashKey} style={{
-          fontSize: 30, fontWeight: 900, fontVariantNumeric: "tabular-nums", letterSpacing: -1,
-          color: C.gold1, textShadow: `0 0 8px ${accent}aa, 0 0 18px ${accent}55`,
-          animation: "digitPulse 0.4s ease-out", fontFamily: "'Courier New', monospace",
-        }}>{String(value).padStart(2, "0")}</div>
-      </div>
-      <div style={{ fontSize: 9.5, letterSpacing: 2, color: C.muted, fontWeight: 800, marginTop: 7 }}>{label}</div>
-    </div>
-  );
-}
+// Countdown lives in src/shared/Countdown.jsx (also used by /handbook-review).
+export { useCountdown, ScoreTile } from "./shared/Countdown.jsx";
 
 export function Confetti({ burstKey }) {
   const palette = [C.gold2, C.blue, C.red, C.emerald, "#fff"];
