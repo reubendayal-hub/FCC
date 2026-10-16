@@ -73,37 +73,60 @@ export default function HandbookEntryCard({ me, teams }) {
     window.location.href = "/handbook-review/";
   }
 
+  const done13 = !!progress?.completed;
+
+  // Gold card (stands out on every app theme — navy, green or light) with a
+  // red days-left tile. The tile pulses gently; faster in the last 7 days.
   return (
-    <button onClick={open} aria-label={`Club Handbook. Have your say. ${done} of 13 parts reviewed. ${daysLeft} days left. ${status}.`}
+    <button onClick={open} className="hbr-card" aria-label={`Club Handbook. Have your say. ${done} of 13 parts reviewed. ${daysLeft} days left. ${status}.`}
       style={{
-        position: "relative", display: "flex", alignItems: "center", gap: 14, width: "100%", textAlign: "left",
-        padding: "16px 18px", borderRadius: 16, border: "none", cursor: "pointer",
-        background: "linear-gradient(135deg,#1B2A5C 0%,#2A3D7A 100%)", color: "#fff",
-        boxShadow: "0 6px 18px rgba(27,42,92,.28)", borderBottom: "3px solid #CC1B33",
+        position: "relative", overflow: "hidden", display: "flex", alignItems: "center", gap: 14, width: "100%", textAlign: "left",
+        padding: "16px 16px 16px 18px", borderRadius: 18, border: "2px solid #F7D774", cursor: "pointer",
+        background: "linear-gradient(135deg,#FFE9A3 0%,#F2C94C 45%,#D4A217 100%)", color: "#1B2A5C",
+        boxShadow: "0 10px 28px rgba(212,162,23,.45), 0 0 0 4px rgba(212,162,23,.18)",
       }}>
+      <style>{`
+        .hbr-card::after{content:"";position:absolute;top:-60%;left:-30%;width:28%;height:220%;transform:rotate(20deg);
+          background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);animation:hbrCardShine 5s ease-in-out infinite;pointer-events:none}
+        @keyframes hbrCardShine{0%,70%{left:-30%}100%{left:130%}}
+        .hbr-days{animation:hbrDaysPulse 2.4s ease-in-out infinite}
+        .hbr-days.urgent{animation-duration:1.1s}
+        @keyframes hbrDaysPulse{0%,100%{box-shadow:0 4px 12px rgba(204,27,51,.45),0 0 0 0 rgba(204,27,51,.45)}50%{box-shadow:0 4px 12px rgba(204,27,51,.45),0 0 0 7px rgba(204,27,51,0)}}
+        .hbr-card:focus-visible{outline:3px solid #1B2A5C;outline-offset:3px}
+        @media (prefers-reduced-motion: reduce){.hbr-card::after,.hbr-days{animation:none}}
+      `}</style>
       <svg width="52" height="52" viewBox="0 0 52 52" aria-hidden="true" style={{ flexShrink: 0 }}>
-        <circle cx="26" cy="26" r={r} fill="none" stroke="rgba(255,255,255,.15)" strokeWidth="5" />
-        <circle cx="26" cy="26" r={r} fill="none" stroke="#D4A217" strokeWidth="5" strokeLinecap="round"
+        <circle cx="26" cy="26" r={r} fill="rgba(255,255,255,.55)" stroke="rgba(27,42,92,.18)" strokeWidth="5" />
+        <circle cx="26" cy="26" r={r} fill="none" stroke="#1B2A5C" strokeWidth="5" strokeLinecap="round"
           strokeDasharray={c} strokeDashoffset={c * (1 - done / 13)} transform="rotate(-90 26 26)" />
-        <text x="26" y="30" textAnchor="middle" fill="#fff" fontSize="12" fontWeight="800">{done}/13</text>
+        <text x="26" y="30" textAnchor="middle" fill="#1B2A5C" fontSize="12" fontWeight="800">{done}/13</text>
       </svg>
-      <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: "block", fontSize: 11, fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: "#D4A217" }}>
-          One FCC · Test drive
+      <span style={{ flex: 1, minWidth: 0, position: "relative", zIndex: 1 }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: "#7A1020" }}>
+          <span style={{ background: "#CC1B33", color: "#fff", padding: "2px 7px", borderRadius: 6, letterSpacing: ".06em" }}>New</span>
+          One FCC
         </span>
-        <span style={{ display: "block", fontFamily: "Lora, Georgia, serif", fontSize: 18, fontWeight: 600, lineHeight: 1.25 }}>
+        <span style={{ display: "block", fontFamily: "Lora, Georgia, serif", fontSize: 19, fontWeight: 700, lineHeight: 1.2, marginTop: 4 }}>
           Club Handbook · Have your say
         </span>
-        <span style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6, fontSize: 12.5, color: "#AEBAE0", flexWrap: "wrap" }}>
-          <span>{daysLeft} days left</span>
+        <span style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 7, fontSize: 12.5, flexWrap: "wrap" }}>
           <span style={{
-            fontWeight: 800, padding: "2px 9px", borderRadius: 999,
-            background: progress?.completed ? "#1F7A4D" : "rgba(255,255,255,.12)", color: "#fff",
+            fontWeight: 800, padding: "3px 10px", borderRadius: 999,
+            background: done13 ? "#1F7A4D" : "#1B2A5C", color: "#fff",
           }}>{status}</span>
+          <span style={{ fontWeight: 700, color: "#3B2E00" }}>Tap to {done > 0 && !done13 ? "continue" : done13 ? "review" : "start"} →</span>
         </span>
       </span>
-      <span aria-hidden="true" style={{ fontSize: 22, color: "#D4A217" }}>→</span>
-      {urgent && <span aria-hidden="true" style={{ position: "absolute", top: 10, right: 10, width: 10, height: 10, borderRadius: "50%", background: "#CC1B33", boxShadow: "0 0 0 3px rgba(204,27,51,.3)" }} />}
+      <span className={`hbr-days${urgent ? " urgent" : ""}`} aria-hidden="true" style={{
+        position: "relative", zIndex: 1, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        minWidth: 64, padding: "8px 10px", borderRadius: 14,
+        background: done13 ? "#1F7A4D" : "linear-gradient(180deg,#E3394F 0%,#CC1B33 100%)", color: "#fff",
+      }}>
+        <span style={{ fontSize: 28, fontWeight: 900, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{done13 ? "✓" : daysLeft}</span>
+        <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", marginTop: 4, whiteSpace: "nowrap" }}>
+          {done13 ? "Done" : daysLeft === 1 ? "Day left" : "Days left"}
+        </span>
+      </span>
     </button>
   );
 }
