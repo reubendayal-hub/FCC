@@ -115,6 +115,20 @@ export async function saveConfig(patch, db = getDb()) {
     if (Number.isNaN(t.getTime())) throw new HttpError(400, "Invalid deadline");
     out.deadlineISO = String(patch.deadlineISO);
   }
+  // Allowlist: app member ids only. open_to_all is deliberately NOT settable
+  // here (rollout isn't built); it stays false unless changed in the console.
+  for (const key of ["testers", "admins"]) {
+    if (!(key in patch)) continue;
+    const list = patch[key];
+    if (!Array.isArray(list) || list.length > 50 || !list.every((id) => typeof id === "string" && /^[A-Za-z0-9_-]{1,40}$/.test(id))) {
+      throw new HttpError(400, `${key} must be a list of member ids`);
+    }
+    out[key] = [...new Set(list)];
+  }
+  if ("open_to_all" in patch) {
+    if (patch.open_to_all !== false) throw new HttpError(400, "open_to_all can only be set to false here");
+    out.open_to_all = false;
+  }
   out.updatedAt = Date.now();
   await db.collection(COLLECTIONS.config).doc("settings").set(out, { merge: true });
   return getConfig(db);

@@ -13,7 +13,7 @@
 //   POST admin-login            { password } → { token }
 //   GET  admin-summary
 //   GET  admin-export           .xlsx
-//   POST admin-settings         { open?, deadlineISO? }
+//   POST admin-settings         { open?, deadlineISO?, testers?, admins? }  (open_to_all not settable)
 //   POST admin-digest           { mode: "preview" | "test" }  preview HTML, or test-send to Reuben only
 // Cron (CRON_SECRET; also requires HANDBOOK_DIGEST_ENABLED=true):
 //   GET  cron-daily             the scheduled entry: Mondays → weekly, day after deadline → final
@@ -180,7 +180,8 @@ const handlers = {
   async "admin-settings"(req, res) {
     method(req, "POST");
     if (!admin.requireAdmin(req, res)) return undefined;
-    return { config: publicConfig(await saveConfig(body(req))) };
+    const saved = await saveConfig(body(req));
+    return { config: publicConfig(saved), testers: saved.testers, admins: saved.admins, open_to_all: saved.open_to_all === true, project: projectId() };
   },
 
   async "admin-digest"(req, res) {
