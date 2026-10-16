@@ -1,11 +1,11 @@
 // Firebase Admin SDK for /handbook-review. Uses its own named app so it
 // never shares state with other routes.
 //
-// Credentials (D2):
-//   HANDBOOK_FIREBASE_SA   service-account JSON (stringified).
-//                          Vercel Preview → cricops-staging, Production → fcc-nets.
-//   FIREBASE_ADMIN_SA_PROD fallback, PRODUCTION ONLY. Preview/dev never fall back
-//                          to prod: without HANDBOOK_FIREBASE_SA they fail cleanly.
+// Credentials (existing Vercel env vars, service-account JSON stringified):
+//   Production          → FIREBASE_ADMIN_SA_PROD     (fcc-nets)
+//   Preview / local dev → FIREBASE_ADMIN_SA_STAGING  (cricops-staging)
+// Preview and dev NEVER read the prod service account. As a second guard, a
+// non-production deployment refuses any credential for the prod project.
 
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
@@ -20,11 +20,18 @@ export const COLLECTIONS = {
 
 export class NotConfiguredError extends Error {}
 
+const PROD_PROJECT = "fcc-nets";
+
 function serviceAccount() {
-  const raw = process.env.HANDBOOK_FIREBASE_SA
-    || (process.env.VERCEL_ENV === "production" ? process.env.FIREBASE_ADMIN_SA_PROD : "");
-  if (!raw) throw new NotConfiguredError("HANDBOOK_FIREBASE_SA not configured for this environment");
-  return JSON.parse(raw);
+  const isProd = process.env.VERCEL_ENV === "production";
+  const envName = isProd ? "FIREBASE_ADMIN_SA_PROD" : "FIREBASE_ADMIN_SA_STAGING";
+  const raw = process.env[envName];
+  if (!raw) throw new NotConfiguredError(`${envName} not configured for this environment`);
+  const sa = JSON.parse(raw);
+  if (!isProd && sa.project_id === PROD_PROJECT) {
+    throw new NotConfiguredError(`${envName} points at the prod project; refusing outside production`);
+  }
+  return sa;
 }
 
 export function getDb() {
