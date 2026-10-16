@@ -51,7 +51,7 @@ export default function App() {
   const [startAccess, setStartAccess] = useState("unknown"); // unknown | allowed | denied
   useEffect(() => {
     if (phase !== "welcome" || !config) return undefined;
-    if (config.unreachable) { setStartAccess("allowed"); return undefined; } // the form's own error handles it
+    if (config.unreachable) { setPhase("failed"); return undefined; } // fail closed: never show the start form unchecked
     if (config.openToAll) { setStartAccess("allowed"); return undefined; }
     if (!prefill?.memberId) { setStartAccess("denied"); return undefined; }
     let alive = true;
