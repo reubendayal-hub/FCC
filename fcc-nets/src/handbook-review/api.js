@@ -28,6 +28,7 @@ async function call(action, { method = "GET", query, body, token, keepalive } = 
 
 export const api = {
   config: () => call("config"),
+  access: (memberId) => call("access", { query: { m: memberId } }),
   start: (identity) => call("start", { method: "POST", body: identity }),
   review: (r) => call("review", { query: { r } }),
   draft: (payload, opts = {}) => call("draft", { method: "POST", body: payload, keepalive: opts.keepalive }),

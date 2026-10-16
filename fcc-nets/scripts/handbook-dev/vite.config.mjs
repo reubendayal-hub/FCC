@@ -13,15 +13,24 @@ process.env.HANDBOOK_ADMIN_SECRET ||= "dev-admin";
 process.env.CRON_SECRET ||= "dev-cron";
 globalThis.__HANDBOOK_FAKE_DB__ = createFakeFirestore();
 // Start "open" so the flow can be tested immediately.
-await globalThis.__HANDBOOK_FAKE_DB__.collection("handbookReviewConfig").doc("settings").set({ open: true });
+// Local fake only: Reuben + Arun (real app ids) and the mock "Parag Sample" id from card-preview.
+await globalThis.__HANDBOOK_FAKE_DB__.collection("handbookReviewConfig").doc("settings").set({
+  open: true, open_to_all: false,
+  testers: ["x3kkunl", "bzfuva3", "dev-parag-sample"], admins: [],
+});
 
 function handbookApi() {
   return {
     name: "handbook-api-dev",
     configureServer(server) {
-      server.middlewares.use(async (req, res, next) => {
+      server.middlewares.use((req, res, next) => {
+        if (!/^\/api\/handbook\//.test(req.url)) return next();
+        // A client disconnect mid-request must not crash the dev server.
+        handle(req, res).catch((e) => { try { res.statusCode = 500; res.end(String(e)); } catch { /* gone */ } });
+      });
+      async function handle(req, res) {
         const m = req.url.match(/^\/api\/handbook\/([a-z-]+)(\?.*)?$/);
-        if (!m) return next();
+        if (!m) { res.statusCode = 404; return res.end("{}"); }
         const { default: handler } = await server.ssrLoadModule("/api/handbook/[action].js");
         const query = Object.fromEntries(new URLSearchParams(m[2] || ""));
         query.action = m[1];
@@ -39,8 +48,8 @@ function handbookApi() {
           json(obj) { s.headersSent = true; res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify(obj)); return s; },
           send(buf) { s.headersSent = true; res.end(buf); return s; },
         };
-        try { await handler(r, s); } catch (e) { res.statusCode = 500; res.end(String(e)); }
-      });
+        await handler(r, s);
+      }
       // Dev switch to simulate a server outage: /__hbr-offline?on=1
       server.middlewares.use("/__hbr-offline", (req, res) => {
         globalThis.__HANDBOOK_DEV_OFFLINE__ = req.url.includes("on=1");

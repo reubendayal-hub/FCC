@@ -7,6 +7,7 @@ import Welcome from "./components/Welcome.jsx";
 import Hub from "./components/Hub.jsx";
 import PartReader from "./components/PartReader.jsx";
 import Complete from "./components/Complete.jsx";
+import NotOpen from "./components/NotOpen.jsx";
 
 // Route lives in the hash so the browser back button works:
 //   ""  → hub,  "#/part/7" → part reader,  "#/done" → completion
@@ -29,7 +30,7 @@ const noopSync = { subscribe: () => () => {}, getSnapshot: () => null };
 export default function App() {
   const [token, setToken] = useState(() => readToken());
   const [config, setConfig] = useState(null);
-  const [phase, setPhase] = useState(token ? "loading" : "welcome"); // loading | welcome | ready | failed
+  const [phase, setPhase] = useState(token ? "loading" : "welcome"); // loading | welcome | ready | notopen | failed
   const [linkError, setLinkError] = useState("");
   // The first route restores the saved scroll position (reload / reopen mid-part).
   const [route, setRoute] = useState(() => ({ ...parseHash(), restore: true }));
@@ -40,10 +41,26 @@ export default function App() {
   const sync = useMemo(() => (token ? createSync(token) : null), [token]);
   const snap = useSyncExternalStore((sync || noopSync).subscribe, (sync || noopSync).getSnapshot);
 
-  // Public config (deadline) for the welcome screen.
+  // Public config (deadline, openToAll) for the welcome screen.
   useEffect(() => {
-    api.config().then(setConfig).catch(() => {});
+    api.config().then(setConfig).catch(() => setConfig({ unreachable: true }));
   }, []);
+
+  // Who may start a review while it's not open to all: only allowlisted app
+  // members, arriving from the app. A forwarded link alone shows "Not open yet".
+  const [startAccess, setStartAccess] = useState("unknown"); // unknown | allowed | denied
+  useEffect(() => {
+    if (phase !== "welcome" || !config) return undefined;
+    if (config.unreachable) { setStartAccess("allowed"); return undefined; } // the form's own error handles it
+    if (config.openToAll) { setStartAccess("allowed"); return undefined; }
+    if (!prefill?.memberId) { setStartAccess("denied"); return undefined; }
+    let alive = true;
+    setStartAccess("unknown");
+    api.access(prefill.memberId)
+      .then((d) => { if (alive) setStartAccess(d.allowed ? "allowed" : "denied"); })
+      .catch(() => { if (alive) setStartAccess("denied"); });
+    return () => { alive = false; };
+  }, [phase, config, prefill]);
 
   // Load the reviewer's review and start autosave.
   useEffect(() => {
@@ -67,6 +84,9 @@ export default function App() {
         if (window.location.search.includes("r=")) {
           window.history.replaceState(null, "", `/handbook-review/${window.location.hash}`);
         }
+      } else if (res.notOpen) {
+        window.history.replaceState(null, "", "/handbook-review/");
+        setPhase("notopen");
       } else if (res.notFound) {
         const fromLink = urlToken() === token;
         window.history.replaceState(null, "", "/handbook-review/");
@@ -121,8 +141,12 @@ export default function App() {
   const closed = !!effectiveConfig?.closed || snap?.status === "closed";
 
   let screen;
-  if (phase === "welcome") {
-    screen = <Welcome deadline={deadline} closed={!!config?.closed} onStarted={onStarted} linkError={linkError} prefill={prefill} onNotMe={() => { clearPrefill(); setPrefill(null); }} />;
+  if (phase === "notopen" || (phase === "welcome" && startAccess === "denied")) {
+    screen = <NotOpen />;
+  } else if (phase === "welcome" && startAccess === "unknown") {
+    screen = <div className="spinner" role="progressbar" aria-label="Loading" />;
+  } else if (phase === "welcome") {
+    screen = <Welcome allowFullForm={!!config?.openToAll} deadline={deadline} closed={!!config?.closed} onStarted={onStarted} linkError={linkError} prefill={prefill} onNotMe={() => { clearPrefill(); setPrefill(null); }} />;
   } else if (phase === "failed") {
     screen = (
       <div className="col" style={{ paddingTop: "30vh", textAlign: "center" }}>

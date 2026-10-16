@@ -12,6 +12,11 @@ export const DEFAULT_CONFIG = {
   open: false,
   deadlineISO: "2026-11-30T23:59:00+01:00",
   version: HANDBOOK_VERSION,
+  // Access while open_to_all is false: only these app member ids may take part.
+  // Defaults are empty, so without a saved config nobody can use the review.
+  testers: [],
+  admins: [],
+  open_to_all: false,
 };
 
 export class HttpError extends Error {
@@ -87,6 +92,15 @@ function cleanPartNumber(p) {
 export async function getConfig(db = getDb()) {
   const snap = await db.collection(COLLECTIONS.config).doc("settings").get();
   return { ...DEFAULT_CONFIG, ...(snap.exists ? snap.data() : {}) };
+}
+
+// Allowlist check. NOTE: memberId comes from the app's client-side login
+// (not server-verified yet) — fine for a 3-person test, not for rollout.
+export function memberAllowed(config, memberId) {
+  if (config.open_to_all === true) return true;
+  if (!memberId) return false;
+  const ids = [...(config.testers || []), ...(config.admins || [])];
+  return ids.includes(memberId);
 }
 
 export function isClosed(config, now = Date.now()) {

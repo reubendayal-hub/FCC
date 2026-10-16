@@ -2,7 +2,8 @@
 // in ONE serverless function (keeps the project under Vercel's function cap).
 //
 // Reviewer (identity = random reviewToken, see _lib/handbook/identity.js):
-//   GET  config                 open / deadline / version
+//   GET  config                 open / deadline / version / openToAll
+//   GET  access?m=              { allowed } for an app member id (testers/admins while not open to all)
 //   POST start                  { name, email, roleGroup } → { reviewToken }
 //   GET  review?r=              the reviewer's own review + config
 //   POST draft                  { r, part?, fields?, roleInterest?, missed?, resume? }  autosave, accepts drafts
@@ -23,7 +24,7 @@ import { getDb, projectId, NotConfiguredError } from "../_lib/handbook/db.js";
 import { newReviewToken, resolveReviewId, identityFields } from "../_lib/handbook/identity.js";
 import {
   HttpError, cleanIdentity, getConfig, isClosed, saveConfig, createReview, getReview,
-  applyChange, publicReview, listReviews,
+  applyChange, publicReview, listReviews, memberAllowed,
 } from "../_lib/handbook/store.js";
 import { buildSummary } from "../_lib/handbook/summary.js";
 import { buildWorkbook } from "../_lib/handbook/export.js";
@@ -57,14 +58,18 @@ function method(req, ...allowed) {
 }
 
 function publicConfig(c) {
-  return { open: c.open, deadlineISO: c.deadlineISO, version: c.version, closed: isClosed(c) };
+  return { open: c.open, deadlineISO: c.deadlineISO, version: c.version, closed: isClosed(c), openToAll: c.open_to_all === true };
 }
+
+const NOT_OPEN = "The handbook review isn't open yet";
 
 async function requireOpenReview(req, db) {
   const id = resolveReviewId(req);
   if (!id) throw new HttpError(401, "Missing or invalid review link");
   if (limited(`w:${id}`, 120, 60_000)) throw new HttpError(429, "Slow down a little");
-  const config = await getConfig(db);
+  const [config, doc] = await Promise.all([getConfig(db), getReview(id, db)]);
+  if (!doc) throw new HttpError(404, "Review not found");
+  if (!memberAllowed(config, doc.memberId)) throw new HttpError(403, NOT_OPEN);
   if (isClosed(config)) throw new HttpError(423, "The review is closed");
   return id;
 }
@@ -82,6 +87,15 @@ const handlers = {
     return publicConfig(await getConfig());
   },
 
+  // Is this app member allowed in? Answers only yes/no.
+  async access(req) {
+    method(req, "GET");
+    if (limited(`a:${ip(req)}`, 60, 60_000)) throw new HttpError(429, "Slow down a little");
+    const m = String(req.query?.m || "");
+    const config = await getConfig();
+    return { allowed: memberAllowed(config, /^[A-Za-z0-9_-]{1,40}$/.test(m) ? m : null) };
+  },
+
   async start(req) {
     method(req, "POST");
     if (limited(`s:${ip(req)}`, 10, 10 * 60_000)) throw new HttpError(429, "Too many attempts, try again in a few minutes");
@@ -89,6 +103,7 @@ const handlers = {
     const config = await getConfig(db);
     if (isClosed(config)) throw new HttpError(423, "The review is closed");
     const identity = cleanIdentity(body(req));
+    if (!memberAllowed(config, identity.memberId)) throw new HttpError(403, NOT_OPEN);
     const ua = String(req.headers["user-agent"] || "");
     const hint = /Mobi|Android|iPhone|iPad/i.test(ua) ? "mobile" : "desktop";
     const reviewToken = newReviewToken();
@@ -104,6 +119,7 @@ const handlers = {
     const db = getDb();
     const [doc, config] = await Promise.all([getReview(id, db), getConfig(db)]);
     if (!doc) throw new HttpError(404, "We couldn't find that review link");
+    if (!memberAllowed(config, doc.memberId)) throw new HttpError(403, NOT_OPEN);
     return { review: publicReview(doc), config: publicConfig(config) };
   },
 

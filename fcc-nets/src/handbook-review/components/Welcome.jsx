@@ -3,7 +3,7 @@ import { api } from "../api.js";
 import { ROLE_GROUPS, TOTAL_PARTS, TOTAL_READ_MINS } from "../content/config.js";
 import { CREST, Countdown, Privacy, BackToApp } from "./bits.jsx";
 
-export function Hero({ deadline, children }) {
+export function Hero({ deadline, children, countdown = true }) {
   return (
     <header className="hero">
       <BackToApp variant="hero" />
@@ -12,17 +12,19 @@ export function Hero({ deadline, children }) {
         <span className="badge">One FCC · One Community</span>
         <h1>How We Run <span>Our Club</span></h1>
         <p className="tag">Read it. Shape it. It's your club.</p>
-        <div className="count-card">
-          <Countdown deadline={deadline} />
-          <span className="count-label">Review closes 30 Nov</span>
-        </div>
+        {countdown && (
+          <div className="count-card">
+            <Countdown deadline={deadline} />
+            <span className="count-label">Review closes 30 Nov</span>
+          </div>
+        )}
         {children}
       </div>
     </header>
   );
 }
 
-export default function Welcome({ deadline, closed, onStarted, linkError, prefill, onNotMe }) {
+export default function Welcome({ deadline, closed, onStarted, linkError, prefill, onNotMe, allowFullForm }) {
   const [name, setName] = useState(prefill?.name || "");
   const [email, setEmail] = useState(prefill?.email || "");
   const [roleGroup, setRoleGroup] = useState(prefill?.roleGroup || "");
@@ -83,7 +85,7 @@ export default function Welcome({ deadline, closed, onStarted, linkError, prefil
               <button type="submit" className="btn btn-primary btn-block" disabled={!ready || busy}>
                 {busy ? "Starting…" : "Start reviewing →"}
               </button>
-              <button type="button" className="linkbtn" style={{ alignSelf: "center" }} onClick={onNotMe}>Not you? Use the full form</button>
+              {allowFullForm && <button type="button" className="linkbtn" style={{ alignSelf: "center" }} onClick={onNotMe}>Not you? Use the full form</button>}
             </form>
           ) : (
             <form className="card stack" onSubmit={submit} noValidate>

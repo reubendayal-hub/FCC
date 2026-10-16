@@ -1,6 +1,8 @@
 // "Club Handbook · Have your say" card for the FCC Training app's Profile tab.
-// Test-drive phase: shown only to HANDBOOK_TESTERS. Kept tiny on purpose —
-// it does NOT import the handbook content, so the app bundle stays lean.
+// Test-drive phase: shown ONLY when the server says this member id is on the
+// allowlist (handbookReviewConfig/settings.testers / admins). Everyone else
+// gets nothing rendered. Kept tiny on purpose — it does NOT import the
+// handbook content, so the app bundle stays lean.
 //
 // Handoff to /handbook-review is same-origin via localStorage (never the URL):
 // the card writes { name, email, roleGroup, memberId } to "hbr:prefill" and
@@ -9,17 +11,7 @@
 import React, { useEffect, useState } from "react";
 import { isCoachMember } from "../utils/members";
 
-// Exact member names, plus first-name matches (Parag hasn't signed up yet).
-const HANDBOOK_TESTERS = ["Reuben Dayal", "Arun Krishnamurthy"];
-const HANDBOOK_TESTER_FIRST_NAMES = ["Parag"];
 const DEADLINE = new Date("2026-11-30T23:59:00+01:00").getTime();
-
-export function isHandbookTester(member) {
-  const name = (member?.name || "").trim();
-  if (!name) return false;
-  if (HANDBOOK_TESTERS.includes(name)) return true;
-  return HANDBOOK_TESTER_FIRST_NAMES.includes(name.split(/\s+/)[0]);
-}
 
 function guessRoleGroup(me, teams) {
   if (me.role === "superadmin" || me.role === "admin") return "board";
@@ -30,9 +22,22 @@ function guessRoleGroup(me, teams) {
 }
 
 export default function HandbookEntryCard({ me, teams }) {
+  const [allowed, setAllowed] = useState(false);
   const [progress, setProgress] = useState(null); // { done, completed } for THIS member's review on this device
 
   useEffect(() => {
+    let alive = true;
+    setAllowed(false);
+    if (!me?.id) return undefined;
+    fetch(`/api/handbook/access?m=${encodeURIComponent(me.id)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (alive) setAllowed(d?.allowed === true); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [me?.id]);
+
+  useEffect(() => {
+    if (!allowed) return undefined;
     let alive = true;
     let token = null;
     try { token = localStorage.getItem("hbr:token"); } catch { /* storage blocked */ }
@@ -47,9 +52,9 @@ export default function HandbookEntryCard({ me, teams }) {
       })
       .catch(() => {});
     return () => { alive = false; };
-  }, [me.id, me.name]);
+  }, [allowed, me.id, me.name]);
 
-  if (!isHandbookTester(me)) return null;
+  if (!allowed) return null;
 
   const done = progress?.done || 0;
   const daysLeft = Math.max(0, Math.floor((DEADLINE - Date.now()) / 86400000));

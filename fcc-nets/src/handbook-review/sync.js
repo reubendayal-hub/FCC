@@ -143,6 +143,7 @@ export function createSync(token) {
       return { ok: true };
     } catch (e) {
       if (e.status === 404 || e.status === 401) return { ok: false, notFound: true, error: e.message };
+      if (e.status === 403) return { ok: false, notOpen: true, error: e.message };
       if (state.server) { set({ status: "offline", lastError: e.message }); return { ok: true, offline: true }; }
       return { ok: false, error: e.message };
     }
@@ -268,7 +269,7 @@ export function createSync(token) {
   }
 
   function handleError(e) {
-    if (e instanceof ApiError && e.status === 423) {
+    if (e instanceof ApiError && (e.status === 423 || e.status === 403)) {
       set({ status: "closed", config: { ...(state.config || {}), closed: true } });
       return;
     }

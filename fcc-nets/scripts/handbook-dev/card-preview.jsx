@@ -5,7 +5,7 @@ import { createRoot } from "react-dom/client";
 import HandbookEntryCard from "../../src/handbook-review/AppEntryCard.jsx";
 
 const q = new URLSearchParams(location.search);
-const me = { id: "dev-" + (q.get("name") || "Parag Sample").toLowerCase().replace(/\W+/g, "-"), name: q.get("name") || "Parag Sample", email: q.get("email") || "parag@example.com", teams: ["Div 3"], role: "member" };
+const me = { id: q.get("id") || "dev-" + (q.get("name") || "Parag Sample").toLowerCase().replace(/\W+/g, "-"), name: q.get("name") || "Parag Sample", email: q.get("email") || "parag@example.com", teams: ["Div 3"], role: "member" };
 
 function MockProfile() {
   return (
