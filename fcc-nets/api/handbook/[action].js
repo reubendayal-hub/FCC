@@ -15,8 +15,9 @@
 //   POST admin-settings         { open?, deadlineISO? }
 //   POST admin-digest           { mode: "preview" | "test" }  preview HTML, or test-send to Reuben only
 // Cron (CRON_SECRET; also requires HANDBOOK_DIGEST_ENABLED=true):
-//   GET  cron-weekly            weekly digest to HANDBOOK_DIGEST_TO
-//   GET  cron-final             final report (1 Dec)
+//   GET  cron-daily             the scheduled entry: Mondays → weekly, day after deadline → final
+//   GET  cron-weekly            weekly digest to HANDBOOK_DIGEST_TO (manual trigger)
+//   GET  cron-final             final report (manual trigger)
 
 import { getDb, projectId, NotConfiguredError } from "../_lib/handbook/db.js";
 import { newReviewToken, resolveReviewId, identityFields } from "../_lib/handbook/identity.js";
@@ -181,6 +182,18 @@ const handlers = {
   // ── Cron ──
   async "cron-weekly"(req, res) { return runCron(req, res, "weekly"); },
   async "cron-final"(req, res) { return runCron(req, res, "final"); },
+  // The one route Vercel cron calls (daily, 07:00 UTC = 08:00 Copenhagen in
+  // winter): Mondays → weekly digest while open; day after the deadline → final report.
+  async "cron-daily"(req, res) {
+    if (!isCron(req)) { res.status(401).json({ error: "Unauthorized" }); return undefined; }
+    const config = await getConfig(getDb());
+    const today = cphDate();
+    const dayAfterDeadline = cphDate(new Date(config.deadlineISO).getTime() + 86400000);
+    if (today === dayAfterDeadline) return runCron(req, res, "final");
+    const weekday = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Copenhagen", weekday: "short" }).format(new Date());
+    if (weekday === "Mon") return runCron(req, res, "weekly");
+    return { skipped: `nothing due today (${today})` };
+  },
 };
 
 async function runCron(req, res, kind) {
