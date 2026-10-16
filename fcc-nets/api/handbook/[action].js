@@ -20,7 +20,7 @@
 //   GET  cron-weekly            weekly digest to HANDBOOK_DIGEST_TO (manual trigger)
 //   GET  cron-final             final report (manual trigger)
 
-import { getDb, projectId, NotConfiguredError } from "../_lib/handbook/db.js";
+import { getDb, projectId, NotConfiguredError, COLLECTIONS } from "../_lib/handbook/db.js";
 import { newReviewToken, resolveReviewId, identityFields } from "../_lib/handbook/identity.js";
 import {
   HttpError, cleanIdentity, getConfig, isClosed, saveConfig, createReview, getReview,
@@ -225,7 +225,7 @@ async function runCron(req, res, kind) {
   const digest = buildDigest(buildSummary(reviews, config), prev, { kind });
   const to = digestRecipients();
   await sendEmail({ to, subject: digest.subject, html: digest.html });
-  await db.collection("handbookReviewLog").doc(key).set(
+  await db.collection(COLLECTIONS.log).doc(key).set(
     { kind, sentAt: Date.now(), to, volunteerKeys: digest.volunteerKeys, stats: digest.stats }, { merge: true });
   return { sent: true, key, to };
 }
