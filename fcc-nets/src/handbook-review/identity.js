@@ -38,3 +38,32 @@ export function forgetToken() {
 export function personalLink(token) {
   return `${window.location.origin}/handbook-review/?r=${token}`;
 }
+
+// ── Handoff from the FCC Training app (same origin, never via the URL) ──
+const PREFILL_KEY = "hbr:prefill";
+const PREFILL_TTL_MS = 30 * 60 * 1000;
+
+export function readPrefill() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PREFILL_KEY) || "null");
+    if (!p || typeof p.name !== "string" || Date.now() - (p.at || 0) > PREFILL_TTL_MS) return null;
+    return { name: p.name, email: p.email || "", roleGroup: p.roleGroup || "", memberId: p.memberId || null };
+  } catch {
+    return null;
+  }
+}
+
+export function clearPrefill() {
+  try { localStorage.removeItem(PREFILL_KEY); } catch { /* ignore */ }
+}
+
+export function cameFromApp() {
+  try { return sessionStorage.getItem("hbr:fromApp") === "1"; } catch { return false; }
+}
+
+// Same person? Compare by app member id when both have one, else by name.
+export function samePerson(review, prefill) {
+  if (!review || !prefill) return true;
+  if (review.memberId && prefill.memberId) return review.memberId === prefill.memberId;
+  return (review.name || "").trim().toLowerCase() === prefill.name.trim().toLowerCase();
+}

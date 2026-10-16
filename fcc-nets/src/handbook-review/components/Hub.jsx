@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { PARTS, TOTAL_PARTS, readMins } from "../content/config.js";
 import { isPartDone } from "../shared/reviewRules.js";
 import { personalLink } from "../identity.js";
-import { CREST, Countdown, ProgressRing, SaveStatus, VerdictChip, VERDICT_ACCENT, Privacy } from "./bits.jsx";
+import { CREST, Countdown, ProgressRing, SaveStatus, VerdictChip, VERDICT_ACCENT, Privacy, BackToApp } from "./bits.jsx";
 import MissedCard from "./MissedCard.jsx";
 
 const NOTE_TEXT = (notes) => {
@@ -54,6 +54,7 @@ export default function Hub({ snap, sync, token, deadline, closed, go, showToast
   return (
     <div className="screen">
       <TopBar snap={snap}>
+        <BackToApp />
         <div className="brand"><img src={CREST} alt="" width="30" height="34" /><b>Club Handbook</b></div>
       </TopBar>
 

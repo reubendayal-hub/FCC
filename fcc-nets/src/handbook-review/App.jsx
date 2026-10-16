@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { api } from "./api.js";
 import { createSync } from "./sync.js";
-import { readToken, saveToken, forgetToken, urlToken, storedToken } from "./identity.js";
+import { readToken, saveToken, forgetToken, urlToken, storedToken, readPrefill, clearPrefill, samePerson } from "./identity.js";
 import { DEFAULT_DEADLINE_ISO, TOTAL_PARTS } from "./content/config.js";
 import Welcome from "./components/Welcome.jsx";
 import Hub from "./components/Hub.jsx";
@@ -34,6 +34,8 @@ export default function App() {
   // The first route restores the saved scroll position (reload / reopen mid-part).
   const [route, setRoute] = useState(() => ({ ...parseHash(), restore: true }));
   const [toast, setToast] = useState("");
+  // Opened from the FCC app: who the app says is logged in (one-tap start).
+  const [prefill, setPrefill] = useState(readPrefill);
 
   const sync = useMemo(() => (token ? createSync(token) : null), [token]);
   const snap = useSyncExternalStore((sync || noopSync).subscribe, (sync || noopSync).getSnapshot);
@@ -51,6 +53,14 @@ export default function App() {
     sync.load().then((res) => {
       if (!alive) return;
       if (res.ok) {
+        // This device holds someone else's review, but the app says a different
+        // member is here now: start fresh for them (their own link still works).
+        if (prefill && !samePerson(sync.getSnapshot().review, prefill)) {
+          setToken(null);
+          setPhase("welcome");
+          return;
+        }
+        if (prefill) { clearPrefill(); setPrefill(null); }
         saveToken(token);
         setPhase("ready");
         // Strip ?r= from the address bar once it's stored, so it isn't shared by accident.
@@ -97,6 +107,8 @@ export default function App() {
   }, []);
 
   function onStarted({ reviewToken }) {
+    clearPrefill();
+    setPrefill(null);
     saveToken(reviewToken);
     setLinkError("");
     setPhase("loading");
@@ -110,7 +122,7 @@ export default function App() {
 
   let screen;
   if (phase === "welcome") {
-    screen = <Welcome deadline={deadline} closed={!!config?.closed} onStarted={onStarted} linkError={linkError} />;
+    screen = <Welcome deadline={deadline} closed={!!config?.closed} onStarted={onStarted} linkError={linkError} prefill={prefill} onNotMe={() => { clearPrefill(); setPrefill(null); }} />;
   } else if (phase === "failed") {
     screen = (
       <div className="col" style={{ paddingTop: "30vh", textAlign: "center" }}>

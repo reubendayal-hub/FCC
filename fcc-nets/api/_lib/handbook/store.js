@@ -40,7 +40,9 @@ export function cleanIdentity(body) {
   if (name.length < 2) throw new HttpError(400, "Please tell us your name");
   if (!EMAIL_RE.test(email)) throw new HttpError(400, "Please enter a valid email");
   if (!ROLE_GROUP_KEYS.includes(roleGroup)) throw new HttpError(400, "Please pick your team / role");
-  return { name, email, roleGroup };
+  // Optional app member id when started from inside the app (not verified — phase 2 will be).
+  const memberId = typeof body?.memberId === "string" && /^[A-Za-z0-9_-]{1,40}$/.test(body.memberId) ? body.memberId : null;
+  return { name, email, roleGroup, memberId };
 }
 
 function cleanPartFields(f) {
@@ -109,6 +111,7 @@ export async function saveConfig(patch, db = getDb()) {
 export function publicReview(doc) {
   return {
     name: doc.name,
+    memberId: doc.memberId || null,
     roleGroup: doc.roleGroup,
     handbookVersion: doc.handbookVersion,
     parts: doc.parts || {},

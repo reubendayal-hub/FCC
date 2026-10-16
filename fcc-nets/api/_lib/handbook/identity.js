@@ -20,6 +20,6 @@ export function resolveReviewId(req) {
   return TOKEN_RE.test(r) ? r : null;
 }
 
-export function identityFields({ name, email, roleGroup }) {
-  return { name, email, roleGroup };
+export function identityFields({ name, email, roleGroup, memberId }) {
+  return { name, email, roleGroup, memberId: memberId || null, source: memberId ? "app" : "link" };
 }

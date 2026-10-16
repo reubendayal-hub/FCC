@@ -21,6 +21,7 @@ import { THEMES, THEME_KEYS } from "../constants/themes";
 import { fmtShort, todayStr } from "../utils/time";
 import { isCoachMember, profileCompletion, maskEmail, getMemberRoleChips } from "../utils/members";
 import { uid } from "../constants/seeds";
+import HandbookEntryCard from "../handbook-review/AppEntryCard";
 import {
   getEffectiveConfig, isDutyEnabled, getSupportParents, setSupportParents,
   getSlotCount, isMatchSession, getSeasonYear, getMatchRoles,
@@ -318,6 +319,8 @@ export default function ProfileView() {
           {/* PROFILE TAB */}
           {/* ══════════════════════════════════════════════════════════ */}
           {profileTab === "profile" && (<>
+          {/* Club Handbook review — test drive, testers only (see AppEntryCard) */}
+          <HandbookEntryCard me={me} teams={teams} />
           {/* Avatar + name card */}
           {(()=>{
             const isFemTeam = myTeams.some(t=>TEAM_META[t]?.feminine);

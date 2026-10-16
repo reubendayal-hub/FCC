@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { CountdownTiles } from "../../shared/Countdown.jsx";
+import { cameFromApp } from "../identity.js";
 
 export const CREST = "/handbook-review/crest.webp";
 const ACCENTS = ["#D4A217", "#5B7BD6", "#CC1B33", "#AEBAE0"];
@@ -103,4 +104,15 @@ export function Confetti() {
 export function formatDate(ms) {
   if (!ms) return "";
   return new Date(ms).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Europe/Copenhagen" });
+}
+
+// "← FCC app" — only when the reviewer arrived from the FCC Training app.
+export function BackToApp({ variant }) {
+  if (!cameFromApp()) return null;
+  return (
+    <a href="/" className={`back-app ${variant || ""}`} aria-label="Back to the FCC Training app">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+      FCC app
+    </a>
+  );
 }
