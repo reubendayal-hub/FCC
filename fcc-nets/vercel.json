@@ -16,8 +16,12 @@
       "schedule": "0 8 * * *"
     },
     {
-      "path": "/api/handbook/cron-daily",
-      "schedule": "0 7 * * *"
+      "path": "/api/handbook/cron-weekly",
+      "schedule": "0 7 * * 1"
+    },
+    {
+      "path": "/api/handbook/cron-final",
+      "schedule": "0 7 1 12 *"
     }
   ]
 }

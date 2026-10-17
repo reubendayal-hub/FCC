@@ -231,6 +231,10 @@ export async function applyChange(id, change, db = getDb()) {
   });
 }
 
+export async function deleteReview(id, db = getDb()) {
+  await db.collection(COLLECTIONS.reviews).doc(id).delete();
+}
+
 export async function listReviews(db = getDb()) {
   const snap = await db.collection(COLLECTIONS.reviews).get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
