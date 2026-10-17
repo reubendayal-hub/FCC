@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { PARTS, TOTAL_PARTS, COMMITTEES } from "../content/config.js";
 import { isPartDone, partProblem, MAX_TEXT, MIN_REASON } from "../shared/reviewRules.js";
 import { VERDICT_META, formatDate } from "./bits.jsx";
-import { TopBar, nextUnreviewed } from "./Hub.jsx";
+import { TopBar } from "./Hub.jsx";
 
 const ANCHOR_TO_PART = Object.fromEntries(PARTS.map((p) => [p.anchor, p.id]));
 
@@ -61,8 +61,18 @@ export default function PartReader({ partId, restore, snap, sync, closed, go, sh
   const done = isPartDone(ans);
   const verdict = ans.verdict || null;
   const [focusText, setFocusText] = useState(false);
+  const [pulse, setPulse] = useState(false);
   const wasDone = useRef(done);
   const docRef = useRef(null);
+  const cardNextRef = useRef(null); // in-card button (desktop)
+  const barNextRef = useRef(null);  // sticky bottom bar button (mobile)
+  const agreeTimer = useRef(null);
+  const pulseTimer = useRef(null);
+  const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+  // Next is enabled once the part counts as reviewed (Agree, or a reason given).
+  // When the review is closed it just navigates.
+  const canNext = closed || done;
 
   // Land at the top, or restore the saved scroll position when resuming.
   useLayoutEffect(() => {
@@ -95,16 +105,61 @@ export default function PartReader({ partId, restore, snap, sync, closed, go, sh
     return () => { window.removeEventListener("scroll", onScroll); clearTimeout(t); };
   }, [partId, closed, sync]);
 
-  // "Saved ✓ · 8 of 13" when this part becomes complete.
+  // "Saved ✓ · 8 of 13" when this part becomes complete. For a reasoned
+  // verdict, the Next button also lights up (no scrolling while they type).
   useEffect(() => {
-    if (done && !wasDone.current) showToast(`Saved ✓ · ${review.doneCount} of ${TOTAL_PARTS}`);
+    if (done && !wasDone.current) {
+      showToast(`Saved ✓ · ${review.doneCount} of ${TOTAL_PARTS}`);
+      if (verdict && verdict !== "agree") flashNext();
+    }
     wasDone.current = done;
   }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => () => { clearTimeout(agreeTimer.current); clearTimeout(pulseTimer.current); }, []);
+
+  // The Next button the reader can actually see: the sticky bar on phones,
+  // the in-card button on wider screens.
+  function visibleNext() {
+    const bar = barNextRef.current;
+    if (bar && bar.offsetParent !== null) return { el: bar, sticky: true };
+    return cardNextRef.current ? { el: cardNextRef.current, sticky: false } : null;
+  }
+
+  // Short gold glow (two cycles). Skipped entirely with reduced motion.
+  function flashNext() {
+    clearTimeout(pulseTimer.current);
+    if (reducedMotion()) return;
+    setPulse(false);
+    requestAnimationFrame(() => {
+      setPulse(true);
+      pulseTimer.current = setTimeout(() => setPulse(false), 1700);
+    });
+  }
+
   function pickVerdict(v) {
     if (closed) return;
+    const prev = verdict;
+    // 1) Autosave first — immediate server write, before any scroll or navigation.
     sync.setPart(partId, { verdict: v }, { immediate: true });
-    setFocusText(v !== "agree");
+    // A newer tap always cancels a pending Agree jump: no double-scroll.
+    clearTimeout(agreeTimer.current);
+    if (v === "agree") {
+      setFocusText(false);
+      if (prev === "agree") return;
+      // 2) After the card re-renders (reason fields collapse), bring Next to the reader.
+      agreeTimer.current = setTimeout(() => {
+        const target = visibleNext();
+        if (!target) return;
+        if (!target.sticky) {
+          target.el.scrollIntoView({ block: "center", behavior: reducedMotion() ? "auto" : "smooth" });
+        }
+        target.el.focus({ preventScroll: true });
+        flashNext();
+      }, 60);
+    } else {
+      // Changes / Disagree: stay put; focus goes to the reason field.
+      setFocusText(true);
+    }
   }
 
   // Links inside the handbook text (e.g. "#conduct") open that part here.
@@ -116,12 +171,16 @@ export default function PartReader({ partId, restore, snap, sync, closed, go, sh
   }
 
   const allDone = review.doneCount === TOTAL_PARTS;
+  const isLast = partId === TOTAL_PARTS;
+  const nextLabel = isLast ? "Review & finish →" : "Next part →";
   function next() {
-    if (!done && verdict) showToast(`Saved as a draft · ${partProblem(ans)}`);
-    if (allDone) return go({ done: true });
-    const n = partId < TOTAL_PARTS ? partId + 1 : nextUnreviewed(review, partId) || 1;
-    go({ part: n });
+    if (!canNext) return;
+    clearTimeout(agreeTimer.current);
+    if (isLast) return go(allDone ? { done: true } : {});
+    go({ part: partId + 1 });
   }
+  const nextHint = canNext ? undefined
+    : verdict ? partProblem(ans) : "Pick a verdict first";
 
   return (
     <div className="screen">
@@ -179,12 +238,24 @@ export default function PartReader({ partId, restore, snap, sync, closed, go, sh
           {ans.updatedAt ? <p className="updated">Last updated {formatDate(ans.updatedAt)}{done ? "" : " · draft"}</p> : null}
 
           <div className="next-row">
-            <button className="btn btn-primary" onClick={next}>
-              {allDone ? "See your summary 🏏" : partId < TOTAL_PARTS ? "Next part →" : "Finish →"}
+            <button ref={cardNextRef} className={`btn next-btn next-main${canNext ? " ready" : ""}${pulse ? " pulse" : ""}`}
+              onClick={next} disabled={!canNext} title={nextHint}>
+              {nextLabel}
             </button>
             <button className="btn btn-ghost" onClick={() => go({})}>Back to all parts</button>
           </div>
+          {!canNext && <p className="updated next-hint" aria-live="polite">{nextHint}</p>}
         </section>
+
+        {/* Phones: Next is always reachable in a sticky bottom bar. */}
+        <div className="next-bar" role="region" aria-label="Part navigation">
+          <span className="next-bar-pos">Part {partId} of {TOTAL_PARTS}</span>
+          <button ref={barNextRef} className={`btn next-btn${canNext ? " ready" : ""}${pulse ? " pulse" : ""}`}
+            onClick={next} disabled={!canNext} aria-describedby={!canNext ? "hb-next-hint" : undefined}>
+            {nextLabel}
+          </button>
+          {!canNext && <span id="hb-next-hint" className="sr">{nextHint}</span>}
+        </div>
 
         <div className="pager">
           {partId > 1 ? <button className="linkbtn" onClick={() => go({ part: partId - 1 })}>← Part {partId - 1}</button> : <span />}
