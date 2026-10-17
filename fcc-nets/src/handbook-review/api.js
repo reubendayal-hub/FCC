@@ -37,5 +37,6 @@ export const api = {
   adminSummary: (token) => call("admin-summary", { token }),
   adminExport: (token) => call("admin-export", { token }),
   adminSettings: (token, patch) => call("admin-settings", { method: "POST", body: patch, token }),
+  adminDeleteReview: (token, id) => call("admin-delete-review", { method: "POST", body: { id }, token }),
   adminDigest: (token, mode, kind = "weekly") => call("admin-digest", { method: "POST", body: { mode, kind }, token }),
 };

@@ -135,6 +135,11 @@ export default function AdminApp() {
       setTimeout(() => URL.revokeObjectURL(url), 2000);
     } catch (e) { flash(e.message); }
   }
+  async function deleteTestReview(r) {
+    const ok = window.confirm(`Permanently delete ${r.name}'s test review (${r.doneCount}/13 parts)?\n\nThis can't be undone. ${r.name} can start again from the app.`);
+    if (!ok) return;
+    try { await api.adminDeleteReview(token, r.id); flash(`Deleted ${r.name}'s test review`); load(); } catch (e) { flash(e.message); }
+  }
   async function previewDigest() {
     try { setDigest(await api.adminDigest(token, "preview")); } catch (e) { flash(e.message); }
   }
@@ -234,7 +239,7 @@ export default function AdminApp() {
             <h2 className="adm-h">Respondents <small>{data.respondents.length}</small></h2>
             <div className="tbl-scroll">
               <table className="adm-tbl">
-                <thead><tr><th>Name</th><th>Role</th><th>Progress</th><th>Last activity</th><th>Email</th></tr></thead>
+                <thead><tr><th>Name</th><th>Role</th><th>Progress</th><th>Last activity</th><th>Email</th><th><span className="sr">Actions</span></th></tr></thead>
                 <tbody>
                   {data.respondents.map((r, i) => (
                     <tr key={i}>
@@ -243,6 +248,12 @@ export default function AdminApp() {
                       <td><span className="prog"><i style={{ width: `${(r.doneCount / 13) * 100}%` }} /></span> {r.doneCount}/13{r.draftCount ? ` · ${r.draftCount} draft` : ""}</td>
                       <td>{fmtTime(r.lastActivity)}</td>
                       <td className="muted">{r.email}</td>
+                      <td>
+                        {r.isTester && r.id && (
+                          <button className="btn btn-ghost btn-sm del-btn" onClick={() => deleteTestReview(r)}
+                            aria-label={`Delete ${r.name}'s test review`}>Delete test review</button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

@@ -28,6 +28,7 @@ export function buildSummary(reviews, config, now = Date.now()) {
   const missed = [];
   const respondents = [];
 
+  const testerIds = [...(config.testers || []), ...(config.admins || [])];
   for (const r of reviews) {
     const parts = r.parts || {};
     const doneCount = countDone(parts);
@@ -53,7 +54,11 @@ export function buildSummary(reviews, config, now = Date.now()) {
     if ((r.anythingMissed || "").trim()) {
       missed.push({ name: r.name, roleGroup: r.roleGroup, text: r.anythingMissed, updatedAt: r.anythingMissedUpdatedAt || 0 });
     }
+    const isTester = !!r.memberId && testerIds.includes(r.memberId);
     respondents.push({
+      // The review id is the reviewer's private link token: only exposed for
+      // test reviews (needed for the admin "delete test review" button).
+      id: isTester ? r.id : undefined, isTester,
       name: r.name, email: r.email, roleGroup: r.roleGroup, doneCount,
       draftCount: Object.values(parts).filter((p) => p && !isPartDone(p)).length,
       completedAt: r.completedAt || null, createdAt: r.createdAt || 0, lastActivity: r.updatedAt || 0,

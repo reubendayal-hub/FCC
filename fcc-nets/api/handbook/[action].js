@@ -14,17 +14,19 @@
 //   GET  admin-summary
 //   GET  admin-export           .xlsx
 //   POST admin-settings         { open?, deadlineISO?, testers?, admins? }  (open_to_all not settable)
+//   POST admin-delete-review    { id }  delete one TEST review (allowlisted testers' reviews only)
 //   POST admin-digest           { mode: "preview" | "test" }  preview HTML, or test-send to Reuben only
 // Cron (CRON_SECRET; also requires HANDBOOK_DIGEST_ENABLED=true):
-//   GET  cron-daily             the scheduled entry: Mondays → weekly, day after deadline → final
-//   GET  cron-weekly            weekly digest to HANDBOOK_DIGEST_TO (manual trigger)
-//   GET  cron-final             final report (manual trigger)
+//   GET  cron-weekly            weekly digest to HANDBOOK_DIGEST_TO — vercel.json: Mondays 07:00 UTC
+//                               (08:00 Copenhagen in winter time; 09:00 in summer time)
+//   GET  cron-final             final report — vercel.json: 1 Dec 07:00 UTC (day after the deadline)
+//   GET  cron-daily             legacy: Mondays → weekly, day after deadline → final (no longer scheduled)
 
 import { getDb, projectId, NotConfiguredError, COLLECTIONS } from "../_lib/handbook/db.js";
 import { newReviewToken, resolveReviewId, identityFields } from "../_lib/handbook/identity.js";
 import {
   HttpError, cleanIdentity, getConfig, isClosed, saveConfig, createReview, getReview,
-  applyChange, publicReview, listReviews, memberAllowed,
+  applyChange, publicReview, listReviews, memberAllowed, deleteReview,
 } from "../_lib/handbook/store.js";
 import { buildSummary } from "../_lib/handbook/summary.js";
 import { buildWorkbook } from "../_lib/handbook/export.js";
@@ -194,6 +196,27 @@ const handlers = {
     // Test send: Reuben only, never logged as a weekly send.
     await sendEmail({ to: [REUBEN], subject: `[TEST] ${digest.subject}`, html: digest.html });
     return { sent: true, to: [REUBEN] };
+  },
+
+  // Delete one test review (admin only). Restricted to reviews by allowlisted
+  // testers/admins, so this can never remove a real member's answers.
+  async "admin-delete-review"(req, res) {
+    method(req, "POST");
+    if (!admin.requireAdmin(req, res)) return undefined;
+    const id = String(body(req).id || "");
+    if (!/^[A-Za-z0-9_-]{32}$/.test(id)) throw new HttpError(400, "Missing review id");
+    const db = getDb();
+    const [config, doc] = await Promise.all([getConfig(db), getReview(id, db)]);
+    if (!doc) throw new HttpError(404, "Review not found");
+    const testerIds = [...(config.testers || []), ...(config.admins || [])];
+    if (!doc.memberId || !testerIds.includes(doc.memberId)) {
+      throw new HttpError(403, "Only test reviews (by allowlisted testers) can be deleted here");
+    }
+    await deleteReview(id, db);
+    await db.collection(COLLECTIONS.log).doc(`delete-${Date.now()}-${id.slice(0, 6)}`).set({
+      kind: "delete", memberId: doc.memberId, name: doc.name, doneCount: doc.doneCount || 0, at: Date.now(),
+    });
+    return { deleted: true, name: doc.name };
   },
 
   // ── Cron ──

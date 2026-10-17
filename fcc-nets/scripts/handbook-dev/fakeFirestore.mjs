@@ -25,6 +25,7 @@ export function createFakeFirestore() {
         store.set(key, clone(data));
       },
       async set(data, opts) { store.set(key, opts?.merge ? { ...(store.get(key) || {}), ...clone(data) } : clone(data)); },
+      async delete() { store.delete(key); },
       async update(patch) {
         if (!store.has(key)) { const e = new Error("5 NOT_FOUND"); e.code = 5; throw e; }
         const cur = store.get(key);
