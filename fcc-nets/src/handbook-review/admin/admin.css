@@ -1,0 +1,72 @@
+/* /handbook-review/admin — dashboard additions on top of ../styles.css */
+.hbr.adm .adm-body { padding-block: 18px 60px; display: flex; flex-direction: column; gap: 16px; }
+.hbr.adm .muted { color: var(--muted); font-size: 13.5px; }
+.hbr.adm .env { font-size: 11.5px; font-weight: 800; letter-spacing: .04em; padding: 4px 10px; border-radius: 999px; background: var(--gold-soft); color: var(--gold-ink); border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); white-space: nowrap; }
+.hbr.adm .env.prod { background: var(--red-soft); color: var(--red-ink); border-color: var(--red); }
+
+.hbr.adm .adm-head { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; justify-content: space-between; background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%); border: none; border-bottom: 4px solid var(--red); }
+.hbr.adm .kpis { display: grid; grid-template-columns: repeat(4, minmax(70px, 1fr)); gap: 10px; flex: 1; min-width: 280px; }
+.hbr.adm .kpi { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .12); }
+.hbr.adm .kpi b { font-family: var(--f-display); font-size: 26px; color: #fff; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.hbr.adm .kpi span { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--gold); }
+.hbr.adm .adm-count { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.hbr.adm .pill { font-size: 12px; font-weight: 800; padding: 3px 12px; border-radius: 999px; }
+.hbr.adm .pill.open { background: #1F7A4D; color: #fff; }
+.hbr.adm .pill.closed { background: var(--red); color: #fff; }
+@media (max-width: 520px) { .hbr.adm .kpis { grid-template-columns: repeat(2, 1fr); } }
+
+.hbr.adm .adm-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.hbr.adm .adm-grid > * { min-width: 0; }
+@media (min-width: 900px) { .hbr.adm .adm-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .hbr.adm .wide { grid-column: 1 / -1; } }
+.hbr.adm .adm-h { font-size: 19px; }
+.hbr.adm .adm-h small { font-family: var(--f-body); font-size: 13px; font-weight: 800; color: var(--muted); margin-left: 6px; }
+.hbr.adm .adm-h-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+.hbr.adm .bars-chart { display: flex; flex-direction: column; gap: 6px; }
+.hbr.adm .bar-row { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) auto; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px; border: 1px solid transparent; background: none; text-align: left; }
+.hbr.adm .bar-row:hover { background: var(--surface-2); }
+.hbr.adm .bar-row.on { border-color: var(--gold); background: var(--gold-soft); }
+.hbr.adm .bar-lbl { font-size: 13px; color: var(--head); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hbr.adm .bar-lbl b { display: inline-block; min-width: 18px; color: var(--red-ink); }
+.hbr.adm .bar-track { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--line); }
+.hbr.adm .bar-track i, .hbr.adm .legend-row i { display: block; height: 100%; }
+.hbr.adm .a { background: var(--agree); }
+.hbr.adm .c { background: var(--gold); }
+.hbr.adm .d { background: var(--red); }
+.hbr.adm .n { background: var(--line); }
+.hbr.adm .bar-n { font-size: 12px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.hbr.adm .legend-row { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); padding: 4px 8px 0; }
+.hbr.adm .legend-row span { display: inline-flex; align-items: center; gap: 5px; }
+.hbr.adm .legend-row i { width: 10px; height: 10px; border-radius: 3px; }
+.hbr.adm .legend-row i.n { border: 1px solid var(--muted); }
+
+.hbr.adm .filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.hbr.adm .filters .input { min-height: 42px; padding: 8px 10px; font-size: 14px; }
+.hbr.adm .filters input { grid-column: 1 / -1; }
+.hbr.adm .feed { display: flex; flex-direction: column; gap: 10px; max-height: 560px; overflow-y: auto; padding-right: 2px; }
+.hbr.adm .cmt { border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--surface-2); display: flex; flex-direction: column; gap: 6px; }
+.hbr.adm .cmt.changes { border-left-color: var(--gold); }
+.hbr.adm .cmt.disagree { border-left-color: var(--red); }
+.hbr.adm .cmt.agree { border-left-color: var(--agree); }
+.hbr.adm .cmt header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13.5px; }
+.hbr.adm .cmt p { font-size: 14.5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.hbr.adm .cmt em { font-style: normal; font-weight: 700; color: var(--head); }
+.hbr.adm .vol { display: flex; flex-direction: column; gap: 2px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.hbr.adm .vol small { color: var(--muted); margin-left: 4px; }
+
+.hbr.adm .tbl-scroll { overflow-x: auto; }
+.hbr.adm .adm-tbl { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 620px; }
+.hbr.adm .adm-tbl th { text-align: left; font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 8px; border-bottom: 2px solid var(--line); }
+.hbr.adm .adm-tbl td { padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.hbr.adm .prog { display: inline-block; width: 60px; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; vertical-align: middle; margin-right: 6px; }
+.hbr.adm .prog i { display: block; height: 100%; background: linear-gradient(to right, var(--gold), var(--red)); }
+
+.hbr.adm .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.hbr.adm .ctl { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.hbr.adm .ctl .linkbox { width: 100%; }
+.hbr.adm .ctl .input { min-height: 42px; font-size: 14px; padding: 8px 10px; }
+.hbr.adm .digest { width: 100%; height: 620px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+
+.hbr.adm .topbar .brand b { overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 420px) { .hbr.adm .topbar .brand b { font-size: 14px; } }
+.hbr.adm .vol-group { font-family: var(--f-body); font-size: 11.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--red-ink); margin-top: 4px; }
