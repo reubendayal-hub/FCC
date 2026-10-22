@@ -16,7 +16,15 @@ export const PART_TITLES = {
   12: "One FCC development", 13: "Adopting this handbook",
 };
 
-export function buildSummary(reviews, config, now = Date.now()) {
+// Copenhagen calendar date, e.g. "2026-11-16".
+export function cphDate(ms = Date.now()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Copenhagen" }).format(new Date(ms));
+}
+
+export const ANONYMOUS = "Anonymous";
+
+// anon: sent anonymous comments ({ id, text, date }) from handbookReviewAnon.
+export function buildSummary(reviews, config, { anon = [], now = Date.now() } = {}) {
   const perPart = [];
   for (let i = 1; i <= TOTAL_PARTS; i++) {
     perPart.push({ part: i, title: PART_TITLES[i], agree: 0, changes: 0, disagree: 0, notYet: 0 });
@@ -51,8 +59,10 @@ export function buildSummary(reviews, config, now = Date.now()) {
     const person = { name: r.name, email: r.email, roleGroup: r.roleGroup };
     for (const c of ri.committees || []) volunteers[`committee:${c}`]?.people.push(person);
     for (const k of ROLE_TOGGLE_KEYS) if (ri[k]) volunteers[`role:${k}`].people.push(person);
-    if ((r.anythingMissed || "").trim()) {
-      missed.push({ name: r.name, roleGroup: r.roleGroup, text: r.anythingMissed, updatedAt: r.anythingMissedUpdatedAt || 0 });
+    // An unsent anonymous draft is never shown, with or without a name.
+    if ((r.anythingMissed || "").trim() && r.anythingMissedAnon !== true) {
+      const at = r.anythingMissedUpdatedAt || 0;
+      missed.push({ name: r.name, roleGroup: r.roleGroup, text: r.anythingMissed, updatedAt: at, date: at ? cphDate(at) : "", anonymous: false });
     }
     const isTester = !!r.memberId && testerIds.includes(r.memberId);
     respondents.push({
@@ -70,7 +80,12 @@ export function buildSummary(reviews, config, now = Date.now()) {
   const completed = respondents.filter((r) => r.doneCount === TOTAL_PARTS).length;
   const deadline = new Date(config.deadlineISO).getTime();
   comments.sort((a, b) => b.updatedAt - a.updatedAt);
-  missed.sort((a, b) => b.updatedAt - a.updatedAt);
+  for (const a of anon) {
+    if ((a.text || "").trim()) missed.push({ key: `anon:${a.id}`, name: ANONYMOUS, roleGroup: "", text: a.text, updatedAt: 0, date: a.date || "", anonymous: true });
+  }
+  // Newest day first; anonymous comments only have a date, so within a day
+  // named ones keep their order and anonymous ones follow.
+  missed.sort((a, b) => b.date.localeCompare(a.date) || b.updatedAt - a.updatedAt);
   respondents.sort((a, b) => b.lastActivity - a.lastActivity);
 
   return {

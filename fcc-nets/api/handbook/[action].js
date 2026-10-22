@@ -6,9 +6,10 @@
 //   GET  access?m=              { allowed } for an app member id (testers/admins while not open to all)
 //   POST start                  { name, email, roleGroup } → { reviewToken }
 //   GET  review?r=              the reviewer's own review + config
-//   POST draft                  { r, part?, fields?, roleInterest?, missed?, resume? }  autosave, accepts drafts
+//   POST draft                  { r, part?, fields?, roleInterest?, missed?, missedAnon?, resume? }  autosave, accepts drafts
 //   POST part                   { r, part, verdict, change?, notOk?, fix?, roleInterest? }  strict
 //   POST missed                 { r, text }
+//   POST missed-anon            { r, text }  send "Did we miss anything?" anonymously (text + date only)
 // Admin (Bearer token from admin-login, secret = HANDBOOK_ADMIN_SECRET):
 //   POST admin-login            { password } → { token }
 //   GET  admin-summary
@@ -26,7 +27,7 @@ import { getDb, projectId, NotConfiguredError, COLLECTIONS } from "../_lib/handb
 import { newReviewToken, resolveReviewId, identityFields } from "../_lib/handbook/identity.js";
 import {
   HttpError, cleanIdentity, getConfig, isClosed, saveConfig, createReview, getReview,
-  applyChange, publicReview, listReviews, memberAllowed, deleteReview,
+  applyChange, publicReview, listReviews, memberAllowed, deleteReview, sendAnonMissed, listAnonMissed,
 } from "../_lib/handbook/store.js";
 import { buildSummary } from "../_lib/handbook/summary.js";
 import { buildWorkbook } from "../_lib/handbook/export.js";
@@ -64,6 +65,9 @@ function publicConfig(c) {
 }
 
 const NOT_OPEN = "The handbook review isn't open yet";
+
+// Everything the dashboard, export and digest are built from.
+const loadAll = (db) => Promise.all([listReviews(db), getConfig(db), listAnonMissed(db)]);
 
 async function requireOpenReview(req, db) {
   const id = resolveReviewId(req);
@@ -150,6 +154,14 @@ const handlers = {
     return { review: await applyChange(id, { missed: body(req).text ?? "" }, db) };
   },
 
+  async "missed-anon"(req) {
+    method(req, "POST");
+    const db = getDb();
+    const id = await requireOpenReview(req, db);
+    if (limited(`ma:${id}`, 10, 60 * 60_000)) throw new HttpError(429, "That's a lot of comments, try again later");
+    return { review: await sendAnonMissed(id, body(req).text, db) };
+  },
+
   // ── Admin ──
   async "admin-login"(req) {
     method(req, "POST");
@@ -163,16 +175,16 @@ const handlers = {
     method(req, "GET");
     if (!admin.requireAdmin(req, res)) return undefined;
     const db = getDb();
-    const [reviews, config] = await Promise.all([listReviews(db), getConfig(db)]);
-    return { ...buildSummary(reviews, { ...config, closed: isClosed(config) }), project: projectId(), env: process.env.VERCEL_ENV || "development" };
+    const [reviews, config, anon] = await loadAll(db);
+    return { ...buildSummary(reviews, { ...config, closed: isClosed(config) }, { anon }), project: projectId(), env: process.env.VERCEL_ENV || "development" };
   },
 
   async "admin-export"(req, res) {
     method(req, "GET");
     if (!admin.requireAdmin(req, res)) return undefined;
     const db = getDb();
-    const [reviews, config] = await Promise.all([listReviews(db), getConfig(db)]);
-    const buf = await buildWorkbook(buildSummary(reviews, config));
+    const [reviews, config, anon] = await loadAll(db);
+    const buf = await buildWorkbook(buildSummary(reviews, config, { anon }));
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="handbook-review-${cphDate()}.xlsx"`);
     res.status(200).send(Buffer.from(buf));
@@ -190,8 +202,8 @@ const handlers = {
     method(req, "POST");
     if (!admin.requireAdmin(req, res)) return undefined;
     const db = getDb();
-    const [reviews, config, prev] = await Promise.all([listReviews(db), getConfig(db), lastDigest(db)]);
-    const digest = buildDigest(buildSummary(reviews, config), prev, { kind: body(req).kind === "final" ? "final" : "weekly" });
+    const [[reviews, config, anon], prev] = await Promise.all([loadAll(db), lastDigest(db)]);
+    const digest = buildDigest(buildSummary(reviews, config, { anon }), prev, { kind: body(req).kind === "final" ? "final" : "weekly" });
     if (body(req).mode !== "test") return { subject: digest.subject, html: digest.html, recipients: digestRecipients() };
     // Test send: Reuben only, never logged as a weekly send.
     await sendEmail({ to: [REUBEN], subject: `[TEST] ${digest.subject}`, html: digest.html });
@@ -244,12 +256,12 @@ async function runCron(req, res, kind) {
   if (kind === "weekly" && isClosed(config)) return { skipped: "review not open" };
   const key = kind === "final" ? "final-report" : `weekly-${cphDate()}`;
   if (!(await claimSend(db, key, { kind }))) return { skipped: `already sent (${key})` };
-  const [reviews, prev] = await Promise.all([listReviews(db), lastDigest(db)]);
-  const digest = buildDigest(buildSummary(reviews, config), prev, { kind });
+  const [reviews, prev, anon] = await Promise.all([listReviews(db), lastDigest(db), listAnonMissed(db)]);
+  const digest = buildDigest(buildSummary(reviews, config, { anon }), prev, { kind });
   const to = digestRecipients();
   await sendEmail({ to, subject: digest.subject, html: digest.html });
   await db.collection(COLLECTIONS.log).doc(key).set(
-    { kind, sentAt: Date.now(), to, volunteerKeys: digest.volunteerKeys, stats: digest.stats }, { merge: true });
+    { kind, sentAt: Date.now(), to, volunteerKeys: digest.volunteerKeys, missedKeys: digest.missedKeys, stats: digest.stats }, { merge: true });
   return { sent: true, key, to };
 }
 

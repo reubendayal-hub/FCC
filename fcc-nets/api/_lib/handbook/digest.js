@@ -9,7 +9,7 @@
 // fails if it already exists — a duplicate cron fire can never double-send.
 
 import { COLLECTIONS } from "./db.js";
-import { PART_TITLES } from "./summary.js";
+import { PART_TITLES, cphDate } from "./summary.js";
 
 const FROM = "FCC Training App <fcc_training_app@nordicanchor.dk>";
 const DEFAULT_TO = ["reuben.dayal@gmail.com"];
@@ -23,10 +23,7 @@ export function digestRecipients() {
   return list.length ? list : DEFAULT_TO;
 }
 
-// Copenhagen calendar date, e.g. "2026-11-16".
-export function cphDate(ms = Date.now()) {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Copenhagen" }).format(new Date(ms));
-}
+export { cphDate };
 
 export async function lastDigest(db) {
   // Tiny collection (one doc per send) — filter in memory, no composite index needed.
@@ -49,12 +46,19 @@ export function buildDigest(summary, prev, { kind = "weekly" } = {}) {
     volunteerKeys.push(key);
     if (!prevVol.has(key)) newVolunteers.push(`${p.name} → ${v.label}`);
   }
+  // "Did we miss anything?": named comments by edit time; anonymous ones
+  // (date only) by whether an earlier digest already listed them.
+  const prevMissed = new Set(prev?.missedKeys || []);
+  const missedKeys = summary.missed.filter((m) => m.anonymous).map((m) => m.key);
+  const newMissed = summary.missed.filter((m) => (m.anonymous ? !prevMissed.has(m.key) : m.updatedAt > since));
   const mostDisagreed = [...summary.perPart]
     .filter((p) => p.disagree + p.changes > 0)
     .sort((a, b) => (b.disagree * 2 + b.changes) - (a.disagree * 2 + a.changes))
     .slice(0, 3);
 
   const final = kind === "final";
+  const missedList = final ? summary.missed : newMissed;
+  const clip = (t) => (t.length > 280 ? `${t.slice(0, 280).trimEnd()}…` : t);
   const volunteerList = final ? summary.volunteers.flatMap((v) => v.people.map((p) => `${p.name} → ${v.label}`)) : newVolunteers;
   const subject = final
     ? `Handbook review — final results: ${kpis.completed} completed of ${kpis.started} started`
@@ -82,11 +86,15 @@ export function buildDigest(summary, prev, { kind = "weekly" } = {}) {
       ${volunteerList.length
         ? `<ul style="margin:0;padding-left:20px">${volunteerList.map((v) => `<li>${esc(v)}</li>`).join("")}</ul>`
         : `<p style="margin:0;color:#5D6E99">None${final ? "" : " this week"}.</p>`}
+      <h3 style="font:600 16px Georgia,serif;color:#1B2A5C;margin:18px 0 6px">${final ? "Did we miss anything?" : "New: did we miss anything?"}</h3>
+      ${missedList.length
+        ? `<ul style="margin:0;padding-left:20px">${missedList.map((m) => `<li><b>${esc(m.name)}:</b> ${esc(clip(m.text))}</li>`).join("")}</ul>`
+        : `<p style="margin:0;color:#5D6E99">None${final ? "" : " this week"}.</p>`}
       <a href="${SITE}/handbook-review/admin/" style="display:inline-block;margin-top:20px;background:#1B2A5C;color:#D4A217;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:700">Open the dashboard${final ? " & export" : ""} →</a>
       <p style="font-size:11px;color:#97A5CF;margin:18px 0 0">Sent to the One FCC Leads only. Reviewers never receive email from this page.</p>
     </div></div>`;
 
-  return { subject, html, volunteerKeys, stats: { newResponses, newComments: newComments.length, newVolunteers: newVolunteers.length } };
+  return { subject, html, volunteerKeys, missedKeys, stats: { newResponses, newComments: newComments.length, newVolunteers: newVolunteers.length, newMissed: newMissed.length } };
 }
 
 export async function sendEmail({ to, subject, html }) {

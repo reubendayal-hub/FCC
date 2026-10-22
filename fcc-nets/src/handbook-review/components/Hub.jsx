@@ -10,7 +10,7 @@ const NOTE_TEXT = (notes) => {
   const bits = [];
   if (parts.length) bits.push(`Part${parts.length > 1 ? "s" : ""} ${parts.join(", ")}`);
   if (notes.includes("roles")) bits.push("your role interests");
-  if (notes.includes("missed")) bits.push("\"Anything we missed?\"");
+  if (notes.includes("missed")) bits.push("\"Did we miss anything?\"");
   return `${bits.join(" and ")} ${bits.length > 1 || parts.length > 1 ? "were" : "was"} updated from another device.`;
 };
 

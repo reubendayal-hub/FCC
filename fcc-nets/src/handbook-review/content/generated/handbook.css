@@ -76,6 +76,8 @@
 .hb-doc thead th{background:var(--navy);color:#fff;font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
 .hb-doc thead th:not(:first-child),.hb-doc tbody td:not(:first-child){text-align:center}
 .hb-doc tbody tr:last-child td{border-bottom:none}
+.hb-doc table.plain{min-width:0}
+.hb-doc table.plain th,.hb-doc table.plain td{text-align:left}
 .hb-doc tbody td:first-child{color:var(--ink);font-weight:600}
 .hb-doc .D,.hb-doc .I{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:22px;padding:0 7px;border-radius:6px;font-size:11.5px;font-weight:800}
 .hb-doc .D{background:var(--red);color:#fff}

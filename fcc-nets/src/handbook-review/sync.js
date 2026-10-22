@@ -81,6 +81,7 @@ export function createSync(token) {
         parts,
         roleInterest: { ...(s.roleInterest || {}), ...(p.roleInterest?.patch || {}) },
         anythingMissed: p.missed ? p.missed.text : s.anythingMissed || "",
+        anythingMissedAnon: p.missed ? p.missed.anon : s.anythingMissedAnon === true,
         resume: p.resume ? { ...p.resume } : s.resume,
         doneCount: countDone(parts),
       };
@@ -120,7 +121,7 @@ export function createSync(token) {
     }
     if (p.missed) {
       const at = server.anythingMissedUpdatedAt || 0;
-      const d = decide(p.missed, at, (server.anythingMissed || "") === p.missed.text);
+      const d = decide(p.missed, at, (server.anythingMissed || "") === p.missed.text && (server.anythingMissedAnon === true) === p.missed.anon);
       if (d === "keep") next.missed = rebase(p.missed, at);
       else if (d === "server") notes.push("missed");
     }
@@ -167,12 +168,40 @@ export function createSync(token) {
     flushSoon(immediate ? 300 : TEXT_DEBOUNCE_MS);
   }
 
-  function setMissed(text) {
+  // "Did we miss anything?" text and the named/anonymous choice travel together.
+  function setMissed(text, anon = view().review?.anythingMissedAnon === true, ms = TEXT_DEBOUNCE_MS) {
     const prev = state.pending.missed;
     const base = prev ? prev.base : (state.server?.anythingMissedUpdatedAt || 0);
-    set({ pending: { ...state.pending, missed: { text, at: Date.now(), base } } });
+    set({ pending: { ...state.pending, missed: { text, anon, at: Date.now(), base } } });
     persist();
-    flushSoon(TEXT_DEBOUNCE_MS);
+    flushSoon(ms);
+  }
+
+  const setMissedAnon = (anon) => setMissed(view().review?.anythingMissed || "", anon, 300);
+
+  // Send the comment anonymously. The draft autosave is stopped first and any
+  // save already in flight is allowed to land, so the text can never be
+  // written back to the review after the server has cleared it.
+  async function sendMissedAnon(text) {
+    const draft = state.pending.missed;
+    set({ pending: { ...state.pending, missed: null } });
+    persist();
+    while (inFlight) await new Promise((r) => setTimeout(r, 50));
+    try {
+      const { review } = await api.missedAnon(token, text);
+      reconcile(review);
+      return { ok: true };
+    } catch (e) {
+      // Not sent: put the draft back so nothing typed is lost.
+      if (!state.pending.missed) {
+        const base = state.server?.anythingMissedUpdatedAt || 0;
+        set({ pending: { ...state.pending, missed: draft || { text, anon: true, at: Date.now(), base } } });
+        persist();
+        flushSoon(TEXT_DEBOUNCE_MS);
+      }
+      if (e instanceof ApiError && (e.status === 423 || e.status === 403)) handleError(e);
+      return { ok: false, error: e.status === 0 ? "You're offline. Your comment is kept here; try again when you're back online." : e.message };
+    }
   }
 
   function setResume(lastPart, scrollPct) {
@@ -190,7 +219,7 @@ export function createSync(token) {
     const out = Object.entries(p.parts).map(([n, item]) => ({ r: token, part: Number(n), fields: item.fields, _part: n, _at: item.at }));
     const extra = {};
     if (p.roleInterest) { extra.roleInterest = p.roleInterest.patch; extra._ri = p.roleInterest.at; }
-    if (p.missed) { extra.missed = p.missed.text; extra._missed = p.missed.at; }
+    if (p.missed) { extra.missed = p.missed.text; extra.missedAnon = p.missed.anon === true; extra._missed = p.missed.at; }
     if (p.resume) { extra.resume = { lastPart: p.resume.lastPart, scrollPct: p.resume.scrollPct }; extra._resume = p.resume.at; }
     if (Object.keys(extra).length) {
       if (out.length) Object.assign(out[0], extra);
@@ -328,7 +357,7 @@ export function createSync(token) {
     subscribe: (l) => { listeners.add(l); return () => listeners.delete(l); },
     getSnapshot: view,
     load, start, stop, flush,
-    setPart, setRoleInterest, setMissed, setResume,
+    setPart, setRoleInterest, setMissed, setMissedAnon, sendMissedAnon, setResume,
     dismissNotes: () => set({ notes: [] }),
   };
 }

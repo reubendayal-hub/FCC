@@ -32,6 +32,7 @@ export const api = {
   start: (identity) => call("start", { method: "POST", body: identity }),
   review: (r) => call("review", { query: { r } }),
   draft: (payload, opts = {}) => call("draft", { method: "POST", body: payload, keepalive: opts.keepalive }),
+  missedAnon: (r, text) => call("missed-anon", { method: "POST", body: { r, text } }),
 
   adminLogin: (password) => call("admin-login", { method: "POST", body: { password } }),
   adminSummary: (token) => call("admin-summary", { token }),

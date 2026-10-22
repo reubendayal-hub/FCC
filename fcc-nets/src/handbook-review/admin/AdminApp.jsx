@@ -228,10 +228,14 @@ export default function AdminApp() {
           </section>
 
           <section className="card stack">
-            <h2 className="adm-h">Anything we missed <small>{data.missed.length}</small></h2>
+            <h2 className="adm-h">Did we miss anything? <small>{data.missed.length}</small></h2>
             {data.missed.length === 0 && <p className="muted">Nothing yet.</p>}
             {data.missed.map((m, i) => (
-              <article key={i} className="cmt"><header><b>{m.name}</b><span className="muted">{ROLE_LABEL[m.roleGroup] || m.roleGroup} · {formatDate(m.updatedAt)}</span></header><p>{m.text}</p></article>
+              <article key={i} className="cmt"><header><b>{m.name}</b><span className="muted">
+                {m.anonymous
+                  ? `Sent anonymously · ${formatDate(Date.parse(`${m.date}T12:00:00Z`))}`
+                  : `${ROLE_LABEL[m.roleGroup] || m.roleGroup} · ${formatDate(m.updatedAt)}`}
+              </span></header><p>{m.text}</p></article>
             ))}
           </section>
 
