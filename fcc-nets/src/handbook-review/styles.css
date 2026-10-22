@@ -134,6 +134,15 @@
 .hbr .tile .meta { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 12.5px; color: var(--muted); font-weight: 600; }
 .hbr .tile.current { border-color: var(--gold); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 30%, transparent), var(--shadow); }
 .hbr .tile .here { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--gold-ink); background: var(--gold-soft); padding: 2px 8px; border-radius: 999px; }
+/* "Read this first" (The fabric of FCC): a part tile in navy, gold star for the number. */
+.hbr .fabric-tile { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%); border-color: transparent; --tile-accent: var(--gold); }
+.hbr .fabric-tile:hover { border-color: var(--gold); }
+.hbr .fabric-tile .star { position: absolute; right: 14px; bottom: 10px; width: 56px; height: 56px; fill: var(--gold); opacity: .9; pointer-events: none; }
+.hbr .fabric-tile .eb { color: var(--gold); }
+.hbr .fabric-tile .tt { color: #fff; }
+.hbr .fabric-tile .sm, .hbr .fabric-tile .meta { color: var(--on-navy-muted); padding-right: 64px; }
+.hbr .fabric-tile .nov { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--gold); background: rgba(255, 255, 255, .1); padding: 2px 8px; border-radius: 999px; }
+.hbr .fabric-end p { color: var(--muted); font-size: 14.5px; }
 
 .hbr .chip-v { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 800; padding: 4px 10px; border-radius: 999px; white-space: nowrap; border: 1px solid transparent; }
 .hbr .chip-v.none { background: var(--grey-soft); color: var(--grey); }

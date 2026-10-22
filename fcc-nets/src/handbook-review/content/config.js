@@ -1,6 +1,6 @@
 // Content config for /handbook-review. Content-only: the part text itself
 // is generated from public/club-handbook.html (see scripts/extract-handbook.mjs).
-import { PARTS as SOURCE_PARTS, SOURCE_VERSION_LINE, SOURCE_FOOTER } from "./generated/parts.js";
+import { PARTS as SOURCE_PARTS, SOURCE_VERSION_LINE, SOURCE_FOOTER, FABRIC as SOURCE_FABRIC } from "./generated/parts.js";
 
 export const HANDBOOK_VERSION = "v0.4";
 export { SOURCE_VERSION_LINE, SOURCE_FOOTER };
@@ -62,4 +62,12 @@ export const PARTS = SOURCE_PARTS.map((p) => ({
 }));
 
 export const TOTAL_PARTS = PARTS.length;
+
+// "The fabric of FCC": read-only intro block shown before Part 1. No verdict,
+// not one of the 13 parts, never counted in progress or read time left.
+export const FABRIC = SOURCE_FABRIC && {
+  ...SOURCE_FABRIC,
+  summary: SOURCE_FABRIC.tags.find((t) => !/read this first/i.test(t)) || "",
+  readMins: readMins(SOURCE_FABRIC.words),
+};
 export const TOTAL_READ_MINS = readMins(SOURCE_PARTS.reduce((n, p) => n + p.words, 0));
