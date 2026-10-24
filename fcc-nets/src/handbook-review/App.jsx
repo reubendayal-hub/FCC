@@ -2,15 +2,16 @@ import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore 
 import { api } from "./api.js";
 import { createSync } from "./sync.js";
 import { readToken, saveToken, forgetToken, urlToken, storedToken, readPrefill, clearPrefill, samePerson } from "./identity.js";
-import { DEFAULT_DEADLINE_ISO, TOTAL_PARTS } from "./content/config.js";
+import { DEFAULT_DEADLINE_ISO, TOTAL_PARTS, FABRIC } from "./content/config.js";
 import Welcome from "./components/Welcome.jsx";
 import Hub from "./components/Hub.jsx";
 import PartReader from "./components/PartReader.jsx";
 import Complete from "./components/Complete.jsx";
+import FabricReader from "./components/FabricReader.jsx";
 import NotOpen from "./components/NotOpen.jsx";
 
 // Route lives in the hash so the browser back button works:
-//   ""  → hub,  "#/part/7" → part reader,  "#/done" → completion
+//   ""  → hub,  "#/part/7" → part reader,  "#/fabric" → "The fabric of FCC",  "#/done" → completion
 function parseHash() {
   const m = window.location.hash.match(/^#\/part\/(\d{1,2})$/);
   if (m) {
@@ -18,9 +19,10 @@ function parseHash() {
     if (n >= 1 && n <= TOTAL_PARTS) return { part: n };
   }
   if (window.location.hash === "#/done") return { done: true };
+  if (window.location.hash === "#/fabric" && FABRIC) return { fabric: true };
   return {};
 }
-const hashFor = (r) => (r.part ? `#/part/${r.part}` : r.done ? "#/done" : "#/");
+const hashFor = (r) => (r.part ? `#/part/${r.part}` : r.fabric ? "#/fabric" : r.done ? "#/done" : "#/");
 
 // Optional ?theme=light|dark override (handy for previews); otherwise follow the device.
 const THEME = (() => { const t = new URLSearchParams(window.location.search).get("theme"); return t === "light" || t === "dark" ? t : undefined; })();
@@ -161,6 +163,8 @@ export default function App() {
     const props = { snap, sync, token, deadline, closed, go, showToast };
     screen = route.part
       ? <PartReader key={route.part} partId={route.part} restore={!!route.restore} {...props} />
+      : route.fabric
+        ? <FabricReader {...props} />
       : route.done && snap.review.doneCount === TOTAL_PARTS
         ? <Complete {...props} />
         : <Hub {...props} />;

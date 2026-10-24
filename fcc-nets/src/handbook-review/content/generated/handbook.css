@@ -44,6 +44,7 @@
 .hb-doc .draft h3{font-family:var(--f-body);font-size:15px;font-weight:800;color:var(--red-ink)}
 .hb-doc .draft p{font-size:15px}
 .hb-doc .note{background:var(--gold-soft);border-left:4px solid var(--gold);border-radius:0 12px 12px 0;padding:12px 16px;font-size:14.5px;color:var(--body)}
+.hb-doc .tbc{background:var(--gold-soft);color:var(--gold-ink);font-weight:700;border:1px dashed var(--gold);border-radius:6px;padding:1px 6px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 .hb-doc .note b{color:var(--gold-ink)}
 .hb-doc .values{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px}
 .hb-doc .value{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--red);border-radius:12px;padding:14px}
@@ -76,6 +77,8 @@
 .hb-doc thead th{background:var(--navy);color:#fff;font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
 .hb-doc thead th:not(:first-child),.hb-doc tbody td:not(:first-child){text-align:center}
 .hb-doc tbody tr:last-child td{border-bottom:none}
+.hb-doc table.plain{min-width:0}
+.hb-doc table.plain th,.hb-doc table.plain td{text-align:left}
 .hb-doc tbody td:first-child{color:var(--ink);font-weight:600}
 .hb-doc .D,.hb-doc .I{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:22px;padding:0 7px;border-radius:6px;font-size:11.5px;font-weight:800}
 .hb-doc .D{background:var(--red);color:#fff}

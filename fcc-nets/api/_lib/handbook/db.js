@@ -16,6 +16,9 @@ export const COLLECTIONS = {
   reviews: "handbookReview",
   config: "handbookReviewConfig",
   log: "handbookReviewLog",
+  // "Did we miss anything?" comments sent anonymously: text + date only,
+  // never a review id, member id, name or exact time.
+  anon: "handbookReviewAnon",
 };
 
 export class NotConfiguredError extends Error {}

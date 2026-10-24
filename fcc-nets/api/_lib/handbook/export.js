@@ -68,12 +68,13 @@ export async function buildWorkbook(summary) {
     { header: "Role group", key: "roleGroup", width: 14 },
   ], volRows);
 
+  // Anonymous comments: Name "Anonymous", no role group, date only.
   addSheet(wb, "Anything missed", [
     { header: "Name", key: "name", width: 24 },
     { header: "Role group", key: "roleGroup", width: 14 },
     { header: "Text", key: "text", width: 80 },
     { header: "Updated", key: "updatedAt", width: 20 },
-  ], summary.missed.map((m) => ({ ...m, updatedAt: iso(m.updatedAt) })));
+  ], summary.missed.map((m) => ({ ...m, updatedAt: m.anonymous ? m.date : iso(m.updatedAt) })));
 
   addSheet(wb, "Respondents", [
     { header: "Name", key: "name", width: 24 },

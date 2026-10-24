@@ -15,7 +15,7 @@ export function Hero({ deadline, children, countdown = true }) {
         {countdown && (
           <div className="count-card">
             <Countdown deadline={deadline} />
-            <span className="count-label">Review closes 30 Nov</span>
+            <span className="count-label">Review closes 6 Nov</span>
           </div>
         )}
         {children}

@@ -11,7 +11,7 @@
 import React, { useEffect, useState } from "react";
 import { isCoachMember } from "../utils/members";
 
-const DEADLINE = new Date("2026-11-30T23:59:00+01:00").getTime();
+const DEADLINE = new Date("2026-11-06T23:59:00+01:00").getTime();
 
 function guessRoleGroup(me, teams) {
   if (me.role === "superadmin" || me.role === "admin") return "board";

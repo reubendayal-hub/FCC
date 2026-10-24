@@ -1,7 +1,9 @@
 // Review storage + validation for /handbook-review. All writes happen here,
 // via the Admin SDK, inside transactions (autosave can fire rapidly).
 
+import crypto from "node:crypto";
 import { getDb, COLLECTIONS } from "./db.js";
+import { cphDate } from "./summary.js";
 import {
   TOTAL_PARTS, VERDICTS, MAX_TEXT, ROLE_TOGGLE_KEYS, COMMITTEE_KEYS, ROLE_GROUP_KEYS,
   partProblem, countDone,
@@ -10,7 +12,7 @@ import {
 export const HANDBOOK_VERSION = "v0.4";
 export const DEFAULT_CONFIG = {
   open: false,
-  deadlineISO: "2026-11-30T23:59:00+01:00",
+  deadlineISO: "2026-11-06T23:59:00+01:00",
   version: HANDBOOK_VERSION,
   // Access while open_to_all is false: only these app member ids may take part.
   // Defaults are empty, so without a saved config nobody can use the review.
@@ -147,6 +149,7 @@ export function publicReview(doc) {
     roleInterest: doc.roleInterest || {},
     roleInterestUpdatedAt: doc.roleInterestUpdatedAt || 0,
     anythingMissed: doc.anythingMissed || "",
+    anythingMissedAnon: doc.anythingMissedAnon === true,
     anythingMissedUpdatedAt: doc.anythingMissedUpdatedAt || 0,
     doneCount: countDone(doc.parts),
     completedAt: doc.completedAt || null,
@@ -166,6 +169,7 @@ export async function createReview(id, identity, userAgentHint, db = getDb()) {
     roleInterest: { committees: [], selector: false, coaching: false, captaincy: false, oneFcc: false },
     roleInterestUpdatedAt: 0,
     anythingMissed: "",
+    anythingMissedAnon: false,
     anythingMissedUpdatedAt: 0,
     doneCount: 0,
     completedAt: null,
@@ -183,7 +187,9 @@ export async function getReview(id, db = getDb()) {
 }
 
 // One write path for autosave and explicit saves.
-//   change = { part?, fields?, roleInterest?, missed?, resume?, strict? }
+//   change = { part?, fields?, roleInterest?, missed?, missedAnon?, resume?, strict? }
+// missedAnon only records the reviewer's choice; an anonymous draft is never
+// shown to admins with a name (see summary.js) and leaves this doc on send.
 // strict=true (POST /part) rejects an incomplete answer; otherwise the part
 // is stored as a draft and only counts once partProblem() returns null.
 export async function applyChange(id, change, db = getDb()) {
@@ -192,6 +198,8 @@ export async function applyChange(id, change, db = getDb()) {
   const fields = cleanPartFields(change.fields);
   const roleInterest = cleanRoleInterest(change.roleInterest);
   const missed = "missed" in change ? cleanText(change.missed) : undefined;
+  if ("missedAnon" in change && typeof change.missedAnon !== "boolean") throw new HttpError(400, "missedAnon must be true or false");
+  const missedAnon = change.missedAnon;
   const resume = cleanResume(change.resume);
 
   return db.runTransaction(async (tx) => {
@@ -219,6 +227,10 @@ export async function applyChange(id, change, db = getDb()) {
       update.anythingMissed = missed;
       update.anythingMissedUpdatedAt = now;
     }
+    if (missedAnon !== undefined) {
+      update.anythingMissedAnon = missedAnon;
+      update.anythingMissedUpdatedAt = now;
+    }
     if (resume) update.resume = { ...resume, updatedAt: now };
 
     const doneCount = countDone(parts);
@@ -229,6 +241,32 @@ export async function applyChange(id, change, db = getDb()) {
     tx.update(ref, update);
     return publicReview({ ...doc, ...update, parts });
   });
+}
+
+// Send a "Did we miss anything?" comment anonymously. In one transaction:
+// the text goes to its own collection with the Copenhagen date only (no
+// review id, member id, name, role or time; random doc id), and the draft is
+// cleared from the reviewer's doc. updatedAt is left alone so "last
+// activity" on the dashboard can't be matched to the comment.
+export async function sendAnonMissed(id, text, db = getDb()) {
+  const clean = cleanText(text).trim();
+  if (clean.length < 3) throw new HttpError(400, "Write your comment first");
+  const ref = db.collection(COLLECTIONS.reviews).doc(id);
+  const anonRef = db.collection(COLLECTIONS.anon).doc(crypto.randomBytes(15).toString("base64url"));
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new HttpError(404, "Review not found");
+    const doc = snap.data();
+    const update = { anythingMissed: "", anythingMissedAnon: true, anythingMissedUpdatedAt: Date.now() };
+    tx.set(anonRef, { text: clean, date: cphDate(), handbookVersion: HANDBOOK_VERSION });
+    tx.update(ref, update);
+    return publicReview({ ...doc, ...update });
+  });
+}
+
+export async function listAnonMissed(db = getDb()) {
+  const snap = await db.collection(COLLECTIONS.anon).get();
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
 export async function deleteReview(id, db = getDb()) {

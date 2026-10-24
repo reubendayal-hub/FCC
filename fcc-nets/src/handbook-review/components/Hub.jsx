@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { PARTS, TOTAL_PARTS, readMins } from "../content/config.js";
+import { PARTS, TOTAL_PARTS, FABRIC, readMins } from "../content/config.js";
 import { isPartDone } from "../shared/reviewRules.js";
 import { personalLink } from "../identity.js";
 import { CREST, Countdown, ProgressRing, SaveStatus, VerdictChip, VERDICT_ACCENT, Privacy, BackToApp } from "./bits.jsx";
@@ -10,7 +10,7 @@ const NOTE_TEXT = (notes) => {
   const bits = [];
   if (parts.length) bits.push(`Part${parts.length > 1 ? "s" : ""} ${parts.join(", ")}`);
   if (notes.includes("roles")) bits.push("your role interests");
-  if (notes.includes("missed")) bits.push("\"Anything we missed?\"");
+  if (notes.includes("missed")) bits.push("\"Did we miss anything?\"");
   return `${bits.join(" and ")} ${bits.length > 1 || parts.length > 1 ? "were" : "was"} updated from another device.`;
 };
 
@@ -48,7 +48,7 @@ export default function Hub({ snap, sync, token, deadline, closed, go, showToast
   }
 
   const nudge = left === 0
-    ? "All parts reviewed. Thank you! You can still change answers until 30 Nov."
+    ? "All parts reviewed. Thank you! You can still change answers until 6 Nov."
     : `${left} to go, about ${minsLeft} minute${minsLeft === 1 ? "" : "s"}.`;
 
   return (
@@ -66,7 +66,7 @@ export default function Hub({ snap, sync, token, deadline, closed, go, showToast
           </div>
           <div className="count-mini">
             <Countdown deadline={deadline} size="sm" />
-            <span className="count-label">Review closes 30 Nov</span>
+            <span className="count-label">Review closes 6 Nov</span>
           </div>
         </div>
       </header>
@@ -80,6 +80,17 @@ export default function Hub({ snap, sync, token, deadline, closed, go, showToast
             <span>{NOTE_TEXT(snap.notes)}</span>
             <button className="linkbtn" onClick={sync.dismissNotes}>OK</button>
           </div>
+        )}
+
+        {FABRIC && (
+          <button className="tile fabric-tile" onClick={() => go({ fabric: true })}
+            aria-label={`Read this first: ${FABRIC.title}. ${FABRIC.summary}. No verdict needed.`}>
+            <svg className="star" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.83 5.73 6.33.92-4.58 4.46 1.08 6.3L12 17.03l-5.66 2.98 1.08-6.3-4.58-4.46 6.33-.92z" /></svg>
+            <span className="eb">Read this first</span>
+            <span className="tt">{FABRIC.title}</span>
+            <span className="sm">{FABRIC.summary}</span>
+            <span className="meta"><span>{FABRIC.readMins} min read</span><span className="nov">No verdict needed</span></span>
+          </button>
         )}
 
         {!closed && hasStarted && left > 0 && (

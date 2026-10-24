@@ -9,7 +9,7 @@
 // fails if it already exists — a duplicate cron fire can never double-send.
 
 import { COLLECTIONS } from "./db.js";
-import { PART_TITLES } from "./summary.js";
+import { PART_TITLES, cphDate } from "./summary.js";
 
 const FROM = "FCC Training App <fcc_training_app@nordicanchor.dk>";
 const DEFAULT_TO = ["reuben.dayal@gmail.com"];
@@ -23,10 +23,7 @@ export function digestRecipients() {
   return list.length ? list : DEFAULT_TO;
 }
 
-// Copenhagen calendar date, e.g. "2026-11-16".
-export function cphDate(ms = Date.now()) {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Copenhagen" }).format(new Date(ms));
-}
+export { cphDate };
 
 export async function lastDigest(db) {
   // Tiny collection (one doc per send) — filter in memory, no composite index needed.
@@ -49,15 +46,22 @@ export function buildDigest(summary, prev, { kind = "weekly" } = {}) {
     volunteerKeys.push(key);
     if (!prevVol.has(key)) newVolunteers.push(`${p.name} → ${v.label}`);
   }
+  // "Did we miss anything?": named comments by edit time; anonymous ones
+  // (date only) by whether an earlier digest already listed them.
+  const prevMissed = new Set(prev?.missedKeys || []);
+  const missedKeys = summary.missed.filter((m) => m.anonymous).map((m) => m.key);
+  const newMissed = summary.missed.filter((m) => (m.anonymous ? !prevMissed.has(m.key) : m.updatedAt > since));
   const mostDisagreed = [...summary.perPart]
     .filter((p) => p.disagree + p.changes > 0)
     .sort((a, b) => (b.disagree * 2 + b.changes) - (a.disagree * 2 + a.changes))
     .slice(0, 3);
 
   const final = kind === "final";
+  const missedList = final ? summary.missed : newMissed;
+  const clip = (t) => (t.length > 280 ? `${t.slice(0, 280).trimEnd()}…` : t);
   const volunteerList = final ? summary.volunteers.flatMap((v) => v.people.map((p) => `${p.name} → ${v.label}`)) : newVolunteers;
   const subject = final
-    ? `Handbook review — final results: ${kpis.completed} completed of ${kpis.started} started`
+    ? `Handbook review — Round 1 results: ${kpis.completed} completed of ${kpis.started} started`
     : `Handbook review — week update: ${kpis.started} started, ${kpis.completionPct}% complete`;
 
   const stat = (n, label) => `<td style="padding:10px;text-align:center;background:#F5F7FC;border-radius:8px">
@@ -67,7 +71,7 @@ export function buildDigest(summary, prev, { kind = "weekly" } = {}) {
   const html = `<div style="font-family:-apple-system,Segoe UI,sans-serif;max-width:560px;margin:0 auto;color:#26344F">
     <div style="background:linear-gradient(135deg,#1B2A5C,#2A3D7A);padding:20px 24px;border-radius:12px 12px 0 0;border-bottom:4px solid #CC1B33">
       <div style="color:#D4A217;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase">One FCC · Handbook review</div>
-      <div style="color:#fff;font:600 20px Georgia,serif;margin-top:4px">${final ? "Final results" : "Your weekly update"}</div>
+      <div style="color:#fff;font:600 20px Georgia,serif;margin-top:4px">${final ? "Round 1 results" : "Your weekly update"}</div>
     </div>
     <div style="background:#fff;border:1px solid #DCE2EF;border-top:none;padding:22px 24px;border-radius:0 0 12px 12px">
       <table style="width:100%;border-spacing:6px"><tr>
@@ -82,11 +86,15 @@ export function buildDigest(summary, prev, { kind = "weekly" } = {}) {
       ${volunteerList.length
         ? `<ul style="margin:0;padding-left:20px">${volunteerList.map((v) => `<li>${esc(v)}</li>`).join("")}</ul>`
         : `<p style="margin:0;color:#5D6E99">None${final ? "" : " this week"}.</p>`}
+      <h3 style="font:600 16px Georgia,serif;color:#1B2A5C;margin:18px 0 6px">${final ? "Did we miss anything?" : "New: did we miss anything?"}</h3>
+      ${missedList.length
+        ? `<ul style="margin:0;padding-left:20px">${missedList.map((m) => `<li><b>${esc(m.name)}:</b> ${esc(clip(m.text))}</li>`).join("")}</ul>`
+        : `<p style="margin:0;color:#5D6E99">None${final ? "" : " this week"}.</p>`}
       <a href="${SITE}/handbook-review/admin/" style="display:inline-block;margin-top:20px;background:#1B2A5C;color:#D4A217;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:700">Open the dashboard${final ? " & export" : ""} →</a>
       <p style="font-size:11px;color:#97A5CF;margin:18px 0 0">Sent to the One FCC Leads only. Reviewers never receive email from this page.</p>
     </div></div>`;
 
-  return { subject, html, volunteerKeys, stats: { newResponses, newComments: newComments.length, newVolunteers: newVolunteers.length } };
+  return { subject, html, volunteerKeys, missedKeys, stats: { newResponses, newComments: newComments.length, newVolunteers: newVolunteers.length, newMissed: newMissed.length } };
 }
 
 export async function sendEmail({ to, subject, html }) {
