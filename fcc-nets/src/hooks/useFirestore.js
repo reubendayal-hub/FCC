@@ -10,7 +10,6 @@ import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { DEFAULT_TEAMS } from "../constants/teams";
 import {
   PRESET_POLL,
-  SEED_MEMBERS,
   SEED_NOTE_TEMPLATES,
   uid,
   normMember,
@@ -45,6 +44,17 @@ export function useFirestore({ currentUserRef }) {
   const [parentDutyConfig, setParentDutyConfig] = useState({});
   const [notifSettings, setNotifSettings] = useState({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+  // dataReadyRef gates every write below: true only after a fully
+  // successful initial load. Before that, or after a failed load, no
+  // save may reach Firestore (prevents overwriting real data with
+  // empty/partial state).
+  const dataReadyRef = useRef(false);
+  const writesBlocked = what => {
+    if (dataReadyRef.current) return false;
+    console.error(`BLOCKED save (${what}): club data not loaded`);
+    return true;
+  };
 
   // Refs that always hold the latest values — avoid stale closures
   const sessionsRef  = useRef([]);
@@ -103,7 +113,10 @@ export function useFirestore({ currentUserRef }) {
         const initialSessions = sr.exists() ? JSON.parse(sr.data().value) : [];
         setSessions(initialSessions);
         sessionsRef.current = initialSessions;
-        const initialMembers = mr.exists() ? JSON.parse(mr.data().value).map(normMember) : SEED_MEMBERS.map(normMember);
+        // Never fall back to SEED_MEMBERS: its positional ids (m1, m2, …)
+        // do not match live member ids and would swap identities.
+        if (!mr.exists()) throw new Error("fccnets/members document is missing");
+        const initialMembers = JSON.parse(mr.data().value).map(normMember);
         setMembers(initialMembers);
         membersRef.current = initialMembers;
         setPins(        pr.exists() ? JSON.parse(pr.data().value) : {});
@@ -153,9 +166,12 @@ export function useFirestore({ currentUserRef }) {
           setDoc(doc(db,"fccnets","captainnotes_templates"), {value: JSON.stringify(seeded)}).catch(()=>{});
         }
         setNotifSettings(nsr.exists() ? JSON.parse(nsr.data().value) : {});
+        dataReadyRef.current = true;
       } catch(e) {
-        setMembers(SEED_MEMBERS.map(normMember)); setPins({}); setTeams(DEFAULT_TEAMS); setRecurring([]); recurringRef.current=[]; setBlockCals([]); setInviteCodes({}); setJoinRequests([]); setAuditLog([]); setReminderLogs([]); setCancelledSessions([]);
-        setAllAttendance({}); setAllSessionNotes([]); setPlayerProgress({}); setCoachOverrides({}); setMatchSelections({}); setNoteTemplates([]); setNotifSettings({});
+        // Leave state empty, keep writes blocked, and show the retry screen.
+        console.error("Club data load failed:", e);
+        dataReadyRef.current = false;
+        setLoadError(e);
       }
       setLoading(false);
     })();
@@ -188,8 +204,9 @@ export function useFirestore({ currentUserRef }) {
   }, []);
 
   // ── Save functions ───────────────────────────────────────────
-  const saveSessions  = async u => { setSessions(u); sessionsRef.current=u; await setDoc(doc(db,"fccnets","sessions"), {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveSessions  = async u => { if (writesBlocked("saveSessions")) return; setSessions(u); sessionsRef.current=u; await setDoc(doc(db,"fccnets","sessions"), {value:JSON.stringify(u)}).catch(()=>{}); };
   const saveMembers   = async u => {
+    if (writesBlocked("saveMembers")) return;
     // Version protection: don't save if new data has fewer members than before (possible corruption)
     const currentCount = membersRef.current?.length || 0;
     if (currentCount > 10 && u.length < currentCount * 0.5) {
@@ -218,21 +235,22 @@ export function useFirestore({ currentUserRef }) {
       memberCount: u.length
     }).catch(()=>{});
   };
-  const savePins      = async u => { setPins(u);      await setDoc(doc(db,"fccnets","pins"),     {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveTeams     = async u => { setTeams(u); teamsRef.current=u; await setDoc(doc(db,"fccnets","teams"),    {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveRecurring = async u => { setRecurring(u); recurringRef.current=u; await setDoc(doc(db,"fccnets",RECURRING_KEY),{value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveBlockCals   = async u => { setBlockCals(u);   await setDoc(doc(db,"fccnets","blockcals"),   {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveCancelledSessions = async u => { setCancelledSessions(u); await setDoc(doc(db,"fccnets","cancelledsessions"), {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveInviteCodes = async u => { setInviteCodes(u);  await setDoc(doc(db,"fccnets","invitecodes"), {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveJoinRequests= async u => { setJoinRequests(u); await setDoc(doc(db,"fccnets",JOINREQS_KEY),  {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveSeasonPlans = async u => { setSeasonPlans(u); await setDoc(doc(db,"fccnets","seasonplans"), {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveAllAttendance   = async u => { setAllAttendance(u);   await setDoc(doc(db,"fccnets","attendance"),     {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveAllSessionNotes = async u => { setAllSessionNotes(u); await setDoc(doc(db,"fccnets","sessionnotes"),   {value:JSON.stringify(u)}).catch(()=>{}); };
-  const savePlayerProgress  = async u => { setPlayerProgress(u);  await setDoc(doc(db,"fccnets","playerprogress"), {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveCoachOverrides  = async u => { setCoachOverrides(u);  await setDoc(doc(db,"fccnets","coachoverrides"), {value:JSON.stringify(u)}).catch(()=>{}); };
-  const saveMatchSelections = async u => { setMatchSelections(u); await setDoc(doc(db,"fccnets","matchselections"), {value:JSON.stringify(u)}).catch(()=>{});};
-  const saveNoteTemplates   = async u => { setNoteTemplates(u);   await setDoc(doc(db,"fccnets","captainnotes_templates"), {value:JSON.stringify(u)}).catch(()=>{});};
+  const savePins      = async u => { if (writesBlocked("savePins")) return; setPins(u);      await setDoc(doc(db,"fccnets","pins"),     {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveTeams     = async u => { if (writesBlocked("saveTeams")) return; setTeams(u); teamsRef.current=u; await setDoc(doc(db,"fccnets","teams"),    {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveRecurring = async u => { if (writesBlocked("saveRecurring")) return; setRecurring(u); recurringRef.current=u; await setDoc(doc(db,"fccnets",RECURRING_KEY),{value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveBlockCals   = async u => { if (writesBlocked("saveBlockCals")) return; setBlockCals(u);   await setDoc(doc(db,"fccnets","blockcals"),   {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveCancelledSessions = async u => { if (writesBlocked("saveCancelledSessions")) return; setCancelledSessions(u); await setDoc(doc(db,"fccnets","cancelledsessions"), {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveInviteCodes = async u => { if (writesBlocked("saveInviteCodes")) return; setInviteCodes(u);  await setDoc(doc(db,"fccnets","invitecodes"), {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveJoinRequests= async u => { if (writesBlocked("saveJoinRequests")) return; setJoinRequests(u); await setDoc(doc(db,"fccnets",JOINREQS_KEY),  {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveSeasonPlans = async u => { if (writesBlocked("saveSeasonPlans")) return; setSeasonPlans(u); await setDoc(doc(db,"fccnets","seasonplans"), {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveAllAttendance   = async u => { if (writesBlocked("saveAllAttendance")) return; setAllAttendance(u);   await setDoc(doc(db,"fccnets","attendance"),     {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveAllSessionNotes = async u => { if (writesBlocked("saveAllSessionNotes")) return; setAllSessionNotes(u); await setDoc(doc(db,"fccnets","sessionnotes"),   {value:JSON.stringify(u)}).catch(()=>{}); };
+  const savePlayerProgress  = async u => { if (writesBlocked("savePlayerProgress")) return; setPlayerProgress(u);  await setDoc(doc(db,"fccnets","playerprogress"), {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveCoachOverrides  = async u => { if (writesBlocked("saveCoachOverrides")) return; setCoachOverrides(u);  await setDoc(doc(db,"fccnets","coachoverrides"), {value:JSON.stringify(u)}).catch(()=>{}); };
+  const saveMatchSelections = async u => { if (writesBlocked("saveMatchSelections")) return; setMatchSelections(u); await setDoc(doc(db,"fccnets","matchselections"), {value:JSON.stringify(u)}).catch(()=>{});};
+  const saveNoteTemplates   = async u => { if (writesBlocked("saveNoteTemplates")) return; setNoteTemplates(u);   await setDoc(doc(db,"fccnets","captainnotes_templates"), {value:JSON.stringify(u)}).catch(()=>{});};
   const saveParentDutyConfig = async (config) => {
+    if (writesBlocked("saveParentDutyConfig")) throw new Error("Club data not loaded");
     try {
       await setDoc(doc(db,"fccnets","parentdutyconfig"), {
         value: JSON.stringify(config || {}),
@@ -244,6 +262,7 @@ export function useFirestore({ currentUserRef }) {
     }
   };
   const saveNotifSettings = async u => {
+    if (writesBlocked("saveNotifSettings")) return;
     setNotifSettings(u);
     await setDoc(doc(db,"fccnets","notifsettings"), { value: JSON.stringify(u) }).catch(()=>{});
   };
@@ -251,12 +270,13 @@ export function useFirestore({ currentUserRef }) {
   // ── Audit log ─────────────────────────────────────────────────
   // Cap at 500 entries; newest first. Only superadmin can read.
   const saveAuditLog = async u => {
+    if (writesBlocked("saveAuditLog")) return;
     setAuditLog(u);
     await setDoc(doc(db,"fccnets",AUDITLOG_KEY), {value:JSON.stringify(u)}).catch(()=>{});
   };
   function logAction(category, detail) {
     const cu = currentUserRef?.current;
-    if(!cu) return;
+    if(!cu || writesBlocked("logAction")) return;
     const entry = {
       id: uid(),
       ts: new Date().toISOString(),
@@ -376,7 +396,7 @@ export function useFirestore({ currentUserRef }) {
     noteTemplates, setNoteTemplates,
     parentDutyConfig, setParentDutyConfig,
     notifSettings, setNotifSettings,
-    loading,
+    loading, loadError,
     saveSessions, saveMembers, savePins, saveTeams, saveRecurring,
     saveBlockCals, saveCancelledSessions, saveInviteCodes, saveJoinRequests,
     saveSeasonPlans, saveAllAttendance, saveAllSessionNotes, savePlayerProgress,
