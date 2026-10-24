@@ -61,7 +61,7 @@ export function buildDigest(summary, prev, { kind = "weekly" } = {}) {
   const clip = (t) => (t.length > 280 ? `${t.slice(0, 280).trimEnd()}…` : t);
   const volunteerList = final ? summary.volunteers.flatMap((v) => v.people.map((p) => `${p.name} → ${v.label}`)) : newVolunteers;
   const subject = final
-    ? `Handbook review — final results: ${kpis.completed} completed of ${kpis.started} started`
+    ? `Handbook review — Round 1 results: ${kpis.completed} completed of ${kpis.started} started`
     : `Handbook review — week update: ${kpis.started} started, ${kpis.completionPct}% complete`;
 
   const stat = (n, label) => `<td style="padding:10px;text-align:center;background:#F5F7FC;border-radius:8px">
@@ -71,7 +71,7 @@ export function buildDigest(summary, prev, { kind = "weekly" } = {}) {
   const html = `<div style="font-family:-apple-system,Segoe UI,sans-serif;max-width:560px;margin:0 auto;color:#26344F">
     <div style="background:linear-gradient(135deg,#1B2A5C,#2A3D7A);padding:20px 24px;border-radius:12px 12px 0 0;border-bottom:4px solid #CC1B33">
       <div style="color:#D4A217;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase">One FCC · Handbook review</div>
-      <div style="color:#fff;font:600 20px Georgia,serif;margin-top:4px">${final ? "Final results" : "Your weekly update"}</div>
+      <div style="color:#fff;font:600 20px Georgia,serif;margin-top:4px">${final ? "Round 1 results" : "Your weekly update"}</div>
     </div>
     <div style="background:#fff;border:1px solid #DCE2EF;border-top:none;padding:22px 24px;border-radius:0 0 12px 12px">
       <table style="width:100%;border-spacing:6px"><tr>
