@@ -5,9 +5,9 @@ import { PARTS as SOURCE_PARTS, SOURCE_VERSION_LINE, SOURCE_FOOTER, FABRIC as SO
 export const HANDBOOK_VERSION = "v0.4";
 export { SOURCE_VERSION_LINE, SOURCE_FOOTER };
 
-// Review closes 30 Nov 2026, 23:59 Europe/Copenhagen (CET, UTC+1).
+// Review closes 6 Nov 2026, 23:59 Europe/Copenhagen (CET, UTC+1).
 // The server's handbookReviewConfig/settings.deadlineISO overrides this.
-export const DEFAULT_DEADLINE_ISO = "2026-11-30T23:59:00+01:00";
+export const DEFAULT_DEADLINE_ISO = "2026-11-06T23:59:00+01:00";
 
 export const COMMITTEES = [
   "Youth",

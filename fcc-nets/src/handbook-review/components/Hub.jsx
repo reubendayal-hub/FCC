@@ -48,7 +48,7 @@ export default function Hub({ snap, sync, token, deadline, closed, go, showToast
   }
 
   const nudge = left === 0
-    ? "All parts reviewed. Thank you! You can still change answers until 30 Nov."
+    ? "All parts reviewed. Thank you! You can still change answers until 6 Nov."
     : `${left} to go, about ${minsLeft} minute${minsLeft === 1 ? "" : "s"}.`;
 
   return (
@@ -66,7 +66,7 @@ export default function Hub({ snap, sync, token, deadline, closed, go, showToast
           </div>
           <div className="count-mini">
             <Countdown deadline={deadline} size="sm" />
-            <span className="count-label">Review closes 30 Nov</span>
+            <span className="count-label">Review closes 6 Nov</span>
           </div>
         </div>
       </header>

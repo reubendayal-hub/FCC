@@ -12,7 +12,7 @@ import {
 export const HANDBOOK_VERSION = "v0.4";
 export const DEFAULT_CONFIG = {
   open: false,
-  deadlineISO: "2026-11-30T23:59:00+01:00",
+  deadlineISO: "2026-11-06T23:59:00+01:00",
   version: HANDBOOK_VERSION,
   // Access while open_to_all is false: only these app member ids may take part.
   // Defaults are empty, so without a saved config nobody can use the review.

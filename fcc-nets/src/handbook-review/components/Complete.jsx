@@ -44,7 +44,7 @@ export default function Complete({ snap, sync, closed, go }) {
           {offers.length > 0 && (
             <p><strong>You offered to help with:</strong> {offers.join(", ")}</p>
           )}
-          <p className="updated">You can still edit until 30 Nov. Tap a part to change it.</p>
+          <p className="updated">You can still edit until 6 Nov. Tap a part to change it.</p>
         </section>
 
         {askMissed && <MissedCard snap={snap} sync={sync} closed={closed} />}
