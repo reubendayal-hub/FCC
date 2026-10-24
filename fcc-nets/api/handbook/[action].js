@@ -20,7 +20,7 @@
 // Cron (CRON_SECRET; also requires HANDBOOK_DIGEST_ENABLED=true):
 //   GET  cron-weekly            weekly digest to HANDBOOK_DIGEST_TO — vercel.json: Mondays 07:00 UTC
 //                               (08:00 Copenhagen in winter time; 09:00 in summer time)
-//   GET  cron-final             final report — vercel.json: 1 Dec 07:00 UTC (day after the deadline)
+//   GET  cron-final             final report — vercel.json: 7 Nov 07:00 UTC (08:00 Copenhagen, day after the deadline)
 //   GET  cron-daily             legacy: Mondays → weekly, day after deadline → final (no longer scheduled)
 
 import { getDb, projectId, NotConfiguredError, COLLECTIONS } from "../_lib/handbook/db.js";
