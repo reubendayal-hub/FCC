@@ -118,6 +118,8 @@ export default async function handler(req, res) {
   // data.isPair + data.children: paired parent+child(ren) approval.
   } else if (type === "approved") {
     const { name, email, playerTeam, isPair, children } = data;
+    // One-time access code (FCC-XXXX), only sent for a verified email. Ignore anything malformed.
+    const inviteCode = /^FCC-[A-Z0-9]{4}$/.test(String(data.inviteCode || "")) ? data.inviteCode : null;
     if (!email) return res.status(400).json({ error: "Missing member email for approval notification" });
     const firstName = escapeHtml((name || "").split(" ")[0] || "there");
     to = [email];
@@ -150,10 +152,17 @@ export default async function handler(req, res) {
         </p>
         <ol style="margin:0;padding-left:18px;font-size:13px;color:#166534;line-height:2;">
           <li>Open the app: <a href="${APP_URL}" style="color:#15803d;">${APP_URL}</a></li>
+          ${inviteCode ? `
+          <li>Under the search box, tap <strong>"Have an FCC-XXXX code? Tap here"</strong> and enter your access code:
+            <strong style="font-size:16px;letter-spacing:2px;">${escapeHtml(inviteCode)}</strong></li>
+          <li>Choose your own 4-digit PIN</li>
+          <li>From then on, type your name in the search box, tap it and enter your PIN</li>` : `
           <li>Type your name in the search box and tap it</li>
-          <li>Verify your identity and set your 4-digit PIN</li>
+          <li>Enter your 4-digit PIN. No PIN yet? Ask your admin for an access code</li>`}
           <li>You're in! Mark your availability before each session</li>
         </ol>
+        ${inviteCode ? `<p style="margin:10px 0 0;font-size:12px;color:#166534;">
+          Your code works once and is only for you, please don't share it.</p>` : ""}
       </div>
       <p style="font-size:13px;color:#6b7280;margin:0 0 20px;line-height:1.6;">
         Remember to mark yourself <strong>Available / Unavailable / Maybe</strong>
