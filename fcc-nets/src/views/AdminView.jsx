@@ -1399,6 +1399,21 @@ export default function AdminView() {
             return req.playerTeam || null;
           };
 
+          // A parent in a parent+child pair can be approved as a non-playing
+          // parent (no team). Sentinel value used only inside this block; it
+          // is never written to a member record.
+          const NON_PLAYING = "__nonplaying__";
+          // Parent's pick: explicit override ─► requested team ─► non-playing
+          // when the sign-up was "registering for my child" (forChild parent
+          // with no team) ─► null (must be picked).
+          const parentPick = (req) => {
+            const ov = overrideTeams[req.id];
+            if (ov !== undefined) return ov || null;
+            if (req.playerTeam) return req.playerTeam;
+            if (req.forChild && (childByParentId.get(req.id) || []).length > 0) return NON_PLAYING;
+            return null;
+          };
+
           // Build a single member record using the admin's final team pick.
           function buildMember(req, teamPick) {
             return normMember({
@@ -1413,18 +1428,22 @@ export default function AdminView() {
               consentGiven: req.consentGiven||false,
               consentDate: req.consentDate||null,
               pendingTeam: false, // resolved at approval time
-              note: req.parentName
+              // A parent-only request carries the parent's own name in parentName;
+              // only child requests get a "Parent: …" note.
+              note: req.parentName && req.parentName !== req.playerName
                 ? `Parent: ${req.parentName}${req.contact ? " · " + req.contact : ""}`
                 : req.contact || null,
             });
           }
 
           function approvePair(parentReq, childReqs) {
-            const parentTeam = finalTeam(parentReq);
-            if (!parentTeam) {
+            const parentChoice = parentPick(parentReq);
+            if (!parentChoice) {
               showToast(`Pick a team for ${parentReq.playerName} first`);
               return;
             }
+            const parentNonPlaying = parentChoice === NON_PLAYING;
+            const parentTeam = parentNonPlaying ? null : parentChoice;
             for (const c of childReqs) {
               if (!finalTeam(c)) {
                 showToast(`Pick a team for ${c.playerName} first`);
@@ -1509,7 +1528,7 @@ export default function AdminView() {
             }
 
             logAction("request",
-              `Approved pair: ${parentReq.playerName} → ${parentTeam}` +
+              `Approved pair: ${parentReq.playerName} → ${parentTeam || "parent (non-playing)"}` +
               (childReqs.length ? ` + ${childReqs.length} child${childReqs.length > 1 ? "ren" : ""}: ${childReqs.map(c => `${c.playerName} (${finalTeam(c)})`).join(", ")}` : "")
             );
 
@@ -1522,7 +1541,7 @@ export default function AdminView() {
                   data: {
                     name: linkedParent.name,
                     email: parentReq.email,
-                    playerTeam: parentTeam, // admin's final pick
+                    playerTeam: parentTeam, // admin's final pick; null for a non-playing parent
                     isPair: childReqs.length > 0,
                     children: linkedChildren.map(c => ({ name: c.name, team: (c.teams || [])[0] || null })),
                   },
@@ -1595,9 +1614,9 @@ export default function AdminView() {
 
           // Per-request team-override dropdown. junior/senior list selected
           // based on whether the request is for a child.
-          const TeamPicker = ({ req, isChild }) => {
+          const TeamPicker = ({ req, isChild, allowNonPlaying }) => {
             const opts = isChild ? juniorTeamList : seniorTeamList;
-            const value = finalTeam(req) || "";
+            const value = (allowNonPlaying ? parentPick(req) : finalTeam(req)) || "";
             const requested = req.playerTeam || "";
             const pending = !!req.pendingTeam;
             return (
@@ -1615,6 +1634,9 @@ export default function AdminView() {
                   maxWidth: 200,
                 }}>
                 <option value="">— Pick a team —</option>
+                {allowNonPlaying && (
+                  <option value={NON_PLAYING}>Parent / non-playing (no team)</option>
+                )}
                 {opts.map(t => (
                   <option key={t} value={t}>
                     {t}{t === requested && !pending ? " (requested)" : ""}
@@ -1641,7 +1663,8 @@ export default function AdminView() {
                 const linkedChildren = childByParentId.get(req.id) || [];
                 const isPair = linkedChildren.length > 0;
                 const verified = !!req.emailVerified;
-                const parentTeamReady = !!finalTeam(req);
+                const parentTeamReady = isPair ? !!parentPick(req) : !!finalTeam(req);
+                const parentIsNonPlaying = isPair && parentPick(req) === NON_PLAYING;
                 const allChildrenTeamsReady = linkedChildren.every(c => !!finalTeam(c));
                 const canApprove = parentTeamReady && allChildrenTeamsReady;
                 const missingFor = !parentTeamReady
@@ -1676,7 +1699,7 @@ export default function AdminView() {
                               Parent + {linkedChildren.length} child{linkedChildren.length > 1 ? "ren" : ""}
                             </span>
                           )}
-                          {req.pendingTeam && (
+                          {req.pendingTeam && !parentIsNonPlaying && (
                             <span style={{fontSize:10,fontWeight:700,
                               padding:"1px 7px",borderRadius:20,
                               background:"#fef3c7",color:"#92400e",
@@ -1697,7 +1720,7 @@ export default function AdminView() {
                           </span>
                         </div>
                       </div>
-                      <TeamPicker req={req} isChild={!!req.forChild && !isPair}/>
+                      <TeamPicker req={req} isChild={!!req.forChild && !isPair} allowNonPlaying={isPair}/>
                     </div>
 
                     {/* Linked child rows — each with its own team picker */}
