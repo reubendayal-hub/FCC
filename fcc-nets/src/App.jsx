@@ -283,7 +283,7 @@ export default function App() {
     matchSelections, setMatchSelections,
     noteTemplates, setNoteTemplates,
     notifSettings,
-    loading,
+    loading, loadError,
     saveSessions, saveMembers, savePins, saveTeams, saveRecurring,
     saveBlockCals, saveCancelledSessions, saveInviteCodes, saveJoinRequests,
     saveSeasonPlans, saveAllAttendance, saveAllSessionNotes, savePlayerProgress,
@@ -1189,7 +1189,6 @@ export default function App() {
     saveMembers(updated);
     const fresh = updated.find(m=>m.id===currentUser.id);
     setCurrentUser(fresh);
-    localStorage.setItem("fcc-current-user", JSON.stringify(fresh));
     setProfileEditing(false);
     showToast(confirmed ? "Profile confirmed ✓" : "Profile saved ✓");
   }
@@ -1203,8 +1202,7 @@ export default function App() {
 
   function handleChangePin() {
     if(!oldPin||!newPin1||!newPin2){setPinMsg("Fill in all fields");return;}
-    // EMERGENCY: Accept 0000 as valid current PIN for everyone during recovery
-    const isValidCurrent = oldPin === "0000" || hashPin(oldPin) === pins[currentUser.id];
+    const isValidCurrent = !!pins[currentUser.id] && hashPin(oldPin) === pins[currentUser.id];
     if(!isValidCurrent){setPinMsg("Current PIN is incorrect");return;}
     if(newPin1.length!==4||!/^\d+$/.test(newPin1)){setPinMsg("New PIN must be 4 digits");return;}
     if(newPin1!==newPin2){setPinMsg("New PINs don't match");return;}
@@ -1464,6 +1462,32 @@ export default function App() {
         <div style={{textAlign:"center",color:G.mid}}>
           <div style={{fontSize:48,marginBottom:12}}>🏏</div>
           <div style={{fontWeight:800,fontSize:18}}>Loading FCC Training…</div>
+        </div>
+      </div>
+    </Shell>
+  );
+
+  // Club data failed to load — never continue with empty/seed data.
+  // All save* calls are blocked in this state (see useFirestore).
+  if(loadError) return (
+    <Shell G={G}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"center",
+        minHeight:"100vh",padding:"0 24px"}}>
+        <div style={{textAlign:"center",maxWidth:320}}>
+          <div style={{fontSize:48,marginBottom:12}}>📡</div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,
+            fontWeight:900,color:G.green,marginBottom:10}}>
+            Couldn't load club data
+          </div>
+          <div style={{fontSize:14,color:G.muted,lineHeight:1.6,marginBottom:20}}>
+            Check your connection and try again. Nothing has been changed.
+          </div>
+          <button onClick={()=>window.location.reload()}
+            style={{width:"100%",background:G.green,color:G.lime,border:"none",
+              borderRadius:12,padding:"13px 20px",fontSize:14,fontWeight:800,
+              cursor:"pointer",fontFamily:"inherit"}}>
+            Retry
+          </button>
         </div>
       </div>
     </Shell>
@@ -2503,6 +2527,41 @@ export default function App() {
   );
 
   // ════════════════════════════════════════════════════════════
+  // RENDER: Auth — member has no PIN set (no unverified way in)
+  // ════════════════════════════════════════════════════════════
+  if(!currentUser && authView==="nopin") return (
+    <Shell G={G}>
+      <div style={{display:"flex",flexDirection:"column",minHeight:"100vh"}}>
+        <div style={{background:G.green,padding:"18px 20px 16px",textAlign:"center"}}>
+          <div style={{color:G.white,fontFamily:"'Playfair Display',serif",
+            fontSize:19,fontWeight:900}}>Hi, {pendingMember?.name.split(" ")[0]}!</div>
+          <div style={{color:"rgba(255,255,255,0.6)",fontSize:12,marginTop:3}}>FCC Training</div>
+        </div>
+        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",
+          padding:"0 24px"}}>
+          <div style={{textAlign:"center",maxWidth:320}}>
+            <div style={{fontSize:52,marginBottom:16}}>🔒</div>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,
+              fontWeight:900,color:G.green,marginBottom:10}}>
+              Account not set up yet
+            </div>
+            <div style={{fontSize:14,color:G.muted,lineHeight:1.6,marginBottom:20}}>
+              Please contact your admin to set up your account. If they've already
+              given you an <b>FCC-XXXX</b> code, go back and enter it on the login screen.
+            </div>
+            <button onClick={()=>{setPendingMember(null);setAuthView("pick");}}
+              style={{background:"none",color:G.muted,border:`1px solid ${G.border}`,
+                borderRadius:12,padding:"10px 20px",fontSize:13,fontWeight:700,
+                cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
+              ← Back
+            </button>
+          </div>
+        </div>
+      </div>
+    </Shell>
+  );
+
+  // ════════════════════════════════════════════════════════════
   // RENDER: Auth — set new PIN
   // ════════════════════════════════════════════════════════════
   if(!currentUser && authView==="newpin") return (
@@ -2535,8 +2594,6 @@ export default function App() {
   // RENDER: Auth — enter PIN
   // ════════════════════════════════════════════════════════════
   if(!currentUser && authView==="enterpin") {
-    const isYouthNoPinMember = ["U11","U13"].some(t=>(pendingMember?.teams||[]).includes(t))
-      && !pins[pendingMember?.id];
     return (
     <Shell G={G}>
       <div style={{display:"flex",flexDirection:"column",minHeight:"100vh"}}>
@@ -2545,13 +2602,6 @@ export default function App() {
             fontSize:19,fontWeight:900}}>Welcome back, {pendingMember?.name.split(" ")[0]}!</div>
           <div style={{color:"rgba(255,255,255,0.6)",fontSize:12,marginTop:3}}>Enter your PIN</div>
         </div>
-        {isYouthNoPinMember&&(
-          <div style={{background:"#fffbeb",border:"1px solid #fde68a",
-            margin:"16px 20px 0",borderRadius:10,padding:"10px 14px",
-            fontSize:12,color:"#92400e",lineHeight:1.6,textAlign:"center"}}>
-            👋 First time? Try <b>0000</b> to log in, then set your own PIN.
-          </div>
-        )}
         <div style={{flex:1,display:"flex",alignItems:"flex-end",paddingBottom:60}}>
           <div style={{width:"100%"}}>
             <PinPad
