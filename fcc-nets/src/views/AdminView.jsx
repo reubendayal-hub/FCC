@@ -1283,7 +1283,9 @@ export default function AdminView() {
         {adminSec.members&&<>
         {/* ── Self-verified members (email confirmed, no action needed) ── */}
         {can(userRole,"addMember")&&(()=>{
-          const verified = members.filter(m=>m.emailVerified&&!m.pin&&!Object.keys(inviteCodes).find(id=>id===m.id));
+          // Children (linked to a parent) log in through the parent, so they never need their own code.
+          const childIds = new Set(members.flatMap(m => m.children || []));
+          const verified = members.filter(m=>m.emailVerified&&!pins[m.id]&&!inviteCodes[m.id]&&!m.parentId&&!childIds.has(m.id));
           if(!verified.length) return null;
           return (
             <div style={{background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:12,
@@ -1522,9 +1524,15 @@ export default function AdminView() {
               return next;
             });
 
+            // A brand-new parent has no PIN, so they need an access code to log
+            // in. Generate it now (the plain code is returned only once), show it
+            // to the admin, and put it in the welcome email when the email was
+            // verified. Existing (matched) parents keep their current login.
             const isNewParent = newPairMembers.some(nm => nm.id === linkedParent.id);
-            if (isNewParent && parentReq.emailVerified && linkedParent.id) {
-              setTimeout(() => generateInviteCode(linkedParent.id), 500);
+            let parentCode = null;
+            if (isNewParent && linkedParent.id) {
+              parentCode = generateInviteCode(linkedParent.id);
+              logAction("pin", `Generated invite code for: ${linkedParent.name}`);
             }
 
             logAction("request",
@@ -1544,11 +1552,16 @@ export default function AdminView() {
                     playerTeam: parentTeam, // admin's final pick; null for a non-playing parent
                     isPair: childReqs.length > 0,
                     children: linkedChildren.map(c => ({ name: c.name, team: (c.teams || [])[0] || null })),
+                    inviteCode: parentReq.emailVerified ? parentCode : null, // never email a code to an unverified address
                   },
                 }),
               }).catch(()=>{});
             }
             showToast(`${linkedParent.name}${childReqs.length ? ` + ${childReqs.length} child${childReqs.length > 1 ? "ren" : ""}` : ""} added ✓`);
+            if (parentCode) {
+              setCodeModal({ name: linkedParent.name, code: parentCode,
+                emailed: !!(parentReq.email && parentReq.emailVerified && notifOn("approval")) });
+            }
           }
 
           function approveRequest(req) {
@@ -1566,9 +1579,9 @@ export default function AdminView() {
             }
             const newMember = buildMember(req, teamPick);
             saveMembers([...members, newMember]);
-            if (req.emailVerified && newMember.id) {
-              setTimeout(()=>generateInviteCode(newMember.id),500);
-            }
+            // New member has no PIN yet: generate their access code now (see approvePair).
+            const soloCode = newMember.id ? generateInviteCode(newMember.id) : null;
+            if (soloCode) logAction("pin", `Generated invite code for: ${newMember.name}`);
             saveJoinRequests(joinRequests.map(r=>r.id===req.id ? {...r,status:"approved"} : r));
             setOverrideTeams(prev => {
               const next = { ...prev };
@@ -1582,11 +1595,16 @@ export default function AdminView() {
                 headers:{"Content-Type":"application/json"},
                 body: JSON.stringify({
                   type: "approved",
-                  data: { name: req.playerName, email: req.email, playerTeam: teamPick },
+                  data: { name: req.playerName, email: req.email, playerTeam: teamPick,
+                    inviteCode: req.emailVerified ? soloCode : null },
                 }),
               }).catch(()=>{});
             }
             showToast(`${req.playerName} added ✓`);
+            if (soloCode) {
+              setCodeModal({ name: req.playerName, code: soloCode,
+                emailed: !!(req.email && req.emailVerified && notifOn("approval")) });
+            }
           }
 
           function declineRequest(req) {
@@ -5423,6 +5441,7 @@ export default function AdminView() {
             <div style={{color:G.muted,fontSize:12,marginBottom:20,textAlign:"center",lineHeight:1.5}}>
               Share this code with {codeModal.name.split(" ")[0]} so they can log in and set their PIN.
               It can only be used once.
+              {codeModal.emailed ? " A copy was also emailed to them." : ""}
             </div>
             {/* Big code display */}
             <div style={{background:G.cream,border:`2px dashed ${G.green}`,borderRadius:12,
